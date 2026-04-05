@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/category2.css?v=1.0.5">
+    <link rel="stylesheet" href="/static/css/category-dashboard.css?v=3.2.1">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="page-header">
+                <div class="page-utility-right" data-info-key="category.hardware"></div>
+                <h1>하드웨어 관리</h1>
+                <p>하드웨어 유형의 <strong>EOSL 현황</strong>과 자산 분포를 한눈에 파악합니다.</p>
+            </div>
+
+            <div class="system-tabs" role="tablist" aria-label="하드웨어 유형 관리 탭">
+                {% set tabs = [
+                    ('cat_hw_dashboard', '대시보드'),
+                    ('cat_hw_server', '서버'),
+                    ('cat_hw_storage', '스토리지'),
+                    ('cat_hw_san', 'SAN'),
+                    ('cat_hw_network', '네트워크'),
+                    ('cat_hw_security', '보안장비')
+                ] %}
+                {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab"
+                       aria-selected="{{ 'true' if current_key == key else 'false' }}"
+                       href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                {% endfor %}
+            </div>
+
+            <!-- ===== 대시보드 본문 ===== -->
+            <div class="cat-dash" id="hw-dashboard-root">
+
+                <!-- 0. 핵심 메시지 배너 -->
+                <div class="cat-alert-banner" id="hw-alert-banner" style="display:none"></div>
+
+                <!-- 1. KPI 요약 카드 -->
+                <div class="cat-section-label"><span>Overview</span><div class="cat-section-line"></div></div>
+                <section class="cat-dash-section" aria-label="KPI 요약">
+                    <div class="cat-kpi-grid" id="hw-kpi-grid">
+                        <div class="cat-kpi-card cat-skeleton cat-skeleton-kpi" data-status="total"></div>
+                        <div class="cat-kpi-card cat-skeleton cat-skeleton-kpi" data-status="imminent"></div>
+                        <div class="cat-kpi-card cat-skeleton cat-skeleton-kpi" data-status="expired"></div>
+                        <div class="cat-kpi-card cat-skeleton cat-skeleton-kpi" data-status="healthy"></div>
+                        <div class="cat-kpi-card cat-skeleton cat-skeleton-kpi" data-status="unknown"></div>
+                    </div>
+                </section>
+
+                <!-- 2. EOSL 상태 시각화 -->
+                <div class="cat-section-label"><span>EOSL Status</span><div class="cat-section-line"></div></div>
+                <section class="cat-dash-section" aria-label="EOSL 상태">
+                    <div class="cat-eosl-grid">
+                        <!-- 좌: 도넛 차트 -->
+                        <div class="cat-dash-card">
+                            <div class="cat-card-header">
+                                <span class="cat-card-dot accent"></span>
+                                <h2>EOSL 비율</h2>
+                            </div>
+                            <div class="cat-card-divider"></div>
+                            <div class="cat-donut-area">
+                                <div class="cat-donut-wrap">
+                                    <canvas id="hw-eosl-donut"></canvas>
+                                    <div class="cat-donut-center">
+                                        <div class="cat-donut-center-value" id="hw-eosl-total">-</div>
+                                        <div class="cat-donut-center-label">전체</div>
+                                    </div>
+                                </div>
+                                <div class="cat-donut-legend" id="hw-eosl-legend"></div>
+                            </div>
+                        </div>
+                        <!-- 우: Top Risk 자산 -->
+                        <div class="cat-dash-card">
+                            <div class="cat-card-header">
+                                <span class="cat-card-dot danger"></span>
+                                <h2>Top 5 위험 자산</h2>
+                            </div>
+                            <div class="cat-card-divider"></div>
+                            <ul class="cat-risk-list" id="hw-risk-list">
+                                <li class="cat-risk-empty">로딩 중…</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. 관리 액션 & 인사이트 -->
+                <div class="cat-section-label"><span>Actions</span><div class="cat-section-line"></div></div>
+                <section class="cat-dash-section" aria-label="관리 액션">
+                    <div class="cat-action-grid">
+                        <!-- 좌: 빠른 액션 -->
+                        <div class="cat-dash-card">
+                            <div class="cat-card-header">
+                                <span class="cat-card-dot accent"></span>
+                                <h2>빠른 액션</h2>
+                            </div>
+                            <div class="cat-card-divider"></div>
+                            <div class="cat-action-list">
+                                <a class="cat-action-btn" id="hw-action-eosl" href="#">
+                                    <svg class="action-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                    EOSL 자산 일괄 확인
+                                    <svg class="action-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                                </a>
+                                <a class="cat-action-btn" id="hw-action-replace" href="#">
+                                    <svg class="action-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"/></svg>
+                                    업데이트/교체 대상 필터 보기
+                                    <svg class="action-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                                </a>
+                                <a class="cat-action-btn" id="hw-action-unknown" href="#">
+                                    <svg class="action-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+                                    미등록 정보 보완
+                                    <svg class="action-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                                </a>
+                            </div>
+                        </div>
+                        <!-- 우: 인사이트 -->
+                        <!-- 우: 인사이트 -->
+                        <div class="cat-dash-card">
+                            <div class="cat-card-header">
+                                <span class="cat-card-dot info"></span>
+                                <h2>인사이트</h2>
+                            </div>
+                            <div class="cat-card-divider"></div>
+                            <div class="cat-insight-list" id="hw-insight-list">
+                                <div class="cat-insight-item info">데이터를 불러오는 중입니다…</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. 장비 유형별 EOSL 요약 -->
+                <div class="cat-section-label"><span>Resources</span><div class="cat-section-line"></div></div>
+                <section class="cat-dash-section" aria-label="장비 유형별 현황">
+                    <div class="cat-section-chart-grid" id="hw-section-charts"></div>
+                </section>
+
+            </div><!-- /.cat-dash -->
+
+            <noscript><div style="text-align:center;padding:40px;color:#9ca3af;">차트를 보려면 JavaScript를 활성화하세요.</div></noscript>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+    <script src="/static/js/9.category/9-2.hardware/0.hw_category_dashboard.js?v=2.3.0"></script>
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

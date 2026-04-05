@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content alarm-page">
+        <div class="content-wrapper">
+            <!-- 페이지 헤더 -->
+            <div class="page-header">
+                <h1>알림 센터</h1>
+                <p>티켓·작업 상태 변경 및 일정 리마인더를 확인합니다.</p>
+            </div>
+
+            <!-- 카테고리 탭 -->
+            <div class="system-tabs" role="tablist" aria-label="알림 카테고리">
+                <button class="system-tab-btn active" role="tab" aria-selected="true" data-category="">
+                    <img class="tab-icon" src="/static/image/svg/alarm/free-icon-font-home.svg" alt="">전체
+                </button>
+                <button class="system-tab-btn" role="tab" aria-selected="false" data-category="ticket">
+                    <img class="tab-icon" src="/static/image/svg/alarm/free-icon-font-ticket-alt.svg" alt="">티켓
+                </button>
+                <button class="system-tab-btn" role="tab" aria-selected="false" data-category="task">
+                    <img class="tab-icon" src="/static/image/svg/alarm/free-icon-font-tools.svg" alt="">작업
+                </button>
+                <button class="system-tab-btn" role="tab" aria-selected="false" data-category="calendar">
+                    <img class="tab-icon" src="/static/image/svg/alarm/free-icon-font-calendar-pen.svg" alt="">캘린더
+                </button>
+            </div>
+
+            <!-- 콘텐츠 카드 -->
+            <div class="tab-content single-pane">
+                <div class="tab-pane active">
+                    <!-- 카드 헤더 -->
+                    <div class="tab-header">
+                        <div class="tab-header-left">
+                            <h2>
+                                <span id="noti-header-label">전체 알림</span>
+                                <span class="noti-count-pill" id="alarm-unread-badge"></span>
+                            </h2>
+                        </div>
+                        <div class="tab-header-right">
+                            <div class="noti-filter-group">
+                                <button class="noti-filter-btn active" data-read="">전체</button>
+                                <button class="noti-filter-btn" data-read="false">읽지 않음</button>
+                                <button class="noti-filter-btn" data-read="true">읽음</button>
+                            </div>
+                            <div class="noti-divider"></div>
+                            <button class="noti-readall-btn" id="alarm-readall-btn" type="button" title="모든 알림을 읽음 처리합니다">
+                                <img src="/static/image/svg/alarm/free-icon-font-magnifying-glass-eye.svg" width="14" height="14" alt="">
+                                모두 읽음
+                            </button>
+                            <button class="noti-readall-btn noti-clearall-btn" id="alarm-clearall-btn" type="button" title="모든 알림을 삭제합니다">
+                                <img src="/static/image/svg/alarm/free-icon-font-trash-empty.svg" width="14" height="14" alt="">
+                                비우기
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 알림 목록 -->
+                    <div class="noti-body" id="alarm-content" aria-live="polite">
+                        <div class="noti-empty" id="alarm-empty">
+                            <div class="noti-empty-visual">
+                                <div class="noti-empty-lottie" id="noti-lottie-wrap"></div>
+                            </div>
+                            <h3 class="noti-empty-title" id="alarm-empty-title">알림이 없습니다</h3>
+                            <p class="noti-empty-desc" id="alarm-empty-desc">티켓·작업 상태가 변경되거나 일정이 다가오면 알려드립니다.</p>
+                        </div>
+                        <ul class="noti-list" id="alarm-list" hidden></ul>
+                        <div class="noti-pagination" id="alarm-pagination" hidden></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 보관 안내 -->
+            <div class="noti-retention-notice">
+                <svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 10-2 0 1 1 0 002 0zm-1 4a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                알림은 최근 60일간의 기록만 보관됩니다.
+            </div>
+
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/vendor/lottie/lottie.min.5.12.2.js"></script>
+    <script src="/static/js/addon_application/2.alarm.js?v=2.4.0"></script>
+</body>
+</html>

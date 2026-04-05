@@ -1,0 +1,214 @@
+/* ===== Version Management Page v4.0.0 ===== */
+/* system.css handles table, pagination, modal, toolbar, empty-state, search, page-size. */
+/* This file only adds version-page-specific tweaks. */
+
+/* ── Count badge — match Onpremise (#system-count) style ── */
+#vr-count {
+	vertical-align:middle;
+	display:inline-flex; align-items:center; justify-content:center;
+	min-width: 44px !important; padding: 0 14px !important; border-radius:999px; line-height:1;
+	background:#6366f1 !important; background-color:#6366f1 !important; color:#ffffff !important;
+	border:0 !important;
+	font-weight:800; font-size:12px; letter-spacing:.2px;
+	box-shadow:0 2px 8px rgba(99,102,241,.28) !important;
+	font-variant-numeric: tabular-nums; font-feature-settings: 'tnum';
+}
+#vr-count.large-number { min-width: 56px !important; padding: 0 18px !important; }
+#vr-count.very-large-number { min-width: 72px !important; padding: 0 24px !important; }
+
+/* ── Status badges ── */
+.rn-badge {
+    display: inline-block;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 6px;
+}
+.rn-badge.current {
+    background: #EEF2FF;
+    color: #6a5acd;
+    font-weight: 600;
+}
+
+/* ── Table column tweaks ── */
+#vr-table .vr-col-ver {
+    white-space: nowrap;
+    font-weight: 600;
+}
+#vr-table .vr-col-items {
+    max-width: 500px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Row action buttons (mirror #system-table .action-btn from system.css) ── */
+#vr-table .action-btn { width:36px; height:36px; border:1px solid #e8eaed; background:#ffffff; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; transition:all .2s ease; margin:0 3px; position:relative; overflow:hidden; }
+#vr-table .action-btn::before { content:""; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent); transition:left .5s ease; }
+#vr-table .action-btn:hover { background-color:#f8f9fa; border-color:#8b5cf6; box-shadow:0 2px 8px rgba(139, 92, 246, 0.15); transform:translateY(-1px); }
+#vr-table .action-btn:hover::before { left:100%; }
+#vr-table .action-icon { width:18px; height:18px; filter:grayscale(.55) brightness(1.35) contrast(.8); opacity:.46; transition:all .2s ease; display:block; }
+#vr-table .action-btn:hover .action-icon { filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85; transform:scale(1.1); }
+#vr-table td[data-col=actions] { text-align:left; white-space:nowrap; }
+
+/* ── Add button — always-on purple (match Onpremise #system-add-btn) ── */
+#vr-add-btn {
+	background:#6366f1 !important; border-color:#6366f1 !important;
+	box-shadow:0 2px 8px rgba(99,102,241,.28) !important;
+}
+#vr-add-btn .header-icon {
+	filter:brightness(0) invert(1) contrast(1) !important; opacity:1 !important; transform:none !important;
+}
+
+/* ── Delete / header button icons — muted gray ── */
+#vr-delete-btn .header-icon {
+	filter:grayscale(.55) brightness(1.35) contrast(.8); opacity:.46;
+	transition:filter .22s ease, opacity .22s ease, transform .22s ease;
+}
+#vr-delete-btn:hover .header-icon {
+	filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85;
+}
+
+/* Edit/Delete hover — purple fill + white icon (match onpremise) */
+#vr-table .action-btn[data-action="edit"]:hover,
+#vr-table .action-btn[data-action="edit"]:focus-visible,
+#vr-table .action-btn[data-action="delete"]:hover,
+#vr-table .action-btn[data-action="delete"]:focus-visible {
+    background:#6366f1; border-color:#e5e7eb; box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+#vr-table .action-btn[data-action="edit"]:hover .action-icon,
+#vr-table .action-btn[data-action="edit"]:focus-visible .action-icon,
+#vr-table .action-btn[data-action="delete"]:hover .action-icon,
+#vr-table .action-btn[data-action="delete"]:focus-visible .action-icon {
+    filter:brightness(0) invert(1); opacity:1; transform:scale(1.08);
+}
+
+/* Selected row — keep action buttons in active state */
+#vr-table tbody tr.selected .action-btn[data-action="edit"],
+#vr-table tbody tr.selected .action-btn[data-action="delete"] {
+    background:#6366f1; border-color:#6366f1; box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+#vr-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+#vr-table tbody tr.selected .action-btn[data-action="delete"] .action-icon {
+    filter:brightness(0) invert(1) contrast(1); opacity:1; transform:scale(1.08);
+}
+
+/* ── Selected row highlight (match onpremise) ── */
+#vr-table tbody tr.selected {
+    background-color: rgba(99,102,241,0.10) !important;
+    border-left: 3px solid var(--accent, #6366f1) !important;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.45) !important;
+}
+#vr-table tbody tr.selected:hover {
+    background-color: rgba(99,102,241,0.16) !important;
+}
+
+/* ══════════════════════════════════════════════
+   EDIT MODAL
+══════════════════════════════════════════════ */
+/* authentication.css overrides system.css form defaults (13px, tighter gaps, extra body padding).
+   Restore system.css values (Onpremise standard) for version modals — every property. */
+#vr-edit-modal .server-add-body { padding: 12px 0; }
+#vr-edit-modal .form-section { margin-bottom: 8px; padding: 0 32px; }
+#vr-edit-modal .form-section .section-header { margin-bottom: 10px; padding-bottom: 8px; }
+#vr-edit-modal .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#vr-edit-modal .form-row { display: flex; flex-direction: column; gap: 4px; }
+#vr-edit-modal .form-row label { font-size: 14px; font-weight: 500; color: #34495e; margin: 0; }
+#vr-edit-modal .form-input {
+    width: 100%; box-sizing: border-box;
+    padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px;
+    font-size: 14px; min-height: 44px; background: #fff !important;
+    color: #0f172a; margin: 0;
+    transition: border-color .2s, box-shadow .2s;
+}
+#vr-edit-modal .form-input::placeholder { color: #94a3b8; }
+#vr-edit-modal .form-input:focus { outline: none; border-color:#e5e7eb; box-shadow:0 0 0 2px rgba(229,231,235,0.5); }
+#vr-edit-modal .required { color: #ef4444; margin-left: 4px; font-weight: 700; }
+
+/* 릴리즈 내용 row — label + textarea only, no phantom elements */
+#rn-items-row { display: flex; flex-direction: column; gap: 4px; }
+#rn-items-row > *:not(label):not(textarea) { display: none !important; }
+#rn-items-row > label { display: block; }
+#rn-items-row > textarea {
+    display: block;
+    min-height: 140px;
+    resize: vertical;
+}
+
+#vr-edit-modal textarea.form-input {
+    font-family: inherit;
+    font-weight: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+}
+
+/* Textarea scrollbar — slim & styled */
+#vr-edit-modal textarea.form-input::-webkit-scrollbar { width:6px; }
+#vr-edit-modal textarea.form-input::-webkit-scrollbar-track { background:transparent; border-radius:3px; }
+#vr-edit-modal textarea.form-input::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:3px; }
+#vr-edit-modal textarea.form-input::-webkit-scrollbar-thumb:hover { background:#9ca3af; }
+#vr-edit-modal textarea.form-input { scrollbar-width:thin; scrollbar-color:#d1d5db transparent; }
+
+/* ══════════════════════════════════════════════
+   GENERAL VERSION PAGE (/p/settings_version)
+══════════════════════════════════════════════ */
+.version-card {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+.version-card-header {
+    padding: 20px 28px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.version-card-header h2 {
+    margin: 0; font-size: 17px; font-weight: 700; color: #1e293b;
+}
+.version-card-body {
+    padding: 24px 28px;
+}
+
+/* System Version Info table */
+.version-info-table {
+    width: 100%; border-collapse: collapse;
+}
+.version-info-table th,
+.version-info-table td {
+    padding: 14px 16px; font-size: 14px; text-align: left;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.version-info-table th {
+    width: 180px; color: #64748b; font-weight: 600; background: rgba(0,0,0,0.015);
+}
+.version-info-table td {
+    color: #1e293b; font-weight: 500;
+}
+.version-info-table tr:last-child th,
+.version-info-table tr:last-child td { border-bottom: none; }
+
+/* Release Notes sections */
+.release-note-section {
+    margin-bottom: 28px; padding-bottom: 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.release-note-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.release-note-version {
+    font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 12px 0;
+    display: flex; align-items: center; gap: 10px;
+}
+.release-note-items {
+    margin: 0; padding-left: 20px; list-style: disc;
+}
+.release-note-items li {
+    font-size: 14px; color: #475569; line-height: 1.7; padding: 2px 0;
+}
+
+.version-loading { color: #94a3b8; font-size: 14px; }
+.version-empty   { color: #94a3b8; font-size: 14px; }

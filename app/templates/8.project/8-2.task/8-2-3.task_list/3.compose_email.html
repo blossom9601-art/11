@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>메일 보내기 - blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/compose_email.css?v=1.0.1">
+</head>
+<body>
+	<div class="compose-header">
+		<h1>✉ 메일 보내기</h1>
+		<button class="btn-close" id="btn-close" type="button">닫기</button>
+		<button class="btn-send" id="btn-send" type="button">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9z"/></svg>
+			보내기
+		</button>
+	</div>
+	<div class="compose-fields">
+		<div class="field-row">
+			<span class="field-label">받는 사람</span>
+			<input class="field-input" id="mail-to" type="text" placeholder="이메일 주소 (쉼표로 구분)">
+		</div>
+		<div class="field-row">
+			<span class="field-label">참조</span>
+			<input class="field-input" id="mail-cc" type="text" placeholder="(선택)">
+		</div>
+		<div class="field-row">
+			<span class="field-label">제목</span>
+			<input class="field-input" id="mail-subject" type="text" placeholder="제목">
+		</div>
+	</div>
+	<div class="compose-body">
+		<iframe id="preview-frame" sandbox="allow-same-origin"></iframe>
+	</div>
+	<div class="compose-status" id="status-bar">보고서가 본문에 첨부되었습니다.</div>
+
+	<div class="sending-overlay" id="sending-overlay">
+		<div class="sending-box">
+			<div class="spinner"></div>
+			<p>메일을 보내는 중입니다…</p>
+		</div>
+	</div>
+	<div class="toast-msg" id="toast"></div>
+
+	<script>
+	(function(){
+		const params = new URLSearchParams(location.search);
+		const subjectParam = params.get('subject') || '';
+		document.getElementById('mail-subject').value = subjectParam;
+
+		const toParam = params.get('to') || '';
+		if(toParam) document.getElementById('mail-to').value = toParam;
+
+		// 본문 HTML은 opener(부모창)에서 전달받음
+		const htmlBody = (window.opener && window.opener.__composeEmailHTML) || '';
+		if(htmlBody){
+			const frame = document.getElementById('preview-frame');
+			frame.addEventListener('load', () => {
+				try{
+					frame.contentDocument.open();
+					frame.contentDocument.write(htmlBody);
+					frame.contentDocument.close();
+				}catch(_){}
+			});
+			// trigger
+			frame.src = 'about:blank';
+		}
+
+		function toast(msg){
+			const t = document.getElementById('toast');
+			t.textContent = msg;
+			t.classList.add('show');
+			setTimeout(()=> t.classList.remove('show'), 3500);
+		}
+
+		document.getElementById('btn-close').addEventListener('click', ()=> window.close());
+
+		document.getElementById('btn-send').addEventListener('click', async ()=>{
+			const to = document.getElementById('mail-to').value.trim();
+			const cc = document.getElementById('mail-cc').value.trim();
+			const subject = document.getElementById('mail-subject').value.trim();
+
+			if(!to){
+				toast('받는 사람을 입력하세요.');
+				document.getElementById('mail-to').focus();
+				return;
+			}
+
+			const btn = document.getElementById('btn-send');
+			btn.disabled = true;
+			document.getElementById('sending-overlay').classList.add('active');
+
+			try{
+				const res = await fetch('/api/task/send-email', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({ to, cc, subject, html: htmlBody })
+				});
+				const data = await res.json();
+				if(data.success){
+					document.getElementById('status-bar').textContent = '✅ 메일이 성공적으로 발송되었습니다.';
+					toast('메일이 발송되었습니다!');
+					setTimeout(()=> window.close(), 2000);
+				} else {
+					toast(data.message || '메일 발송에 실패했습니다.');
+					btn.disabled = false;
+				}
+			}catch(e){
+				toast('메일 발송 중 오류가 발생했습니다.');
+				btn.disabled = false;
+			}finally{
+				document.getElementById('sending-overlay').classList.remove('active');
+			}
+		});
+	})();
+	</script>
+</body>
+</html>

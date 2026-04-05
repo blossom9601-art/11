@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.32">
+    <script src="/static/js/4.governance/4-3.network_policy/4-3-3.ad/2.ad_detail.js?v=1.2.9"></script>
+</head>
+<body class="page-ad-policy" data-gov-detail-id="{{ gov_detail_id or '' }}">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 (동적) -->
+            <a href="{{ url_for('pages.show', key='gov_ad_policy') }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{% if title and title != 'AD POLICY' %}{{ title }}{% else %}&nbsp;{% endif %}</h1>
+                <p id="page-header-subtitle">{% if subtitle and subtitle != '-' %}{{ subtitle }}{% else %}&nbsp;{% endif %}</p>
+            </div>
+
+            <!-- AD 상세 탭 네비게이션 -->
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_detail') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_domain') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_domain' %} active{% endif %}">도메인 관리</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_account') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_account' %} active{% endif %}">계정 관리</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_log') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_file') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_file' %} active{% endif %}">구성/파일</a>
+            </div>
+
+            <!-- 서버 상세 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <!-- 기본정보 탭 -->
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <!-- 기본정보 섹션 -->
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid grid-1-1-1">
+                            <!-- AD 정책 기본 정보 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>AD</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>상태</label><span id="ad-status" class="status-pill"><span class="status-dot ws-wait" aria-hidden="true"></span><span class="status-text">-</span></span></div>
+                                    <div class="info-row"><label>도메인명</label><span class="info-value" id="ad-domain">-</span></div>
+                                        <div class="info-row"><label>FQDN 수</label><span class="info-value" id="ad-fqdn-count">-</span></div>
+                                        <div class="info-row"><label>계정 수</label><span class="info-value" id="ad-account-count">-</span></div>
+                                        <div class="info-row"><label>역할</label><span class="info-value" id="ad-role">-</span></div>
+                                    <div class="info-row"><label>비고</label><span class="info-value" id="ad-note">-</span></div>
+                                </div>
+                            </div>
+
+                            <div class="basic-info-card" id="ad-domain-status-card">
+                                <div class="basic-info-card-header">
+                                    <h4>도메인 관리 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap" id="ad-domain-stats">
+                                        <div class="pie-chart" id="ad-domain-pie" aria-label="도메인 상태 분포 그래프">
+                                            <div class="donut-center" aria-hidden="true">
+                                                <div class="donut-total" id="ad-domain-total">0</div>
+                                            </div>
+                                        </div>
+                                        <ul class="pie-legend" id="ad-domain-legend" aria-label="도메인 상태별 개수"></ul>
+                                    </div>
+                                    <p id="ad-domain-empty" class="info-desc" hidden>도메인 상태 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+
+                            <div class="basic-info-card" id="ad-account-status-card">
+                                <div class="basic-info-card-header">
+                                    <h4>계정 관리 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap" id="ad-account-stats">
+                                        <div class="pie-chart" id="ad-account-pie" aria-label="계정 상태 분포 그래프">
+                                            <div class="donut-center" aria-hidden="true">
+                                                <div class="donut-total" id="ad-account-total">0</div>
+                                            </div>
+                                        </div>
+                                        <ul class="pie-legend" id="ad-account-legend" aria-label="계정 상태별 개수"></ul>
+                                    </div>
+                                    <p id="ad-account-empty" class="info-desc" hidden>계정 상태 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <!-- 기본정보 수정 모달 (AD 리스트 페이지와 동일한 구조/스타일) -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>AD 항목 수정</h3><p class="server-edit-subtitle">선택한 AD 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

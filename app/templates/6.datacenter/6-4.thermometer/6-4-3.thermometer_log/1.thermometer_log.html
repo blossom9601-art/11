@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/center.css">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="datacenter.temperature_humidity"></div>
+                    <h1>온/습도 관리</h1>
+                    <p>온/습도 자산을 관리 합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
+                <div id="dynamic-system-tabs"
+                     data-page-code="DC_THERMOMETER"
+                     data-current-key="{{ current_key }}"
+                     data-aria-label="온/습도 관리 탭"></div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>온/습도 기록 <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="온/습도 기록 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: HPE%가상). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <!-- 순서: 삭제 → 기준 -->
+                                <button class="header-btn" id="system-delete-btn" title="삭제처리"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon"></button>
+                                <button class="header-btn" id="system-criteria-btn" title="기준 설정" aria-label="최고온도/최고습도 기준 설정">
+                                    <img src="/static/image/svg/free-icon-todo.svg" alt="기준" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
+                                <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th data-col="date">날짜</th>
+                                        <th data-col="place">장소</th>
+                                        <th data-col="temp_max">최고온도(℃)</th>
+                                        <th data-col="temp_avg">평균온도(℃)</th>
+                                        <th data-col="humid_max">최고습도(%)</th>
+                                        <th data-col="humid_avg">평균습도(%)</th>
+                                        <th data-col="result">결과</th>
+                                        <th data-col="note">비고</th>
+                                        <th data-col="actions">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State (테이블 헤더 아래, 페이지네이션 위) -->
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">온/습도 기록이 없습니다.</h3>
+                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 기록을 등록하세요.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <div class="page-numbers" id="system-page-numbers"></div>
+                                <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
+    <script src="/static/js/6.datacenter/6-4.thermometer/6-4-3.thermometer_log/1.thermometer_log.js"></script>
+
+        <!-- 기록/결과등록 통합 모달 -->
+        <div id="system-entry-modal" class="server-add-modal system-entry-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3 id="system-entry-title">결과 리뷰</h3>
+                        <p id="system-entry-subtitle" class="server-add-subtitle">파일을 분석하고 결과를 확인하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-entry-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="system-entry-form">
+                        <!-- 1. 기본정보 -->
+                        <div class="form-section">
+                            <div class="section-header"><h4>기본 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row"><label>날짜 <span class="required-asterisk" aria-hidden="true">*</span></label><input name="date" class="form-input" placeholder="YYYY-MM-DD" required></div>
+                                <div class="form-row"><label>장소 <span class="required-asterisk" aria-hidden="true">*</span></label>
+                                    <div class="fk-searchable-control" data-place-control="true">
+                                        <button type="button" class="fk-searchable-display" data-place-display="true" aria-haspopup="dialog" aria-expanded="false">
+                                            <span class="place-display-text" data-place-text>장소 선택</span>
+                                        </button>
+                                        <button type="button" class="fk-searchable-clear" data-place-clear="true" hidden>지움</button>
+                                        <select name="place" class="fk-search-native-hidden" required>
+                                            <option value="" disabled selected>장소 선택</option>
+                                            <option value="퓨처센터(5층)">퓨처센터(5층)</option>
+                                            <option value="퓨처센터(6층)">퓨처센터(6층)</option>
+                                            <option value="을지트윈타워(15층)">을지트윈타워(15층)</option>
+                                            <option value="재해복구센터(4층)">재해복구센터(4층)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row"><label>결과 <span class="required-asterisk" aria-hidden="true">*</span></label>
+                                    <select name="result" class="form-input" required>
+                                        <option value="" disabled selected>선택</option>
+                                        <option value="적정">적정</option>
+                                        <option value="주의">주의</option>
+                                        <option value="경고">경고</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>비고</label><input name="note" class="form-input" placeholder="추가 참고사항"></div>
+                            </div>
+                        </div>
+                        <!-- 2. 파일등록 -->
+                        <div class="form-section" id="register-file-section">
+                            <div class="section-header section-header-inline">
+                                <h4>파일 등록</h4>
+                                <div class="section-tools">
+                                    <button type="button" class="btn-secondary" id="register-sample-download">샘플 다운로드</button>
+                                </div>
+                            </div>
+                            <div class="upload-dropzone" id="register-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+                                <div class="upload-illu"><img src="/static/image/svg/list/free-icon-excel.svg" alt="엑셀" class="template-icon"></div>
+                                <div class="upload-text center">
+                                    <strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+                                    <div class="upload-subinfo" aria-hidden="true" style="margin-top:6px;">
+                                        <span class="sub-left">지원 확장자: XLS, XLSX</span>
+                                        <span class="sub-right">최대 10 MB</span>
+                                    </div>
+                                </div>
+                                <input type="file" id="register-input" class="visually-hidden" accept=".xls,.xlsx" aria-hidden="true" />
+                            </div>
+                            <div class="upload-meta" id="register-meta" hidden>
+                                <div class="file-chip" id="register-file-chip" aria-live="polite"></div>
+                            </div>
+                        </div>
+                        <!-- 3. 분석 결과 -->
+                        <div class="form-section">
+                            <div class="section-header section-header-inline">
+                                <h4>분석 결과</h4>
+                                <div class="section-tools">
+                                    <button type="button" class="header-btn" id="register-results-download" aria-label="분석 결과 다운로드" title="분석 결과 다운로드" disabled>
+                                        <img src="/static/image/svg/free-icon-folder-download.svg" alt="분석 결과 다운로드" class="header-icon" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="register-empty" class="system-empty" role="status" aria-live="polite" style="padding:12px;">
+                                파일을 업로드하면 분석 결과가 표로 표시됩니다.
+                            </div>
+                            <div id="register-results" class="system-table-container"></div>
+                            <div id="register-warning" class="analysis-warning" hidden role="alert" aria-live="polite"></div>
+                            <div id="register-stats-divider" class="section-divider dotted" hidden aria-hidden="true"></div>
+                            <!-- 통계 분석 (업로드한 데이터 시간대별) -->
+                            <div id="register-stats" class="form-section" hidden>
+                                <div class="section-header section-header-inline">
+                                    <h4>통계 분석</h4>
+                                    <div class="section-tools">
+                                        <div class="segmented" role="group" aria-label="그래프 종류 선택">
+                                            <button type="button" id="register-stats-temp" class="segmented-btn active" aria-pressed="true">온도</button>
+                                            <button type="button" id="register-stats-humid" class="segmented-btn" aria-pressed="false">습도</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding:8px 0 0;">
+                                    <canvas id="register-stats-canvas" class="timeline-canvas" style="height:180px;max-height:none;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-entry-save" data-mode="add">등록</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컬럼 선택 모달 (전용회선 페이지 스타일 적용) -->
+        <div id="system-column-modal" class="server-add-modal system-column-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>컬럼 선택</h3>
+                        <p class="server-add-subtitle">표시할 컬럼을 선택하세요 (기본 열은 체크됨)</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-column-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-column-body">
+                    <form id="system-column-form"><!-- JS로 컬럼 체크박스 렌더링 --></form>
+                </div>
+                <div class="server-add-actions system-column-actions">
+                    <div class="action-buttons left">
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-reset">초기화</button>
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-selectall-btn">전체 선택</button>
+                    </div>
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-column-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 불용처리 확인 모달 -->
+        <div id="system-dispose-modal" class="server-add-modal system-dispose-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>불용처리</h3>
+                        <p class="server-add-subtitle" id="dispose-subtitle">선택된 0개의 소프트웨어를 정말 불용처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-dispose-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>불용자산으로 처리되면 해당 유형자산은 불용자산 메뉴로 이동됩니다.</p>
+                            <p>불용 처리된 자산은 회사 보유 자산으로 집계되지 않습니다.</p>
+                            <p>(단, 불용자산에서 복구 가능합니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-process.svg" alt="Process Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-dispose-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제처리 확인 모달 -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 소프트웨어를 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 자산을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 행 복제 확인 모달 -->
+        <div id="system-duplicate-modal" class="server-add-modal system-duplicate-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>행 복제</h3>
+                        <p class="server-add-subtitle" id="duplicate-subtitle">선택된 0개의 행을 복제합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-duplicate-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>선택된 행의 복제본을 생성합니다.</p>
+                            <p>복제 후 <strong>소프트웨어 이름</strong> 끝에 _COPY가 붙습니다.</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-programming.svg" alt="Programming Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-duplicate-confirm">복제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CSV 다운로드 확인 모달 -->
+        {% include 'layouts/_download_modal_range.html' %}
+
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <!-- 일괄변경 모달 -->
+        <div id="system-bulk-modal" class="server-add-modal system-bulk-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>일괄변경</h3>
+                        <p class="server-add-subtitle" id="bulk-subtitle">선택된 0개의 소프트웨어에서 지정한 필드를 일괄 변경합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-bulk-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-bulk-body">
+                    <form id="system-bulk-form"><!-- JS로 필드 렌더링 --></form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-bulk-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <!-- 기준 설정 모달 -->
+        <div id="system-criteria-modal" class="server-add-modal system-criteria-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>기준 설정</h3>
+                        <p class="server-add-subtitle">최고온도(℃), 최고습도(%) 기준값을 입력하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-criteria-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body" style="padding: 16px 20px 20px;">
+                    <div class="form-section">
+                        <div class="section-header"><h4>기준 온/습도 설정</h4></div>
+                        <form id="system-criteria-form" class="form-grid" style="display:grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap:14px 18px; align-items:start; margin-top: 8px;">
+                            <div class="form-row" style="display:flex; flex-direction:column; gap:6px;">
+                                <label for="criteria-temp-max" style="display:block; margin-bottom:6px;">최고온도(℃)</label>
+                                <input id="criteria-temp-max" name="criteria-temp-max" type="number" step="0.1" min="0" class="form-input" placeholder="예: 30" />
+                            </div>
+                            <div class="form-row" style="display:flex; flex-direction:column; gap:6px;">
+                                <label for="criteria-humid-max" style="display:block; margin-bottom:6px;">최고습도(%)</label>
+                                <input id="criteria-humid-max" name="criteria-humid-max" type="number" step="1" min="0" max="100" class="form-input" placeholder="예: 60" />
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-criteria-apply">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 업로드 모달 -->
+        <div id="system-upload-modal" class="server-add-modal system-upload-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>엑셀 업로드</h3>
+                        <p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 소프트웨어를 등록합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-upload-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-upload-body">
+                    <div class="upload-dropzone" id="upload-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+                        <div class="upload-illu"><div id="upload-anim" class="lottie-anim" aria-hidden="true"></div></div>
+                        <div class="upload-text center">
+                            <strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+                        </div>
+                        <input type="file" id="upload-input" class="visually-hidden" accept=".xls,.xlsx" aria-hidden="true" />
+                    </div>
+                    <div class="upload-subinfo" aria-hidden="true">
+                        <span class="sub-left">지원 가능한 확장자: XLS, XLSX</span>
+                        <span class="sub-right">최대 파일 사이즈: 10 MB</span>
+                    </div>
+                    <div class="upload-meta" id="upload-meta" hidden>
+                        <div class="file-chip" id="upload-file-chip" aria-live="polite"></div>
+                    </div>
+                    <div class="upload-help">
+                        <p class="upload-warning">엑셀업로드는 반드시 제공한 양식을 사용해야 합니다.<br>아래 양식을 다운로드한 뒤 작성하여 업로드 해주세요.</p>
+                        <div class="template-card">
+                            <div class="template-label"><img src="/static/image/svg/list/free-icon-excel.svg" alt="엑셀" class="template-icon">엑셀 업로드 양식</div>
+                            <button type="button" class="btn-primary template-download-btn" id="upload-template-download" aria-label="양식 다운로드">
+                                <img src="/static/image/svg/list/free-icon-download.svg" alt="" class="template-icon" aria-hidden="true">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-upload-confirm" disabled>등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- (기존 결과등록/추가/수정 모달은 통합되어 삭제됨) -->
+
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+

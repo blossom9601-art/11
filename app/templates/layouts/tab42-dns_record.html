@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab42-dns_record.css?v=1.0">
+    <script src="/static/js/4.governance/4-3.network_policy/4-3-2.dns/2.dns_detail.js?v=1.4.1"></script>
+    <script defer src="/static/js/layouts/tab42-dns_record.js?v=1.0"></script>
+</head>
+<body class="page-dns-record" data-gov-detail-id="{{ gov_detail_id or '' }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper">
+            <a href="{{ url_for('pages.show', key='gov_dns_policy') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{% if title and title != 'DNS POLICY' and title != 'DNS 정책' %}{{ title }}{% else %}&nbsp;{% endif %}</h1>
+                <p id="page-header-subtitle">{% if subtitle and subtitle not in ('-', 'Network DNS Policy Management') %}{{ subtitle }}{% else %}&nbsp;{% endif %}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='gov_dns_policy_detail') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_dns_policy_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='gov_dns_policy_dns_record') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_dns_policy_dns_record' %} active{% endif %}">레코드</a>
+                <a href="{{ url_for('pages.show', key='gov_dns_policy_log') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_dns_policy_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='gov_dns_policy_file') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_dns_policy_file' %} active{% endif %}">구성/파일</a>
+            </div>
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="dns-record-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="dns-record-row-add-btn" title="행추가" type="button" aria-label="행추가">
+                        <img src="/static/image/svg/free-icon-add-folder.svg" alt="행추가">
+                    </button>
+                    <div class="detail-section">
+                        <h3>
+                            DNS 레코드
+                            <div class="page-size-selector" id="dns-record-page-size-wrap" aria-label="보기 개수">
+                                <label for="dns-record-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="dns-record-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10" selected>10개</option>
+                                    <option value="25">25개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                    <option value="200">200개</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="dns-record-table">
+                                <colgroup>
+                                    <col class="ip-range-col-check">
+                                    <col class="dns-record-col-status">
+                                    <col class="dns-record-col-type">
+                                    <col class="dns-record-col-host">
+                                    <col class="dns-record-col-fqdn">
+                                    <col class="dns-record-col-ip">
+                                    <col class="dns-record-col-priority">
+                                    <col class="dns-record-col-service">
+                                    <col class="dns-record-col-remark">
+                                    <col class="ip-range-col-actions">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <input type="checkbox" id="dns-record-select-all" aria-label="전체 선택" />
+                                        </th>
+                                        <th>상태</th>
+                                        <th>유형</th>
+                                        <th>호스트명</th>
+                                        <th>FQDN</th>
+                                        <th>IP</th>
+                                        <th>우선순위</th>
+                                        <th>서비스</th>
+                                        <th>비고</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dns-record-table-body"></tbody>
+                            </table>
+                            <datalist id="dns-record-ip-datalist"></datalist>
+                        </div>
+
+                        <div id="dns-record-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">DNS 레코드 항목이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '행추가' 버튼을 눌러 첫 DNS 레코드를 등록하세요.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="dns-record-pagination">
+                            <div class="pagination-info"><span id="dns-record-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="dns-record-first" disabled type="button" aria-label="처음">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="dns-record-prev" disabled type="button" aria-label="이전">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="dns-record-page-numbers"></div>
+                                <button class="pagination-btn" id="dns-record-next" disabled type="button" aria-label="다음">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="dns-record-last" disabled type="button" aria-label="마지막">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+
+    <div id="dns-record-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>DNS 레코드 삭제</h3>
+                    <p class="server-add-subtitle">선택한 DNS 레코드를 삭제합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="dns-record-delete-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="dns-record-delete-msg">이 DNS 레코드를 삭제하시겠습니까?</p>
+                        <p style="margin-top:8px; font-size:13px; color:#94a3b8;">삭제된 항목은 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="dns-record-delete-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="dns-record-delete-confirm">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

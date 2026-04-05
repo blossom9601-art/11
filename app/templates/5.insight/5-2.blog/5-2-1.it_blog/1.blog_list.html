@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/insight.css?v=20260110_1">
+</head>
+<body class="blog-page">
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper">
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="blog-list-pane">
+					<section class="blog-hero" aria-label="IT 블로그" style="--blog-hero-image:url('/static/image/login/america5.jpg')">
+						<button type="button" class="blog-add-fab" id="blog-add-open" aria-label="블로그 글 추가" title="추가">
+							<img src="/static/image/svg/free-icon-blog-text.svg" alt="" aria-hidden="true">
+						</button>
+						<div class="blog-hero-inner">
+							<h1 class="blog-hero-title">IT 블로그</h1>
+							<p class="blog-hero-subtitle">최신 트렌드, 보안, 기술 소식 모아보기</p>
+							<div class="blog-hero-search" role="search">
+								<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+								<input type="text" id="blog-search" placeholder="블로그 검색" aria-label="블로그 검색" autocomplete="off">
+							</div>
+						</div>
+					</section>
+
+					<div class="blog-top-tags" aria-label="인기 태그">
+						<div class="blog-top-tags-inner" id="blog-top-tags" aria-live="polite"></div>
+					</div>
+
+					<div
+						class="blog-grid"
+						id="blog-grid"
+						data-detail-url="{{ url_for('pages.show', key='insight_blog_it_detail') }}"
+						data-current-user-name="{{ current_user_name or '' }}"
+						data-current-emp-no="{{ current_emp_no or '' }}"
+						data-current-user-role="{{ current_user_role or '' }}"
+					></div>
+					<div id="blog-scroll-sentinel" class="blog-scroll-sentinel" aria-hidden="true"></div>
+
+					<div id="blog-empty" class="system-empty" role="status" aria-live="polite" hidden>
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3>등록된 게시글이 없습니다.</h3>
+							<p>데이터가 등록되면 카드 형식으로 표시됩니다.</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<div id="blog-context-menu" class="blog-context-menu" role="menu" hidden>
+		<button type="button" class="blog-context-item" id="blog-context-view" role="menuitem">보기</button>
+		<button type="button" class="blog-context-item" id="blog-context-edit" role="menuitem">수정</button>
+		<button type="button" class="blog-context-item danger" id="blog-context-delete" role="menuitem">삭제</button>
+	</div>
+
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/js/5.insight/5-2.blog/5-2-1.it_blog/1.blog_list.js?v=1.2.1"></script>
+
+	<!-- 블로그 글 추가/수정 모달 (공용 모달 재사용) -->
+	{% with
+		modal_prefix='blog',
+		modal_title_text='블로그 글 추가',
+		modal_subtitle_text='작성한 글은 목록과 상세 페이지에 표시됩니다.',
+		modal_title_placeholder='게시글 제목',
+		modal_editor_aria_label='게시글 내용',
+		modal_editor_placeholder='게시글 내용을 입력하세요',
+		modal_title_required=false,
+		modal_submit_type='button',
+		modal_submit_text='등록'
+	%}
+		{% include '5.insight/_shared/_content_editor_modal.html' %}
+	{% endwith %}
+</body>
+</html>
+

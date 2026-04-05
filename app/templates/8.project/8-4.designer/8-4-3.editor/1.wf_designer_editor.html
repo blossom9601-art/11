@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom — Workflow Editor</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <link rel="stylesheet" href="/static/css/wf_designer.css?v=6.33">
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@2.0.8/dist/lottie-player.js" async></script>
+</head>
+<body class="wf-editor-active">
+    <!-- 에디터 전용 페이지: 헤더/사이드바 없음 -->
+    <main class="main-content wf-editor-main" data-profile-id="{{ current_user_profile_id or '' }}" data-profile-image="{{ current_profile_image or '' }}" data-user-name="{{ current_user_name or '' }}" style="margin:0;padding:0;width:100vw;height:100vh;">
+        <div class="wf-editor" id="wf-editor-root"></div>
+    </main>
+
+    <script src="/static/js/8.project/8-4.designer/8-4-3.editor/1.wf_designer_editor.js?v=20260315b"></script>
+</body>
+</html>

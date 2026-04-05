@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/admin.css?v=20260104-30">
+</head>
+<body class="page-admin-settings">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content admin-page">
+        <section class="profile">
+            <div class="profile-cover" aria-hidden="true"></div>
+            <div class="profile-header container">
+                <div class="profile-primary">
+                    <div class="avatar" role="button" tabindex="0" title="프로필 이미지 변경" aria-label="프로필 이미지 변경" style="background-image: url({{ (user.profile_image if user and user.profile_image else '/static/image/svg/profil/free-icon-bussiness-man.svg')|tojson }});"></div>
+                    <div class="identity">
+                        <div class="name-row"><h2 class="name">{{ (user.name if user and user.name else '-') }}</h2></div>
+                        <div class="bio-row">
+                            <p class="bio">{{ ((user.motto if user and user.motto else '') or (user.note if user and user.note else '') or '디자인은 억지로 하면 안 됩니다. 자연스럽지 않다면 다시 생각해야 합니다.') }}</p>
+                            <button class="action-btn" id="btn-edit-bio" title="메시지 수정" aria-label="메시지 수정" type="button">
+                                <img src="/static/image/svg/admin/free-icon-pen-square.svg" alt="메시지 수정" class="action-icon">
+                            </button>
+                        </div>
+                        {% if user and user.location and user.location|trim != '-' %}
+                            <p class="meta">{{ user.location }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs container" role="tablist" aria-label="설정 섹션">
+                <a id="overview" class="tab" href="{{ url_for('auth.settings_profile') }}" role="tab" aria-selected="false">프로필</a>
+                <a id="member" class="tab" href="{{ url_for('auth.settings_member') }}" role="tab" aria-selected="false">멤버</a>
+                <a id="memo" class="tab active" href="{{ url_for('auth.settings_memo') }}" role="tab" aria-selected="true">메모</a>
+                <a id="password" class="tab" href="{{ url_for('auth.settings_password') }}" role="tab" aria-selected="false">패스워드</a>
+            </div>
+
+            <div class="tab-panels container">
+                <section class="tab-panel active memo-tab-panel" role="tabpanel" aria-labelledby="memo">
+                    <aside class="memo-groups memo-groups-float" aria-label="그룹">
+                        <div id="memo-group-list" class="memo-group-list" role="list" aria-label="그룹 목록"></div>
+                        <button type="button" id="memo-group-add" class="memo-group-add" title="그룹 만들기" aria-label="그룹 만들기">+</button>
+                    </aside>
+
+                    <div class="card editing memo-panel-card" aria-label="메모 목록">
+                        <div class="card-header" aria-label="메모 헤더">
+                            <h3 class="card-title" id="memo-active-group" aria-label="현재 그룹">
+                                <span id="memo-active-group-name"></span>
+                            </h3>
+                            <div class="memo-header-actions" aria-label="메모 도구">
+                                <div class="search-container" role="search" aria-label="메모 검색">
+                                    <div class="search-input-wrapper" id="memo-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="memo-search" placeholder="검색" class="search-input" aria-label="메모 검색" autocomplete="off">
+                                        <div class="search-loader" id="memo-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                </div>
+                                <div class="memo-view-toggle" aria-label="보기 모드">
+                                    <select id="memo-view-mode" class="memo-view-select" aria-label="메모 보기">
+                                        <option value="partial">부분보기</option>
+                                        <option value="full">전체보기</option>
+                                    </select>
+                                </div>
+                                <button class="header-btn" id="memo-new" title="추가" aria-label="추가">
+                                    <img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div id="memo-grid" class="memo-grid" aria-live="polite"></div>
+
+                            <div class="modern-pagination" id="memo-pagination" aria-label="페이지" aria-live="polite">
+                                <div class="pagination-info"><span id="memo-pagination-info">0-0 / 0개 항목</span></div>
+                                <div class="pagination-controls">
+                                    <button class="pagination-btn" id="memo-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                    <button class="pagination-btn" id="memo-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                    <div class="page-numbers" id="memo-page-list"></div>
+                                    <button class="pagination-btn" id="memo-next-btn" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                    <button class="pagination-btn" id="memo-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/js/blossom.js"></script>
+    <!-- Modal editor like 이미지2 -->
+    <div id="memo-editor" class="memo-editor-modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="editor-backdrop" data-editor-close></div>
+        <div class="editor-dialog" role="document">
+            <div class="editor-header">
+                <div class="left">
+                    <button class="action-btn primary" id="editor-save" title="저장" aria-label="저장">
+                        <img class="action-icon" src="/static/image/svg/save.svg" alt="저장">
+                    </button>
+                </div>
+                <div class="center">
+                    <span class="editor-location">내 메모</span>
+                </div>
+                <div class="right">
+                    <button class="action-btn" id="editor-delete" title="삭제" aria-label="삭제">
+                        <img class="action-icon" src="/static/image/svg/delete.svg" alt="삭제">
+                    </button>
+                    <button class="action-btn" id="editor-star" title="중요" aria-label="중요">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-star.svg" alt="중요">
+                    </button>
+                    <button class="action-btn close-ghost" id="editor-cancel" title="취소" aria-label="취소">
+                        <img class="action-icon" src="/static/image/svg/cancel.svg" alt="취소">
+                    </button>
+                </div>
+            </div>
+            <div class="editor-toolbar" role="toolbar" aria-label="편집 도구">
+                <div class="toolbar-group">
+                    <button type="button" class="action-btn toolbar-btn" id="tb-bold" title="굵게" aria-label="굵게">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-bold.svg" alt="굵게">
+                    </button>
+                    <button type="button" class="action-btn toolbar-btn" id="tb-underline" title="밑줄" aria-label="밑줄">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-underline.svg" alt="밑줄">
+                    </button>
+                    <button type="button" class="action-btn toolbar-btn" id="tb-strike" title="취소선" aria-label="취소선">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-strikethrough.svg" alt="취소선">
+                    </button>
+                    <button type="button" class="action-btn toolbar-btn" id="tb-highlight" title="형광펜" aria-label="형광펜">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-highlighter.svg" alt="형광펜">
+                    </button>
+                    <button type="button" class="action-btn toolbar-btn" id="tb-checkbox" title="체크박스" aria-label="체크박스">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-checkbox.svg" alt="체크박스">
+                    </button>
+                    <button type="button" class="action-btn toolbar-btn" id="tb-picture" title="사진첨부" aria-label="사진첨부">
+                        <img class="action-icon" src="/static/image/svg/memo/free-icon-picture.svg" alt="사진첨부">
+                    </button>
+                </div>
+            </div>
+            <div class="editor-body">
+                <input id="editor-title" type="text" class="editor-title" placeholder="제목" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                <div id="editor-rich" class="editor-text rich" contenteditable="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-placeholder="메모를 입력하세요."></div>
+                <textarea id="editor-body-input" class="editor-text" placeholder="메모를 입력하세요." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" hidden></textarea>
+                <div id="editor-preview" class="editor-preview" aria-live="polite" aria-label="체크리스트 미리보기"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Profile Image Picker (modal) -->
+    <div id="profile-picker" class="profile-picker" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="picker-backdrop" data-picker-close></div>
+        <div class="picker-dialog" role="document">
+            <div class="picker-header">
+                <h3 class="picker-title">프로필 이미지 선택</h3>
+                <button class="btn-icon" data-picker-close title="닫기">×</button>
+            </div>
+            <div class="picker-body">
+                <div class="picker-grid" aria-label="프로필 이미지 목록" role="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group create modal (memo) -->
+    <div id="memo-group-modal" class="server-add-modal system-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-group-title">
+        <div class="server-add-content" role="document">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="memo-group-title">그룹 만들기</h3>
+                </div>
+                <button class="close-btn" type="button" id="memo-group-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="input-group">
+                    <label for="memo-group-name">그룹명</label>
+                    <input type="text" id="memo-group-name" name="memo_group_name" placeholder="그룹명을 입력하세요" autocomplete="off" spellcheck="false" />
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="memo-group-cancel">취소</button>
+                    <button type="button" class="btn-primary" id="memo-group-create">생성</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group delete confirm modal (memo) -->
+    <div id="memo-group-delete-modal" class="server-add-modal system-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-group-delete-title">
+        <div class="server-add-content" role="document">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="memo-group-delete-title">그룹 삭제</h3>
+                </div>
+                <button class="close-btn" type="button" id="memo-group-delete-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <p id="memo-group-delete-subtitle" class="modal-subtitle">정말 삭제하시겠습니까?</p>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="memo-group-delete-cancel">취소</button>
+                    <button type="button" class="btn-primary" id="memo-group-delete-confirm">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group rename modal (memo) -->
+    <div id="memo-group-rename-modal" class="server-add-modal system-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-group-rename-title">
+        <div class="server-add-content" role="document">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="memo-group-rename-title">그룹 이름변경</h3>
+                </div>
+                <button class="close-btn" type="button" id="memo-group-rename-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="input-group">
+                    <label for="memo-group-rename-name">그룹명</label>
+                    <input type="text" id="memo-group-rename-name" name="memo_group_rename_name" placeholder="그룹명을 입력하세요" autocomplete="off" spellcheck="false" />
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="memo-group-rename-cancel">취소</button>
+                    <button type="button" class="btn-primary" id="memo-group-rename-confirm">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memo move modal (memo) -->
+    <div id="memo-move-modal" class="server-add-modal system-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-move-title">
+        <div class="server-add-content" role="document">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="memo-move-title">그룹 이동</h3>
+                </div>
+                <button class="close-btn" type="button" id="memo-move-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="input-group">
+                    <label for="memo-move-group-select">이동할 그룹</label>
+                    <select id="memo-move-group-select" name="memo_move_group" aria-label="이동할 그룹"></select>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="memo-move-cancel">취소</button>
+                    <button type="button" class="btn-primary" id="memo-move-confirm">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memo warning modal (same style as /p/cat_business_work message modal) -->
+    <div id="memo-warning-modal" class="server-add-modal system-message-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-warning-title" aria-describedby="memo-warning-message">
+        <div class="server-add-content" role="document">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="memo-warning-title">알림</h3>
+                </div>
+                <button class="close-btn" type="button" data-modal-close title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="memo-warning-message">메시지 내용</p>
+                    </div>
+                    <div class="message-illust">
+                        <img id="memo-warning-illustration" src="/static/image/svg/free-sticker-message.svg" alt="알림" loading="lazy" decoding="async" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="memo-warning-ok" data-modal-close>확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/authentication/11-1.setting/11-1-3.memo.js?v=20260103-34"></script>
+</body>
+</html>

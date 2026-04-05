@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.26">
+	<script src="/static/js/blossom.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20250315a" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>보안관리</h1>
+					<p>비밀번호 정책과 세션/접속 정책을 관리합니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<!-- ── 보안 경고 배너 ── -->
+			<div id="security-warnings" class="sec-warnings" style="display:none"></div>
+
+			<div class="security-two-col">
+				<!-- ════════ 비밀번호 정책 (좌측) ════════ -->
+				<div class="sec-col-left">
+					<section class="setting-card" id="password-policy-card" aria-labelledby="password-policy-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="password-policy-title">비밀번호 정책</h2>
+								<p>길이, 조합, 만료 주기를 정의해 조직 전반 보안 레벨을 통일합니다.</p>
+							</div>
+							<button type="button" class="chip-link" data-action="restore-password-defaults">기본값 복원</button>
+						</div>
+						<form id="password-policy-form" class="setting-form" autocomplete="off">
+							<div class="form-grid single-col">
+								<div class="form-row">
+									<label for="password-min-length">최소 길이<span class="required">*</span></label>
+									<input type="number" id="password-min-length" name="min_length" class="form-input" min="6" max="32" step="1" required>
+								</div>
+								<div class="form-row">
+									<label for="password-max-length">최대 길이</label>
+									<input type="number" id="password-max-length" name="max_length" class="form-input" min="8" max="128" step="1">
+								</div>
+								<div class="form-row">
+									<label for="password-expiry-days">암호 만료 주기(일)<span class="sec-hint">0 = 만료 없음</span></label>
+									<input type="number" id="password-expiry-days" name="expiry_days" class="form-input" min="0" max="365">
+								</div>
+								<div class="form-row">
+									<label for="password-history">이전 비밀번호 사용 제한<span class="sec-hint">최근 N개 재사용 금지</span></label>
+									<input type="number" id="password-history" name="history" class="form-input" min="0" max="24">
+								</div>
+								<div class="form-row">
+									<label for="password-fail-lock">로그인 실패 잠금 횟수</label>
+									<input type="number" id="password-fail-lock" name="fail_lock_threshold" class="form-input" min="3" max="20" step="1">
+								</div>
+								<div class="form-row">
+									<label for="password-lock-duration">계정 잠금 유지 시간(분)</label>
+									<input type="number" id="password-lock-duration" name="lock_duration_minutes" class="form-input" min="1" max="720" step="1">
+								</div>
+							</div>
+							<div class="form-row form-row-wide">
+								<label>필수 문자 조합</label>
+								<div class="chip-toggle-group" role="group" aria-label="필수 문자 조합">
+									<label class="chip-toggle"><input type="checkbox" name="require_uppercase" value="1"><span>대문자</span></label>
+									<label class="chip-toggle"><input type="checkbox" name="require_number" value="1"><span>숫자</span></label>
+									<label class="chip-toggle"><input type="checkbox" name="require_symbol" value="1"><span>특수문자</span></label>
+								</div>
+							</div>
+
+							<!-- ── 패스워드 문구 제한 ── -->
+							<div class="sec-subsection">
+								<h3 class="sec-subsection-title">패스워드 문구 제한</h3>
+								<div class="sec-check-grid">
+									<label class="checkbox"><input type="checkbox" name="block_common_passwords" value="1"><span>공통 취약 비밀번호 차단 (password, admin 등)</span></label>
+									<label class="checkbox"><input type="checkbox" name="block_user_id" value="1"><span>사용자 ID 포함 금지</span></label>
+									<label class="checkbox"><input type="checkbox" name="block_personal_info" value="1"><span>이름 / 이메일 / 회사명 포함 금지</span></label>
+									<label class="checkbox"><input type="checkbox" name="block_sequential_chars" value="1"><span>연속 문자 3자 이상 금지 (abc, 123 등)</span></label>
+									<label class="checkbox"><input type="checkbox" name="block_repeated_chars" value="1"><span>동일 문자 반복 3회 이상 금지 (aaa, 111 등)</span></label>
+									<label class="checkbox"><input type="checkbox" name="block_keyboard_patterns" value="1"><span>키보드 배열 패턴 금지 (qwer, asdf 등)</span></label>
+								</div>
+							</div>
+
+							<!-- ── 관리자 정의 금칙어 ── -->
+							<div class="sec-subsection">
+								<h3 class="sec-subsection-title">관리자 정의 금칙어 목록</h3>
+								<p class="sec-subsection-desc">사용이 금지된 단어를 입력 후 Enter 또는 쉼표로 추가합니다.</p>
+								<div class="sec-tag-input-wrap" id="banned-words-wrap">
+									<div class="sec-tag-list" id="banned-words-tags"></div>
+									<input type="text" class="sec-tag-input" id="banned-words-input" placeholder="금칙어 입력 후 Enter…" autocomplete="off">
+								</div>
+							</div>
+
+							<!-- ── 비밀번호 변경 / 강도 ── -->
+							<div class="sec-subsection">
+								<h3 class="sec-subsection-title">비밀번호 변경 정책</h3>
+								<div class="sec-check-grid">
+									<label class="checkbox"><input type="checkbox" name="force_change_first_login" value="1"><span>최초 로그인 시 비밀번호 변경 강제</span></label>
+									<label class="checkbox"><input type="checkbox" name="force_change_admin_reset" value="1"><span>관리자 초기화 비밀번호 사용 시 즉시 변경</span></label>
+									<label class="checkbox"><input type="checkbox" name="show_strength_meter" value="1"><span>비밀번호 강도 표시 (약함 / 보통 / 강함 / 매우 강함)</span></label>
+								</div>
+								<div class="form-grid single-col" style="margin-top:12px">
+									<div class="form-row">
+										<label for="password-min-interval">비밀번호 변경 최소 간격(시간)<span class="sec-hint">너무 짧은 간격으로 반복 변경 방지</span></label>
+										<input type="number" id="password-min-interval" name="min_change_interval_hours" class="form-input" min="0" max="720">
+									</div>
+								</div>
+							</div>
+
+							<!-- ── 비밀번호 강도 미리보기 ── -->
+							<div class="sec-subsection">
+								<h3 class="sec-subsection-title">비밀번호 강도 미리보기</h3>
+								<p class="sec-subsection-desc">현재 정책 기준으로 비밀번호 강도를 테스트합니다.</p>
+								<input type="text" id="password-strength-test" class="form-input" placeholder="테스트 비밀번호를 입력하세요…" autocomplete="new-password">
+								<div class="sec-strength-bar-wrap">
+									<div class="sec-strength-bar" id="strength-bar"></div>
+								</div>
+								<span class="sec-strength-label" id="strength-label"></span>
+								<ul class="sec-validation-list" id="strength-checklist"></ul>
+							</div>
+
+							<div class="setting-actions">
+								<div class="action-buttons">
+									<button type="submit" class="btn-save">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+										비밀번호 정책 저장
+									</button>
+								</div>
+								<p class="setting-status" id="password-policy-status">아직 저장된 정책이 없습니다.</p>
+							</div>
+						</form>
+					</section>
+				</div>
+
+				<!-- ════════ 세션 및 접속 관리 (우측) ════════ -->
+				<div class="sec-col-right">
+					<section class="setting-card" id="session-settings-card" aria-labelledby="session-settings-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="session-settings-title">세션 및 접속 관리</h2>
+								<p>유휴 시간과 동시 접속 제한으로 계정 사용을 추적합니다.</p>
+							</div>
+							<button type="button" class="chip-link chip-danger" data-action="force-logout">전체 로그아웃</button>
+						</div>
+						<form id="session-settings-form" class="setting-form" autocomplete="off">
+							<div class="form-grid single-col">
+								<div class="form-row">
+									<label for="session-idle">유휴 시간 제한(분)<span class="sec-hint">미입력 시 활동 없으면 자동 로그아웃</span></label>
+									<input type="number" id="session-idle" name="idle_minutes" class="form-input" min="5" max="240">
+								</div>
+								<div class="form-row">
+									<label for="session-absolute">절대 세션 만료 시간(시간)<span class="sec-hint">활동 여부와 관계없이 최대 유지 시간</span></label>
+									<input type="number" id="session-absolute" name="absolute_hours" class="form-input" min="1" max="72">
+								</div>
+								<div class="form-row">
+									<label for="session-reissue">세션 토큰 재발급 주기(분)<span class="sec-hint">주기적 세션 갱신으로 탈취 위험 완화</span></label>
+									<input type="number" id="session-reissue" name="session_reissue_minutes" class="form-input" min="5" max="360">
+								</div>
+								<div class="form-row">
+									<label for="session-max">동시 접속 허용 수</label>
+									<select id="session-max" name="max_sessions" class="form-input">
+										<option value="1">1대 (추천)</option>
+										<option value="2">2대</option>
+										<option value="3">3대</option>
+										<option value="5">5대</option>
+									</select>
+								</div>
+								<div class="form-row">
+									<label for="session-concurrent-policy">동시 접속 초과 시 처리</label>
+									<select id="session-concurrent-policy" name="concurrent_policy" class="form-input">
+										<option value="keep_existing">새 로그인 차단 (기존 세션 유지)</option>
+										<option value="kill_existing">기존 세션 종료 (새 로그인 허용)</option>
+										<option value="kill_oldest">가장 오래된 세션 종료</option>
+									</select>
+								</div>
+							</div>
+
+							<div class="sec-check-grid">
+								<label class="checkbox"><input type="checkbox" name="notify_new_login" value="1"><span>새 기기 접속 시 메일 알림</span></label>
+								<label class="checkbox"><input type="checkbox" name="auto_logout_admin" value="1"><span>관리자 콘솔 미사용 시 즉시 잠금</span></label>
+								<label class="checkbox"><input type="checkbox" name="logout_on_browser_close" value="1"><span>브라우저 종료 시 자동 로그아웃</span></label>
+							</div>
+
+							<div class="sec-info-box" id="browser-close-info" style="display:none">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+								<div>
+									<strong>브라우저 종료 시 자동 로그아웃</strong>
+									<p>활성화 시 브라우저 종료 후 재접속하면 반드시 재로그인이 필요합니다. 인증 정보가 세션 쿠키(Session Cookie)로만 유지되며, localStorage/영구 저장소에 저장되지 않습니다.</p>
+									<p class="sec-info-policy">적용 보안: HttpOnly · Secure · SameSite=Strict · 서버 세션 기반 인증</p>
+								</div>
+							</div>
+
+							<!-- ── 활성 세션 관리 (별도 페이지 링크) ── -->
+							<div class="sec-subsection">
+								<h3 class="sec-subsection-title">활성 세션 관리</h3>
+								<p class="sec-subsection-desc">현재 로그인된 세션 정보를 조회하고 관리합니다.</p>
+								<a class="sess-link-card" href="{{ url_for('auth.admin_sessions_page') }}">
+									<span class="sess-link-card-icon">
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+									</span>
+									<span class="sess-link-card-text">
+										<strong>세션 관리 페이지로 이동</strong>
+										<small>활성 세션 목록 조회, 세션 종료 등 세션 관리 기능을 사용합니다.</small>
+									</span>
+									<span class="sess-link-card-arrow">→</span>
+								</a>
+							</div>
+
+							<div class="setting-actions">
+								<div class="action-buttons">
+									<button type="submit" class="btn-save">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+										세션 정책 저장
+									</button>
+								</div>
+								<p class="setting-status" id="session-settings-status">세션 정책이 아직 적용되지 않았습니다.</p>
+							</div>
+						</form>
+					</section>
+				</div>
+			</div>
+
+			<!-- ── 적용 범위 안내 모달 ── -->
+			<div class="sec-apply-modal" id="sec-apply-modal" aria-hidden="true">
+				<div class="sec-apply-modal-card">
+					<h3>정책 적용 범위</h3>
+					<div class="sec-apply-items" id="sec-apply-items"></div>
+					<div class="sec-apply-actions">
+						<button type="button" class="btn-secondary" id="sec-apply-cancel">취소</button>
+						<button type="button" class="btn-save" id="sec-apply-confirm">저장</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

@@ -1,0 +1,289 @@
+/* ===== Sessions Management Page v1.0.0 ===== */
+/* system.css handles table, pagination, modal, toolbar, search, page-size. */
+/* This file adds session-specific styles only. */
+
+/* ── Stats Row ── */
+.sess-stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.sess-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 28px;
+    min-width: 200px;
+    transition: all .25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.sess-stat-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.04), transparent);
+    transition: left .6s ease;
+}
+
+.sess-stat-card:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 20px -4px rgba(99, 102, 241, 0.12);
+    transform: translateY(-2px);
+}
+
+.sess-stat-card:hover::before {
+    left: 100%;
+}
+
+.sess-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sess-stat-icon--sessions {
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.sess-stat-icon--users {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.sess-stat-svg {
+    width: 24px;
+    height: 24px;
+    opacity: .75;
+}
+
+.sess-stat-icon--sessions .sess-stat-svg {
+    filter: brightness(0) saturate(100%) invert(34%) sepia(82%) saturate(2126%) hue-rotate(228deg) brightness(91%) contrast(97%);
+}
+
+.sess-stat-icon--users .sess-stat-svg {
+    filter: brightness(0) saturate(100%) invert(57%) sepia(38%) saturate(1106%) hue-rotate(114deg) brightness(95%) contrast(89%);
+}
+
+.sess-stat-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.sess-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+}
+
+.sess-stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* ── 새로고침 / 선택종료 / 전체종료 hover: #6366F1 ── */
+#sess-refresh-btn:hover,
+#sess-bulk-terminate-btn:hover,
+#sess-terminate-all-btn:hover {
+    background: #6366f1 !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3) !important;
+}
+#sess-refresh-btn:hover .header-icon,
+#sess-bulk-terminate-btn:hover .header-icon,
+#sess-terminate-all-btn:hover .header-icon {
+    filter: brightness(0) invert(1) !important;
+    opacity: 1 !important;
+}
+
+/* ── 전체종료 버튼 항상 #6366F1 ── */
+.sess-btn-terminate-all {
+    background: #6366f1 !important;
+    border-color: #6366f1 !important;
+}
+.sess-btn-terminate-all .header-icon {
+    filter: brightness(0) invert(1) !important;
+    opacity: 1 !important;
+}
+.sess-btn-terminate-all:hover {
+    background: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4) !important;
+}
+
+/* ── Status badges ── */
+.sess-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    color: #1f2937;
+}
+
+.sess-badge-current {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #1f2937;
+}
+
+.sess-badge-active {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #1f2937;
+}
+
+.sess-badge-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.sess-badge-current .sess-badge-dot { background: #6366f1; }
+.sess-badge-active .sess-badge-dot { background: #10b981; }
+
+/* ── Terminate action button in table ── */
+#sess-table .action-btn[data-action="terminate"] {
+    border-color: rgba(239, 68, 68, 0.2);
+}
+#sess-table .action-btn[data-action="terminate"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+#sess-table .action-btn[data-action="terminate"]:hover .action-icon {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ── Current session row highlight ── */
+#sess-table tbody tr {
+    cursor: pointer;
+}
+#sess-table tbody tr.sess-row-current {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.04) 0%, rgba(99, 102, 241, 0.02) 100%) !important;
+}
+#sess-table tbody tr.sess-row-current:hover {
+    background: rgba(99, 102, 241, 0.06) !important;
+}
+
+/* ── Selected row (mirrors onpremise #system-table) ── */
+#sess-table tbody tr.selected {
+    background-color: rgba(99, 102, 241, 0.10) !important;
+    border-left: 3px solid var(--accent, #6366f1) !important;
+    box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.45) !important;
+}
+#sess-table tbody tr.selected:hover {
+    background-color: rgba(99, 102, 241, 0.16) !important;
+}
+
+/* ── IP address chip ── */
+.sess-ip {
+    font-size: 12px;
+    background: #f1f5f9;
+    padding: 3px 10px;
+    border-radius: 6px;
+    color: #475569;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: 1px solid #e2e8f0;
+}
+
+/* ── Sub text ── */
+.sess-sub {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* ── Count badge — onpremise 스타일 동일 ── */
+#sess-count-badge {
+    vertical-align: middle;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px !important; padding: 0 14px !important; border-radius: 999px; line-height: 1;
+    background: #6366f1 !important; background-color: #6366f1 !important; color: #ffffff !important;
+    border: 0 !important;
+    font-weight: 800; font-size: 12px; letter-spacing: .2px;
+    box-shadow: 0 2px 8px rgba(99,102,241,.28) !important;
+    font-variant-numeric: tabular-nums; font-feature-settings: 'tnum';
+}
+#sess-count-badge.large-number { min-width: 56px !important; padding: 0 18px !important; }
+#sess-count-badge.very-large-number { min-width: 72px !important; padding: 0 24px !important; }
+
+/* ── Muted (for disabled action) ── */
+.sess-muted {
+    color: #cbd5e1;
+}
+
+/* ── Empty state override for sessions ── */
+#sess-empty.system-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 60px 20px 40px;
+    text-align: center;
+    background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 70%);
+    border: 1px dashed #cbd5e1;
+    border-radius: 16px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+}
+#sess-empty .empty-illustration {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.08) inset, 0 6px 20px -10px rgba(0, 0, 0, 0.15);
+}
+#sess-empty .empty-icon-img {
+    width: 70px;
+    height: 70px;
+    opacity: .75;
+    filter: grayscale(.1);
+}
+#sess-empty h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #334155;
+    letter-spacing: -.5px;
+}
+#sess-empty p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: #64748b;
+}

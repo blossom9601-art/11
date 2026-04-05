@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/dashboard_add.css?v=20260318-5">
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper backup-dashboard" id="package-dashboard-root">
+			<div class="page-header">
+                    <div class="page-utility-right" data-info-key="governance.package_management"></div>
+				<h1>Package Inventory Console</h1>
+				<p>버전/유형/제조사/라이선스/취약점 기준으로 패키지 현황을 시각화합니다.</p>
+			</div>
+
+			<!-- System Status Bar -->
+			<div class="bk-status-bar" id="pkgStatusBar">
+				<div class="bk-status-indicator">
+					<span class="bk-status-pulse green" id="pkgHealthDot"></span>
+					<span id="pkgHealthText">System Operational</span>
+				</div>
+				<span class="bk-status-sep"></span>
+				<span class="bk-status-meta">
+					<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					<span id="pkgStatusTime">-</span>
+				</span>
+				<span class="bk-status-sep"></span>
+				<span class="bk-status-meta" id="pkgStatusTotal">Packages: -</span>
+			</div>
+
+			{% set tabs = [
+				('gov_package_dashboard', '대시보드'),
+				('gov_package_list', '패키지 검색'),
+				('gov_package_vulnerability', '패키지 취약점'),
+			] %}
+			<div class="system-tabs" role="tablist" aria-label="패키지 관리 탭">
+				{% for key, label in tabs %}
+					<a class="system-tab-btn {% if current_key == key %}active{% endif %}"
+					   role="tab"
+					   aria-selected="{{ 'true' if current_key == key else 'false' }}"
+					   href="/p/{{ key }}">{{ label }}</a>
+				{% endfor %}
+			</div>
+
+			<!-- KPI Summary Row -->
+			<section class="bk-kpi-row bk-kpi-row--4" aria-label="패키지 KPI">
+				<div class="bk-kpi-card" id="kpi-pkg-total">
+					<span class="bk-kpi-dot accent"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiPkgTotal">0</span>
+						<span class="bk-kpi-label">전체 패키지</span>
+					</div>
+				</div>
+				<div class="bk-kpi-card" id="kpi-pkg-types">
+					<span class="bk-kpi-dot daily"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiPkgTypes">0</span>
+						<span class="bk-kpi-label">유형 수</span>
+					</div>
+				</div>
+				<div class="bk-kpi-card" id="kpi-pkg-vendors">
+					<span class="bk-kpi-dot monthly"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiPkgVendors">0</span>
+						<span class="bk-kpi-label">제조사 수</span>
+					</div>
+				</div>
+				<div class="bk-kpi-card" id="kpi-pkg-vuln">
+					<span class="bk-kpi-dot danger"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiPkgVuln">0</span>
+						<span class="bk-kpi-label">취약 패키지</span>
+					</div>
+				</div>
+			</section>
+
+			<!-- Charts -->
+			<div class="bk-section-label"><span>Analytics</span><div class="bk-section-line"></div></div>
+			<section class="chart-grid" aria-label="패키지 차트 영역">
+			<article class="bk-card" aria-labelledby="pkg-type-title">
+				<div class="bk-card-header">
+					<span class="bk-card-dot accent"></span>
+					<h2 id="pkg-type-title">패키지 유형</h2>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="chart-wrap h-320"><canvas id="pkgTypeChart" role="img" aria-label="패키지 유형"></canvas></div>
+				<div class="chart-desc">유형별 패키지 구성 비율</div>
+			</article>
+			<article class="bk-card" aria-labelledby="pkg-manufacturer-title">
+				<div class="bk-card-header">
+					<span class="bk-card-dot info"></span>
+					<h2 id="pkg-manufacturer-title">패키지 제조사</h2>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="chart-wrap h-320"><canvas id="pkgManufacturerChart" role="img" aria-label="패키지 제조사"></canvas></div>
+				<div class="chart-desc">상위 제조사별 패키지 수량 분포</div>
+			</article>
+			<article class="bk-card" aria-labelledby="pkg-license-title">
+				<div class="bk-card-header">
+					<span class="bk-card-dot accent"></span>
+					<h2 id="pkg-license-title">패키지 라이선스</h2>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="chart-wrap h-320"><canvas id="pkgLicenseChart" role="img" aria-label="패키지 라이선스"></canvas></div>
+				<div class="chart-desc">라이선스 유형별 패키지 분포</div>
+			</article>
+			<article class="bk-card" aria-labelledby="pkg-vuln-title">
+				<div class="bk-card-header">
+					<span class="bk-card-dot warning"></span>
+					<h2 id="pkg-vuln-title">취약점 보유 현황</h2>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="chart-wrap h-320"><canvas id="pkgVulnPresenceChart" role="img" aria-label="취약점 보유 현황"></canvas></div>
+				<div class="chart-desc">취약점 보유 여부에 따른 패키지 분포</div>
+			</section>
+
+			<!-- Footer -->
+			<footer class="bk-dashboard-footer" aria-label="운영 정보">
+				<div class="bk-footer-inner">
+					<span class="bk-footer-title">Package Inventory Console v1.0</span>
+					<span class="bk-footer-sep">|</span>
+					<span>Last Refresh : <span id="pkgFooterTime">-</span></span>
+					<span class="bk-footer-sep">|</span>
+					<span>Env : Production</span>
+				</div>
+			</footer>
+			<noscript><div class="chart-placeholder" aria-hidden="true">차트를 보려면 JavaScript 를 활성화하세요.</div></noscript>
+		</div>
+	</main>
+
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+	<script src="/static/js/4.governance/4-7.package_policy/4-7-0.package_dashboard/1.package_dashboard.js?v=20260317-9"></script>
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

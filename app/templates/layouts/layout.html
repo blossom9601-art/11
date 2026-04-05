@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260315">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/bls-modal.css?v=20260321d">
+    <link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=20260321b">
+</head>
+<body{% if menu_code %} data-menu-code="{{ menu_code }}"{% endif %}>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-left">
+            <img src="/static/image/logo/blossom_logo.png" alt="Blossom 로고" class="header-logo">
+            <h1 class="system-title">blossom</h1>
+        </div>
+        <div class="header-right">
+            <button class="header-btn" id="btn-sidebar" title="메뉴">
+                <img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
+            </button>
+            <button class="header-btn" id="btn-work-timeline" title="작업 타임라인" type="button" data-href="{{ url_for('main.addon_work_timeline') }}">
+                <img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
+            </button>
+            <a class="header-btn" id="btn-notifications" title="알림" href="{{ url_for('main.addon_notifications') }}">
+                <img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
+            </a>
+            <a class="header-btn" id="btn-chat" title="채팅" href="{{ url_for('main.addon_chat') }}">
+                <img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
+            </a>
+            <a class="header-btn" id="btn-calendar" title="달력" href="{{ url_for('main.addon_calendar') }}">
+                <img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
+            </a>
+            <button class="header-btn" id="btn-account" title="계정" type="button" data-emp-no="{{ current_user_emp_no or '' }}">
+                <img src="/static/image/center/avatar-default.svg" alt="계정" class="header-avatar-icon">
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-menu">
+            <ul class="menu-list">
+                <!-- 대시보드 -->
+                <li class="menu-item">
+                    <a href="../1. dashboard/index.html" class="menu-link">
+                        <img src="/static/image/svg/dashboard.svg" alt="대시보드" class="menu-icon">
+                        <span class="menu-text">대시보드</span>
+                    </a>
+                </li>
+                
+                <!-- 시스템 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/build.svg" alt="시스템" class="menu-icon">
+                        <span class="menu-text">시스템</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../2.hardware/2-1.hardware/2-1-1.server.html" class="submenu-link">서버</a></li>
+                        <li><a href="../2.hardware/2-1.hardware/2-2-1.storage.html" class="submenu-link">스토리지</a></li>
+                        <li><a href="../2.hardware/2-1.hardware/2-3-1.director.html" class="submenu-link">SAN</a></li>
+                        <li><a href="../2.hardware/2-1.hardware/2-4-1.network.html" class="submenu-link">네트워크</a></li>
+                        <li><a href="../2.hardware/2-1.hardware/2-5-1.security.html" class="submenu-link">보안장비</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 소프트웨어 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/apps.svg" alt="소프트웨어" class="menu-icon">
+                        <span class="menu-text">소프트웨어</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../3.software/3-1.os.html" class="submenu-link">운영체제</a></li>
+                        <li><a href="../3.software/3-2.db.html" class="submenu-link">데이터베이스</a></li>
+                        <li><a href="../3.software/3-3.middleware.html" class="submenu-link">미들웨어</a></li>
+                        <li><a href="../3.software/3-4.docker.html" class="submenu-link">도커</a></li>
+                        <li><a href="../3.software/3-5.kubernetes.html" class="submenu-link">쿠버네티스</a></li>
+                        <li><a href="../3.software/3-6.server_access_control.html" class="submenu-link">서버 접근제어</a></li>
+                        <li><a href="../3.software/3-7.server_integrity_account.html" class="submenu-link">서버 통합계정</a></li>
+                        <li><a href="../3.software/3-8.server_monitoring.html" class="submenu-link">서버 모니터링</a></li>
+                        <li><a href="../3.software/3-9.server_security_control.html" class="submenu-link">서버 보안통제</a></li>
+                        <li><a href="../3.software/3-10.etc_sw.html" class="submenu-link">기타</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 네트워크 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/dns.svg" alt="네트워크" class="menu-icon">
+                        <span class="menu-text">네트워크</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../4.network/4-1.ip_range.html" class="submenu-link">IP 범위</a></li>
+                        <li><a href="../4.network/4-2.dedicated_line.html" class="submenu-link">전용회선</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 백업정책 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/backup.svg" alt="백업정책" class="menu-icon">
+                        <span class="menu-text">백업정책</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../5.backup/5-1.backup_policy.html" class="submenu-link">백업정책</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 데이터센터 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/domain.svg" alt="데이터센터" class="menu-icon">
+                        <span class="menu-text">데이터센터</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+            <li><a href="/app/templates/6.datacenter/6-1.rack/6-1-1.future_5f.html" class="submenu-link">RACK 관리</a></li>
+            <li><a href="/app/templates/6.datacenter/6-2.floor/6-2-1.future_5f.html" class="submenu-link">상면 관리</a></li>
+                        <li><a href="../6.datacenter/6-3.access.html" class="submenu-link">출입관리</a></li>
+                        <li><a href="../6.datacenter/6-4.erasure.html" class="submenu-link">데이터삭제</a></li>
+                        <li><a href="../6.datacenter/6-5.temperature.html" class="submenu-link">온/습도관리</a></li>
+                        <li><a href="../6.datacenter/6-6.power.html" class="submenu-link">전력관리</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 유지보수 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/build.svg" alt="유지보수" class="menu-icon">
+                        <span class="menu-text">유지보수</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../7.maintenance/7-1.contract.html" class="submenu-link">계약관리</a></li>
+                        <li><a href="../7.maintenance/7-2.inspection.html" class="submenu-link">정기점검</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 프로젝트 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/folder.svg" alt="프로젝트" class="menu-icon">
+                        <span class="menu-text">프로젝트</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../8.project/8-1.project.html" class="submenu-link">프로젝트 현황</a></li>
+                        <li><a href="../8.project/8-2.task.html" class="submenu-link">작업 현황</a></li>
+                        <li><a href="../8.project/8-3.desk/8-3-1.workflow/1.workflow_progress.html" class="submenu-link">티켓 현황</a></li>
+                        <li><a href="../8.project/8-4.designer/8-4-1.explore/1.wf_designer_explore.html" class="submenu-link">워크플로우 제작</a></li>
+                    </ul>
+                </li>
+                
+                <!-- 설정 -->
+                <li class="menu-item has-submenu">
+                    <div class="menu-link submenu-trigger">
+                        <img src="/static/image/svg/settings.svg" alt="설정" class="menu-icon">
+                        <span class="menu-text">설정</span>
+                        <img src="/static/image/svg/expand_more.svg" alt="펼치기" class="submenu-arrow">
+                    </div>
+                    <ul class="submenu">
+                        <li><a href="../9.setting/9-1.business.html" class="submenu-link">비즈니스</a></li>
+                        <li><a href="../9.setting/9-2.hardware.html" class="submenu-link">하드웨어</a></li>
+                        <li><a href="../9.setting/9-3.software.html" class="submenu-link">소프트웨어</a></li>
+                        <li><a href="../9.setting/9-4.component.html" class="submenu-link">컴포넌트</a></li>
+                        <li><a href="../9.setting/9-5.company.html" class="submenu-link">회사</a></li>
+                        <li><a href="../9.setting/9-6.customer.html" class="submenu-link">고객</a></li>
+                        <li><a href="../9.setting/9-7.vendor.html" class="submenu-link">벤더</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/_shared/bls-stats-modal.js?v=20260321a" defer></script>
+
+    <!-- 데이터 동기화 엔진 (순서: core → entities → bridge) -->
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+
+    <script src="/static/js/blossom-permission-guard.js?v=20260315_dis" defer></script>
+
+    <!-- 공통 유틸리티 (순서: constants → dom-utils → api-client → modal-utils → table-utils) -->
+    <script src="/static/js/common/constants.js?v=20260315"></script>
+    <script src="/static/js/common/dom-utils.js?v=20260315"></script>
+    <script src="/static/js/common/api-client.js?v=20260315"></script>
+    <script src="/static/js/common/modal-utils.js?v=20260315"></script>
+    <script src="/static/js/common/bls-modal-factory.js?v=20260317"></script>
+    <script src="/static/js/common/bls-alert.js?v=20260317"></script>
+    <script src="/static/js/common/table-utils.js?v=20260315"></script>
+</body>
+</html>

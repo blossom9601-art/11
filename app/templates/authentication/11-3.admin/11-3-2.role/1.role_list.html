@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.44">
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/js/blossom-permission-guard.js?v=20260315_dis" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-2.role/1.role_list.js?v=20260328a" defer></script>
+</head>
+<body data-menu-code="settings.permission" data-skip-perm-guard="true">
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper role-management-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>화면권한 설정</h1>
+					<p>역할 단위로 메뉴 접근 권한을 지정합니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<!-- ── 소스 선택 + 검색 + 버튼 ── -->
+			<div class="perm-toolbar">
+				<div class="perm-toolbar-left">
+					<!-- 화면권한 구분 토글 (메뉴/상세) -->
+					<div class="perm-section-toggle" id="perm-section-toggle">
+						<button type="button" class="perm-section-btn active" data-section="menu">메뉴화면권한</button>
+						<button type="button" class="perm-section-btn" data-section="detail">상세화면권한</button>
+					</div>
+					<span class="perm-toolbar-divider"></span>
+					<div class="perm-source-toggle" id="perm-source-toggle">
+						<button type="button" class="perm-source-btn active" data-source="role">역할</button>
+						<button type="button" class="perm-source-btn" data-source="dept">부서</button>
+					</div>
+					<!-- 역할 패널 -->
+					<div class="perm-source-panel" id="perm-panel-role">
+						<div class="perm-role-search-wrap perm-select-box">
+							<input type="text" id="perm-role-search" class="perm-role-search-input perm-select-input" placeholder="역할 선택" autocomplete="off">
+							<span class="perm-select-caret">
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</span>
+							<div class="perm-role-dropdown" id="perm-role-dropdown" style="display:none;"></div>
+						</div>
+					</div>
+					<!-- 부서 패널 -->
+					<div class="perm-source-panel" id="perm-panel-dept" style="display:none;">
+						<div class="perm-role-search-wrap perm-select-box">
+							<input type="text" id="perm-dept-search" class="perm-role-search-input perm-select-input" placeholder="부서 선택" autocomplete="off">
+							<span class="perm-select-caret">
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</span>
+							<div class="perm-role-dropdown" id="perm-dept-dropdown" style="display:none;"></div>
+						</div>
+					</div>
+				</div>
+				<div class="perm-toolbar-right">
+					<button class="header-btn" id="perm-role-add-btn" title="역할 추가">
+						<img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
+					</button>
+					<button class="header-btn" id="perm-role-save" disabled title="저장">
+						<img src="/static/image/svg/free-icon-disk.svg" alt="저장" class="header-icon">
+					</button>
+				</div>
+			</div>
+
+			<!-- ── 매트릭스 ── -->
+			<div class="perm-matrix-wrapper" id="perm-role-matrix"></div>
+		</div>
+	</main>
+
+	<!-- 역할 추가 모달 -->
+	<div id="role-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="role-add-title">
+		<div class="server-add-content" style="max-width:560px;">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="role-add-title">역할 추가</h3>
+					<p class="server-add-subtitle">역할명과 설명을 입력하세요.</p>
+				</div>
+				<button class="close-btn" type="button" id="role-add-close" title="닫기" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="role-add-form">
+					<div class="form-section">
+						<div class="section-header"><h4>역할 정보</h4></div>
+						<div class="form-grid">
+							<div class="form-row">
+								<label>역할명 <span class="required">*</span></label>
+								<input type="text" id="role-add-name" class="form-input" placeholder="예: 감사자" maxlength="64">
+							</div>
+							<div class="form-row">
+								<label>설명</label>
+								<input type="text" id="role-add-desc" class="form-input" placeholder="선택 사항" maxlength="200">
+							</div>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" id="role-add-cancel">취소</button>
+					<button type="button" class="btn-primary" id="role-add-submit">추가</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 변경사항 확인 모달 -->
+	<div id="dirty-confirm-modal" class="server-add-modal system-dispose-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="dirty-confirm-title">
+		<div class="server-add-content" style="max-width:640px;">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="dirty-confirm-title">변경사항 확인</h3>
+					<p class="server-add-subtitle">저장하지 않은 변경사항이 있습니다.</p>
+				</div>
+				<button class="close-btn" type="button" id="dirty-confirm-close" title="닫기" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p id="dirty-confirm-message">저장하지 않은 변경사항이 있습니다.<br>계속 진행하시겠습니까?</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" id="dirty-confirm-cancel">취소</button>
+					<button type="button" class="btn-primary" id="dirty-confirm-ok">계속</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 상태 알림 바 -->
+	<div id="system-status" class="system-status-bar" aria-live="polite"></div>
+
+	<!-- 메시지 모달 -->
+	<div id="system-message-modal" class="server-add-modal system-message-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="system-message-title">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="system-message-title">알림</h3>
+				</div>
+				<button class="close-btn" type="button" id="system-message-close" title="닫기" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p id="system-message-content">메시지 내용</p>
+					</div>
+					<div class="message-illust">
+						<img src="/static/image/svg/list/free-sticker-solution.svg" alt="Solution Illustration" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="system-message-ok">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

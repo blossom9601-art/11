@@ -1,0 +1,551 @@
+/*
+ * tab14-log.css — 변경이력 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────
+ * 모든 상세 페이지의 변경이력 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 공통값: 여백, 크기, 색상, 반지름, 그림자 등 모든 시각 속성
+ * ● 페이지 설정값: data-* 속성 또는 JS config 객체로 주입
+ *
+ * 버전: 1.0 (2026-03-18)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab14-log-root {
+    /* 색상 */
+    --lg-accent:           #6366f1;
+    --lg-accent-light:     #e0e7ff;
+    --lg-accent-hover:     rgba(99,102,241,.18);
+    --lg-danger:           #ef4444;
+    --lg-danger-light:     #fee2e2;
+    --lg-text:             #1f2937;
+    --lg-text-secondary:   #6b7280;
+    --lg-text-muted:       #9ca3af;
+    --lg-border:           #e5e7eb;
+    --lg-bg:               #ffffff;
+    --lg-bg-toolbar:       #f9fafb;
+
+    /* 배지 색상 */
+    --lg-badge-create-bg:  #dbeafe;
+    --lg-badge-create-fg:  #2563eb;
+    --lg-badge-update-bg:  #ede9fe;
+    --lg-badge-update-fg:  #7c3aed;
+    --lg-badge-delete-bg:  #fee2e2;
+    --lg-badge-delete-fg:  #dc2626;
+
+    /* diff 색상 */
+    --lg-diff-old-bg:      rgba(239,68,68,0.04);
+    --lg-diff-old-fg:      #991b1b;
+    --lg-diff-new-bg:      rgba(34,197,94,0.04);
+    --lg-diff-new-fg:      #166534;
+
+    /* 여백 */
+    --lg-toolbar-padding:  10px 16px;
+    --lg-toolbar-gap:      10px;
+    --lg-meta-margin:      20px 28px 0;
+    --lg-meta-padding:     11px 18px;
+    --lg-diff-margin:      18px 28px 20px;
+
+    /* 크기 */
+    --lg-input-h:          34px;
+    --lg-input-font:       13px;
+    --lg-meta-icon-size:   30px;
+
+    /* 반지름 */
+    --lg-radius-input:     6px;
+    --lg-radius-card:      10px;
+    --lg-radius-badge:     12px;
+
+    /* 그림자 */
+    --lg-shadow-focus:     0 0 0 2px rgba(99,102,241,0.12);
+
+    /* 전환 */
+    --lg-transition:       border-color .2s, box-shadow .2s;
+}
+
+/* ═══════════════════════════════════
+   1. 필터 툴바 (Filter Toolbar)
+   ═══════════════════════════════════ */
+.tab14-log-root .lg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--lg-toolbar-gap);
+    padding: var(--lg-toolbar-padding);
+    background: var(--lg-bg-toolbar);
+    border: 1px solid var(--lg-border);
+    border-top: none;
+    flex-wrap: wrap;
+}
+
+.tab14-log-root .lg-toolbar-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tab14-log-root .lg-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.tab14-log-root .lg-toolbar-sep {
+    color: var(--lg-text-muted);
+    font-size: 14px;
+    line-height: 1;
+    user-select: none;
+}
+
+/* 날짜 입력 */
+.tab14-log-root .lg-date-input {
+    width: 130px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: var(--lg-radius-input);
+    font-size: var(--lg-input-font);
+    color: var(--lg-text);
+    background: var(--lg-bg);
+    cursor: pointer;
+    transition: var(--lg-transition);
+}
+.tab14-log-root .lg-date-input:hover { border-color: #a5b4fc; }
+.tab14-log-root .lg-date-input:focus,
+.tab14-log-root .lg-date-input.active {
+    outline: none;
+    border-color: var(--lg-accent);
+    box-shadow: var(--lg-shadow-focus);
+}
+.tab14-log-root .lg-date-input::placeholder { color: var(--lg-text-muted); }
+
+/* 유형 셀렉트 */
+.tab14-log-root .lg-toolbar-select {
+    padding: 6px 28px 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: var(--lg-radius-input);
+    font-size: var(--lg-input-font);
+    color: var(--lg-text);
+    background: var(--lg-bg);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+    transition: var(--lg-transition);
+}
+.tab14-log-root .lg-toolbar-select:hover { border-color: #a5b4fc; }
+.tab14-log-root .lg-toolbar-select:focus {
+    outline: none;
+    border-color: var(--lg-accent);
+    box-shadow: var(--lg-shadow-focus);
+}
+
+/* 키워드 입력 */
+.tab14-log-root .lg-toolbar-keyword {
+    width: 180px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: var(--lg-radius-input);
+    font-size: var(--lg-input-font);
+    color: var(--lg-text);
+    background: var(--lg-bg);
+    transition: var(--lg-transition);
+}
+.tab14-log-root .lg-toolbar-keyword:hover { border-color: #a5b4fc; }
+.tab14-log-root .lg-toolbar-keyword:focus {
+    outline: none;
+    border-color: var(--lg-accent);
+    box-shadow: var(--lg-shadow-focus);
+}
+.tab14-log-root .lg-toolbar-keyword::placeholder { color: var(--lg-text-muted); }
+
+/* 조회 버튼 */
+.tab14-log-root .lg-toolbar-search-btn {
+    padding: 6px 18px;
+    border: none;
+    border-radius: var(--lg-radius-input);
+    font-size: var(--lg-input-font);
+    font-weight: 600;
+    color: #fff;
+    background: var(--lg-accent);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, box-shadow .2s;
+}
+.tab14-log-root .lg-toolbar-search-btn:hover {
+    background: #4f46e5;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.25);
+}
+.tab14-log-root .lg-toolbar-search-btn:active { background: #4338ca; }
+
+/* 페이지 사이즈 (툴바 내) */
+.tab14-log-root .lg-toolbar .page-size-selector {
+    position: static;
+    transform: none;
+    margin: 0;
+}
+.tab14-log-root .lg-toolbar .page-size-selector::after { content: none; }
+.tab14-log-root .lg-toolbar .page-size-select {
+    padding: 6px 28px 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: var(--lg-radius-input);
+    font-size: var(--lg-input-font);
+    color: var(--lg-text);
+    background: var(--lg-bg);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+    transition: var(--lg-transition);
+}
+.tab14-log-root .lg-toolbar .page-size-select:hover { border-color: #a5b4fc; }
+.tab14-log-root .lg-toolbar .page-size-select:focus {
+    outline: none;
+    border-color: var(--lg-accent);
+    box-shadow: var(--lg-shadow-focus);
+}
+
+/* ═══════════════════════════════════
+   2. 테이블 (Table)
+   ═══════════════════════════════════ */
+
+/* 행 선택 하이라이트 */
+.tab14-log-root #lg-spec-table tbody tr.selected,
+.tab14-log-root #lg-spec-table tbody tr.selected:nth-child(odd),
+.tab14-log-root #lg-spec-table tbody tr.selected:nth-child(even) {
+    background-color: rgba(99,102,241,0.10) !important;
+    border-left: 3px solid var(--lg-accent) !important;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.45) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr.selected:hover,
+.tab14-log-root #lg-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab14-log-root #lg-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: rgba(99,102,241,0.16) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr.selected td,
+.tab14-log-root #lg-spec-table tbody tr.selected > td {
+    background-color: rgba(106,90,205,0.10) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr.selected:hover td,
+.tab14-log-root #lg-spec-table tbody tr.selected:hover > td {
+    background-color: rgba(106,90,205,0.16) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--lg-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab14-log-root #lg-spec-table tbody tr:has(input.lg-row-check:checked) {
+    background-color: rgba(99,102,241,0.10) !important;
+    box-shadow: inset 0 0 0 1px rgba(99,102,241,0.45) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr:hover:has(input.lg-row-check:checked) {
+    background-color: rgba(99,102,241,0.16) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr:has(input.lg-row-check:checked) td {
+    background-color: rgba(99,102,241,0.10) !important;
+}
+.tab14-log-root #lg-spec-table tbody tr:hover:has(input.lg-row-check:checked) td {
+    background-color: rgba(99,102,241,0.16) !important;
+}
+
+/* 액션 컬럼 정렬 */
+.tab14-log-root #lg-spec-table td.system-actions {
+    text-align: left !important;
+    padding-left: 16px;
+    padding-right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.tab14-log-root #lg-spec-table td.system-actions .action-btn { margin: 0; }
+
+/* 버튼 위치 */
+.tab14-log-root #lg-download-btn.add-btn-icon { right: 20px !important; }
+.tab14-log-root #lg-bulk-delete-btn.add-btn-icon { right: 74px !important; }
+
+/* ═══════════════════════════════════
+   3. 상세 diff 모달 (Detail Modal)
+   ═══════════════════════════════════ */
+.tab14-log-root #lg-detail-modal .server-edit-content {
+    max-width: 680px;
+    height: 80vh;
+}
+.tab14-log-root #lg-detail-modal .server-edit-body {
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* 요약 카드 (2×2 그리드) */
+.tab14-log-root .lg-evt-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: var(--lg-meta-margin);
+    border-radius: var(--lg-radius-card);
+    overflow: hidden;
+    border: 1px solid var(--lg-border);
+    background: #fafbfc;
+}
+.tab14-log-root .lg-evt-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--lg-meta-padding);
+    font-size: 13px;
+    color: #374151;
+    border-bottom: 1px solid #f0f1f3;
+}
+.tab14-log-root .lg-evt-meta-item:nth-child(odd) { border-right: 1px solid #f0f1f3; }
+.tab14-log-root .lg-evt-meta-item:nth-last-child(-n+2) { border-bottom: none; }
+.tab14-log-root .lg-evt-meta-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--lg-meta-icon-size);
+    height: var(--lg-meta-icon-size);
+    border-radius: 8px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
+}
+.tab14-log-root .lg-evt-meta-icon svg {
+    width: 15px;
+    height: 15px;
+    stroke: var(--lg-accent);
+    stroke-width: 2;
+    fill: none;
+}
+.tab14-log-root .lg-evt-meta-label {
+    font-size: 11px;
+    color: var(--lg-text-muted);
+    line-height: 1;
+    margin-bottom: 2px;
+}
+.tab14-log-root .lg-evt-meta-val {
+    font-size: 13px;
+    color: var(--lg-text);
+    font-weight: 500;
+    line-height: 1.3;
+    word-break: break-all;
+}
+
+/* 액션 타입 배지 */
+.tab14-log-root .lg-evt-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: var(--lg-radius-badge);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+}
+.tab14-log-root .lg-evt-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+.tab14-log-root .lg-evt-badge--create {
+    background: var(--lg-badge-create-bg);
+    color: var(--lg-badge-create-fg);
+}
+.tab14-log-root .lg-evt-badge--create::before { background: var(--lg-badge-create-fg); }
+.tab14-log-root .lg-evt-badge--update {
+    background: var(--lg-badge-update-bg);
+    color: var(--lg-badge-update-fg);
+}
+.tab14-log-root .lg-evt-badge--update::before { background: var(--lg-badge-update-fg); }
+.tab14-log-root .lg-evt-badge--delete {
+    background: var(--lg-badge-delete-bg);
+    color: var(--lg-badge-delete-fg);
+}
+.tab14-log-root .lg-evt-badge--delete::before { background: var(--lg-badge-delete-fg); }
+
+/* 이벤트 요약 */
+.tab14-log-root .lg-evt-summary {
+    margin: 16px 28px 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border-left: 3px solid var(--lg-accent);
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.55;
+    word-break: break-all;
+}
+
+/* diff 테이블 */
+.tab14-log-root .lg-diff-wrap { margin: var(--lg-diff-margin); }
+.tab14-log-root .lg-diff-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--lg-text-secondary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tab14-log-root .lg-diff-title::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 13px;
+    background: linear-gradient(180deg, #667eea, #764ba2);
+    border-radius: 2px;
+}
+.tab14-log-root .lg-diff-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-card);
+    overflow: hidden;
+    font-size: 13px;
+}
+.tab14-log-root .lg-diff-table thead th {
+    background: #f8fafc;
+    color: var(--lg-text-secondary);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--lg-border);
+}
+.tab14-log-root .lg-diff-table thead th.lg-th-arrow {
+    text-align: center;
+    width: 36px;
+    padding: 10px 4px;
+}
+.tab14-log-root .lg-diff-table tbody td {
+    padding: 10px 14px;
+    color: #374151;
+    vertical-align: top;
+    border-bottom: 1px solid #f3f4f6;
+    word-break: break-all;
+}
+.tab14-log-root .lg-diff-table tbody tr:last-child td { border-bottom: none; }
+.tab14-log-root .lg-diff-table tbody td.lg-td-field {
+    font-weight: 600;
+    color: #4b5563;
+    white-space: nowrap;
+}
+.tab14-log-root .lg-diff-table tbody td.lg-td-old {
+    background: var(--lg-diff-old-bg);
+    color: var(--lg-diff-old-fg);
+}
+.tab14-log-root .lg-diff-table tbody td.lg-td-new {
+    background: var(--lg-diff-new-bg);
+    color: var(--lg-diff-new-fg);
+}
+.tab14-log-root .lg-diff-table tbody td.lg-td-arrow {
+    text-align: center;
+    color: var(--lg-text-muted);
+    font-size: 15px;
+    padding: 10px 4px;
+    vertical-align: middle;
+}
+.tab14-log-root .lg-diff-empty {
+    color: #cbd5e1;
+    font-style: italic;
+}
+.tab14-log-root .lg-no-diff {
+    text-align: center;
+    padding: 32px 0;
+    color: var(--lg-text-muted);
+    font-size: 14px;
+}
+
+/* ═══════════════════════════════════
+   4. 삭제 확인 모달 (Delete Modal)
+   ═══════════════════════════════════ */
+.tab14-log-root #lg-delete-modal .server-add-content { max-width: 680px; }
+.tab14-log-root #lg-delete-modal .server-add-header { padding: 20px 32px; }
+.tab14-log-root #lg-delete-modal .dispose-title { display: block; }
+.tab14-log-root #lg-delete-modal .dispose-title h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+.tab14-log-root #lg-delete-modal .server-add-body {
+    padding: 20px 0 24px;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+.tab14-log-root #lg-delete-modal .dispose-content {
+    margin: 0 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+.tab14-log-root #lg-delete-modal .dispose-text {
+    flex: 1 1 auto;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+}
+.tab14-log-root #lg-delete-modal .dispose-text p { margin: 0 0 8px 0; }
+.tab14-log-root #lg-delete-modal .dispose-illust {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab14-log-root #lg-delete-modal .dispose-illust img {
+    width: 220px;
+    max-width: min(36vw, 240px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.08));
+    border-radius: 10px;
+}
+
+/* ═══════════════════════════════════
+   5. CSV 다운로드 모달 (Download Modal)
+   ═══════════════════════════════════ */
+/* 기본 레이아웃은 system-download-modal 클래스에서 상속 */
+
+/* ═══════════════════════════════════
+   6. 반응형 (Responsive)
+   ═══════════════════════════════════ */
+@media (max-width: 900px) {
+    .tab14-log-root .lg-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .tab14-log-root .lg-toolbar-filters { flex-wrap: wrap; }
+    .tab14-log-root .lg-toolbar-right {
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+    .tab14-log-root .lg-date-input { width: 120px; }
+    .tab14-log-root .lg-toolbar-keyword { width: 140px; }
+}
+
+@media (max-width: 680px) {
+    .tab14-log-root #lg-delete-modal .dispose-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    .tab14-log-root #lg-delete-modal .dispose-illust img {
+        width: 160px;
+        max-width: 70vw;
+    }
+}

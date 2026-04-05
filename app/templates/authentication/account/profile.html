@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <title>내 프로필 - blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.1">
+    <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <script src="/static/js/blossom.js" defer></script>
+</head>
+<body class="account-profile-page">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="page-header"><h1>내 프로필</h1><p>계정 기본 정보를 확인합니다.</p></div>
+            <div class="profile-card">
+                <div class="profile-card-left">
+                    <img src="{{ user.profile_image or '/static/image/svg/profil/free-icon-bussiness-man.svg' }}" alt="{{ user.name or user.emp_no }}" class="profile-avatar" loading="lazy" data-debug-profile-image="{{ user.profile_image }}" />
+                    
+                </div>
+                <div class="profile-card-right">
+                    <table class="profile-info-table">
+                        <tbody>
+                            <tr><th>사번</th><td>{{ user.emp_no }}</td></tr>
+                            <tr><th>이름</th><td>{{ user.name }}</td></tr>
+                            <tr><th>별명</th><td>{{ user.nickname }}</td></tr>
+                            <tr><th>역할</th><td>{{ user.role }}</td></tr>
+                            <tr><th>소속</th><td>{{ user.department }}</td></tr>
+                            <tr><th>회사</th><td>{{ user.company }}</td></tr>
+                            <tr><th>위치</th><td>{{ user.location }}</td></tr>
+                            <tr><th>내선전화</th><td>{{ user.ext_phone }}</td></tr>
+                            <tr><th>휴대전화</th><td>{{ user.mobile_phone }}</td></tr>
+                            <tr><th>이메일</th><td>{{ user.email }}</td></tr>
+                            <tr><th>업무</th><td>{{ user.job }}</td></tr>
+                            <tr><th>허용 IP</th><td>{{ user.allowed_ip }}</td></tr>
+                            <tr><th>마지막 로그인</th><td>{{ user.last_login_at }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="profile-actions">
+                <a href="/logout" class="btn-danger">로그아웃</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

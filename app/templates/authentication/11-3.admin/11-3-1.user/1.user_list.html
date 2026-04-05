@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <!-- 버전 파라미터 bump (캐시 강제 무효화) -->
+    <!-- v1.0.13: 메시지 모달 레이아웃/텍스트 색상 온프레미스 완전 동기화 + 스티커 축소 유지 -->
+    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.20">
+    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/authentication/11-3.admin/11-3-1.user/1.user_list.js?v=20260228d"></script>
+</head>
+<body>
+    <span id="debug-users-count" style="display:none">0</span>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <h1>설정</h1>
+                    <p>시스템 설정 중 사용자를 관리합니다.</p>
+                </div>
+                <!-- ADMIN 사용자 관리 탭 -->
+                <div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+                    <a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+                </div>
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>사용자 <span class="count-badge" id="system-count" data-count="0">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="제조사 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: HPE%가상). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <!-- 삭제처리 / 일괄변경 버튼 (보기 박스와 복제 버튼 사이) -->
+                                <button class="header-btn" id="system-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+                                    <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-bulk-btn" title="일괄변경" aria-label="선택 행 일괄변경">
+                                    <img src="/static/image/svg/list/free-icon-bulk-edit.svg" alt="일괄변경" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-stats-btn" title="통계" aria-label="현재 결과 통계 보기">
+                                    <img src="/static/image/svg/list/free-icon-chart.svg" alt="통계" class="header-icon">
+                                </button>
+                                <!-- 제거된: 불용처리, 행 복제, 업로드, CSV 다운로드 버튼 -->
+                                <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <!-- 수평 스크롤 래퍼 (카테고리 서버 리스트와 동일 패턴) -->
+                        <div class="system-table-scroll-wrapper">
+                            <div class="system-table-container server-table-container hscroll-inner" id="table-scroll-inner">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all" aria-label="전체 선택"></th>
+                                        <th data-col="profile">프로필</th>
+                                        <th data-col="emp_no">사번</th>
+                                        <th data-col="name">이름</th>
+                                        <th data-col="nickname">별명</th>
+                                        <th data-col="company">회사</th>
+                                        <th data-col="department">소속</th>
+                                        <th data-col="role">역할</th>
+                                        <th data-col="employment_status">재직</th>
+                                        <th data-col="ext_phone">내선전화</th>
+                                        <th data-col="mobile_phone">휴대전화</th>
+                                        <th data-col="email">이메일</th>
+                                        <th data-col="job">업무</th>
+                                        <th data-col="last_login_at">마지막 로그인 시간</th>
+                                        <th data-col="password_changed_at">비밀번호 변경일</th>
+                                        <th data-col="password_expires_at">비밀번호 만료일</th>
+                                        <th data-col="locked">계정 잠금 여부</th>
+                                        <th data-col="fail_cnt">로그인 실패 횟수</th>
+                                        <th data-col="lock_reset">잠금 초기화</th>
+                                        <th data-col="password_reset">비밀번호 초기화</th>
+                                        <th data-col="created_at">생성일</th>
+                                        <th data-col="updated_at">수정일</th>
+                                        <th data-col="allowed_ip">허용 IP</th>
+                                        <th data-col="actions">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                            </div>
+                        </div>
+                        <!-- 빈 상태 플레이스홀더: 데이터 없거나 비인가(HTML 응답) 시 표시 -->
+                        <div id="user-empty-placeholder" class="user-empty-placeholder" style="display:none;">
+                            <div class="empty-box">
+                                <img src="/static/image/svg/list/free-sticker-process.svg" alt="Empty" class="empty-icon" loading="lazy" />
+                                <p class="empty-title">사용자 내역이 없습니다.</p>
+                                <p class="empty-sub">우측 상단 '추가' 버튼을 눌러 첫 사용자를 등록하세요.</p>
+                            </div>
+                        </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination" data-style="category2">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled aria-label="첫 페이지"><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled aria-label="이전 페이지"><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <!-- 빈 데이터 초기 로드에서도 1 페이지가 시각적으로 바로 나타나도록 기본 버튼 삽입 (JS 렌더 후 교체) -->
+                                <div class="page-numbers" id="system-page-numbers" aria-label="페이지 번호">
+                                    <button class="page-btn active" data-page="1" type="button">1</button>
+                                </div>
+                                <button class="pagination-btn" id="system-next" disabled aria-label="다음 페이지"><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled aria-label="마지막 페이지"><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 사용자 수정 모달 (추가 모달과 동일 스타일) -->
+        <div id="user-edit-modal" class="server-edit-modal user-edit-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="user-edit-title">
+            <div class="server-edit-content">
+                <div class="server-edit-header">
+                    <div class="server-add-title">
+                        <h3 id="user-edit-title">사용자 수정</h3>
+                        <p class="server-add-subtitle">선택한 사용자의 프로필 및 기본 정보를 수정합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="user-edit-close" title="닫기" aria-label="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-edit-body user-edit-body">
+                    <form id="user-edit-form" method="post" action="/admin/auth/update" autocomplete="off">
+                        <div class="form-section">
+                            <div class="section-header"><h4>프로필</h4></div>
+                            <div class="profile-preview-wrapper">
+                                <button type="button" id="edit-profile-preview-btn" class="profile-preview-btn" aria-label="프로필 이미지 선택">
+                                    <img src="/static/image/svg/profil/free-icon-bussiness-man.svg" alt="현재 프로필" id="edit-profile-preview-img" class="profile-preview-img" loading="lazy">
+                                </button>
+                                <p class="profile-preview-hint">이미지를 클릭하여 다른 프로필을 선택하세요.</p>
+                            </div>
+                            <input type="hidden" name="profile_image" id="edit-profile-image-input" value="/static/image/svg/profil/free-icon-bussiness-man.svg">
+                        </div>
+                        <div class="form-section">
+                            <div class="section-header"><h4>기본 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row"><label>사번<span class="required">*</span></label><input class="form-input" type="text" name="emp_no" required placeholder="사번" maxlength="32" id="edit-emp-no"></div>
+                                <div class="form-row"><label>이름<span class="required">*</span></label><input class="form-input" type="text" name="name" required placeholder="이름" maxlength="64" id="edit-name"></div>
+                                <div class="form-row"><label>별명</label><input class="form-input" type="text" name="nickname" placeholder="별명" maxlength="64" id="edit-nickname"></div>
+                                <div class="form-row"><label>회사</label><input class="form-input" type="text" name="company" placeholder="회사" maxlength="128" id="edit-company"></div>
+                                <div class="form-row"><label>소속</label><input class="form-input" type="text" name="department" placeholder="소속" maxlength="128" id="edit-department"></div>
+                                <div class="form-row"><label>재직</label><select class="form-input" name="employment_status" id="edit-employment-status">
+                                        <option value="재직">재직</option>
+                                        <option value="휴직">휴직</option>
+                                        <option value="퇴직">퇴직</option>
+                                    </select></div>
+                                <div class="form-row"><label>내선전화</label><input class="form-input" type="text" name="ext_phone" placeholder="내선전화" maxlength="32" id="edit-ext-phone"></div>
+                                <div class="form-row"><label>휴대전화</label><input class="form-input" type="text" name="mobile_phone" placeholder="휴대전화" maxlength="32" id="edit-mobile-phone"></div>
+                                <div class="form-row"><label>이메일<span class="required">*</span></label><input class="form-input" type="email" name="email" required placeholder="email@example.com" maxlength="128" id="edit-email"></div>
+                                <div class="form-row"><label>역할<span class="required">*</span></label><select class="form-input" name="role" required aria-label="역할 선택" id="edit-role">
+                                        <option value="USER">사용자</option>
+                                        <option value="TEAM_LEADER">팀장</option>
+                                        <option value="APPROVER">승인권자</option>
+                                        <option value="AUDITOR">감사자</option>
+                                        <option value="ADMIN">관리자</option>
+                                    </select></div>
+                                <div class="form-row form-row-wide"><label>허용 IP</label><input class="form-input" type="text" name="allowed_ip" placeholder="허용 IP (쉼표 구분: 10.0.0.1,10.0.0.2)" maxlength="512" aria-label="허용 IP" id="edit-allowed-ip"></div>
+                                <div class="form-row form-row-wide"><label>업무</label><textarea class="form-input textarea-large" name="job" placeholder="업무" maxlength="1024" rows="6" id="edit-job"></textarea></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="section-header"><h4>서명</h4></div>
+                            <div class="signature-upload-wrapper">
+                                <div class="signature-preview-box" id="edit-signature-preview">
+                                    <img src="" alt="서명 미등록" id="edit-signature-img" class="signature-preview-img" style="display:none" />
+                                    <div class="signature-placeholder" id="edit-signature-placeholder">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <span>서명 이미지를 등록하세요</span>
+                                    </div>
+                                </div>
+                                <div class="signature-actions">
+                                    <label class="btn-secondary signature-upload-btn" for="edit-signature-file">이미지 선택
+                                        <input type="file" id="edit-signature-file" accept="image/*" hidden />
+                                    </label>
+                                    <button type="button" class="btn-secondary signature-remove-btn" id="edit-signature-remove" disabled>제거</button>
+                                </div>
+                                <p class="signature-hint">PNG/JPG 파일을 권장합니다. 투명 배경(PNG)이 적합합니다.</p>
+                                <input type="hidden" name="signature_image" id="edit-signature-data" value="">
+                            </div>
+                        </div>
+                        <input type="hidden" name="user_id" id="edit-user-id" value="">
+                    </form>
+                </div>
+                <div class="server-edit-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="submit" form="user-edit-form" class="btn-primary" id="user-edit-save" disabled>저장</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컬럼 선택 모달 (전용회선 페이지 스타일 적용) -->
+        <div id="system-column-modal" class="server-add-modal system-column-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>컬럼 선택</h3>
+                        <p class="server-add-subtitle">표시할 컬럼을 선택하세요 (기본 열은 체크됨)</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-column-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-column-body">
+                    <form id="system-column-form"><!-- JS로 컬럼 체크박스 렌더링 --></form>
+                </div>
+                <div class="server-add-actions system-column-actions">
+                    <div class="action-buttons left">
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-reset">초기화</button>
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-selectall-btn">전체 선택</button>
+                    </div>
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-column-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <!-- 일괄변경 모달 -->
+        <div id="system-bulk-modal" class="server-add-modal system-bulk-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>일괄변경</h3>
+                        <p class="server-add-subtitle" id="bulk-subtitle">일괄변경할 행을 먼저 선택하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-bulk-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-bulk-body">
+                    <form id="system-bulk-form"><!-- JS로 필드 렌더링 --></form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-bulk-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제처리 확인 모달 (온프레미스 스타일 학습 후 사용자 페이지 적용) -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3 id="delete-modal-title">삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0명의 사용자를 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 사용자를 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 사용자에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% include 'layouts/_stats_modal.html' %}
+
+        <!-- 사용자 추가 모달 -->
+        <div id="user-add-modal" class="server-add-modal user-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="user-add-title">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3 id="user-add-title">사용자 추가</h3>
+                        <p class="server-add-subtitle">프로필과 기본 정보를 입력하여 사용자를 생성합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="user-add-close" title="닫기" aria-label="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body user-add-body">
+                    <form id="user-add-form" method="post" action="/admin/auth/create" autocomplete="off">
+                        <div class="form-section">
+                            <div class="section-header"><h4>프로필</h4></div>
+                            <!-- 단일 프리뷰: 클릭하면 선택 모달 오픈 -->
+                            <div class="profile-preview-wrapper">
+                                <button type="button" id="profile-preview-btn" class="profile-preview-btn" aria-label="프로필 이미지 선택">
+                                    <img src="/static/image/svg/profil/free-icon-bussiness-man.svg" alt="현재 프로필" id="profile-preview-img" class="profile-preview-img" loading="lazy">
+                                </button>
+                                <p class="profile-preview-hint">이미지를 클릭하여 다른 프로필을 선택하세요.</p>
+                            </div>
+                            <input type="hidden" name="profile_image" id="profile-image-input" value="/static/image/svg/profil/free-icon-bussiness-man.svg">
+                        </div>
+                        <div class="form-section">
+                            <div class="section-header"><h4>기본 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row"><label>사번<span class="required">*</span></label><input class="form-input" type="text" name="emp_no" required placeholder="사번" maxlength="32"></div>
+                                <div class="form-row"><label>이름<span class="required">*</span></label><input class="form-input" type="text" name="name" required placeholder="이름" maxlength="64"></div>
+                                <div class="form-row"><label>별명</label><input class="form-input" type="text" name="nickname" placeholder="별명" maxlength="64"></div>
+                                <div class="form-row"><label>회사</label><input class="form-input" type="text" name="company" placeholder="회사" maxlength="128"></div>
+                                <div class="form-row"><label>소속</label><input class="form-input" type="text" name="department" placeholder="소속" maxlength="128"></div>
+                                <div class="form-row"><label>재직</label><select class="form-input" name="employment_status">
+                                        <option value="재직" selected>재직</option>
+                                        <option value="휴직">휴직</option>
+                                        <option value="퇴직">퇴직</option>
+                                    </select></div>
+                                <div class="form-row"><label>내선전화</label><input class="form-input" type="text" name="ext_phone" placeholder="내선전화" maxlength="32"></div>
+                                <div class="form-row"><label>휴대전화</label><input class="form-input" type="text" name="mobile_phone" placeholder="휴대전화" maxlength="32"></div>
+                                <div class="form-row"><label>이메일<span class="required">*</span></label><input class="form-input" type="email" name="email" required placeholder="email@example.com" maxlength="128"></div>
+                                <div class="form-row"><label>역할<span class="required">*</span></label><select class="form-input" name="role" required aria-label="역할 선택">
+                                        <option value="USER" selected>사용자</option>
+                                        <option value="TEAM_LEADER">팀장</option>
+                                        <option value="APPROVER">승인권자</option>
+                                        <option value="AUDITOR">감사자</option>
+                                        <option value="ADMIN">관리자</option>
+                                    </select></div>
+                                <div class="form-row form-row-wide"><label>허용 IP</label><input class="form-input" type="text" name="allowed_ip" placeholder="허용 IP (쉼표 구분: 10.0.0.1,10.0.0.2)" maxlength="512" aria-label="허용 IP"></div>
+                                <div class="form-row form-row-wide"><label>업무</label><textarea class="form-input textarea-large" name="job" placeholder="업무" maxlength="1024" rows="6"></textarea></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="section-header"><h4>서명</h4></div>
+                            <div class="signature-upload-wrapper">
+                                <div class="signature-preview-box" id="add-signature-preview">
+                                    <img src="" alt="서명 미등록" id="add-signature-img" class="signature-preview-img" style="display:none" />
+                                    <div class="signature-placeholder" id="add-signature-placeholder">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <span>서명 이미지를 등록하세요</span>
+                                    </div>
+                                </div>
+                                <div class="signature-actions">
+                                    <label class="btn-secondary signature-upload-btn" for="add-signature-file">이미지 선택
+                                        <input type="file" id="add-signature-file" accept="image/*" hidden />
+                                    </label>
+                                    <button type="button" class="btn-secondary signature-remove-btn" id="add-signature-remove" disabled>제거</button>
+                                </div>
+                                <p class="signature-hint">PNG/JPG 파일을 권장합니다. 투명 배경(PNG)이 적합합니다.</p>
+                                <input type="hidden" name="signature_image" id="add-signature-data" value="">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="submit" form="user-add-form" class="btn-primary" id="user-add-save" disabled>저장</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 프로필 선택 모달 -->
+        <div id="profile-picker-modal" class="server-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="profile-picker-title">
+            <div class="server-add-content profile-picker-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3 id="profile-picker-title">프로필 이미지 선택</h3>
+                        <p class="server-add-subtitle">원하는 아바타를 선택하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="profile-picker-close" title="닫기" aria-label="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body profile-picker-body">
+                    <div class="profile-grid" id="profile-picker-grid" aria-label="프로필 이미지 목록" role="list"></div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="profile-picker-ok" disabled>선택</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </body>
+</html>
+

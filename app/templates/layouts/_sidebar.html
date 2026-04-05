@@ -1,0 +1,276 @@
+<!-- Reusable sidebar navigation -->
+{% if sidebar_perms is not defined %}{% set sidebar_perms = {} %}{% endif %}
+{% set _category_match_map = {
+	'business': [
+		'cat_business_dashboard', 'cat_business_division', 'cat_business_group', 'cat_business_group_detail',
+		'cat_business_group_file', 'cat_business_group_log', 'cat_business_group_manager',
+		'cat_business_group_system', 'cat_business_group_task', 'cat_business_operation', 'cat_business_status',
+		'cat_business_work'
+	],
+	'hw': [
+		'cat_hw_dashboard', 'cat_hw_network', 'cat_hw_network_detail', 'cat_hw_network_file', 'cat_hw_network_hardware', 'cat_hw_network_log',
+		'cat_hw_network_task', 'cat_hw_san', 'cat_hw_san_detail', 'cat_hw_san_file', 'cat_hw_san_hardware', 'cat_hw_san_log',
+		'cat_hw_san_task', 'cat_hw_security', 'cat_hw_security_detail', 'cat_hw_security_file', 'cat_hw_security_hardware',
+		'cat_hw_security_log', 'cat_hw_security_task', 'cat_hw_server', 'cat_hw_server_detail', 'cat_hw_server_file',
+		'cat_hw_server_hardware', 'cat_hw_server_log', 'cat_hw_server_task', 'cat_hw_storage', 'cat_hw_storage_detail',
+		'cat_hw_storage_file', 'cat_hw_storage_hardware', 'cat_hw_storage_log', 'cat_hw_storage_task'
+	],
+	'sw': [
+		'cat_sw_dashboard', 'cat_sw_database', 'cat_sw_database_detail', 'cat_sw_database_file', 'cat_sw_database_log', 'cat_sw_database_system',
+		'cat_sw_database_task', 'cat_sw_high_availability', 'cat_sw_high_availability_detail', 'cat_sw_high_availability_file',
+		'cat_sw_high_availability_log', 'cat_sw_high_availability_system', 'cat_sw_high_availability_task', 'cat_sw_middleware',
+		'cat_sw_middleware_detail', 'cat_sw_middleware_file', 'cat_sw_middleware_log', 'cat_sw_middleware_system',
+		'cat_sw_middleware_task', 'cat_sw_os', 'cat_sw_os_detail', 'cat_sw_os_file', 'cat_sw_os_log', 'cat_sw_os_system',
+		'cat_sw_os_task', 'cat_sw_security', 'cat_sw_security_detail', 'cat_sw_security_file', 'cat_sw_security_log',
+		'cat_sw_security_system', 'cat_sw_security_task', 'cat_sw_virtualization', 'cat_sw_virtualization_detail',
+		'cat_sw_virtualization_file', 'cat_sw_virtualization_log', 'cat_sw_virtualization_system', 'cat_sw_virtualization_task'
+	],
+	'component': [
+		'cat_component_cpu', 'cat_component_cpu_detail', 'cat_component_cpu_file', 'cat_component_cpu_log',
+		'cat_component_cpu_system', 'cat_component_cpu_task', 'cat_component_disk', 'cat_component_etc', 'cat_component_gpu',
+		'cat_component_gpu_detail', 'cat_component_gpu_file', 'cat_component_gpu_log', 'cat_component_gpu_system',
+		'cat_component_gpu_task', 'cat_component_hba', 'cat_component_memory', 'cat_component_memory_detail',
+		'cat_component_memory_file', 'cat_component_memory_log', 'cat_component_memory_system', 'cat_component_memory_task',
+		'cat_component_nic'
+	],
+	'company': [
+		'cat_company_center', 'cat_company_department'
+	],
+	'customer': [
+		'cat_customer_client1'
+	],
+	'vendor': [
+		'cat_vendor_maintenance', 'cat_vendor_maintenance_component', 'cat_vendor_maintenance_detail', 'cat_vendor_maintenance_file',
+		'cat_vendor_maintenance_hardware', 'cat_vendor_maintenance_log', 'cat_vendor_maintenance_manager',
+		'cat_vendor_maintenance_software', 'cat_vendor_maintenance_task', 'cat_vendor_manufacturer',
+		'cat_vendor_manufacturer_component', 'cat_vendor_manufacturer_detail', 'cat_vendor_manufacturer_file',
+		'cat_vendor_manufacturer_hardware', 'cat_vendor_manufacturer_log', 'cat_vendor_manufacturer_manager',
+		'cat_vendor_manufacturer_software', 'cat_vendor_manufacturer_task'
+	]
+} %}
+{% set _sidebar_match_map = {
+	'dashboard': ['dashboard'],
+	'hw_server_onpremise': [
+		'hw_server_onpremise', 'hw_server_onpremise_detail', 'hw_server_onpremise_hw', 'hw_server_onpremise_sw',
+		'hw_server_onpremise_backup', 'hw_server_onpremise_if', 'hw_server_onpremise_account', 'hw_server_onpremise_authority',
+		'hw_server_onpremise_activate', 'hw_server_onpremise_firewalld', 'hw_server_onpremise_storage',
+		'hw_server_onpremise_task', 'hw_server_onpremise_vulnerability', 'hw_server_onpremise_package', 'hw_server_onpremise_log',
+		'hw_server_onpremise_file', 'hw_server_cloud', 'hw_server_cloud_detail', 'hw_server_cloud_hw', 'hw_server_cloud_sw',
+		'hw_server_cloud_backup', 'hw_server_cloud_if', 'hw_server_cloud_account', 'hw_server_cloud_authority',
+		'hw_server_cloud_activate', 'hw_server_cloud_firewalld', 'hw_server_cloud_storage',
+		'hw_server_cloud_task', 'hw_server_cloud_vulnerability', 'hw_server_cloud_package', 'hw_server_cloud_log', 'hw_server_cloud_file',
+		'hw_server_frame', 'hw_server_frame_detail', 'hw_server_frame_frontbay', 'hw_server_frame_rearbay', 'hw_server_frame_if',
+		'hw_server_frame_account', 'hw_server_frame_task', 'hw_server_frame_log', 'hw_server_frame_file',
+		'hw_server_workstation', 'hw_server_workstation_detail', 'hw_server_workstation_hw', 'hw_server_workstation_sw',
+		'hw_server_workstation_backup', 'hw_server_workstation_if', 'hw_server_workstation_account', 'hw_server_workstation_authority',
+		'hw_server_workstation_activate', 'hw_server_workstation_firewalld', 'hw_server_workstation_storage', 'hw_server_workstation_task', 'hw_server_workstation_vulnerability',
+		'hw_server_workstation_package', 'hw_server_workstation_log', 'hw_server_workstation_file'
+	],
+	'hw_storage_san': [
+		'hw_storage_san', 'hw_storage_san_detail', 'hw_storage_san_basic', 'hw_storage_san_assign', 'hw_storage_san_group',
+		'hw_storage_san_hw', 'hw_storage_san_if', 'hw_storage_san_account', 'hw_storage_san_task',
+		'hw_storage_san_log', 'hw_storage_san_file', 'hw_storage_backup', 'hw_storage_backup_detail', 'hw_storage_backup_basic',
+		'hw_storage_backup_assign', 'hw_storage_backup_group', 'hw_storage_backup_hw', 'hw_storage_backup_if', 'hw_storage_backup_account',
+		'hw_storage_backup_task', 'hw_storage_backup_log', 'hw_storage_backup_file'
+	],
+	'hw_san_director': [
+		'hw_san_director', 'hw_san_director_detail', 'hw_san_director_hw', 'hw_san_director_if', 'hw_san_director_account',
+		'hw_san_director_task', 'hw_san_director_log', 'hw_san_director_file', 'hw_san_switch',
+		'hw_san_switch_detail', 'hw_san_switch_hw', 'hw_san_switch_if', 'hw_san_switch_account', 'hw_san_switch_task', 'hw_san_switch_log', 'hw_san_switch_file'
+	],
+	'hw_network_l2': [
+		'hw_network_l2', 'hw_network_l2_detail', 'hw_network_l2_hw', 'hw_network_l2_if', 'hw_network_l2_account', 'hw_network_l2_task', 'hw_network_l2_log', 'hw_network_l2_file', 'hw_network_l4', 'hw_network_l4_detail', 'hw_network_l4_hw',
+		'hw_network_l4_if', 'hw_network_l4_account', 'hw_network_l4_task', 'hw_network_l4_log',
+		'hw_network_l4_file', 'hw_network_l7', 'hw_network_l7_detail', 'hw_network_l7_hw', 'hw_network_l7_if', 'hw_network_l7_account',
+		'hw_network_l7_task', 'hw_network_l7_log', 'hw_network_l7_file', 'hw_network_ap',
+		'hw_network_ap_detail', 'hw_network_ap_hw', 'hw_network_ap_if', 'hw_network_ap_account', 'hw_network_ap_task', 'hw_network_ap_log', 'hw_network_ap_file', 'hw_network_dedicateline', 'hw_network_dedicateline_detail',
+		'hw_network_dedicateline_hw', 'hw_network_dedicateline_if', 'hw_network_dedicateline_account', 'hw_network_dedicateline_task', 'hw_network_dedicateline_log', 'hw_network_dedicateline_file'
+	],
+	'hw_security_firewall': [
+		'hw_security_firewall', 'hw_security_firewall_detail', 'hw_security_firewall_hw', 'hw_security_firewall_if',
+		'hw_security_firewall_account', 'hw_security_firewall_task', 'hw_security_firewall_log',
+		'hw_security_firewall_file', 'hw_security_vpn', 'hw_security_vpn_detail', 'hw_security_vpn_hw', 'hw_security_vpn_if',
+		'hw_security_vpn_account', 'hw_security_vpn_task', 'hw_security_vpn_log', 'hw_security_vpn_file',
+		'hw_security_ids', 'hw_security_ids_detail', 'hw_security_ids_hw', 'hw_security_ids_if', 'hw_security_ids_account',
+		'hw_security_ids_task', 'hw_security_ids_log', 'hw_security_ids_file', 'hw_security_ips',
+		'hw_security_ips_detail', 'hw_security_ips_hw', 'hw_security_ips_if', 'hw_security_ips_account', 'hw_security_ips_task', 'hw_security_ips_log', 'hw_security_ips_file', 'hw_security_hsm', 'hw_security_hsm_detail',
+		'hw_security_hsm_hw', 'hw_security_hsm_if', 'hw_security_hsm_account', 'hw_security_hsm_task',
+		'hw_security_hsm_log', 'hw_security_hsm_file', 'hw_security_kms', 'hw_security_kms_detail', 'hw_security_kms_hw',
+		'hw_security_kms_if', 'hw_security_kms_account', 'hw_security_kms_task', 'hw_security_kms_log',
+		'hw_security_kms_file', 'hw_security_wips', 'hw_security_wips_detail', 'hw_security_wips_hw', 'hw_security_wips_if',
+		'hw_security_wips_account', 'hw_security_wips_task', 'hw_security_wips_log',
+		'hw_security_wips_file', 'hw_security_etc', 'hw_security_etc_detail', 'hw_security_etc_hw', 'hw_security_etc_if',
+		'hw_security_etc_account', 'hw_security_etc_task', 'hw_security_etc_log', 'hw_security_etc_file'
+	],
+	'gov_dr_training': ['gov_dr_training'],
+	'gov_backup_policy': ['gov_backup_dashboard', 'gov_backup_policy', 'gov_backup_tape'],
+	'gov_package_list': ['gov_package_dashboard', 'gov_package_list', 'gov_package_vulnerability'],
+	'gov_vulnerability_dashboard': ['gov_vulnerability_dashboard', 'gov_vulnerability_analysis', 'gov_vulnerability_guide'],
+	'gov_ip_policy': [
+		'gov_ip_policy', 'gov_ip_policy_detail', 'gov_ip_policy_ip_range', 'gov_ip_policy_log', 'gov_ip_policy_file',
+		'gov_dns_policy', 'gov_dns_policy_detail', 'gov_dns_policy_dns_record', 'gov_dns_policy_log', 'gov_dns_policy_file',
+		'gov_ad_policy', 'gov_ad_policy_detail', 'gov_ad_policy_log', 'gov_ad_policy_file',
+		'gov_ad_policy_account', 'gov_ad_policy_domain'
+	],
+	'gov_vpn_policy': [
+		'gov_vpn_policy', 'gov_vpn_policy_detail', 'gov_vpn_policy_manager', 'gov_vpn_policy_communication', 'gov_vpn_policy_vpn_policy',
+		'gov_vpn_policy_log', 'gov_vpn_policy_file', 'gov_vpn_policy2', 'gov_vpn_policy2_detail',
+		'gov_vpn_policy2_manager', 'gov_vpn_policy2_communication', 'gov_vpn_policy2_vpn_policy',
+		'gov_vpn_policy2_log', 'gov_vpn_policy2_file', 'gov_vpn_policy3', 'gov_vpn_policy3_detail', 'gov_vpn_policy3_manager',
+		'gov_vpn_policy3_communication', 'gov_vpn_policy3_vpn_policy', 'gov_vpn_policy3_log',
+		'gov_vpn_policy3_file', 'gov_vpn_policy4', 'gov_vpn_policy4_detail', 'gov_vpn_policy4_manager', 'gov_vpn_policy4_communication',
+		'gov_vpn_policy4_vpn_policy', 'gov_vpn_policy4_log', 'gov_vpn_policy4_file', 'gov_vpn_policy5',
+		'gov_vpn_policy5_detail', 'gov_vpn_policy5_manager', 'gov_vpn_policy5_communication', 'gov_vpn_policy5_vpn_policy',
+		'gov_vpn_policy5_log', 'gov_vpn_policy5_file'
+	],
+	'gov_dedicatedline_member': [
+		'gov_dedicatedline_member', 'gov_dedicatedline_member_detail', 'gov_dedicatedline_member_manager', 'gov_dedicatedline_member_task',
+		'gov_dedicatedline_member_log', 'gov_dedicatedline_member_file', 'gov_dedicatedline_customer', 'gov_dedicatedline_customer_detail',
+		'gov_dedicatedline_customer_manager', 'gov_dedicatedline_customer_task', 'gov_dedicatedline_customer_log',
+		'gov_dedicatedline_customer_file', 'gov_dedicatedline_van', 'gov_dedicatedline_van_detail', 'gov_dedicatedline_van_manager',
+		'gov_dedicatedline_van_task', 'gov_dedicatedline_van_log', 'gov_dedicatedline_van_file', 'gov_dedicatedline_affiliate',
+		'gov_dedicatedline_affiliate_detail', 'gov_dedicatedline_affiliate_manager', 'gov_dedicatedline_affiliate_task',
+		'gov_dedicatedline_affiliate_log', 'gov_dedicatedline_affiliate_file', 'gov_dedicatedline_intranet',
+		'gov_dedicatedline_intranet_detail', 'gov_dedicatedline_intranet_manager', 'gov_dedicatedline_intranet_task',
+		'gov_dedicatedline_intranet_log', 'gov_dedicatedline_intranet_file'
+	],
+	'gov_unused_server': ['gov_unused_hardware', 'gov_unused_server', 'gov_unused_storage', 'gov_unused_san', 'gov_unused_network', 'gov_unused_security'],
+	'dc_access_control': ['dc_access_control', 'dc_access_records', 'dc_authority_control', 'dc_authority_records', 'dc_access_system'],
+	'dc_data_deletion': ['dc_data_deletion', 'dc_data_deletion_system'],
+	'dc_rack_lab1': ['dc_rack_lab1', 'dc_rack_lab2', 'dc_rack_lab3', 'dc_rack_lab4', 'dc_rack_list'],
+	'dc_thermo_lab1': ['dc_thermo_lab1', 'dc_thermo_lab2', 'dc_thermo_lab3', 'dc_thermo_lab4', 'dc_thermometer_list', 'dc_thermometer_log'],
+	'dc_cctv_lab1': ['dc_cctv_lab1', 'dc_cctv_lab2', 'dc_cctv_lab3', 'dc_cctv_lab4', 'dc_cctv_list'],
+	'cost_opex_dashboard': [
+		'cost_opex_dashboard',
+		'cost_opex_hardware', 'cost_opex_hardware_detail', 'cost_opex_hardware_contract',
+		'cost_opex_hardware_log', 'cost_opex_hardware_file',
+		'cost_opex_software', 'cost_opex_software_detail', 'cost_opex_software_contract', 'cost_opex_software_log', 'cost_opex_software_file',
+		'cost_opex_etc', 'cost_opex_etc_detail', 'cost_opex_etc_contract', 'cost_opex_etc_log', 'cost_opex_etc_file'
+	],
+	'cost_capex_dashboard': [
+		'cost_capex_dashboard', 'cost_capex_contract',
+		'cost_capex_hardware', 'cost_capex_hardware_detail', 'cost_capex_hardware_contract', 'cost_capex_hardware_log', 'cost_capex_hardware_file',
+		'cost_capex_software', 'cost_capex_software_detail', 'cost_capex_software_contract', 'cost_capex_software_log', 'cost_capex_software_file',
+		'cost_capex_etc', 'cost_capex_etc_detail', 'cost_capex_etc_contract', 'cost_capex_etc_log', 'cost_capex_etc_file'
+	],
+	'proj_status': [
+		'proj_status', 'proj_participating', 'proj_completed', 'proj_completed_detail', 'proj_completed_integrity', 'proj_completed_scope',
+		'proj_completed_schedule', 'proj_completed_cost', 'proj_completed_quality', 'proj_completed_resource', 'proj_completed_communication',
+		'proj_completed_risk', 'proj_completed_procurement', 'proj_completed_stakeholder'
+	],
+	'task_status': ['task_status', 'task_participating', 'task_completed'],
+	'workflow_progress': ['workflow_progress', 'workflow_completed'],
+	'wf_designer_explore': ['wf_designer_explore', 'wf_designer_manage'],
+	'cat_business_dashboard': _category_match_map['business'],
+	'cat_hw_dashboard': _category_match_map['hw'],
+	'cat_hw_server': _category_match_map['hw'],
+	'cat_sw_dashboard': _category_match_map['sw'],
+	'cat_sw_os': _category_match_map['sw'],
+	'cat_component_cpu': _category_match_map['component'],
+	'cat_company_center': _category_match_map['company'],
+	'cat_customer_client1': _category_match_map['customer'],
+	'cat_vendor_manufacturer': _category_match_map['vendor']
+	,
+	'insight_trend': ['insight_trend', 'insight_security', 'insight_report', 'insight_technical'],
+	'insight_blog_it': ['insight_blog_it', 'insight_blog_it_detail']
+} %}
+{% set _insight_open_keys = (_sidebar_match_map.get('insight_trend') or []) + (_sidebar_match_map.get('insight_blog_it') or []) %}
+<nav class="sidebar" id="sidebar">
+	<div class="sidebar-menu">
+		<ul class="menu-list main-list">
+			{% if sidebar_perms.get('dashboard', {}).get('read', True) %}
+			<li class="menu-item"><a href="{{ url_for('pages.show', key='dashboard') }}" class="menu-link" data-match-keys="{{ (_sidebar_match_map.get('dashboard') or []) | join(',') }}"><img src="/static/image/svg/dashboard.svg" class="menu-icon" alt="대시"/><span class="menu-text">대시보드</span></a></li>
+			{% endif %}
+			{% if sidebar_perms.get('system', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/build.svg" class="menu-icon" alt="HW"/><span class="menu-text">시스템</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='hw_server_onpremise') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_server_onpremise') or []) | join(',') }}">서버</a></li>
+					<li><a href="{{ url_for('pages.show', key='hw_storage_san') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_storage_san') or []) | join(',') }}">스토리지</a></li>
+					<li><a href="{{ url_for('pages.show', key='hw_san_director') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_san_director') or []) | join(',') }}">SAN</a></li>
+					<li><a href="{{ url_for('pages.show', key='hw_network_l2') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_network_l2') or []) | join(',') }}">네트워크</a></li>
+					<li><a href="{{ url_for('pages.show', key='hw_security_firewall') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_security_firewall') or []) | join(',') }}">보안장비</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('governance', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/governance.svg" class="menu-icon" alt="NW"/><span class="menu-text">거버넌스</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<!-- <li><a href="{{ url_for('pages.show', key='gov_dr_training') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_dr_training') or []) | join(',') }}">재해복구 모의훈련</a></li> -->
+					<li><a href="{{ url_for('pages.show', key='gov_backup_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_backup_policy') or []) | join(',') }}">백업 정책</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_package_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_package_list') or []) | join(',') }}">패키지 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_vulnerability_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_vulnerability_dashboard') or []) | join(',') }}">취약점 분석</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_ip_policy') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_ip_policy') or []) | join(',') }}">IP 정책</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_vpn_policy') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_vpn_policy') or []) | join(',') }}">VPN 정책</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_dedicatedline_member') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_dedicatedline_member') or []) | join(',') }}">전용회선 정책</a></li>
+					<li><a href="{{ url_for('pages.show', key='gov_unused_server') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_unused_server') or []) | join(',') }}">불용자산 관리</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('datacenter', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='dc_access_control') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_access_control') or []) | join(',') }}">출입 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_data_deletion') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_data_deletion') or []) | join(',') }}">데이터 삭제 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_rack_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_rack_lab1') or []) | join(',') }}">RACK 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_thermo_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_thermo_lab1') or []) | join(',') }}">온/습도 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_cctv_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_cctv_lab1') or []) | join(',') }}">CCTV 관리</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('cost', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-font-usd-circle.svg" class="menu-icon" alt="비용"/><span class="menu-text">비용관리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='cost_opex_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cost_opex_dashboard') or []) | join(',') }}">OPEX</a></li>
+					<li><a href="{{ url_for('pages.show', key='cost_capex_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cost_capex_dashboard') or []) | join(',') }}">CAPEX</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('project', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/folder.svg" class="menu-icon" alt="프로젝트"/><span class="menu-text">프로젝트</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='proj_status') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('proj_status') or []) | join(',') }}">프로젝트 현황</a></li>
+					<li><a href="{{ url_for('pages.show', key='task_status') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('task_status') or []) | join(',') }}">작업 현황</a></li>
+					<li><a href="{{ url_for('pages.show', key='workflow_progress') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('workflow_progress') or []) | join(',') }}">티켓 현황</a></li>
+					<li><a href="{{ url_for('pages.show', key='wf_designer_explore') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('wf_designer_explore') or []) | join(',') }}">워크플로우 제작</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('insight', {}).get('read', True) %}
+			<li class="menu-item has-submenu{{ ' open' if current_key in _insight_open_keys else '' }}">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-lightbulb-on.svg" class="menu-icon" alt="인사이트"/><span class="menu-text">인사이트</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='insight_trend') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('insight_trend') or []) | join(',') }}">기술자료</a></li>
+					<li><a href="{{ url_for('pages.show', key='insight_blog_it') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('insight_blog_it') or []) | join(',') }}">블로그</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('category', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/settings.svg" class="menu-icon" alt="카테고리"/><span class="menu-text">카테고리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='cat_business_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_business_dashboard') or []) | join(',') }}">비즈니스</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_hw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_hw_dashboard') or []) | join(',') }}">하드웨어</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_sw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_sw_dashboard') or []) | join(',') }}">소프트웨어</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_component_cpu') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_component_cpu') or []) | join(',') }}">컴포넌트</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_company_center') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_company_center') or []) | join(',') }}">회사</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_customer_client1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_customer_client1') or []) | join(',') }}">고객</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_vendor_manufacturer') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_vendor_manufacturer') or []) | join(',') }}">벤더</a></li>
+				</ul>
+			</li>
+			{% endif %}
+		</ul>
+		{# ADMIN 역할: 공백 제거 후 대소문자 무시. session role 없으면 표시 안함. #}
+		{% set _sess_role = (session.get('role','') | trim) %}
+		{% if _sess_role.upper() == 'ADMIN' and sidebar_perms.get('settings', {}).get('read', True) %}
+		<ul class="menu-list sidebar-settings">
+			<li class="menu-item"><a href="{{ url_for('auth.admin_settings') }}" class="menu-link" aria-label="관리자 설정"><img src="/static/image/svg/admin/free-icon-settings.svg" class="menu-icon" alt="설정"/><span class="menu-text">설정</span></a></li>
+		</ul>
+		{% endif %}
+	</div>
+</nav>
+

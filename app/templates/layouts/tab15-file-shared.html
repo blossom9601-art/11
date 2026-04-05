@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <!--
+        tab15-file-shared.html — 구성/파일 탭 공통 템플릿
+        ─────────────────────────────────────────────────
+        모든 상세 페이지의 "구성/파일" 탭이 이 단일 템플릿을 사용한다.
+        페이지별 차이는 Jinja 컨텍스트 변수로 주입:
+
+        [공통 — pages.py 에서 자동 설정]
+          title          : 페이지 제목
+          subtitle       : 페이지 부제
+          back_key       : 뒤로가기 대상 라우트 키
+          back_label     : 뒤로가기 버튼 라벨
+          tabs           : [{key, label}, ...] 탭 목록
+          current_key    : 현재 활성 탭 키
+          tab15_owner_key: 파일 소유자 식별 키
+
+        [선택 — data-* 속성으로 JS에 전달]
+          tab15_max_files     : 첨부파일 최대 개수 (기본 5)
+          tab15_max_size_mb   : 파일 최대 크기 MB (기본 10)
+          tab15_accept_images : 구성도 허용 확장자 (기본 "png,jpg,jpeg")
+
+        주의: 이 파일을 복사/수정하지 마세요. 스타일/동작 변경은
+              tab15-file.css / tab15-file-shared.js 에서만 수행합니다.
+    -->
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab15-file.css?v=2.6">
+    <script src="/static/js/_detail/tab15-file-shared.js?v=1.2"></script>
+</head>
+<body{% if gov_detail_id %} data-gov-detail-id="{{ gov_detail_id }}"{% endif %}>
+    <!-- 공통 헤더 & 사이드바 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <!-- Main Content -->
+    <main class="main-content tab15-file-root"
+          data-owner-key="{{ tab15_owner_key|default('') }}"
+          {% if tab15_max_files %}data-max-files="{{ tab15_max_files }}"{% endif %}
+          {% if tab15_max_size_mb %}data-max-size-mb="{{ tab15_max_size_mb }}"{% endif %}
+          {% if tab15_accept_images %}data-accept-images="{{ tab15_accept_images }}"{% endif %}>
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <!-- 페이지 타이틀 -->
+            <div class="page-header">
+                <h1 id="page-title">{{ title or '-' }}</h1>
+                <p id="page-subtitle">{{ subtitle if subtitle and subtitle != '-' else '-' }}</p>
+            </div>
+
+            <!-- 상세 탭 네비게이션 -->
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 구성/파일 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <div class="detail-section">
+                        <h3>구성도</h3>
+                        <div class="basic-info-grid grid-3-1">
+                            <!-- ===== 대표 구성도 (좌측, 3) ===== -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>대표 구성도</h4>
+                                    <div class="card-actions">
+                                        <button class="t15-icon-btn danger" id="fi-diagram-clear" type="button"
+                                                title="구성도 삭제" aria-label="구성도 삭제">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="t15-action-icon">
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="t15-diagram-box dropzone diagram-dropzone" id="fi-diagram-box"
+                                         role="button" tabindex="0" aria-label="대표 구성도 업로드">
+                                        <input type="file" id="fi-diagram-input" accept="image/*" hidden>
+                                        <div class="t15-diagram-placeholder" id="fi-diagram-empty">
+                                            <img src="/static/image/svg/tab15/free-icon-generative-image.svg" alt="" class="t15-diagram-empty-icon">
+                                            <p class="t15-diagram-empty-text">여기에 파일을 끌어다 놓거나 클릭하여 업로드</p>
+                                        </div>
+                                        <img id="fi-diagram-img" class="t15-diagram-image" alt="대표 구성도 미리보기" hidden>
+                                    </div>
+                                    <div class="t15-diagram-hint">이미지 파일 1개만 업로드 가능합니다.</div>
+                                </div>
+                            </div>
+
+                            <!-- ===== 첨부파일 (우측, 1) ===== -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>첨부파일 <span class="t15-count-badge" id="fi-attach-count">0</span></h4>
+                                    <div class="card-actions">
+                                        <input type="file" id="fi-attach-input" multiple hidden>
+                                    </div>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="t15-attach-dropzone" id="fi-attach-drop"
+                                         aria-label="파일을 끌어다 놓거나 클릭하여 업로드">
+                                        <p>여기에 파일을 끌어다 놓거나 클릭하여 업로드</p>
+                                    </div>
+                                    <ul class="t15-attach-list" id="fi-attach-list" aria-live="polite">
+                                        <!-- 업로드된 파일 항목이 JS에 의해 동적으로 추가됩니다 -->
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260318_tab15"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+
+    <!-- 파일/첨부 안내 모달 -->
+    {% set msgm_modal_id = 'file-notice-modal' %}
+    {% set msgm_title_id = 'file-notice-title' %}
+    {% set msgm_title = '안내' %}
+    {% set msgm_subtitle = '파일 업로드 안내입니다.' %}
+    {% set msgm_content_id = 'file-notice-text' %}
+    {% set msgm_content = '안내 메시지' %}
+    {% set msgm_close_id = 'file-notice-close' %}
+    {% set msgm_ok_id = 'file-notice-ok' %}
+    {% set msgm_illustration_src = '/static/image/svg/free-sticker-profile.svg' %}
+    {% set msgm_illustration_alt = '알림 스티커' %}
+    {% include 'layouts/_message_modal.html' %}
+
+    <!-- 파일 다운로드 확인 모달 -->
+    {% set dcm_modal_id = 'fl-download-modal' %}
+    {% set dcm_title_id = 'fl-download-title' %}
+    {% set dcm_title = '파일 다운로드' %}
+    {% set dcm_subtitle = '선택한 파일을 다운로드합니다.' %}
+    {% set dcm_close_id = 'fl-download-close' %}
+    {% set dcm_cancel_id = 'fl-download-cancel' %}
+    {% set dcm_confirm_id = 'fl-download-confirm' %}
+    {% set dcm_primary_id = 'fl-download-msg' %}
+    {% set dcm_primary_message = '파일을 다운로드하시겠습니까?' %}
+    {% set dcm_secondary_message = '확인을 누르면 다운로드가 시작됩니다.' %}
+    {% include 'layouts/_download_modal_confirm.html' %}
+
+    <!-- 파일 삭제 확인 모달 -->
+    <div id="fl-delete-modal" class="server-add-modal modal-overlay-full tab15-file-delete-modal"
+         aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="fl-delete-title">
+        <div class="server-add-content tab15-file-delete-modal__content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3 id="fl-delete-title">첨부파일 삭제</h3>
+                    <p class="server-add-subtitle">선택한 파일을 삭제합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="fl-delete-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content tab15-file-delete-modal__layout">
+                    <div class="dispose-text tab15-file-delete-modal__copy">
+                        <p id="fl-delete-msg" class="tab15-file-delete-modal__primary">
+                            <span id="fl-delete-file-name" class="tab15-file-delete-modal__filename" hidden></span>
+                            <span id="fl-delete-msg-text">이 파일을 삭제하시겠습니까?</span>
+                        </p>
+                        <p class="tab15-file-delete-modal__secondary">삭제된 항목은 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust tab15-file-delete-modal__illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="삭제 안내" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="fl-delete-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="fl-delete-confirm">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

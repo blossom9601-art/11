@@ -1,0 +1,52 @@
+{% set dcm_modal_id = dcm_modal_id|default('fl-download-modal') %}
+{% set dcm_title_id = dcm_title_id|default('fl-download-title') %}
+{% set dcm_title = dcm_title|default('파일 다운로드') %}
+{% set dcm_subtitle = dcm_subtitle|default('선택한 파일을 다운로드합니다.') %}
+{% set dcm_close_id = dcm_close_id|default('fl-download-close') %}
+{% set dcm_cancel_id = dcm_cancel_id|default('fl-download-cancel') %}
+{% set dcm_cancel_label = dcm_cancel_label|default('취소') %}
+{% set dcm_confirm_id = dcm_confirm_id|default('fl-download-confirm') %}
+{% set dcm_confirm_label = dcm_confirm_label|default('다운로드') %}
+{% set dcm_primary_id = dcm_primary_id|default('fl-download-msg') %}
+{% set dcm_primary_message = dcm_primary_message|default('파일을 다운로드하시겠습니까?') %}
+{% set dcm_secondary_message = dcm_secondary_message|default('확인을 누르면 다운로드가 시작됩니다.') %}
+{% set dcm_illustration_src = dcm_illustration_src|default('/static/image/svg/list/free-sticker-research.svg') %}
+{% set dcm_illustration_alt = dcm_illustration_alt|default('다운로드 안내') %}
+{% set dcm_modal_class = dcm_modal_class|default('server-add-modal system-download-modal modal-overlay-full bls-download-modal bls-download-modal--confirm') %}
+{% set dcm_content_class = dcm_content_class|default('server-add-content') %}
+{% set dcm_header_class = dcm_header_class|default('server-add-header') %}
+{% set dcm_title_wrap_class = dcm_title_wrap_class|default('server-add-title') %}
+{% set dcm_body_class = dcm_body_class|default('server-add-body') %}
+{% set dcm_actions_class = dcm_actions_class|default('server-add-actions align-right') %}
+<div id="{{ dcm_modal_id }}" class="{{ dcm_modal_class }}" aria-hidden="true">
+    <div class="{{ dcm_content_class }}" role="dialog" aria-modal="true" aria-labelledby="{{ dcm_title_id }}">
+        <div class="{{ dcm_header_class }} bls-download-modal__header">
+            <div class="{{ dcm_title_wrap_class }} dispose-title bls-download-modal__header-copy">
+                <h3 id="{{ dcm_title_id }}" class="bls-download-modal__title">{{ dcm_title }}</h3>
+                <p class="server-add-subtitle bls-download-modal__subtitle">{{ dcm_subtitle }}</p>
+            </div>
+            <button class="close-btn bls-download-modal__close" type="button" id="{{ dcm_close_id }}" title="닫기" aria-label="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="{{ dcm_body_class }} bls-download-modal__body">
+            <div class="dispose-content bls-download-modal__layout">
+                <div class="dispose-text bls-download-modal__copy">
+                    <p class="bls-download-modal__primary" id="{{ dcm_primary_id }}">{{ dcm_primary_message }}</p>
+                    <p class="bls-download-modal__secondary">{{ dcm_secondary_message }}</p>
+                </div>
+                <div class="dispose-illust bls-download-modal__illust">
+                    <img src="{{ dcm_illustration_src }}" alt="{{ dcm_illustration_alt }}" loading="lazy" />
+                </div>
+            </div>
+        </div>
+        <div class="{{ dcm_actions_class }} bls-download-modal__footer">
+            <div class="action-buttons right bls-download-modal__actions">
+                <button type="button" class="btn-secondary bls-download-modal__button bls-download-modal__button--secondary" id="{{ dcm_cancel_id }}">{{ dcm_cancel_label }}</button>
+                <button type="button" class="btn-primary bls-download-modal__button bls-download-modal__button--primary" id="{{ dcm_confirm_id }}">{{ dcm_confirm_label }}</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,221 @@
+/*
+ * tab72-capex.css — 계약정보(CAPEX) 탭 공통 스타일
+ * ───────────────────────────────────────────────────
+ * 이 파일은 layouts/tab72-capex-shared.html 전용이다.
+ * 모든 CAPEX 도메인(하드웨어/소프트웨어/기타)에서 동일한 UI를 보장한다.
+ *
+ * 디자인 토큰(CSS 변수)으로 관리하며, 개별 페이지 CSS에서
+ * 덮어쓰지 않도록 .page-tab72-capex 스코프를 사용한다.
+ */
+
+/* ── 디자인 토큰 ── */
+.page-tab72-capex {
+    /* 여백 체계 */
+    --tab72-section-padding: 24px;
+    --tab72-section-gap: 20px;
+    --tab72-header-height: 48px;
+    --tab72-table-row-height: 44px;
+
+    /* 색상 */
+    --tab72-border-color: rgba(255, 255, 255, 0.08);
+    --tab72-header-bg: rgba(255, 255, 255, 0.03);
+    --tab72-row-hover-bg: rgba(255, 255, 255, 0.04);
+    --tab72-total-bg: rgba(255, 255, 255, 0.05);
+    --tab72-sum-color: #60a5fa;
+
+    /* 타이포그래피 */
+    --tab72-header-font-size: 13px;
+    --tab72-cell-font-size: 13px;
+    --tab72-total-font-size: 13px;
+
+    /* 라운딩 & 그림자 */
+    --tab72-border-radius: 12px;
+    --tab72-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ── 섹션 레이아웃 (공통 간격 강제) ── */
+.page-tab72-capex .detail-section {
+    padding: var(--tab72-section-padding);
+    margin-bottom: var(--tab72-section-gap);
+}
+
+.page-tab72-capex .detail-section > h3.has-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--tab72-header-height);
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* ── 상단 액션 버튼 ── */
+.page-tab72-capex .detail-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.page-tab72-capex .detail-header-actions .add-btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tab72-border-color);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.page-tab72-capex .detail-header-actions .add-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.page-tab72-capex .detail-header-actions .add-btn-icon:active {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.page-tab72-capex .detail-header-actions .add-btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.page-tab72-capex .detail-header-actions .add-btn-icon img {
+    width: 18px;
+    height: 18px;
+}
+
+/* ── 테이블 공통 ── */
+.page-tab72-capex .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--tab72-border-radius);
+    border: 1px solid var(--tab72-border-color);
+    box-shadow: var(--tab72-shadow);
+}
+
+.page-tab72-capex .hw-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.page-tab72-capex .hw-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--tab72-header-bg);
+    font-size: var(--tab72-header-font-size);
+    font-weight: 600;
+    height: var(--tab72-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--tab72-border-color);
+}
+
+.page-tab72-capex .hw-table tbody td {
+    font-size: var(--tab72-cell-font-size);
+    height: var(--tab72-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--tab72-border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.page-tab72-capex .hw-table tbody tr:hover {
+    background: var(--tab72-row-hover-bg);
+}
+
+/* ── 합계행 ── */
+.page-tab72-capex .hw-table tfoot td {
+    font-size: var(--tab72-total-font-size);
+    font-weight: 600;
+    height: var(--tab72-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    background: var(--tab72-total-bg);
+    border-top: 1px solid var(--tab72-border-color);
+}
+
+.page-tab72-capex .hw-table tfoot .total-label {
+    text-align: right;
+    padding-right: 16px;
+}
+
+.page-tab72-capex .hw-table tfoot .total-cell {
+    color: var(--tab72-sum-color);
+}
+
+/* ── Empty State (공통 높이/간격 강제) ── */
+.page-tab72-capex .system-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.page-tab72-capex .system-empty .empty-icon-img {
+    width: 64px;
+    height: 64px;
+    opacity: 0.5;
+    margin-bottom: 16px;
+}
+
+.page-tab72-capex .system-empty .empty-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.page-tab72-capex .system-empty .empty-desc {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+/* ── Pagination (공통 높이/간격 강제) ── */
+.page-tab72-capex .modern-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 8px;
+    margin-top: 12px;
+}
+
+.page-tab72-capex .modern-pagination .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-tab72-capex .modern-pagination .pagination-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--tab72-border-color);
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.page-tab72-capex .modern-pagination .pagination-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.page-tab72-capex .modern-pagination .pagination-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

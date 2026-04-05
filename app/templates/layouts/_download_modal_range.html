@@ -1,0 +1,70 @@
+{% set dlm_modal_id = dlm_modal_id|default('system-download-modal') %}
+{% set dlm_title_id = dlm_title_id|default('download-title') %}
+{% set dlm_title = dlm_title|default('CSV 다운로드') %}
+{% set dlm_subtitle_id = dlm_subtitle_id|default('download-subtitle') %}
+{% set dlm_subtitle = dlm_subtitle|default('현재 결과를 CSV로 내보냅니다.') %}
+{% set dlm_close_id = dlm_close_id|default('system-download-close') %}
+{% set dlm_confirm_id = dlm_confirm_id|default('system-download-confirm') %}
+{% set dlm_confirm_label = dlm_confirm_label|default('다운로드') %}
+{% set dlm_primary_message = dlm_primary_message|default('내보낼 범위를 선택하세요.') %}
+{% set dlm_secondary_id = dlm_secondary_id|default('') %}
+{% set dlm_secondary_message = dlm_secondary_message|default('') %}
+{% set dlm_range_name = dlm_range_name|default('csv-range') %}
+{% set dlm_row_all_id = dlm_row_all_id|default('csv-range-row-all') %}
+{% set dlm_row_selected_id = dlm_row_selected_id|default('csv-range-row-selected') %}
+{% set dlm_all_id = dlm_all_id|default('csv-range-all') %}
+{% set dlm_selected_id = dlm_selected_id|default('csv-range-selected') %}
+{% set dlm_all_label = dlm_all_label|default('전체 결과') %}
+{% set dlm_selected_label = dlm_selected_label|default('선택된 행만') %}
+{% set dlm_illustration_src = dlm_illustration_src|default('/static/image/svg/list/free-sticker-research.svg') %}
+{% set dlm_illustration_alt = dlm_illustration_alt|default('다운로드 안내') %}
+{% set dlm_modal_class = dlm_modal_class|default('server-add-modal system-download-modal modal-overlay-full bls-download-modal bls-download-modal--range') %}
+{% set dlm_content_class = dlm_content_class|default('server-add-content') %}
+{% set dlm_header_class = dlm_header_class|default('server-add-header') %}
+{% set dlm_title_wrap_class = dlm_title_wrap_class|default('server-add-title') %}
+{% set dlm_body_class = dlm_body_class|default('server-add-body') %}
+{% set dlm_actions_class = dlm_actions_class|default('server-add-actions align-right') %}
+{% set dlm_hidden = dlm_hidden|default(false) %}
+<div id="{{ dlm_modal_id }}" class="{{ dlm_modal_class }}" aria-hidden="true"{% if dlm_hidden %} hidden{% endif %}>
+    <div class="{{ dlm_content_class }}" role="dialog" aria-modal="true" aria-labelledby="{{ dlm_title_id }}">
+        <div class="{{ dlm_header_class }} bls-download-modal__header">
+            <div class="{{ dlm_title_wrap_class }} dispose-title bls-download-modal__header-copy">
+                <h3 id="{{ dlm_title_id }}" class="bls-download-modal__title">{{ dlm_title }}</h3>
+                <p class="server-add-subtitle bls-download-modal__subtitle" id="{{ dlm_subtitle_id }}">{{ dlm_subtitle }}</p>
+            </div>
+            <button class="close-btn bls-download-modal__close" type="button" id="{{ dlm_close_id }}" title="닫기" aria-label="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="{{ dlm_body_class }} bls-download-modal__body">
+            <div class="dispose-content bls-download-modal__layout">
+                <div class="dispose-text bls-download-modal__copy">
+                    <p class="bls-download-modal__primary">{{ dlm_primary_message }}</p>
+                    {% if dlm_secondary_message %}
+                    <p class="bls-download-modal__secondary"{% if dlm_secondary_id %} id="{{ dlm_secondary_id }}"{% endif %}>{{ dlm_secondary_message }}</p>
+                    {% endif %}
+                    <div class="form-radio-group bls-download-modal__options">
+                        <label id="{{ dlm_row_all_id }}" class="bls-download-modal__option">
+                            <input type="radio" name="{{ dlm_range_name }}" id="{{ dlm_all_id }}" value="all" checked>
+                            <span>{{ dlm_all_label }}</span>
+                        </label>
+                        <label id="{{ dlm_row_selected_id }}" class="bls-download-modal__option">
+                            <input type="radio" name="{{ dlm_range_name }}" id="{{ dlm_selected_id }}" value="selected">
+                            <span>{{ dlm_selected_label }}</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="dispose-illust bls-download-modal__illust">
+                    <img src="{{ dlm_illustration_src }}" alt="{{ dlm_illustration_alt }}" loading="lazy" />
+                </div>
+            </div>
+        </div>
+        <div class="{{ dlm_actions_class }} bls-download-modal__footer">
+            <div class="action-buttons right bls-download-modal__actions">
+                <button type="button" class="btn-primary bls-download-modal__button bls-download-modal__button--primary" id="{{ dlm_confirm_id }}">{{ dlm_confirm_label }}</button>
+            </div>
+        </div>
+    </div>
+</div>

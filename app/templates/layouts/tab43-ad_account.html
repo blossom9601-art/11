@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab43-ad_account.css?v=1.0">
+    <script src="/static/js/4.governance/4-3.network_policy/4-3-3.ad/2.ad_detail.js?v=1.2.9"></script>
+    <script defer src="/static/js/layouts/tab43-ad_account.js?v=1.0"></script>
+</head>
+<body class="page-ad-policy" data-gov-detail-id="{{ gov_detail_id or '' }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-wrapper">
+            <a href="{{ url_for('pages.show', key='gov_ad_policy') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{% if title and title != 'AD POLICY' %}{{ title }}{% else %}&nbsp;{% endif %}</h1>
+                <p id="page-header-subtitle">{% if subtitle and subtitle != '-' %}{{ subtitle }}{% else %}&nbsp;{% endif %}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_detail') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_domain') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_domain' %} active{% endif %}">도메인 관리</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_account') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_account' %} active{% endif %}">계정 관리</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_log') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='gov_ad_policy_file') }}{% if request.args.get('id') %}?id={{ request.args.get('id') | urlencode }}{% endif %}" class="server-detail-tab-btn{% if current_key == 'gov_ad_policy_file' %} active{% endif %}">구성/파일</a>
+            </div>
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="ad-account-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="ad-account-row-add-btn" title="행추가" type="button" aria-label="행추가">
+                        <img src="/static/image/svg/free-icon-add-folder.svg" alt="행추가">
+                    </button>
+
+                    <div class="detail-section">
+                        <h3>
+                            운영 계정
+                            <div class="page-size-selector" id="ad-account-page-size-wrap" aria-label="보기 개수">
+                                <label for="ad-account-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="ad-account-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10" selected>10개</option>
+                                    <option value="25">25개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                    <option value="200">200개</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="ad-account-table">
+                                <colgroup>
+                                    <col>
+                                    <col class="equal-col">
+                                    <col style="width: 18%">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="actions-col">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="ad-account-select-all" aria-label="전체 선택"></th>
+                                        <th>상태</th>
+                                        <th>계정이름<span class="req-star" aria-hidden="true">*</span></th>
+                                        <th>계정유형</th>
+                                        <th>부서이름</th>
+                                        <th>사용자</th>
+                                        <th>용도</th>
+                                        <th>비고</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ad-account-table-body"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="ad-account-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">등록된 운영 계정이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '추가' 버튼으로 서비스/관리 계정을 등록하세요.</p>
+                            </div>
+                        </div>
+
+                        <div class="modern-pagination" id="ad-account-pagination">
+                            <div class="pagination-info"><span id="ad-account-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="ad-account-first" disabled type="button" aria-label="처음">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="ad-account-prev" disabled type="button" aria-label="이전">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="ad-account-page-numbers"></div>
+                                <button class="pagination-btn" id="ad-account-next" disabled type="button" aria-label="다음">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="ad-account-last" disabled type="button" aria-label="마지막">
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+
+    <div id="ad-account-modal" class="server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3 id="ad-account-modal-title">계정 추가</h3><p class="server-edit-subtitle">운영 계정 정보를 입력하세요.</p></div>
+                <button class="close-btn" type="button" id="ad-account-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="ad-account-form">
+                    <div class="form-section">
+                        <div class="section-header"><h4>운영 계정</h4></div>
+                        <div class="form-grid">
+                            <div class="form-row"><label>계정명<span class="req-star" aria-hidden="true">*</span></label><input name="username" class="form-input" placeholder="예: svc_ldap_bind"></div>
+                            <div class="form-row"><label>표시명</label><input name="display_name" class="form-input" placeholder="예: LDAP Bind Account"></div>
+                            <div class="form-row"><label>유형</label>
+                                <select name="account_type" class="form-input search-select fk-select" data-placeholder="유형 선택">
+                                    <option value="PERSONAL">개인계정</option>
+                                    <option value="SERVICE">서비스계정</option>
+                                    <option value="ADMIN">관리자계정</option>
+                                </select>
+                            </div>
+                            <div class="form-row"><label>상태</label>
+                                <select name="status" class="form-input search-select fk-select" data-placeholder="상태 선택">
+                                    <option value="ACTIVE">활성</option>
+                                    <option value="INACTIVE">비활성</option>
+                                    <option value="RESERVED">예약</option>
+                                </select>
+                            </div>
+                            <div class="form-row"><label>담당자(조직)</label>
+                                <select name="owner_user_id" class="form-input search-select fk-select" data-placeholder="담당자 선택" id="ad-account-owner-user">
+                                    <option value="">(직접입력)</option>
+                                </select>
+                                <input type="hidden" name="owner_dept_id" id="ad-account-owner-dept-id" value="">
+                            </div>
+                            <div class="form-row"><label>담당자</label><input name="owner" class="form-input" placeholder="예: 인프라팀 홍길동"></div>
+                            <div class="form-row"><label>만료일</label><input name="password_expires_at" class="form-input" placeholder="YYYY-MM-DD"></div>
+                            <div class="form-row"><label>최근 변경일</label><input name="password_rotated_at" class="form-input" placeholder="YYYY-MM-DD"></div>
+                            <div class="form-row"><label>권한</label><input name="privilege" class="form-input" placeholder="예: Domain Admin"></div>
+                            <div class="form-row form-row-wide"><label>용도</label><input name="purpose" class="form-input" placeholder="예: AD 조회(동기화)용"></div>
+                            <div class="form-row form-row-wide"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="5"></textarea></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="ad-account-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

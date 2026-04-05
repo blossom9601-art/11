@@ -1,0 +1,149 @@
+/*
+ * tab31-basic-storage.css — 스토리지 구성정보 탭 공통 스타일
+ * ──────────────────────────────────────────────────────────
+ * 모든 스토리지 상세 페이지의 "구성정보" 탭이 이 단일 CSS를 사용한다.
+ * 기본 레이아웃은 detail.css에서 제공하며, 이 파일은 tab31 전용 토큰과
+ * 오버라이드만 정의한다. 개별 페이지 CSS에서 절대 덮어쓰지 마세요.
+ *
+ * [디자인 토큰 — CSS 변수]
+ *   --t31-section-gap      : 카드 간 간격
+ *   --t31-card-radius      : 카드 border-radius
+ *   --t31-card-border      : 카드 테두리 색상
+ *   --t31-card-shadow      : 카드 그림자
+ *   --t31-header-bg        : 카드 헤더 배경색
+ *   --t31-header-border    : 카드 헤더 하단 border 색상
+ *   --t31-header-font-size : 카드 헤더 폰트 크기
+ *   --t31-content-padding  : 카드 콘텐츠 패딩
+ *   --t31-row-height       : info-row 높이
+ *   --t31-label-color      : 라벨 색상
+ *   --t31-value-color      : 값 색상
+ *   --t31-donut-size       : 도넛 차트 크기
+ *   --t31-donut-hole       : 도넛 내부 원 inset
+ */
+
+/* ── 디자인 토큰 ─────────────────────────────────────────── */
+.tab31-basic-root {
+    --t31-section-gap: 20px;
+    --t31-card-radius: 8px;
+    --t31-card-border: #e5e7eb;
+    --t31-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --t31-header-bg: #f8fafc;
+    --t31-header-border: #e5e7eb;
+    --t31-header-font-size: 16px;
+    --t31-content-padding: 22px;
+    --t31-row-height: 46px;
+    --t31-label-color: #6b7280;
+    --t31-value-color: #111827;
+    --t31-donut-size: 260px;
+    --t31-donut-hole: 40px;
+}
+
+/* ── 그리드 / 카드 오버라이드 ─────────────────────────────── */
+.tab31-basic-root .basic-info-grid.grid-1-1 {
+    gap: var(--t31-section-gap);
+}
+
+.tab31-basic-root .basic-info-card {
+    border-radius: var(--t31-card-radius);
+    border-color: var(--t31-card-border);
+    box-shadow: var(--t31-card-shadow);
+}
+
+.tab31-basic-root .basic-info-card-header {
+    background: var(--t31-header-bg);
+    border-bottom-color: var(--t31-header-border);
+}
+
+.tab31-basic-root .basic-info-card-header h4 {
+    font-size: var(--t31-header-font-size);
+}
+
+.tab31-basic-root .basic-info-card-content {
+    padding: var(--t31-content-padding);
+}
+
+/* ── 정보 행 (info-row) — 3등분 그리드 ────────────────── */
+.tab31-basic-root .info-row {
+    min-height: var(--t31-row-height);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    align-items: center;
+    padding: 0;
+}
+
+.tab31-basic-root .info-row label {
+    color: var(--t31-label-color);
+}
+
+.tab31-basic-root .info-row .info-value {
+    color: var(--t31-value-color);
+    font-weight: 400;
+    text-align: right;
+}
+
+/* 비율 배지 — 3번째 칸 왼쪽정렬 */
+.tab31-basic-root .info-row .info-pct {
+    display: inline-flex;
+    align-items: center;
+    justify-self: end;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+.tab31-basic-root .info-row .info-pct:empty {
+    display: none;
+}
+.tab31-basic-root .info-row .info-pct.pct-alloc {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+}
+.tab31-basic-root .info-row .info-pct.pct-unalloc {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+}
+
+/* ── 도넛 차트 ───────────────────────────────────────────── */
+.tab31-basic-root .donut-multi {
+    width: var(--t31-donut-size);
+    height: var(--t31-donut-size);
+}
+
+.tab31-basic-root .donut-multi::before {
+    inset: var(--t31-donut-hole);
+}
+
+.tab31-basic-root .donut-center .donut-title {
+    display: none;
+}
+
+.tab31-basic-root .donut-center .donut-total {
+    font-size: 32px;
+    margin-top: 0;
+}
+
+.tab31-basic-root .alloc-nodata {
+    height: var(--t31-donut-size);
+}
+
+/* ── 수정 모달 — 하드웨어 탭 모달과 동일 스타일 ─────────── */
+/* 입력 사이징은 desk.css + detail.css 기본값(44px/12px 16px)을 그대로 상속 */
+.tab31-basic-root ~ #bs-edit-modal .form-input {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tab31-basic-root ~ #bs-edit-modal .form-input:focus {
+    border-color:#e5e7eb;
+    box-shadow:0 0 0 2px rgba(229,231,235,0.5);
+}
+
+/* ── 반응형 ──────────────────────────────────────────────── */
+@media (max-width: 720px) {
+    .tab31-basic-root {
+        --t31-donut-size: 200px;
+        --t31-donut-hole: 30px;
+        --t31-content-padding: 16px;
+        --t31-section-gap: 16px;
+    }
+}

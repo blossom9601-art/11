@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/insight.css?v=20260107_1">
+</head>
+
+<body class="blog-page blog-detail-page">
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper">
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="blog-detail-pane">
+					<div class="blog-detail-wrap">
+						<article class="blog-post" aria-label="블로그 상세">
+							<div class="blog-post-media" id="blog-post-media-wrap" hidden>
+								<img id="blog-post-image" src="" alt="게시글 이미지" loading="lazy" hidden>
+							</div>
+
+							<header class="blog-post-header">
+								<div class="blog-author">
+									<img id="blog-post-avatar" class="blog-author-avatar" src="/static/image/svg/free-sticker-profile.svg" alt="작성자">
+									<div class="blog-author-meta">
+										<div class="blog-author-line">
+											<span id="blog-post-author" class="blog-author-name"></span>
+											<span class="blog-author-dot">·</span>
+											<span id="blog-post-time" class="blog-author-time"></span>
+										</div>
+										<div class="blog-author-sub" id="blog-post-department"></div>
+									</div>
+								</div>
+							</header>
+
+							<div class="blog-post-body" id="blog-post-body-wrap" hidden>
+								<h1 id="blog-post-title" class="blog-post-title"></h1>
+								<div id="blog-post-content" class="blog-post-content"></div>
+								<div class="blog-post-attachments" id="blog-post-attachments" hidden>
+									<div class="blog-post-attachments-title">첨부파일</div>
+									<ul class="blog-post-attachments-list" id="blog-post-attachments-list"></ul>
+								</div>
+							</div>
+
+							<div class="blog-post-actions" id="blog-post-actions-wrap" aria-label="반응 및 댓글" hidden>
+								<button type="button" class="blog-action" id="blog-like-btn" aria-pressed="false" aria-label="좋아요">
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="blog-action-icon" aria-hidden="true" focusable="false">
+										<path fill="currentColor" d="M22.773,7.721A4.994,4.994,0,0,0,19,6H15.011l.336-2.041A3.037,3.037,0,0,0,9.626,2.122L8,5.417V21H18.3a5.024,5.024,0,0,0,4.951-4.3l.705-5A4.994,4.994,0,0,0,22.773,7.721Z"/>
+										<path fill="currentColor" d="M0,11v5a5.006,5.006,0,0,0,5,5H6V6H5A5.006,5.006,0,0,0,0,11Z"/>
+									</svg>
+									<span class="blog-action-count" id="blog-like-count">0</span>
+								</button>
+								<div class="blog-action blog-action-static" aria-label="댓글 수">
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="blog-action-icon" aria-hidden="true" focusable="false">
+										<path fill="currentColor" d="m20,0H4C1.794,0,0,1.794,0,4v12c0,2.206,1.794,4,4,4h2.923l3.748,3.157c.382.339.862.507,1.337.507.468,0,.931-.162,1.293-.484l3.847-3.18h2.852c2.206,0,4-1.794,4-4V4c0-2.206-1.794-4-4-4Zm-2.298,7.712l-5.793,5.707c-.386.387-.896.58-1.407.58s-1.025-.195-1.416-.585l-2.782-2.696c-.397-.385-.407-1.018-.022-1.414.385-.397,1.018-.406,1.414-.022l2.793,2.707,5.809-5.701c.396-.387,1.027-.383,1.414.011.388.393.384,1.026-.01,1.414Z"/>
+									</svg>
+									<span class="blog-action-count" id="blog-comment-count">0</span>
+								</div>
+							</div>
+
+							<section class="blog-comments" id="blog-comments-wrap" aria-label="댓글" hidden>
+								<ul class="blog-comments-list" id="blog-comments-list"></ul>
+
+								<form class="blog-comment-form" id="blog-comment-form">
+									<input type="text" id="blog-comment-input" placeholder="댓글을 입력하세요" aria-label="댓글 입력" autocomplete="off">
+									<button type="submit" id="blog-comment-submit" aria-label="등록">
+										<img src="/static/image/svg/insight/free-icon-registration.svg" alt="" class="blog-submit-icon" aria-hidden="true">
+									</button>
+								</form>
+							</section>
+						</article>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/js/5.insight/5-2.blog/5-2-1.it_blog/2.blog_detail.js?v=1.1.5"></script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/contract.css?v=1.1.7">
+    <link rel="stylesheet" href="/static/css/capex_executive.css?v=20260215c">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper" id="opex-dashboard-root">
+            <div class="page-header">
+                <h1>OPEX 관리</h1>
+                <p>OPEX(Operating Expenditure) <strong>대시보드</strong> (5개년 유지보수 현황)</p>
+            </div>
+
+            <div class="system-tabs-row">
+                <div class="system-tabs" role="tablist" aria-label="비용관리 OPEX 탭">
+                    {% set tabs = [
+                        ('cost_opex_dashboard','대시보드'),
+                        ('cost_opex_hardware','하드웨어'),
+                        ('cost_opex_software','소프트웨어'),
+                        ('cost_opex_etc','기타 사용료'),
+                    ] %}
+                    {% for key,label in tabs %}
+                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+                <div class="year-filter-wrap">
+                    <select id="yearFilter" class="year-filter-select" aria-label="연도 필터">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Executive Dashboard -->
+            <div class="exec-dashboard">
+
+                <!-- ── KPI Cards ── -->
+                <section class="kpi-grid" aria-label="핵심 KPI">
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-total">총 OPEX (5개년)</span>
+                            <span class="kpi-value" id="kpi-total">-</span>
+                            <span class="kpi-sub" id="kpi-total-count">-</span>
+                        </div>
+                        <div class="kpi-icon indigo"><img src="/static/image/svg/free-icon-font-usd-circle.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-this-year">올해 집행</span>
+                            <span class="kpi-value" id="kpi-this-year">-</span>
+                            <span class="kpi-sub" id="kpi-this-year-count">-</span>
+                        </div>
+                        <div class="kpi-icon emerald"><img src="/static/image/svg/free-icon-font-money-income.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-yoy">전년 대비</span>
+                            <span class="kpi-value" id="kpi-yoy-amount">-</span>
+                            <span class="kpi-sub">YoY 증감률 <span class="kpi-badge flat" id="kpi-yoy">-</span></span>
+                        </div>
+                        <div class="kpi-icon amber"><img src="/static/image/svg/free-icon-font-chart-line-up.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-qoq">분기 대비</span>
+                            <span class="kpi-value" id="kpi-qoq-amount">-</span>
+                            <span class="kpi-sub" id="kpi-qoq-label">QoQ 증감률 <span class="kpi-badge flat" id="kpi-qoq">-</span></span>
+                        </div>
+                        <div class="kpi-icon rose"><img src="/static/image/svg/free-icon-font-chart-pie.svg" alt=""></div>
+                    </div>
+                </section>
+
+                <!-- ── 계약 구분 (2/3) + 계약 상태 (1/3) ── -->
+                <section class="analysis-grid analysis-grid--2-1" aria-label="계약 구분 + 상태">
+                    <article class="exec-card analysis-card analysis-card--wide">
+                        <div class="exec-card-title">계약 구분</div>
+                        <div class="trend-canvas-wrap">
+                            <canvas id="barDivision" role="img" aria-label="계약 구분"></canvas>
+                        </div>
+                        <div class="chart-legend" id="legend-division"></div>
+                    </article>
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">계약 상태</div>
+                        <div class="chart-wrap-inner"><canvas id="donutContractStatus" role="img" aria-label="계약 상태"></canvas></div>
+                        <div class="chart-legend" id="legend-contract-status"></div>
+                    </article>
+                </section>
+
+                <!-- ── 하드웨어 / 소프트웨어 / 기타 사용료 (3-col) ── -->
+                <section class="analysis-grid" aria-label="계약유형 상세">
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">하드웨어</div>
+                        <div class="chart-wrap-inner"><canvas id="pieHwDetail" role="img" aria-label="하드웨어 상세"></canvas></div>
+                        <div class="chart-legend" id="legend-hw-detail"></div>
+                    </article>
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">소프트웨어</div>
+                        <div class="chart-wrap-inner"><canvas id="pieSwDetail" role="img" aria-label="소프트웨어 상세"></canvas></div>
+                        <div class="chart-legend" id="legend-sw-detail"></div>
+                    </article>
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">기타 사용료</div>
+                        <div class="chart-wrap-inner"><canvas id="pieEtcDetail" role="img" aria-label="기타 사용료 상세"></canvas></div>
+                        <div class="chart-legend" id="legend-etc-detail"></div>
+                    </article>
+                </section>
+
+                <!-- ── 계약 건수 (2) + 계약 수량 (5) + 유지보수 업체 (3) ── -->
+                <section class="opex-bottom-row" aria-label="계약 건수 + 계약 수량 + 유지보수 업체">
+                    <article class="exec-card analysis-card opex-col-count">
+                        <div class="exec-card-title">계약 건수</div>
+                        <div class="opex-qty-card-body" style="display:flex;align-items:center;justify-content:center;height:calc(100% - 40px);">
+                            <div style="text-align:center;">
+                                <span class="opex-qty-count-value" id="qty-contract-count">0</span>
+                                <span class="opex-qty-count-unit">건</span>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="exec-card analysis-card opex-col-qty">
+                        <div class="exec-card-title">계약 전체/활성 수량</div>
+                        <div class="chart-wrap-inner chart-wrap-fill"><canvas id="barQtyStacked" role="img" aria-label="계약 전체/활성 수량"></canvas></div>
+                    </article>
+                    <article class="exec-card analysis-card vendor-bar-card opex-col-vendor">
+                        <div class="exec-card-title">유지보수 업체</div>
+                        <div class="chart-wrap-inner chart-wrap-fill"><canvas id="barVendor" role="img" aria-label="유지보수 업체"></canvas></div>
+                    </article>
+                </section>
+
+            </div><!-- /exec-dashboard -->
+
+            <noscript><div class="chart-placeholder" aria-hidden="true">차트를 보려면 JavaScript 를 활성화하세요.</div></noscript>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js"></script>
+    <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+    <script src="/static/js/7.cost/7-1.opex/7-1-0.dashboard/opex_dashboard.js?v=20260215p"></script>
+</body>
+</html>

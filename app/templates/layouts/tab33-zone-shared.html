@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <!--
+        tab33-zone-shared.html — 존 구성 탭 공통 템플릿
+        ─────────────────────────────────────────────────────────
+        SAN 디렉터 / SAN 스위치 상세 페이지의 "존 구성" 탭이 이 단일 템플릿을 사용한다.
+        페이지별 차이는 Jinja 컨텍스트 변수로 주입:
+
+        [공통 — pages.py 에서 자동 설정]
+          title            : 페이지 제목 (h1)
+          subtitle         : 페이지 부제 (p)
+          back_key         : 뒤로가기 대상 라우트 키
+          back_label       : 뒤로가기 버튼 라벨
+          tabs             : [{key, label}, ...] 탭 목록
+          current_key      : 현재 활성 탭 키
+          storage_prefix   : sessionStorage 키 prefix
+    -->
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab33-zone.css?v=5.3">
+    <script src="/static/js/_detail/tab33-zone.js?v=4.5"></script>
+</head>
+<body class="page-server-zone-tab">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content tab33-zone-root">
+        <div class="content-wrapper">
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <div class="page-header">
+                <h1 id="page-title">{{ title or '-' }}</h1>
+                <p id="page-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 존 구성 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+
+                    <!-- 아이콘 액션 버튼 (다운로드 / 추가) -->
+                    <button class="add-btn-icon" id="zone-btn-download" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="zone-btn-add" title="추가" type="button" aria-label="추가">
+                        <img src="/static/image/svg/free-icon-add.svg" alt="추가">
+                    </button>
+
+                    <!-- ═══════════════════════════════════════════
+                         Zone 목록 영역
+                         ═══════════════════════════════════════════ -->
+                    <div class="detail-section zone-list-section">
+                        <h3>Zone 목록</h3>
+                        <!-- 필터 + 보기설정 툴바 -->
+                        <div class="zone-toolbar" id="zone-filter-bar">
+                            <div class="zone-toolbar-filters">
+                                <select id="zone-type-filter" class="zone-toolbar-select" title="구분 필터">
+                                    <option value="">전체 구분</option>
+                                    <option value="cfg">CFG</option>
+                                    <option value="zone">ZONE</option>
+                                    <option value="alias">ALIAS</option>
+                                </select>
+                                <select id="zone-status-filter" class="zone-toolbar-select" title="상태 필터">
+                                    <option value="">전체 상태</option>
+                                    <option value="활성">활성</option>
+                                    <option value="비활성">비활성</option>
+                                </select>
+                                <input type="text" id="zone-search" class="zone-toolbar-keyword" placeholder="키워드 검색" aria-label="키워드 검색">
+                                <button type="button" class="zone-toolbar-search-btn" id="zone-btn-search">조회</button>
+                            </div>
+                            <div class="zone-toolbar-right">
+                                <div class="page-size-selector" aria-label="보기 개수">
+                                    <label for="zone-page-size" class="visually-hidden">보기 개수</label>
+                                    <select id="zone-page-size" class="page-size-select" title="보기 개수">
+                                        <option value="10">10개</option>
+                                        <option value="20">20개</option>
+                                        <option value="50">50개</option>
+                                        <option value="100">100개</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="hw-table" id="zone-list-table">
+                                <colgroup>
+                                    <col style="width:40px">
+                                    <col style="width:100px">
+                                    <col style="width:auto">
+                                    <col style="width:9%">
+                                    <col style="width:9%">
+                                    <col style="width:9%">
+                                    <col style="width:8%">
+                                    <col style="width:8%">
+                                    <col style="width:12%">
+                                    <col style="width:120px">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="zone-select-all" aria-label="전체 선택"></th>
+                                        <th>구분</th>
+                                        <th>이름</th>
+                                        <th>Member 수</th>
+                                        <th>Initiator 수</th>
+                                        <th>Target 수</th>
+                                        <th>상태</th>
+                                        <th>검토</th>
+                                        <th>비고</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="zone-list-body">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 데이터 없음 상태 -->
+                        <div id="zone-list-empty" class="system-empty" role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">Zone 내역이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '추가' 버튼을 눌러 Zone을 등록하세요.</p>
+                            </div>
+                        </div>
+
+                        <!-- 페이지네이션 -->
+                        <div class="modern-pagination" id="zone-list-pagination">
+                            <div class="pagination-info"><span id="zone-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="zone-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="zone-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="zone-page-numbers"></div>
+                                <button class="pagination-btn" id="zone-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="zone-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/_detail/_hardware_detail.js?v=1.0.0"></script>
+    <script>
+    /* 페이지 타이틀/서브타이틀 복원 — sessionStorage에서 선택 행 정보로 설정 */
+    (function resolveZonePageHeader(){
+        'use strict';
+        var titleEl = document.getElementById('page-title');
+        var subEl   = document.getElementById('page-subtitle');
+        if(!titleEl && !subEl) return;
+
+        function norm(v){ var s=String(v==null?'':v).trim(); return (!s||s==='-')?'':s; }
+        if(norm(titleEl?titleEl.textContent:'') && norm(subEl?subEl.textContent:'')) return;
+
+        var serverPrefix = '{{ storage_prefix|default("", true) }}'.trim();
+        if(serverPrefix){
+            var stores = [];
+            try{ if(window.sessionStorage) stores.push(window.sessionStorage); }catch(_){}
+            try{ if(window.localStorage)  stores.push(window.localStorage); }catch(_){}
+
+            function read(kind){
+                var keys = [
+                    serverPrefix + ':selected:' + kind,
+                    serverPrefix + ':selected:' + kind + '_name'
+                ];
+                for(var si=0;si<stores.length;si++){
+                    for(var ki=0;ki<keys.length;ki++){
+                        var v = norm(stores[si].getItem(keys[ki]));
+                        if(v) return v;
+                    }
+                }
+                var rowKey = serverPrefix + ':selected:row';
+                for(var si2=0;si2<stores.length;si2++){
+                    try{
+                        var raw = stores[si2].getItem(rowKey);
+                        if(!raw) continue;
+                        var row = JSON.parse(raw);
+                        if(!row||typeof row!=='object') continue;
+                        return (kind==='work')
+                            ? norm(row.work_name||row.workName||row.work||row.title||row.name)
+                            : norm(row.system_name||row.systemName||row.system||row.subTitle||row.subtitle);
+                    }catch(_){}
+                }
+                return '';
+            }
+            var w = read('work'),  s = read('system');
+            if(w && titleEl) titleEl.textContent = w;
+            if(s && subEl)   subEl.textContent   = s;
+            return;
+        }
+
+        if(window.BlossomHardwareDetail){
+            var pm = window.location.pathname.match(/\/p\/([^\/]+)/);
+            var pageKey = pm ? pm[1] : '';
+            var baseKey = pageKey.replace(/_zone$/, '');
+            var parts = baseKey.split('_').filter(function(p){ return !!p; });
+
+            var candidates = [];
+            for(var len = parts.length; len >= 1; len--){
+                for(var start = parts.length - len; start >= 0; start--){
+                    var seg = parts.slice(start, start + len).join('_');
+                    candidates.push(seg);
+                    candidates.push(seg.toUpperCase());
+                }
+            }
+
+            BlossomHardwareDetail.initHeader({
+                storagePrefix: parts[parts.length-1] || 'detail',
+                headerKeyPrefix: parts[parts.length-1] || 'detail',
+                compatHeaderKeyPrefixes: candidates
+            });
+        }
+    })();
+    </script>
+
+    <!-- Zone CSV 다운로드 모달 -->
+    {% set dlm_modal_id = 'zone-download-modal' %}
+    {% set dlm_title_id = 'zone-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle = '현재 Zone 목록을 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'zone-download-close' %}
+    {% set dlm_confirm_id = 'zone-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'zone-csv-range' %}
+    {% set dlm_all_id = 'zone-csv-range-all' %}
+    {% set dlm_selected_id = 'zone-csv-range-selected' %}
+    {% include 'layouts/_download_modal_range.html' %}
+
+    <!-- Zone cfgshow 가져오기 모달 -->
+    <div id="zone-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content" style="max-width:860px;">
+            <div class="server-add-header">
+                <div class="dispose-title">
+                    <h3>cfgshow 가져오기</h3>
+                    <p class="server-edit-subtitle">cfgshow 내용을 붙여넣으면 자동으로 파싱하여 등록합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="zone-add-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="form-group">
+                    <label for="zone-cfgshow-input">cfgshow 내용 <span class="required">*</span></label>
+                    <textarea id="zone-cfgshow-input" class="form-input zone-cfgshow-textarea" rows="12"
+                        placeholder="cfg:    c2&#10;zone:   peer_zone3&#10;        00:02:00:00:00:03:01:02&#10;        30:08:00:05:33:88:e3:f5&#10;zone:   zone2   alias3; alias4&#10;alias:  alias1  00:00:00:00:00:00:00:01"></textarea>
+                </div>
+                <!-- 파싱 미리보기 -->
+                <div id="zone-cfgshow-preview" class="zone-cfgshow-preview" style="display:none;">
+                    <h4 class="zone-preview-title">파싱 결과 미리보기</h4>
+                    <div class="table-wrap">
+                        <table class="hw-table" id="zone-preview-table">
+                            <colgroup>
+                                <col style="width:80px">
+                                <col style="width:30%">
+                                <col style="width:auto">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>구분</th>
+                                    <th>이름</th>
+                                    <th>Member</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zone-preview-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="zone-parse-btn">파싱</button>
+                    <button type="button" class="btn-primary" id="zone-add-confirm" disabled>등록</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone 수정 모달 (드래그 앤 드롭) -->
+    <div id="zone-edit-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content" style="max-width:820px;">
+            <div class="server-add-header">
+                <div class="dispose-title">
+                    <h3>Zone 수정</h3>
+                    <p class="server-edit-subtitle">Zone 정보와 멤버 역할을 수정합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="zone-edit-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="zone-edit-info-row">
+                    <div class="form-group zone-edit-field">
+                        <label>구분</label>
+                        <input type="text" id="zone-edit-type" class="form-input" disabled>
+                    </div>
+                    <div class="form-group zone-edit-field">
+                        <label for="zone-edit-name">이름 <span class="required">*</span></label>
+                        <input type="text" id="zone-edit-name" class="form-input" placeholder="이름">
+                    </div>
+                    <div class="form-group zone-edit-field">
+                        <label for="zone-edit-status">상태</label>
+                        <select id="zone-edit-status" class="form-input search-select">
+                            <option value="활성">활성</option>
+                            <option value="비활성">비활성</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="zone-edit-remark">비고</label>
+                    <input type="text" id="zone-edit-remark" class="form-input" placeholder="비고">
+                </div>
+                <!-- Initiator / Target 멤버 이동 영역 -->
+                <div id="zone-dnd-area" class="zone-dnd-area" style="display:none;">
+                    <div class="zone-dnd-panel">
+                        <h4 class="zone-dnd-title">Initiator</h4>
+                        <div class="zone-dnd-list" id="zone-dnd-initiator" data-role="initiator"></div>
+                    </div>
+                    <div class="zone-dnd-arrows">
+                        <button type="button" class="zone-arrow-btn" id="zone-move-to-target" title="Target으로 이동">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                        <button type="button" class="zone-arrow-btn" id="zone-move-to-initiator" title="Initiator로 이동">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                    </div>
+                    <div class="zone-dnd-panel">
+                        <h4 class="zone-dnd-title">Target</h4>
+                        <div class="zone-dnd-list" id="zone-dnd-target" data-role="target"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="zone-edit-confirm">수정</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone 삭제 확인 모달 -->
+    <div id="zone-delete-modal" class="server-add-modal modal-overlay-full blossom-message-modal" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>Zone 삭제</h3>
+                    <p class="server-add-subtitle">선택한 Zone 구성을 삭제합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="zone-delete-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="zone-delete-count">이 Zone을 삭제하시겠습니까?</p>
+                        <p style="margin-top:8px; font-size:13px; color:#94a3b8;">삭제된 항목은 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="zone-delete-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="zone-delete-confirm">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone 상세 모달 -->
+    <div id="zone-detail-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="dispose-title">
+                    <h3>Zone 상세</h3>
+                    <p class="server-edit-subtitle" id="zone-detail-modal-subtitle">Zone 멤버 구성을 확인합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="zone-detail-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <!-- Zone 요약 정보 -->
+                <div class="zone-detail-summary">
+                    <div class="zone-summary-item">
+                        <span class="zone-summary-label">구분</span>
+                        <span class="zone-summary-value" id="zone-detail-type">-</span>
+                    </div>
+                    <div class="zone-summary-item">
+                        <span class="zone-summary-label">이름</span>
+                        <span class="zone-summary-value" id="zone-detail-name">-</span>
+                    </div>
+                    <div class="zone-summary-item">
+                        <span class="zone-summary-label">상태</span>
+                        <span class="zone-summary-value" id="zone-detail-status">-</span>
+                    </div>
+                </div>
+
+                <!-- Initiator / Target 좌우 분할 -->
+                <div class="zone-member-grid">
+                    <!-- 좌측: Initiator -->
+                    <div class="zone-member-panel">
+                        <h4 class="zone-member-title">Initiator</h4>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="zone-initiator-table">
+                                <colgroup>
+                                    <col style="width:30%">
+                                    <col style="width:50%">
+                                    <col style="width:20%">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Alias</th>
+                                        <th>WWN</th>
+                                        <th>Port</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="zone-initiator-body">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="zone-initiator-empty" class="zone-member-empty" style="display:none;">
+                            <p>Initiator가 없습니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- 우측: Target -->
+                    <div class="zone-member-panel">
+                        <h4 class="zone-member-title">Target</h4>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="zone-target-table">
+                                <colgroup>
+                                    <col style="width:30%">
+                                    <col style="width:50%">
+                                    <col style="width:20%">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Alias</th>
+                                        <th>WWN</th>
+                                        <th>Port</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="zone-target-body">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="zone-target-empty" class="zone-member-empty" style="display:none;">
+                            <p>Target이 없습니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="zone-detail-cancel">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

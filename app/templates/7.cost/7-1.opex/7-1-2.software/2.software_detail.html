@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail5.css">
+    <script src="/static/js/7.cost/7-1.opex/7-1-2.software/2.software_detail.js?v=20260120-1"></script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content" {% if detail_manage_no %}data-manage-no="{{ detail_manage_no }}"{% endif %} {% if detail_contract and detail_contract.id %}data-contract-id="{{ detail_contract.id }}"{% endif %} {% if detail_contract and detail_contract.vendor_id %}data-vendor-id="{{ detail_contract.vendor_id }}"{% endif %} {% if detail_entity_key %}data-entity-key="{{ detail_entity_key }}"{% endif %}>
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            <a href="{{ url_for('pages.show', key='cost_opex_software') }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '-' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='cost_opex_software_detail') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_software_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='cost_opex_software_contract') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_software_contract' %}active{% endif %}">계약정보</a>
+                <a href="{{ url_for('pages.show', key='cost_opex_software_log') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_software_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='cost_opex_software_file') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_software_file' %}active{% endif %}">구성/파일</a>
+            </div>
+
+            <!-- 유지보수 상세 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <!-- 기본정보 탭 -->
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <!-- 기본정보 섹션 -->
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid">
+                            <!-- 계약 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>계약</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>계약상태</label><span class="info-value" id="cd-contract_status">{% set _st = (detail_contract.contract_status if detail_contract and detail_contract.contract_status else '-') %}{% set _cls = 'ws-wait' %}{% if _st == '진행' %}{% set _cls = 'ws-run' %}{% elif _st == '해지' %}{% set _cls = 'ws-stop' %}{% endif %}<span class="status-pill"><span class="status-dot {{ _cls }}"></span><span class="status-text">{{ _st }}</span></span></span></div>
+                                    <div class="info-row"><label>계약명</label><span class="info-value" id="cd-contract_name">{{ detail_contract.contract_name if detail_contract and detail_contract.contract_name else '-' }}</span></div>
+                                    <div class="info-row"><label>관리번호</label><span class="info-value" id="cd-manage_no">{{ (detail_contract.manage_no if detail_contract and detail_contract.manage_no else detail_manage_no) or '-' }}</span></div>
+                                    <div class="info-row"><label>관리유형</label><span class="info-value" id="cd-manage_type">{{ detail_contract.manage_type if detail_contract and detail_contract.manage_type else '-' }}</span></div>
+                                    <div class="info-row"><label>유지보수 사업자</label><span class="info-value" id="cd-maint_vendor">{{ detail_contract.maint_vendor if detail_contract and detail_contract.maint_vendor else '-' }}</span></div>
+                                </div>
+                            </div>
+                            <!-- 유지보수 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>유지보수</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>유지보수 전체수량</label><span class="info-value" id="cd-maint_qty_total">{% if detail_contract and detail_contract.maint_qty_total is not none %}{{ detail_contract.maint_qty_total }}{% else %}-{% endif %}</span></div>
+                                    <div class="info-row"><label>유지보수 활성수량</label><span class="info-value" id="cd-maint_qty_active">{% if detail_contract and detail_contract.maint_qty_active is not none %}{{ detail_contract.maint_qty_active }}{% else %}-{% endif %}</span></div>
+                                    <div class="info-row"><label>유지보수 시작일</label><span class="info-value" id="cd-maint_start">{{ detail_contract.maint_start if detail_contract and detail_contract.maint_start else '-' }}</span></div>
+                                    <div class="info-row"><label>유지보수 종료일</label><span class="info-value" id="cd-maint_end">{{ detail_contract.maint_end if detail_contract and detail_contract.maint_end else '-' }}</span></div>
+                                    <div class="info-row"><label>유지보수 금액</label><span class="info-value" id="cd-maint_amount">{% if detail_contract and detail_contract.maint_amount_display %}{{ detail_contract.maint_amount_display }}원{% elif detail_contract and detail_contract.maint_amount is not none %}{{ detail_contract.maint_amount }}원{% else %}-{% endif %}</span></div>
+                                    <div class="info-row"><label>유지보수 점검대상</label><span class="info-value" id="cd-inspection_target">{% if detail_contract and detail_contract.inspection_target is not none %}<span class="cell-ox with-badge"><span class="ox-badge {% if detail_contract.inspection_target %}on{% else %}off{% endif %}">{{ 'O' if detail_contract.inspection_target else 'X' }}</span></span>{% else %}-{% endif %}</span></div>
+                                    <div class="info-row"><label>유지보수 담당자</label><span class="info-value" id="cd-maint_manager">{{ detail_contract.maint_manager if detail_contract and detail_contract.maint_manager else '-' }}</span></div>
+                                    <div class="info-row"><label>비고</label><span class="info-value" id="cd-memo">{{ detail_contract.memo if detail_contract and detail_contract.memo else '-' }}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+    <!-- 기본정보 수정 모달 (리스트의 '수정' 모달과 동일 구조) -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>유지보수 계약 수정</h3><p class="server-edit-subtitle">선택한 계약 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form">
+                    <!-- 계약 기본 정보 -->
+                    <div class="form-section">
+                        <div class="section-header"><h4>계약</h4></div>
+                        <div class="form-grid">
+                            <div class="form-row"><label>계약상태</label>
+                                <select name="contract_status" class="form-input">
+                                    <option value="">선택</option>
+                                    <option value="진행">진행</option>
+                                    <option value="해지">해지</option>
+                                    <option value="만료">만료</option>
+                                </select>
+                            </div>
+                            <div class="form-row"><label>계약명</label><input name="contract_name" class="form-input" placeholder="계약명"></div>
+                            <div class="form-row"><label>관리번호</label><input name="manage_no" class="form-input" placeholder="관리번호"></div>
+                            <div class="form-row"><label>유지보수 사업자</label>
+                                <select name="vendor_id" class="form-input search-select" data-searchable-scope="page" data-search-source="vendorMaintenance" data-placeholder="검색 선택" data-allow-clear="false">
+                                    <option value="">검색 선택</option>
+                                    {% if detail_contract and detail_contract.vendor_id %}<option value="{{ detail_contract.vendor_id }}" selected>{{ detail_contract.maint_vendor if detail_contract.maint_vendor else (detail_contract.vendor_name if detail_contract.vendor_name else detail_contract.vendor_id) }}</option>{% endif %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 유지보수 정보 -->
+                    <div class="form-section">
+                        <div class="section-header"><h4>유지보수</h4></div>
+                        <div class="form-grid">
+                            <div class="form-row" hidden><label>유지보수 전체수량</label><input name="maint_qty_total" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                            <div class="form-row" hidden><label>유지보수 활성수량</label><input name="maint_qty_active" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                            <div class="form-row"><label>유지보수 시작일</label><input name="maint_start" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                            <div class="form-row"><label>유지보수 종료일</label><input name="maint_end" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                            <div class="form-row" hidden><label>유지보수 금액</label><input name="maint_amount" type="text" class="form-input locked-field" value="0원" disabled></div>
+                            <div class="form-row"><label>유지보수 점검대상</label>
+                                <select name="inspection_target" class="form-input search-select" data-searchable-scope="page" data-placeholder="선택" data-allow-clear="false">
+                                    <option value="">선택</option>
+                                    <option value="O">O</option>
+                                    <option value="X">X</option>
+                                </select>
+                            </div>
+                            <div class="form-row"><label>유지보수 담당자</label>
+                                <select name="maint_manager" class="form-input search-select" data-searchable="true" data-placeholder="선택" data-manager-select="edit">
+                                    <option value="">선택</option>
+                                </select>
+                            </div>
+                            <div class="form-row form-row-wide"><label>비고</label><textarea name="memo" class="form-input textarea-large" rows="6"></textarea></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

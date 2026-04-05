@@ -1,0 +1,26 @@
+/* Local fallback for older Material Icons Outlined (NOT Material Symbols variable font).
+  Keep this under the 'Material Icons Outlined' family so it doesn't override
+  the Google CDN 'Material Symbols Outlined' family loaded on the page. */
+@font-face {
+  font-family: 'Material Icons Outlined';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./MaterialIconsOutlined-Regular.otf') format('opentype');
+}
+/* Convenience utility class if needed */
+.material-symbols-rounded {
+  font-family: 'Material Icons Outlined', 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+  

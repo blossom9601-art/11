@@ -1,0 +1,127 @@
+/* =========================================================
+ *  tab06-authority.css  — 권한관리 탭 공통 디자인 시스템
+ *  Scoped under .tab06-authority-root
+ *  ※ 모든 상세 페이지에서 동일한 UI/UX 보장
+ * ========================================================= */
+
+/* ── 디자인 토큰 ─────────────────────────────────────── */
+.tab06-authority-root {
+    /* 색상 */
+    --au-primary:           #3b82f6;
+    --au-primary-hover:     #2563eb;
+    --au-row-selected-bg:   rgba(59,130,246,.06);
+    --au-row-hover-bg:      rgba(59,130,246,.04);
+    --au-border:            #e2e8f0;
+    --au-bg:                #ffffff;
+    --au-empty-bg:          #f8fafc;
+    --au-shadow:            0 1px 3px rgba(0,0,0,.05);
+
+    /* 여백 체계 */
+    --au-content-padding:   24px;
+    --au-section-gap:       20px;
+    --au-header-height:     44px;
+    --au-row-height:        42px;
+    --au-empty-min-height:  180px;
+
+    /* 타이포그래피 */
+    --au-font-size:         13.5px;
+    --au-header-font-size:  13px;
+
+    /* 라운딩 */
+    --au-radius:            8px;
+    --au-btn-radius:        6px;
+}
+
+/* ── 테이블 행 선택 하이라이트 ────────────────────────── */
+.tab06-authority-root #au-spec-table tbody tr.selected {
+    background: var(--au-row-selected-bg);
+}
+.tab06-authority-root #au-spec-table tbody tr:hover {
+    background: var(--au-row-hover-bg);
+}
+
+/* ── 버튼 공통 (다운로드 / 행 추가) ─────────────────── */
+.tab06-authority-root #au-download-btn,
+.tab06-authority-root #au-row-add {
+    border-radius: var(--au-btn-radius);
+    transition: box-shadow .15s, transform .15s;
+}
+.tab06-authority-root #au-download-btn:hover,
+.tab06-authority-root #au-row-add:hover {
+    box-shadow: var(--au-shadow);
+    transform: translateY(-1px);
+}
+.tab06-authority-root #au-download-btn:active,
+.tab06-authority-root #au-row-add:active {
+    transform: translateY(0);
+}
+.tab06-authority-root #au-download-btn:disabled,
+.tab06-authority-root #au-download-btn[disabled],
+.tab06-authority-root #au-row-add:disabled,
+.tab06-authority-root #au-row-add[disabled] {
+    opacity: .45;
+    pointer-events: none;
+}
+
+/* ── 콘텐츠 패딩 통일 ───────────────────────────────── */
+.tab06-authority-root .server-detail-content {
+    padding: var(--au-content-padding);
+}
+.tab06-authority-root .detail-section {
+    margin-top: var(--au-section-gap);
+}
+.tab06-authority-root .detail-section h3 {
+    min-height: var(--au-header-height);
+    font-size: var(--au-header-font-size);
+}
+
+/* ── 테이블 행 높이 강제 ─────────────────────────────── */
+.tab06-authority-root #au-spec-table tbody td {
+    height: var(--au-row-height);
+    font-size: var(--au-font-size);
+    vertical-align: middle;
+}
+.tab06-authority-root #au-spec-table thead th {
+    font-size: var(--au-header-font-size);
+}
+
+/* ── 빈 상태 영역 ────────────────────────────────────── */
+.tab06-authority-root #au-empty {
+    min-height: var(--au-empty-min-height);
+    background: var(--au-empty-bg);
+    border-radius: var(--au-radius);
+}
+
+/* ── 다운로드 모달 ───────────────────────────────────── */
+.tab06-authority-root ~ #au-download-modal .btn-primary,
+body #au-download-modal .btn-primary {
+    border-radius: var(--au-btn-radius);
+}
+
+/* ── 삭제 모달 ───────────────────────────────────────── */
+.tab06-authority-root ~ #au-delete-modal .btn-danger,
+body #au-delete-modal .btn-danger {
+    border-radius: var(--au-btn-radius);
+}
+
+/* ── 시스템 수정 모달 ────────────────────────────────── */
+.tab06-authority-root ~ #system-edit-modal .btn-primary,
+body #system-edit-modal .btn-primary {
+    border-radius: var(--au-btn-radius);
+}
+
+/* ── 반응형 ──────────────────────────────────────────── */
+@media (max-width: 1280px) {
+    .tab06-authority-root {
+        --au-content-padding: 16px;
+        --au-section-gap:    14px;
+    }
+}
+@media (max-width: 768px) {
+    .tab06-authority-root {
+        --au-content-padding: 10px;
+        --au-section-gap:    10px;
+        --au-row-height:     36px;
+        --au-font-size:      12.5px;
+    }
+}

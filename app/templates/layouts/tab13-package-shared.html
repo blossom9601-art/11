@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.34">
+    <link rel="stylesheet" href="/static/css/tab13-package.css?v=1.3">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content tab13-package-root">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <!-- 페이지 타이틀 / 서브타이틀 -->
+            <div class="page-header">
+                <h1 id="page-title">{{ title or '-' }}</h1>
+                <p id="page-subtitle">{{ subtitle if subtitle and subtitle != '-' else '-' }}</p>
+            </div>
+
+            <!-- 상세 탭 네비게이션 -->
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                    class="server-detail-tab-btn {% if current_key == t.key %}active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 패키지 컨텐츠 영역 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="pk-upload-btn" title="CSV 업로드" type="button" aria-label="CSV 업로드">
+                        <img src="/static/image/svg/list/free-icon-upload.svg" alt="CSV 업로드">
+                    </button>
+                    <button class="add-btn-icon" id="pk-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="pk-row-add" title="행 추가" type="button" aria-label="행 추가">
+                        <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                    </button>
+                    <div class="detail-section">
+                        <h3>
+                            패키지 정보
+                            <div class="page-size-selector" aria-label="보기 개수">
+                                <label for="pk-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="pk-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="pk-spec-table" data-scope="{{ tab13_scope or '' }}">
+                                <colgroup>
+                                    <col><!-- checkbox -->
+                                    <col style="width: 160px"><!-- 패키지 이름 -->
+                                    <col style="width: 140px"><!-- 버전 -->
+                                    <col style="width: 140px"><!-- 유형 -->
+                                    <col style="width: 260px"><!-- 식별자 -->
+                                    <col style="width: 140px"><!-- 제조사 -->
+                                    <col style="width: 140px"><!-- 라이선스 -->
+                                    <col style="width: 140px"><!-- 취약점(버튼) -->
+                                    <col class="actions-col"><!-- 관리 -->
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="pk-select-all" aria-label="전체 선택"></th>
+                                        <th>패키지 이름<span class="req-star" aria-hidden="true">*</span></th>
+                                        <th>버전</th>
+                                        <th>유형</th>
+                                        <th>식별자</th>
+                                        <th>제조사</th>
+                                        <th>라이선스</th>
+                                        <th>취약점</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- JS 에서 데이터 렌더링 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State -->
+                        <div id="pk-empty" class="system-empty" role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">패키지 내역이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '추가' 버튼을 눌러 첫 패키지를 등록하세요.</p>
+                            </div>
+                        </div>
+                        <!-- Pagination -->
+                        <div class="modern-pagination" id="pk-pagination">
+                            <div class="pagination-info"><span id="pk-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="pk-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="pk-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="pk-page-numbers"></div>
+                                <button class="pagination-btn" id="pk-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="pk-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/_detail/_hardware_detail.js?v=1.0.0"></script>
+    <script>
+    /* 페이지 타이틀/서브타이틀 복원 — sessionStorage 기반 */
+    (function resolvePackagePageHeader(){
+        'use strict';
+        var titleEl = document.getElementById('page-title');
+        var subEl   = document.getElementById('page-subtitle');
+        if(!titleEl && !subEl) return;
+
+        function norm(v){ var s=String(v==null?'':v).trim(); return (!s||s==='-')?'':s; }
+        if(norm(titleEl?titleEl.textContent:'') && norm(subEl?subEl.textContent:'')) return;
+
+        var serverPrefix = '{{ storage_prefix|default("", true) }}'.trim();
+        if(serverPrefix){
+            var stores = [];
+            try{ if(window.sessionStorage) stores.push(window.sessionStorage); }catch(_){}
+            try{ if(window.localStorage)  stores.push(window.localStorage); }catch(_){}
+
+            function read(kind){
+                var keys = [
+                    serverPrefix + ':selected:' + kind,
+                    serverPrefix + ':selected:' + kind + '_name'
+                ];
+                for(var si=0;si<stores.length;si++){
+                    for(var ki=0;ki<keys.length;ki++){
+                        var v = norm(stores[si].getItem(keys[ki]));
+                        if(v) return v;
+                    }
+                }
+                var rowKey = serverPrefix + ':selected:row';
+                for(var si2=0;si2<stores.length;si2++){
+                    try{
+                        var raw = stores[si2].getItem(rowKey);
+                        if(!raw) continue;
+                        var row = JSON.parse(raw);
+                        if(!row||typeof row!=='object') continue;
+                        return (kind==='work')
+                            ? norm(row.work_name||row.workName||row.work||row.title||row.name)
+                            : norm(row.system_name||row.systemName||row.system||row.subTitle||row.subtitle);
+                    }catch(_){}
+                }
+                return '';
+            }
+            var w = read('work'),  s = read('system');
+            if(w && titleEl) titleEl.textContent = w;
+            if(s && subEl)   subEl.textContent   = s;
+            return;
+        }
+
+        if(window.BlossomHardwareDetail){
+            var pm = window.location.pathname.match(/\/p\/([^\/]+)/);
+            var pageKey = pm ? pm[1] : '';
+            var baseKey = pageKey.replace(/_package$/, '');
+            var parts = baseKey.split('_').filter(function(p){ return !!p; });
+
+            var candidates = [];
+            for(var len = parts.length; len >= 1; len--){
+                for(var start = parts.length - len; start >= 0; start--){
+                    var seg = parts.slice(start, start + len).join('_');
+                    candidates.push(seg);
+                    candidates.push(seg.toUpperCase());
+                }
+            }
+
+            BlossomHardwareDetail.initHeader({
+                storagePrefix: parts[parts.length-1] || 'detail',
+                headerKeyPrefix: parts[parts.length-1] || 'detail',
+                compatHeaderKeyPrefixes: candidates
+            });
+        }
+    })();
+    </script>
+    <script src="/static/js/_detail/tab13-package.js?v=20260131-4"></script>
+
+    <!-- 시스템 수정 모달 -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>시스템 수정</h3><p class="server-edit-subtitle">선택한 시스템 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV 다운로드 확인 모달 -->
+        {% set dlm_modal_id = 'pk-download-modal' %}
+    {% set dlm_title_id = 'pk-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle_id = 'pk-download-subtitle' %}
+    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'pk-download-close' %}
+    {% set dlm_confirm_id = 'pk-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'pk-csv-range' %}
+    {% set dlm_row_all_id = 'pk-csv-range-row-all' %}
+    {% set dlm_row_selected_id = 'pk-csv-range-row-selected' %}
+    {% set dlm_all_id = 'pk-csv-range-all' %}
+    {% set dlm_selected_id = 'pk-csv-range-selected' %}
+    {% set dlm_all_label = '전체 결과' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
+    {% set dlm_illustration_alt = 'Research Illustration' %}
+    {% include 'layouts/_download_modal_range.html' %}
+
+    <!-- CSV 업로드 모달 -->
+    <div id="pk-upload-modal" class="server-add-modal system-upload-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content" style="max-width: 760px;">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3>CSV 업로드</h3>
+                    <p class="server-add-subtitle">CSV 파일을 업로드하여 패키지 목록을 등록합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="pk-upload-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body system-upload-body">
+                <div class="upload-dropzone" id="pk-upload-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+                    <div class="upload-illu"><div id="pk-upload-anim" class="lottie-anim" aria-hidden="true"></div></div>
+                    <div class="upload-text center">
+                        <strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+                    </div>
+                    <input type="file" id="pk-upload-file" class="visually-hidden" accept=".csv,text/csv" aria-hidden="true" />
+                </div>
+                <div class="upload-subinfo" aria-hidden="true">
+                    <span class="sub-left">지원 가능한 확장자: CSV</span>
+                    <span class="sub-right">최대 파일 사이즈: 10 MB</span>
+                </div>
+                <div class="upload-meta" id="pk-upload-meta" hidden>
+                    <div class="file-chip" id="pk-upload-file-chip" aria-live="polite"></div>
+                </div>
+                <div class="upload-help">
+                    <p class="upload-warning">CSV 업로드는 반드시 제공한 양식을 사용해야 합니다.<br>아래 양식을 다운로드한 뒤 작성하여 업로드 해주세요.</p>
+                    <div class="template-card">
+                        <div class="template-label"><img src="/static/image/svg/list/free-icon-excel.svg" alt="CSV" class="template-icon">CSV 업로드 양식</div>
+                        <button type="button" class="btn-primary template-download-btn" id="pk-upload-template-download" aria-label="양식 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="" class="template-icon" aria-hidden="true">
+                        </button>
+                    </div>
+                    <div id="pk-upload-status" class="upload-status" style="margin-top:10px; min-height: 20px;"></div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="pk-upload-confirm" disabled>등록</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 취약점 입력/조회 모달 -->
+    <div id="pk-vuln-modal" class="server-add-modal system-download-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>취약점 요약</h3>
+                    <p class="server-add-subtitle" id="pk-vuln-subtitle">· -</p>
+                </div>
+                <button class="close-btn" type="button" id="pk-vuln-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body" style="padding:16px 0;">
+                <div style="display:grid; gap:10px; padding:0 24px;">
+                    <textarea id="pk-vuln-text" class="form-input" rows="12" style="width:100%; resize:vertical; box-sizing:border-box;" readonly></textarea>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="pk-vuln-save">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

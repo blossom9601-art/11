@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+        <link rel="stylesheet" href="/static/css/admin.css?v=20260104-11">
+</head>
+<body class="page-admin-settings page-settings-profile">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content admin-page">
+        <!-- Profile cover and header -->
+        <section class="profile">
+            <div class="profile-cover" aria-hidden="true"></div>
+            <div class="profile-header container">
+                <div class="profile-primary">
+                    <div class="avatar" role="button" tabindex="0" title="프로필 이미지 변경" aria-label="프로필 이미지 변경" style="background-image: url({{ (user.profile_image if user and user.profile_image else '/static/image/svg/profil/free-icon-bussiness-man.svg')|tojson }});"></div>
+                    <div class="identity">
+                        <div class="name-row">
+                            <h2 class="name">{{ (user.name if user and user.name else '-') }}</h2>
+                        </div>
+                        <div class="bio-row">
+                            <p class="bio">{{ ((user.motto if user and user.motto else '') or (user.note if user and user.note else '') or '디자인은 억지로 하면 안 됩니다. 자연스럽지 않다면 다시 생각해야 합니다.') }}</p>
+                            <button class="action-btn" id="btn-edit-bio" title="메시지 수정" aria-label="메시지 수정" type="button">
+                                <img src="/static/image/svg/admin/free-icon-pen-square.svg" alt="메시지 수정" class="action-icon">
+                            </button>
+                        </div>
+                        {% if user and user.location and user.location|trim != '-' %}
+                            <p class="meta">{{ user.location }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs container" role="tablist" aria-label="프로필 섹션">
+                <a id="overview" class="tab active" href="{{ url_for('auth.settings_profile') }}" role="tab" aria-selected="true">프로필</a>
+                <a id="member" class="tab" href="{{ url_for('auth.settings_member') }}" role="tab" aria-selected="false">멤버</a>
+                <a id="memo" class="tab" href="{{ url_for('auth.settings_memo') }}" role="tab" aria-selected="false">메모</a>
+                <a id="password" class="tab" href="{{ url_for('auth.settings_password') }}" role="tab" aria-selected="false">패스워드</a>
+            </div>
+
+            <!-- Tab panels -->
+            <div class="tab-panels container">
+                <!-- Overview only -->
+                <section id="tab-overview" class="tab-panel active" role="tabpanel" aria-labelledby="overview">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">프로필 정보</h3>
+                            <button class="action-btn" id="btn-edit-profile" title="수정" aria-label="수정">
+                                <img class="action-icon" src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="details-grid">
+                                <div class="detail-row" data-key="full_name">
+                                    <div class="label">이름</div>
+                                    <div class="value" data-field="full_name">{{ (user.name if user and user.name else '-') }}</div>
+                                </div>
+                                <div class="detail-row" data-key="nickname">
+                                    <div class="label">별명</div>
+                                    <div class="value" data-field="nickname">{{ (user.nickname if user and user.nickname else '-') }}</div>
+                                    <input class="inline-input" type="text" name="nickname" value="{{ (user.nickname if user and user.nickname else '') }}" />
+                                </div>
+                                <div class="detail-row" data-key="department">
+                                    <div class="label">소속</div>
+                                    <div class="value" data-field="department">{{ (user.department if user and user.department else '-') }}</div>
+                                    {% set _dept = (user.department if user and user.department and user.department|trim != '-' else '') %}
+                                    <select
+                                        class="inline-input search-select"
+                                        name="department"
+                                        data-searchable="true"
+                                        data-searchable-scope="page"
+                                        data-placeholder="선택"
+                                        data-allow-clear="true"
+                                    >
+                                        <option value="">선택</option>
+                                        {% for dept_name in (departments or []) %}
+                                            {% set _dn = (dept_name or '')|trim %}
+                                            {% if _dn %}
+                                                <option value="{{ _dn }}" {% if _dept and _dn == _dept %}selected{% endif %}>{{ _dn }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="detail-row" data-key="location">
+                                    <div class="label">위치</div>
+                                    <div class="value" data-field="location">{{ (user.location if user and user.location else '-') }}</div>
+                                    <input class="inline-input" type="text" name="location" value="{{ (user.location if user and user.location else '') }}" />
+                                </div>
+                                <div class="detail-row" data-key="phone_ext">
+                                    <div class="label">내선전화</div>
+                                    <div class="value" data-field="phone_ext">{{ (user.ext_phone if user and user.ext_phone else '-') }}</div>
+                                    <input class="inline-input" type="text" name="phone_ext" value="{{ (user.ext_phone if user and user.ext_phone else '') }}" />
+                                </div>
+                                <div class="detail-row" data-key="phone_mobile">
+                                    <div class="label">휴대전화</div>
+                                    <div class="value" data-field="phone_mobile">{{ (user.mobile_phone if user and user.mobile_phone else '-') }}</div>
+                                    <input class="inline-input" type="text" name="phone_mobile" value="{{ (user.mobile_phone if user and user.mobile_phone else '') }}" />
+                                </div>
+                                <div class="detail-row" data-key="email">
+                                    <div class="label">이메일</div>
+                                    <a class="value value-link" data-field="email" href="mailto:{{ (user.email if user and user.email else '') }}">{{ (user.email if user and user.email else '-') }}</a>
+                                    <input class="inline-input" type="email" name="email" value="{{ (user.email if user and user.email else '') }}" />
+                                </div>
+                                <div class="detail-row" data-key="duty">
+                                    <div class="label">업무</div>
+                                    <div class="value" data-field="duty">{{ (user.job if user and user.job else '-') }}</div>
+                                    <input class="inline-input" type="text" name="duty" value="{{ (user.job if user and user.job else '') }}" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+
+    </main>
+
+    <!-- Profile Image Picker (modal) -->
+    <div id="profile-picker" class="profile-picker" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="picker-backdrop" data-picker-close></div>
+        <div class="picker-dialog" role="document">
+            <div class="picker-header">
+                <h3 class="picker-title">프로필 이미지 선택</h3>
+                <button class="btn-icon" data-picker-close title="닫기">×</button>
+            </div>
+            <div class="picker-body">
+                <div class="picker-grid" aria-label="프로필 이미지 목록" role="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/blossom.js"></script>
+    <!-- Searchable dropdown (검색/드롭박스) -->
+    <script src="/static/js/ui/searchable_select.js?v=1.2.0"></script>
+    <!-- Admin-only script -->
+    <script src="/static/js/authentication/11-1.setting/11-1-1.admin.js?v=20260103-2"></script>
+
+    <!-- /settings/profile diagnostics (enabled only with ?diag=1) -->
+    <script>
+        (function(){
+            try {
+                var params = new URLSearchParams(window.location.search || '');
+                if (params.get('diag') !== '1') return;
+                var titleEl = document.querySelector('#tab-overview .card .card-header .card-title');
+                var headerEl = document.querySelector('#tab-overview .card .card-header');
+                var editBtn = document.getElementById('btn-edit-profile');
+                var profileScroll = document.querySelector('main.main-content.admin-page > section.profile');
+                if (!titleEl || !headerEl || !editBtn) return;
+
+                var panel = document.createElement('pre');
+                panel.setAttribute('id', 'diag-profile-title');
+                panel.style.position = 'fixed';
+                panel.style.right = '12px';
+                panel.style.bottom = '12px';
+                panel.style.zIndex = '99999';
+                panel.style.maxWidth = '560px';
+                panel.style.maxHeight = '50vh';
+                panel.style.overflow = 'auto';
+                panel.style.padding = '10px 12px';
+                panel.style.background = 'rgba(17,24,39,0.92)';
+                panel.style.color = '#e5e7eb';
+                panel.style.font = '12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+                panel.style.borderRadius = '10px';
+                panel.style.boxShadow = '0 10px 30px rgba(0,0,0,.25)';
+                panel.textContent = 'diag=1 enabled. Measuring…\n';
+                document.body.appendChild(panel);
+
+                function roundRect(r){
+                    return {
+                        x: Math.round(r.x*100)/100,
+                        y: Math.round(r.y*100)/100,
+                        w: Math.round(r.width*100)/100,
+                        h: Math.round(r.height*100)/100
+                    };
+                }
+
+                function measureTextWidth(text, font){
+                    var c = document.createElement('canvas');
+                    var ctx = c.getContext('2d');
+                    ctx.font = font;
+                    return Math.round(ctx.measureText(text).width * 100) / 100;
+                }
+
+                function snapshot(label){
+                    var tRect = titleEl.getBoundingClientRect();
+                    var hRect = headerEl.getBoundingClientRect();
+                    var cs = window.getComputedStyle(titleEl);
+                    var docEl = document.documentElement;
+                    var scrollbarW = window.innerWidth - docEl.clientWidth;
+                    var font = cs.font || (cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + '/' + cs.lineHeight + ' ' + cs.fontFamily);
+                    var textW = measureTextWidth(titleEl.textContent || '', font);
+                    return {
+                        label: label,
+                        ts: new Date().toISOString(),
+                        dpr: window.devicePixelRatio,
+                        editing: document.querySelector('#tab-overview .card')?.classList.contains('editing') || false,
+                        scrollbarW: scrollbarW,
+                        titleRect: roundRect(tRect),
+                        headerRect: roundRect(hRect),
+                        profileClientW: profileScroll ? profileScroll.clientWidth : null,
+                        profileScrollW: profileScroll ? profileScroll.scrollWidth : null,
+                        textMeasureW: textW,
+                        computed: {
+                            letterSpacing: cs.letterSpacing,
+                            fontKerning: cs.fontKerning,
+                            textRendering: cs.textRendering,
+                            textShadow: cs.textShadow,
+                            font: font,
+                            transform: cs.transform,
+                            webkitFontSmoothing: cs.webkitFontSmoothing || null
+                        }
+                    };
+                }
+
+                function log(label){
+                    var s = snapshot(label);
+                    panel.textContent += JSON.stringify(s, null, 2) + '\n\n';
+                    console.log('[diag profile title]', s);
+                }
+
+                log('load');
+                editBtn.addEventListener('click', function(){
+                    log('click (immediate)');
+                    setTimeout(function(){ log('click (+0ms)'); }, 0);
+                    setTimeout(function(){ log('click (+50ms)'); }, 50);
+                    setTimeout(function(){ log('click (+200ms)'); }, 200);
+                });
+            } catch (e) {
+                console.warn('diag failed', e);
+            }
+        })();
+    </script>
+</body>
+</html>

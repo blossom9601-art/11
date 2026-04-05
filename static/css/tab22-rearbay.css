@@ -1,0 +1,64 @@
+/*
+ * tab22-rearbay.css
+ * 후면베이 탭 공통 스타일
+ * ─────────────────────────────────────────────
+ * 후면베이(tab22) 전용 스타일을 여기에 작성합니다.
+ * 기본 테이블/레이아웃 스타일은 detail.css 에서 상속합니다.
+ */
+
+/* 후면베이 루트 컨테이너 */
+.tab22-bay-root .table-wrap {
+    overflow-x: auto;
+}
+.tab22-bay-root .system-actions.table-actions {
+    text-align: left;
+}
+
+/* ── Searchable select (테이블 셀 안) ── */
+.fk-searchable-control{ position:relative; width:100%; }
+.fk-searchable-control .fk-searchable-display{
+    width:100%; border:1px solid #e5e7eb; background-color:#fff;
+    border-radius:6px; padding:6px 30px 6px 8px; min-height:32px;
+    font-size:13px; text-align:left; color:#0f172a;
+    transition:border-color .15s ease; position:relative; cursor:pointer;
+}
+.fk-searchable-control .fk-searchable-display:focus{ outline:none; border-color:#94a3b8; box-shadow:0 0 0 2px rgba(148,163,184,0.3); }
+.fk-searchable-control .fk-searchable-display::after{
+    content:""; position:absolute; top:50%; right:8px;
+    width:0; height:0; border-left:4px solid transparent;
+    border-right:4px solid transparent; border-top:5px solid #475569;
+    transform:translateY(-25%); pointer-events:none;
+}
+.fk-searchable-control .fk-searchable-display:not(.has-value){ color:#94a3b8; }
+.fk-searchable-control .fk-searchable-clear{
+    position:absolute; top:50%; right:24px; transform:translateY(-50%);
+    border:none; background:transparent; color:#94a3b8; font-size:11px;
+    cursor:pointer; padding:2px 3px; opacity:0; transition:opacity .15s ease;
+}
+.fk-searchable-control:hover .fk-searchable-clear{ opacity:1; }
+.fk-searchable-control .fk-searchable-clear:hover{ color:#0f172a; }
+.fk-searchable-control .fk-search-native-hidden{ display:none; }
+.fk-searchable-control.is-disabled .fk-searchable-display,
+.fk-searchable-control.is-disabled .fk-searchable-clear{ cursor:not-allowed; opacity:.6; }
+
+/* Search panel (body 에 append) */
+.fk-search-panel{
+    position:fixed; background-color:#fff; border:1px solid #e5e7eb;
+    border-radius:10px; box-shadow:0 16px 32px rgba(15,23,42,.15);
+    max-height:340px; display:flex; flex-direction:column;
+    overflow:hidden; z-index:5000;
+}
+.fk-search-panel__header{ display:flex; gap:6px; padding:10px; border-bottom:1px solid #eef2f7; }
+.fk-search-panel__input{ flex:1; border:1px solid #e5e7eb; border-radius:6px; padding:6px 8px; font-size:13px; }
+.fk-search-panel__input:focus{ outline:none; border-color:#94a3b8; box-shadow:0 0 0 2px rgba(148,163,184,0.3); }
+.fk-search-panel__close{ border:none; background:#f1f5f9; border-radius:6px; padding:0 10px; font-size:12px; cursor:pointer; color:#475569; }
+.fk-search-panel__list{ padding:4px 0; max-height:240px; overflow-y:auto; }
+.fk-search-panel__item,
+.fk-search-panel__option{ width:100%; text-align:left; padding:8px 14px; border:none; background:transparent; cursor:pointer; font-size:13px; color:#0f172a; }
+.fk-search-panel__item:hover,
+.fk-search-panel__option:hover,
+.fk-search-panel__item.active,
+.fk-search-panel__option.is-active{ background-color:rgba(99,102,241,.08); }
+.fk-search-panel__item.selected,
+.fk-search-panel__option.is-selected{ font-weight:600; color:#4f46e5; }
+.fk-search-panel__empty{ padding:14px; font-size:13px; color:#6b7280; }

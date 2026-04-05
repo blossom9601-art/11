@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <!--
+        tab72-capex-shared.html — 계약정보(CAPEX) 탭 공통 템플릿
+        ──────────────────────────────────────────────────────────
+        모든 CAPEX 상세 페이지의 "계약정보" 탭이 이 단일 템플릿을 사용한다.
+        페이지별 차이는 Jinja 컨텍스트 변수로 주입:
+
+        [공통 — pages.py 에서 자동 설정]
+          title              : 페이지 제목 (h1)
+          subtitle           : 페이지 부제 (p)
+          back_key           : 뒤로가기 대상 라우트 키
+          back_label         : 뒤로가기 버튼 라벨
+          tabs               : [{key, label}, ...] 탭 목록
+          current_key        : 현재 활성 탭 키
+          detail_manage_no   : 관리 번호
+          detail_entity_key  : 엔티티 키 (cost:<base_key>:<manage_no>)
+          detail_contract    : 계약 상세 dict (capex_type 등 포함)
+
+        주의: 이 파일을 복사/수정하지 마세요. 스타일/동작 변경은
+              tab72-capex.css / tab72-capex.js 에서만 수행합니다.
+    -->
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab72-capex.css?v=1.0">
+    <script src="/static/js/7.cost/shared/tab72-capex.js?v=20260320-01"></script>
+</head>
+<body class="page-tab72-capex">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content page-tab72-capex"
+          {% if detail_manage_no %}data-manage-no="{{ detail_manage_no }}"{% endif %}
+          {% if detail_entity_key %}data-entity-key="{{ detail_entity_key }}"{% endif %}
+          {% if detail_contract and detail_contract.get('capex_type') %}data-capex-type="{{ detail_contract.get('capex_type') }}"{% endif %}>
+        <div class="content-wrapper">
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '-' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 계약정보 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <div class="detail-header-actions tab62-header-actions" aria-label="계약정보 상단 동작">
+                        <button class="add-btn-icon" id="tab62-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                        </button>
+                        <button class="add-btn-icon" id="tab62-row-add" title="행 추가" type="button" aria-label="행 추가">
+                            <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                        </button>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3 class="has-header-actions">계약정보</h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="tab62-spec-table" data-tab62="1">
+                                <colgroup>
+                                    <col>
+                                    <col style="width: 150px;"> <!-- 조달방법 -->
+                                    <col style="width: 150px;"> <!-- 조달구분 -->
+                                    <col style="width: 150px;"> <!-- 품목유형 -->
+                                    <col style="width: 150px;"> <!-- 제조사 -->
+                                    <col style="width: 180px;"> <!-- 모델명 -->
+                                    <col style="width: 250px;"> <!-- 상세사양 -->
+                                    <col style="width: 150px;"> <!-- 계약업체 -->
+                                    <col style="width: 150px;"> <!-- 조달단가 -->
+                                    <col style="width: 150px;"> <!-- 조달수량 -->
+                                    <col style="width: 150px;"> <!-- 조달금액 -->
+                                    <col style="width: 150px;"> <!-- 유지보수율 -->
+                                    <col style="width: 150px;"> <!-- TCO -->
+                                    <col style="width: 150px;"> <!-- 무상기간 -->
+                                    <col style="width: 150px;"> <!-- 무상기간 시작 -->
+                                    <col style="width: 150px;"> <!-- 무상기간 종료 -->
+                                    <col style="width: 200px;"> <!-- 프로젝트 번호 -->
+                                    <col class="actions-col"> <!-- 관리 -->
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="tab62-select-all" aria-label="전체 선택"></th>
+                                        <th>조달방법 <span style="color:red">*</span></th>
+                                        <th>조달구분 <span style="color:red">*</span></th>
+                                        <th>품목유형 <span style="color:red">*</span></th>
+                                        <th>제조사 <span style="color:red">*</span></th>
+                                        <th>모델명 <span style="color:red">*</span></th>
+                                        <th>상세사양</th>
+                                        <th>계약업체 <span style="color:red">*</span></th>
+                                        <th>조달단가 <span style="color:red">*</span></th>
+                                        <th>조달수량 <span style="color:red">*</span></th>
+                                        <th>조달금액</th>
+                                        <th>유지보수율 <span style="color:red">*</span></th>
+                                        <th>TCO</th>
+                                        <th>무상기간 <span style="color:red">*</span></th>
+                                        <th>무상기간 시작</th>
+                                        <th>무상기간 종료</th>
+                                        <th>프로젝트 번호</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                                <tfoot id="tab62-total-foot">
+                                    <tr id="tab62-total-row">
+                                        <td></td>
+                                        <td colspan="7" class="total-label">합계</td>
+                                        <td data-total="unit_price" class="total-cell">-</td>
+                                        <td data-total="quantity" class="total-cell">-</td>
+                                        <td data-total="total_price" class="total-cell">-</td>
+                                        <td></td>
+                                        <td data-total="tco" class="total-cell">-</td>
+                                        <td colspan="4"></td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="tab62-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">계약 항목이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '추가' 버튼을 눌러 첫 계약을 등록하세요.</p>
+                            </div>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="modern-pagination" id="tab62-pagination">
+                            <div class="pagination-info"><span id="tab62-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="tab62-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="tab62-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="tab62-page-numbers"></div>
+                                <button class="pagination-btn" id="tab62-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="tab62-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <!-- Stylish printer icon with rounded strokes -->
+  <path d="M7 7V4.8C7 4.358 7.358 4 7.8 4h8.4c.442 0 .8.358.8.8V7"/>
+  <rect x="3.6" y="7" width="16.8" height="9" rx="2.2"/>
+  <path d="M7 14.5h10v4.7a.8.8 0 0 1-.8.8H7.8a.8.8 0 0 1-.8-.8v-4.7z"/>
+  <circle cx="6.6" cy="10.2" r=".8" fill="currentColor" stroke="none"/>
+  <path d="M9.5 17h5M9.5 19h5"/>
+</svg>

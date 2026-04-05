@@ -1,0 +1,753 @@
+/*
+ * tab32-assign-storage.css — 할당정보(Tab32) 공통 스타일
+ * ─────────────────────────────────────────────────────────
+ * 이 파일은 모든 스토리지 상세 페이지의 '할당정보' 탭에서
+ * 공유하는 단일 스타일시트다.
+ *
+ * ★ 페이지별 개별 CSS에서 이 파일의 규칙을 덮어쓰지 마세요.
+ *   디자인 토큰(CSS 변수)을 통해 커스터마이징합니다.
+ *
+ * [디자인 토큰]
+ *   --asg-input-height       : 입력 필드 높이 (기본 40px)
+ *   --asg-input-padding      : 입력 필드 패딩 (기본 10px 12px)
+ *   --asg-input-border       : 입력 필드 테두리 색상 (기본 #e5e7eb)
+ *   --asg-input-radius       : 입력 필드 둥글기 (기본 8px)
+ *   --asg-input-bg           : 입력 필드 배경색 (기본 #ffffff)
+ *   --asg-input-font-size    : 입력 필드 글자 크기 (기본 14px)
+ *   --asg-input-color        : 입력 필드 글자 색상 (기본 #0f172a)
+ *   --asg-focus-border       : 포커스 테두리 색상 (기본 #6a5acd)
+ *   --asg-focus-shadow       : 포커스 그림자 (기본 rgba(106,90,205,.12))
+ *   --asg-link-color         : 링크 색상 (기본 #2563eb)
+ *   --asg-link-hover         : 링크 호버 색상 (기본 #1d4ed8)
+ *   --asg-placeholder-color  : 플레이스홀더 색상 (기본 #94a3b8)
+ *   --asg-meta-color         : 보조 텍스트 색상 (기본 #64748b)
+ */
+
+/* ── 1. 디자인 토큰 ─────────────────────────────────────────────── */
+.page-storage-assign-info {
+  --asg-input-height: 32px;
+  --asg-input-padding: 6px 10px;
+  --asg-input-border: #e5e7eb;
+  --asg-input-radius: 8px;
+  --asg-input-bg: #ffffff;
+  --asg-input-font-size: 14px;
+  --asg-input-color: #0f172a;
+  --asg-focus-border: #e5e7eb;
+  --asg-focus-shadow: rgba(229,231,235,0.5);
+  --asg-link-color: #2563eb;
+  --asg-link-hover: #1d4ed8;
+  --asg-placeholder-color: #94a3b8;
+  --asg-meta-color: #64748b;
+}
+
+/* ── 2. 메인 테이블: 그룹 링크 ──────────────────────────────────── */
+.page-storage-assign-info #asg-table .asg-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--asg-link-color);
+  font-weight: 500;
+  text-decoration: none;
+}
+.page-storage-assign-info #asg-table .asg-link:hover {
+  color: var(--asg-link-hover);
+}
+.page-storage-assign-info #asg-table .asg-link:focus {
+  outline: 2px solid rgba(99,102,241,.35);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── 3. 모달 내부: 공통 입력 스타일 (호스트 + 볼륨 + 복제 통합) ── */
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-volume-table, #asg-repl-table) td {
+  vertical-align: middle;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-volume-table, #asg-repl-table) :is(input.form-input, select.form-input) {
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--asg-input-height);
+  min-height: var(--asg-input-height);
+  padding: var(--asg-input-padding);
+  border: 1px solid var(--asg-input-border);
+  border-radius: var(--asg-input-radius);
+  background-color: var(--asg-input-bg);
+  font-size: var(--asg-input-font-size);
+  color: var(--asg-input-color);
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-volume-table, #asg-repl-table) textarea.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--asg-input-border);
+  border-radius: var(--asg-input-radius);
+  padding: var(--asg-input-padding);
+  background-color: var(--asg-input-bg);
+  font-size: var(--asg-input-font-size);
+  color: var(--asg-input-color);
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-volume-table, #asg-repl-table) :is(input.form-input, select.form-input, textarea.form-input):focus {
+  outline: none;
+  border-color: var(--asg-focus-border);
+  box-shadow: 0 0 0 3px var(--asg-focus-shadow);
+}
+
+/* ── 4. 검색 가능 FK 셀렉트 (호스트 + 복제 공통) ──────────────── */
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control {
+  position: relative;
+  width: 100%;
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-display {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--asg-input-border);
+  background-color: var(--asg-input-bg);
+  border-radius: var(--asg-input-radius);
+  padding: 6px 42px 6px 10px;
+  min-height: var(--asg-input-height);
+  font-size: var(--asg-input-font-size);
+  text-align: left;
+  color: var(--asg-input-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color .15s ease, box-shadow .15s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-display:focus {
+  outline: none;
+  border-color: var(--asg-focus-border);
+  box-shadow: 0 0 0 3px var(--asg-focus-shadow);
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-display::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #475569;
+  transform: translateY(-25%);
+  pointer-events: none;
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-display:not(.has-value) {
+  color: var(--asg-placeholder-color);
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-clear {
+  position: absolute;
+  top: 50%;
+  right: 34px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--asg-placeholder-color);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) :is(#asg-host-table, #asg-repl-table) .fk-searchable-control .fk-searchable-clear:hover {
+  color: var(--asg-input-color);
+}
+
+/* ── 5. 복제 테이블: 컬럼 폭 균형 ──────────────────────────────── */
+/* "복제 스토리지" 열을 넓게 */
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table td:nth-child(3) .fk-searchable-control {
+  min-width: 220px;
+}
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(3), td:nth-child(3)) {
+  width: 18%;
+}
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(4), td:nth-child(4)),
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(5), td:nth-child(5)),
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(6), td:nth-child(6)) {
+  width: 14%;
+}
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6)) {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table :is(th:nth-child(7), td:nth-child(7)) {
+  width: 56px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.page-storage-assign-info :is(#asg-modal, .asg-modal-content) #asg-repl-table td.system-actions.table-actions {
+  justify-content: flex-start;
+}
+
+/* ── 6. 호스트 식별자 서브모달 ──────────────────────────────────── */
+.page-storage-assign-info #asg-host-ident-modal textarea.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--asg-input-border);
+  border-radius: var(--asg-input-radius);
+  padding: var(--asg-input-padding);
+  background-color: var(--asg-input-bg);
+  font-size: var(--asg-input-font-size);
+  color: var(--asg-input-color);
+}
+.page-storage-assign-info #asg-host-ident-modal textarea.form-input:focus {
+  outline: none;
+  border-color: var(--asg-focus-border);
+  box-shadow: 0 0 0 3px var(--asg-focus-shadow);
+}
+
+/* ── 7. 호스트 식별자 인라인 표시 ───────────────────────────────── */
+.page-storage-assign-info .asg-modal-content #asg-host-table .asg-ident-full {
+  display: block;
+  line-height: 1.4;
+}
+.page-storage-assign-info .asg-modal-content #asg-host-table .asg-ident-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.page-storage-assign-info .asg-modal-content #asg-host-table .asg-ident-more {
+  margin-top: 4px;
+  color: var(--asg-meta-color);
+  font-size: 12px;
+}
+.page-storage-assign-info .asg-modal-content #asg-host-table .asg-ident-empty {
+  color: var(--asg-placeholder-color);
+}
+
+/*  8. 메인 테이블: 다운로드 버튼 + 페이지 크기 위치  */
+/* (detail.css 에서 이동됨) */
+body.page-storage-assign-info .server-detail-pane#basic #asg-download-btn.add-btn-icon{ right: 74px !important; }
+body.page-storage-assign-info .detail-section h3 .page-size-selector{ right: 128px; }
+
+/*  9. CSV 다운로드 모달: 라디오 그룹 레이아웃  */
+#asg-download-modal .form-radio-group { margin-top:10px; display:grid; gap:8px; }
+#asg-download-modal .form-radio-group label { display:flex; align-items:center; gap:8px; }
+
+/*  10. 업무 그룹 4탭 모달  */
+/* (detail.css 에서 이동됨) */
+/* =============================
+   Tab32 (할당정보) - 업무 그룹 4탭 모달
+   ============================= */
+.page-storage-assign-info #asg-modal .server-edit-content.asg-modal-content{
+  max-width:1240px;
+  width:min(1240px, 96vw);
+  height:720px;
+  max-height:90vh;
+}
+
+/* Tab32: icon action buttons hover color (save/edit/delete) */
+.page-storage-assign-info .action-btn:hover,
+.page-storage-assign-info .action-btn:focus-visible{
+  background-color:#6366F1;
+  border-color:#6366F1;
+  box-shadow:0 2px 10px rgba(99, 102, 241, .28);
+}
+
+/* Tab32: keep action icons visually straight (avoid global hover scaling) */
+.page-storage-assign-info .action-btn:hover{ transform:none; }
+.page-storage-assign-info #asg-modal .action-btn{
+  width:34px;
+  height:34px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.page-storage-assign-info #asg-modal .action-btn .action-icon{
+  width:18px;
+  height:18px;
+  display:block;
+}
+
+.page-storage-assign-info .action-btn:hover .action-icon,
+.page-storage-assign-info .action-btn:focus-visible .action-icon{
+  filter:brightness(0) invert(1);
+  opacity:1;
+}
+
+/* Tab32: left-align action buttons (save/edit/delete) inside modal tables */
+.page-storage-assign-info #asg-modal .hw-table td.system-actions,
+.page-storage-assign-info #asg-modal .hw-table td.table-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  overflow:visible;
+  text-overflow:clip;
+  text-align:left;
+}
+
+.page-storage-assign-info #asg-modal .hw-table td.system-actions .action-btn,
+.page-storage-assign-info #asg-modal .hw-table td.table-actions .action-btn{
+  margin:0;
+}
+
+/* Tab32: make volume editor selects match account-management compact controls */
+.page-storage-assign-info #asg-modal #asg-volume-table tr.asg-editor-row td select.form-input{
+  width:100%;
+  min-width:0;
+  height:36px;
+  min-height:36px;
+  line-height:1.4;
+  padding:8px 34px 8px 10px;
+  font-size:13px;
+  font-family:inherit;
+  border:1px solid #e5e7eb;
+  border-radius:6px;
+  box-sizing:border-box;
+  background-position:right 10px center;
+}
+
+/* Tab32: compact inline editor controls when editing existing rows */
+.page-storage-assign-info #asg-modal .hw-table tr[data-editing="1"] td :is(input.form-input, select.form-input, textarea.form-input){
+  width:100%;
+  min-width:0;
+  height:36px;
+  min-height:36px;
+  line-height:1.4;
+  padding:8px 10px;
+  font-size:13px;
+  font-family:inherit;
+  border:1px solid #e5e7eb;
+  border-radius:6px;
+  box-sizing:border-box;
+}
+
+.page-storage-assign-info #asg-modal .hw-table tr[data-editing="1"] td select.form-input{
+  padding-right:34px;
+  background-position:right 10px center;
+}
+
+/* Tab32: volumes total row */
+.page-storage-assign-info #asg-modal #asg-volume-table tbody tr.asg-total-row td{
+  background:#f8fafc;
+  border-top:1px solid #e5e7eb;
+}
+
+/* Tab32: avoid horizontal scroll; fit volume columns in one view */
+.page-storage-assign-info #asg-modal .table-wrap{
+  overflow-x:hidden;
+}
+.page-storage-assign-info #asg-modal .table-wrap::-webkit-scrollbar{ height:0; }
+.page-storage-assign-info #asg-modal .table-wrap{ scrollbar-width:none; }
+
+.page-storage-assign-info #asg-modal #asg-volume-table{
+  width:100%;
+  table-layout:fixed;
+}
+
+/* Clamp long text so columns can stay compact */
+.page-storage-assign-info #asg-modal #asg-volume-table th,
+.page-storage-assign-info #asg-modal #asg-volume-table td{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* But never clip the action buttons */
+.page-storage-assign-info #asg-modal #asg-volume-table td.system-actions,
+.page-storage-assign-info #asg-modal #asg-volume-table td.table-actions{
+  overflow:visible;
+  text-overflow:clip;
+}
+
+/* Column sizing (sum=100%): name 20 / uuid 24 / capacity 11 / type 11 / repl 11 / remark 11 / actions 12 */
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(1){ width:20%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(2){ width:24%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(3){ width:11%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(4){ width:11%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(5){ width:11%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(6){ width:11%; }
+.page-storage-assign-info #asg-modal #asg-volume-table :is(th,td):nth-child(7){ width:12%; min-width:96px; }
+
+/* Capacity column: right-align + numeric readability */
+.page-storage-assign-info #asg-modal #asg-volume-table th:nth-child(3){
+  text-align:left;
+}
+.page-storage-assign-info #asg-modal #asg-volume-table td:nth-child(3){
+  text-align:left;
+}
+.page-storage-assign-info #asg-modal #asg-volume-table tr.asg-editor-row td:nth-child(3) .form-input,
+.page-storage-assign-info #asg-modal #asg-volume-table tr[data-editing="1"] td:nth-child(3) .form-input{
+  text-align:left;
+}
+
+/* Replication O/X badge should be left-aligned */
+.page-storage-assign-info #asg-modal #asg-volume-table td:nth-child(5){
+  text-align:left;
+}
+
+/* Tab32: host table sizing + identifier detail button */
+.page-storage-assign-info #asg-modal #asg-host-table{
+  width:100%;
+  table-layout:fixed;
+}
+.page-storage-assign-info #asg-modal #asg-host-table th,
+.page-storage-assign-info #asg-modal #asg-host-table td{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* Column sizing (sum=100%): work 22 / system 18 / host-type 14 / conn-type 12 / identifiers 24 / actions 10 */
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(1){ width:22%; }
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(2){ width:18%; }
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(3){ width:14%; }
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(4){ width:12%; }
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(5){ width:24%; }
+.page-storage-assign-info #asg-modal #asg-host-table :is(th,td):nth-child(6){ width:10%; min-width:96px; }
+
+.page-storage-assign-info #asg-modal #asg-host-table td:nth-child(5){
+  overflow:visible;
+  text-overflow:clip;
+}
+
+.page-storage-assign-info #asg-modal .asg-identifier-cell{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+}
+.page-storage-assign-info #asg-modal .asg-identifier-cell .asg-ident-text{
+  flex:1 1 auto;
+  min-width:0;
+  resize: vertical;
+  min-height:40px;
+  line-height:1.35;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
+}
+
+.page-storage-assign-info #asg-modal .asg-detail-btn.action-btn{
+  width:34px;
+  height:34px;
+  padding:0;
+  border-radius:8px;
+}
+.page-storage-assign-info #asg-modal .asg-detail-btn .action-icon{
+  width:16px;
+  height:16px;
+}
+
+/* Tab32: host identifiers sub-modal */
+.page-storage-assign-info .asg-submodal{
+  position:fixed;
+  inset:0;
+  background:rgba(15, 23, 42, 0.45);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:10050;
+}
+.page-storage-assign-info .asg-submodal.show{
+  display:flex;
+}
+.page-storage-assign-info .asg-submodal-content{
+  background:#fff;
+  border-radius:16px;
+  width:min(720px, 94vw);
+  max-height:80vh;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 24px 80px rgba(0,0,0,0.25);
+  overflow:hidden;
+}
+.page-storage-assign-info .asg-submodal-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 18px 12px;
+  border-bottom:1px solid #e5e7eb;
+}
+.page-storage-assign-info .asg-submodal-title h3{
+  margin:0;
+  font-size:18px;
+}
+.page-storage-assign-info .asg-submodal-subtitle{
+  margin:6px 0 0;
+  color:#6b7280;
+  font-size:12px;
+}
+.page-storage-assign-info .asg-submodal-body{
+  padding:16px 18px;
+  overflow:auto;
+}
+.page-storage-assign-info .asg-submodal-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding:12px 18px 18px;
+  border-top:1px solid #e5e7eb;
+}
+
+.page-storage-assign-info .server-detail-pane#basic #asg-add-btn.add-btn-icon{
+  background:#6366f1;
+  background-color:#6366f1;
+  box-shadow:0 4px 10px rgba(99,102,241,0.25);
+}
+.page-storage-assign-info .server-detail-pane#basic #asg-add-btn.add-btn-icon:hover,
+.page-storage-assign-info .server-detail-pane#basic #asg-add-btn.add-btn-icon:active{
+  background:#6366f1;
+  background-color:#6366f1;
+  transform:none;
+}
+.page-storage-assign-info .server-detail-pane#basic #asg-add-btn.add-btn-icon:focus-visible{
+  outline:3px solid rgba(99,102,241,0.35);
+  outline-offset:2px;
+}
+
+.page-storage-assign-info #asg-modal .asg-modal-tabs{
+  display:flex;
+  gap:0;
+  padding:0;
+  border-bottom:0;
+}
+
+.page-storage-assign-info #asg-modal .asg-modal-tabs-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:0 32px;
+  border-bottom:2px solid #e5e7eb;
+}
+
+.page-storage-assign-info #asg-modal .asg-modal-tab-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.page-storage-assign-info #asg-modal .asg-modal-tab-actions [data-asg-action-for]{
+  display:none;
+}
+
+.page-storage-assign-info #asg-modal[data-asg-active-tab="hosts"] .asg-modal-tab-actions [data-asg-action-for="hosts"],
+.page-storage-assign-info #asg-modal[data-asg-active-tab="volumes"] .asg-modal-tab-actions [data-asg-action-for="volumes"],
+.page-storage-assign-info #asg-modal[data-asg-active-tab="replications"] .asg-modal-tab-actions [data-asg-action-for="replications"]{
+  display:inline-flex;
+}
+
+.page-storage-assign-info #asg-modal .asg-plus{
+  display:block;
+  font-size:22px;
+  font-weight:700;
+  line-height:1;
+  margin-top:-1px;
+}
+
+.page-storage-assign-info #asg-modal .asg-modal-body{
+  padding:18px 32px 24px;
+  overflow:auto;
+}
+
+.page-storage-assign-info #asg-modal .asg-tab-pane{ display:none; }
+.page-storage-assign-info #asg-modal .asg-tab-pane.active{ display:block; }
+
+/* Tab32 modal internal layout polish */
+.page-storage-assign-info #asg-modal .detail-section{
+  margin:0;
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+
+.page-storage-assign-info #asg-modal .asg-overview-card{
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  padding:18px 18px 16px;
+  margin-bottom:16px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Overview: label-left / field-right rows (match reference layout) */
+.page-storage-assign-info #asg-modal .asg-overview-form{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.page-storage-assign-info #asg-modal .asg-overview-form .req-star{
+  margin-left:4px;
+  color:#ef4444;
+  font-weight:800;
+}
+
+.page-storage-assign-info #asg-modal .asg-form-row{
+  display:grid;
+  grid-template-columns: 220px 1fr;
+  gap:24px;
+  align-items:start;
+}
+
+.page-storage-assign-info #asg-modal .asg-inline-label{
+  margin:0;
+  padding-top:10px;
+  line-height:1.4;
+  white-space:nowrap;
+  font-size:13px;
+  color:#4b5563;
+}
+
+.page-storage-assign-info #asg-modal .asg-form-control{ min-width:0; }
+
+.page-storage-assign-info #asg-modal .asg-form-row--desc .asg-inline-label,
+.page-storage-assign-info #asg-modal .asg-form-row--remark .asg-inline-label{ padding-top:12px; }
+
+.page-storage-assign-info #asg-modal .asg-form-grid{
+  display:grid;
+  grid-template-columns: 360px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "name desc"
+    "spacer desc"
+    "remark remark";
+  gap:14px 24px;
+  align-items:start;
+  min-height: 360px;
+}
+
+.page-storage-assign-info #asg-modal .asg-field--name{ grid-area:name; }
+.page-storage-assign-info #asg-modal .asg-field--desc{ grid-area:desc; }
+
+.page-storage-assign-info #asg-modal .asg-overview-spacer{
+  grid-area: spacer;
+}
+
+.page-storage-assign-info #asg-modal .asg-remark-row{
+  grid-area: remark;
+  display:grid;
+  grid-template-columns: 360px 1fr;
+  gap:14px 24px;
+  align-items:start;
+}
+
+.page-storage-assign-info #asg-modal .asg-remark-row .form-label{ margin:0; padding-top:2px; }
+
+.page-storage-assign-info #asg-modal .form-label{
+  display:block;
+  margin:0 0 8px;
+  font-weight:600;
+  color:#374151;
+}
+
+.page-storage-assign-info #asg-modal .form-input,
+.page-storage-assign-info #asg-modal textarea.form-input{
+  width:100%;
+  box-sizing:border-box;
+}
+
+.page-storage-assign-info #asg-modal textarea.form-input{
+  resize:vertical;
+  min-height:96px;
+  line-height:1.6;
+}
+
+.page-storage-assign-info #asg-modal #asg-desc{ min-height:220px; }
+.page-storage-assign-info #asg-modal #asg-remark{ min-height:120px; }
+
+.page-storage-assign-info #asg-modal .asg-tab-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  margin:0 0 10px;
+}
+
+.page-storage-assign-info #asg-modal .asg-icon-btn{
+  width:36px;
+  height:36px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#6366f1;
+  border:1px solid #6366f1;
+  border-radius:8px;
+  cursor:pointer;
+  transition:all .2s ease;
+  position:relative;
+  overflow:hidden;
+}
+
+.page-storage-assign-info #asg-modal .asg-icon-btn:hover{
+  background:#6366f1;
+  border-color:#6366f1;
+  box-shadow:0 6px 14px rgba(99,102,241,.28);
+  transform:none;
+}
+
+.page-storage-assign-info #asg-modal .asg-icon-btn:active{
+  transform:none;
+  box-shadow:0 4px 10px rgba(99,102,241,0.25);
+}
+
+/* Show the same plus icon used by list page header add button */
+.page-storage-assign-info #asg-modal .asg-plus{ display:none; }
+.page-storage-assign-info #asg-modal .asg-icon-btn .header-icon{
+  width:18px;
+  height:18px;
+  opacity:1;
+  transition:all .2s ease;
+  filter:brightness(0) invert(1) saturate(1) contrast(1);
+}
+.page-storage-assign-info #asg-modal .asg-icon-btn:hover .header-icon{
+  transform:none;
+  filter:brightness(0) invert(1) saturate(1) contrast(1);
+}
+
+/* Table container inside modal */
+.page-storage-assign-info #asg-modal .table-wrap{
+  border:0;
+  box-shadow:none;
+  border-radius:12px;
+  overflow:auto;
+  background:#ffffff;
+  background-clip:padding-box;
+  position:relative;
+}
+
+.page-storage-assign-info #asg-modal .table-wrap::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  pointer-events:none;
+  z-index:5;
+}
+
+.page-storage-assign-info #asg-modal table.hw-table{
+  width:100%;
+  border:0;
+  border-radius:0;
+  overflow:visible;
+}
+
+.page-storage-assign-info #asg-modal table.hw-table thead th{
+  background:#f8fafc;
+  position:sticky;
+  top:0;
+  z-index:1;
+}
+
+@media (max-width: 900px){
+  .page-storage-assign-info #asg-modal .asg-form-row{
+    grid-template-columns: 1fr;
+    gap:10px;
+  }
+
+  .page-storage-assign-info #asg-modal .asg-inline-label{ padding-top:0; margin:0 0 8px; }
+}
+

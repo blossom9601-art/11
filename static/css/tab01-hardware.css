@@ -1,0 +1,564 @@
+/*
+ * tab01-hardware.css — 하드웨어 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────────
+ * 모든 상세 페이지의 하드웨어 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 공통값: 여백, 크기, 색상, 반지름, 그림자 등 모든 시각 속성
+ * ● 기존 detail.css의 hw- 접두 규칙은 ID 셀렉터로 전역 적용되므로
+ *   이 파일에서는 .tab01-hardware-root 스코프 규칙만 추가한다.
+ *
+ * 버전: 1.0 (2026-03-19)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab01-hardware-root {
+    /* 색상 */
+    --hw-accent:           #6366f1;
+    --hw-accent-light:     #e0e7ff;
+    --hw-accent-hover:     rgba(99,102,241,.18);
+    --hw-danger:           #ef4444;
+    --hw-danger-light:     #fee2e2;
+    --hw-text:             #1f2937;
+    --hw-text-secondary:   #6b7280;
+    --hw-text-muted:       #94a3b8;
+    --hw-border:           #e5e7eb;
+    --hw-bg:               #ffffff;
+
+    /* 선택 행 */
+    --hw-selected-bg:      rgba(99,102,241,0.10);
+    --hw-selected-hover:   rgba(99,102,241,0.16);
+    --hw-selected-td:      rgba(106,90,205,0.10);
+    --hw-selected-td-hover:rgba(106,90,205,0.16);
+
+    /* 여백 */
+    --hw-section-padding:  0;
+    --hw-btn-top-offset:   0;
+
+    /* 크기 */
+    --hw-table-font:       13px;
+    --hw-action-btn-size:  36px;
+
+    /* 반지름 */
+    --hw-radius-btn:       10px;
+
+    /* 그림자 */
+    --hw-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+    --hw-shadow-btn-hover: 0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --hw-transition:       all .2s ease;
+}
+
+/* ═══════════════════════════════════
+   1. 테이블 행 선택 하이라이트
+   ═══════════════════════════════════ */
+.tab01-hardware-root #hw-spec-table tbody tr.selected,
+.tab01-hardware-root #hw-spec-table tbody tr.selected:nth-child(odd),
+.tab01-hardware-root #hw-spec-table tbody tr.selected:nth-child(even) {
+    background-color: var(--hw-selected-bg) !important;
+    border-left: 3px solid var(--hw-accent) !important;
+    box-shadow: var(--hw-shadow-selected) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.selected:hover,
+.tab01-hardware-root #hw-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab01-hardware-root #hw-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: var(--hw-selected-hover) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.selected td,
+.tab01-hardware-root #hw-spec-table tbody tr.selected > td {
+    background-color: var(--hw-selected-td) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.selected:hover td,
+.tab01-hardware-root #hw-spec-table tbody tr.selected:hover > td {
+    background-color: var(--hw-selected-td-hover) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--hw-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) {
+    background-color: var(--hw-selected-bg) !important;
+    box-shadow: var(--hw-shadow-selected) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr:hover:has(input.hw-row-check:checked) {
+    background-color: var(--hw-selected-hover) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) td {
+    background-color: var(--hw-selected-bg) !important;
+}
+.tab01-hardware-root #hw-spec-table tbody tr:hover:has(input.hw-row-check:checked) td {
+    background-color: var(--hw-selected-hover) !important;
+}
+
+/* ═══════════════════════════════════
+   2. 선택 행 액션 버튼 강조
+   ═══════════════════════════════════ */
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="edit"],
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="delete"],
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="save"],
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="edit"],
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="delete"],
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="save"] {
+    background: var(--hw-accent);
+    border-color: var(--hw-accent);
+    box-shadow: var(--hw-shadow-btn-hover);
+}
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="delete"] .action-icon,
+.tab01-hardware-root #hw-spec-table tbody tr.selected .action-btn[data-action="save"] .action-icon,
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="edit"] .action-icon,
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="delete"] .action-icon,
+.tab01-hardware-root #hw-spec-table tbody tr:has(input.hw-row-check:checked) .action-btn[data-action="save"] .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ═══════════════════════════════════
+   3. 버튼 위치
+   ═══════════════════════════════════ */
+.tab01-hardware-root #hw-download-btn.add-btn-icon {
+    right: 74px !important;
+}
+.tab01-hardware-root #hw-row-add.add-btn-icon {
+    right: 20px !important;
+}
+
+/* ═══════════════════════════════════
+   4. 삭제 모달
+   ═══════════════════════════════════ */
+.tab01-hardware-root ~ #hw-delete-modal .server-add-content { max-width: 680px; }
+.tab01-hardware-root ~ #hw-delete-modal .server-add-header { padding: 20px 32px; }
+.tab01-hardware-root ~ #hw-delete-modal .dispose-title { display: block; }
+.tab01-hardware-root ~ #hw-delete-modal .dispose-title h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+.tab01-hardware-root ~ #hw-delete-modal .server-add-body {
+    padding: 20px 0 24px;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+.tab01-hardware-root ~ #hw-delete-modal .dispose-content {
+    margin: 0 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+.tab01-hardware-root ~ #hw-delete-modal .dispose-text {
+    flex: 1 1 auto;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+}
+.tab01-hardware-root ~ #hw-delete-modal .dispose-text p { margin: 0 0 8px 0; }
+.tab01-hardware-root ~ #hw-delete-modal .dispose-illust {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab01-hardware-root ~ #hw-delete-modal .dispose-illust img {
+    width: 220px;
+    max-width: min(36vw, 240px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.08));
+    border-radius: 10px;
+}
+
+/* ═══════════════════════════════════
+   5. CSV 다운로드 모달
+   ═══════════════════════════════════ */
+.tab01-hardware-root ~ #hw-download-modal .form-radio-group {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+.tab01-hardware-root ~ #hw-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ═══════════════════════════════════
+   6. 반응형 (Responsive)
+   ═══════════════════════════════════ */
+@media (max-width: 680px) {
+    .tab01-hardware-root ~ #hw-delete-modal .dispose-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    .tab01-hardware-root ~ #hw-delete-modal .dispose-illust img {
+        width: 160px;
+        max-width: 70vw;
+    }
+}
+
+/* ═══════════════════════════════════
+   7. 확장 행 (Expand Row)
+   ═══════════════════════════════════ */
+.tab01-hardware-root .js-hw-expand .action-icon {
+    transition: transform .2s ease, filter .2s ease;
+}
+.tab01-hardware-root .js-hw-expand.hw-expanded .action-icon {
+    transform: rotate(45deg);
+}
+.tab01-hardware-root .js-hw-expand:hover {
+    background: var(--hw-accent) !important;
+    border-color: var(--hw-accent) !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,.28);
+}
+.tab01-hardware-root .js-hw-expand:hover .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+}
+
+.tab01-hardware-root #hw-spec-table tbody tr.hw-expand-row {
+    background: #f8f9fb;
+    border-top: none;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.hw-expand-row > td {
+    border-top: none;
+    padding: 10px 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+.tab01-hardware-root #hw-spec-table tbody tr.hw-expand-row:hover {
+    background: #f4f6f8;
+}
+
+.tab01-hardware-root .hw-expand-cell {
+    padding: 0;
+}
+
+.tab01-hardware-root .hw-expand-loading,
+.tab01-hardware-root .hw-expand-empty {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+    padding: 12px;
+}
+
+.tab01-hardware-root .hw-expand-detail {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0;
+    background: #fff;
+    border: 1px solid #dfe3e8;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    margin-bottom: 8px;
+}
+
+/* TPMC 테이블 */
+.tab01-hardware-root .hw-tpmc-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    margin-bottom: 10px;
+}
+.tab01-hardware-root .hw-tpmc-table th,
+.tab01-hardware-root .hw-tpmc-table td {
+    font-size: 14px !important;
+    line-height: normal !important;
+    padding: 10px 16px !important;
+    white-space: nowrap;
+    text-align: center;
+    width: 14.28%;
+}
+.tab01-hardware-root .hw-tpmc-table th {
+    font-size: 12.5px !important;
+    font-weight: 700;
+    color: #475569;
+    letter-spacing: .02em;
+    background: #f1f5f9;
+    border-bottom: 2px solid #d0d5dd;
+    border-right: 1px solid #e2e8f0;
+}
+.tab01-hardware-root .hw-tpmc-table th:last-child {
+    border-right: none;
+}
+.tab01-hardware-root .hw-tpmc-table td {
+    color: #1e293b;
+    border-bottom: 1px solid #e8ecf1;
+    border-right: 1px solid #f1f3f6;
+    font-variant-numeric: tabular-nums;
+}
+.tab01-hardware-root .hw-tpmc-table td:last-child {
+    border-right: none;
+}
+.tab01-hardware-root .hw-tpmc-table td.accent {
+    color: var(--hw-accent);
+    font-weight: 700;
+    font-size: 14.5px !important;
+}
+.tab01-hardware-root .hw-tpmc-table td.hw-tpmc-comp-error {
+    color: #ef4444;
+    font-size: 13px !important;
+    text-align: left;
+}
+
+/* 보정계수 편집 인풋 */
+.tab01-hardware-root .hw-factor-input {
+    width: 64px;
+    padding: 5px 8px;
+    border: 1px solid rgba(99,102,241,.3);
+    border-radius: 6px;
+    background: #fafaff;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6366f1;
+    text-align: center;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    -moz-appearance: textfield;
+}
+.tab01-hardware-root .hw-factor-input::-webkit-inner-spin-button,
+.tab01-hardware-root .hw-factor-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.tab01-hardware-root .hw-factor-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99,102,241,.12);
+    background: #fff;
+}
+
+/* 역할 보정계수 선택기 */
+.tab01-hardware-root .hw-role-selector {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 0;
+    padding-left: 16px;
+    flex-wrap: wrap;
+}
+.tab01-hardware-root .hw-role-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+    letter-spacing: .02em;
+    white-space: nowrap;
+}
+.tab01-hardware-root .hw-role-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+}
+.tab01-hardware-root .hw-role-opt input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #6366f1;
+    cursor: pointer;
+    margin: 0;
+}
+.tab01-hardware-root .hw-role-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+.tab01-hardware-root .hw-role-db { background: #fef3c7; color: #92400e; }
+.tab01-hardware-root .hw-role-was { background: #dbeafe; color: #1e40af; }
+.tab01-hardware-root .hw-role-web { background: #d1fae5; color: #065f46; }
+.tab01-hardware-root .hw-role-coeff {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.tab01-hardware-root .hw-role-result {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--hw-accent);
+    margin-left: 6px;
+}
+.tab01-hardware-root .hw-role-hint {
+    font-size: 11px;
+    color: #94a3b8;
+    width: 100%;
+    margin-top: -2px;
+}
+
+/* TPMC 에러 */
+.tab01-hardware-root .hw-tpmc-comp-error {
+    font-size: 12px;
+    color: #ef4444;
+    padding: 4px 12px;
+}
+
+.tab01-hardware-root .hw-expand-field {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #eef0f3;
+    border-bottom: 1px solid #eef0f3;
+}
+.tab01-hardware-root .hw-expand-field:last-child {
+    border-right: none;
+}
+
+.tab01-hardware-root .hw-expand-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #7a8494;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    background: #f5f7f9;
+    padding: 6px 12px;
+    border-bottom: 1px solid #e8ebef;
+}
+
+.tab01-hardware-root .hw-expand-value {
+    font-size: 13px;
+    color: #1f2937;
+    padding: 8px 12px;
+    min-height: 20px;
+}
+
+.tab01-hardware-root .hw-tpmc-accent {
+    color: var(--hw-accent);
+    font-weight: 600;
+}
+.tab01-hardware-root .hw-tpmc-error {
+    color: #ef4444;
+    font-size: 12px;
+}
+.tab01-hardware-root .hw-tpmc-comp-error {
+    font-size: 12px;
+    color: #ef4444;
+    padding: 4px 12px;
+}
+
+/* TPMC 합산 요약 바 (확장 행 내부) */
+.tab01-hardware-root .hw-expand-tpmc-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 5px 12px;
+    background: linear-gradient(135deg, #eef2ff 0%, #f0f4ff 100%);
+    border: 1px solid rgba(99,102,241,.15);
+    border-radius: 6px;
+    margin-top: 4px;
+}
+/* 테이블 하단 TPMC 요약 박스 — 확장 행에 이미 표시되므로 숨김 */
+.tab01-hardware-root .hw-tpmc-summary {
+    display: none !important;
+}
+.tab01-hardware-root .hw-expand-tpmc-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tab01-hardware-root .hw-expand-tpmc-label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+}
+.tab01-hardware-root .hw-expand-tpmc-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+}
+.tab01-hardware-root .hw-expand-tpmc-num.managed {
+    color: var(--hw-accent);
+}
+.tab01-hardware-root .hw-expand-tpmc-factors {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-left: auto;
+}
+.tab01-hardware-root .hw-expand-tpmc-error {
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* 산출식 (Formula) */
+.tab01-hardware-root .hw-expand-formula {
+    margin-top: 6px;
+    padding: 10px 16px;
+    background: #fafbff;
+    border: 1px solid rgba(99,102,241,.12);
+    border-radius: 8px;
+}
+.tab01-hardware-root .hw-expand-formula-title {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--hw-accent);
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+}
+.tab01-hardware-root .hw-expand-formula-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tab01-hardware-root .hw-formula-comp-label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: -2px;
+}
+.tab01-hardware-root .hw-formula-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.tab01-hardware-root .hw-formula-token {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    cursor: default;
+}
+.tab01-hardware-root .hw-formula-token.hw-formula-val {
+    background: #eef2ff;
+    border-color: rgba(99,102,241,.2);
+    color: var(--hw-accent);
+}
+.tab01-hardware-root .hw-formula-token.hw-formula-result {
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    border-color: var(--hw-accent);
+    color: var(--hw-accent);
+    font-weight: 700;
+    font-size: 14px;
+}
+.tab01-hardware-root .hw-formula-op {
+    font-size: 13px;
+    font-weight: 500;
+    color: #94a3b8;
+}
+.tab01-hardware-root .hw-formula-legend {
+    display: block;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 4px;
+    letter-spacing: .02em;
+}

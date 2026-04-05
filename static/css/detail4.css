@@ -1,0 +1,29 @@
+/* detail4.css — 고유 스타일 (공통은 detail-common.css) */
+
+.basic-info-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+
+.telco-logo { width:16px; height:16px; object-fit:contain; display:inline-block; vertical-align:middle; }
+
+.speed-pill { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+
+.speed-dot { display:inline-block; width:8px; height:8px; border-radius:50%; }
+
+.speed-dot.tier-1 { background:#9aa0a6; }
+
+.speed-dot.tier-2 { background:#4fc3f7; }
+
+.speed-dot.tier-3 { background:#00bcd4; }
+
+.speed-dot.tier-4 { background:#26a69a; }
+
+.speed-dot.tier-5 { background:#2e7d32; }
+
+.hw-table input[type="text"],
+.hw-table input[type="number"],
+.hw-table input[type="date"],
+.hw-table textarea {
+  width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:13px; color:#374151; background:#fff;
+}
+
+.hw-table input[type="text"], .hw-table input[type="number"], .hw-table textarea, .hw-table select { max-width:100%; }
+

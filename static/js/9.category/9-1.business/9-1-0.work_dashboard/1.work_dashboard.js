@@ -1,0 +1,863 @@
+(function(){
+// --- Color themes -----------------------------------------------------------
+// You can switch theme via: window.setWorkPalette('pastel'|'blossom'|'slate')
+// The selection is persisted in localStorage (key: workPalette)
+function getQueryParam(name){ try{ return new URLSearchParams(location.search).get(name); }catch(_){ return null; } }
+var THEME_PALETTES = {
+  // Soft pastel tints
+  pastel: ['#A5B4FC','#C7D2FE','#FBCFE8','#FDE68A','#99F6E4','#BFDBFE','#FCA5A5','#FDE68A','#D8B4FE','#86EFAC'],
+  // Default blossom accent mix (purple/indigo/pink/sky)
+  blossom: ['#6366F1','#7C3AED','#8B5CF6','#A78BFA','#C084FC','#E879F9','#F472B6','#EC4899','#60A5FA','#22D3EE'],
+  // Muted slate neutrals with a hint of indigo accents
+  slate: ['#94A3B8','#64748B','#A5B4FC','#475569','#CBD5E1','#9CA3AF','#818CF8','#E5E7EB','#6B7280','#A78BFA']
+};
+
+function currentTheme(){
+  const fromUrl = getQueryParam('palette');
+  const fromStore = typeof localStorage !== 'undefined' ? localStorage.getItem('workPalette') : null;
+  const t = (fromUrl || fromStore || 'blossom');
+  return THEME_PALETTES[t] ? t : 'blossom';
+}
+
+function setPaletteTheme(theme){
+  try{ if (THEME_PALETTES[theme] && typeof localStorage!== 'undefined'){ localStorage.setItem('workPalette', theme); } }catch(_){ }
+}
+
+// Expose a simple switcher that reloads to re-render with new colors
+window.setWorkPalette = function(theme){
+  if (!THEME_PALETTES[theme]) return;
+  setPaletteTheme(theme);
+  try{ location.reload(); }catch(_){ }
+};
+
+function palette(n) {
+  const theme = currentTheme();
+  const base = THEME_PALETTES[theme] || THEME_PALETTES.blossom;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+  return out;
+}
+
+// Utility to add alpha to hex colors
+function addAlpha(hex, a){
+  try{
+    const h = hex.replace('#','');
+    const bigint = parseInt(h.length===3 ? h.split('').map(ch=>ch+ch).join('') : h, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a))})`;
+  }catch(_){ return hex; }
+}
+
+// Limit categories: top N by count, rest aggregated as '기타'. Default N=9 (10 total).
+function top10WithOthers(items, topN) {
+  const n = (topN && topN > 0) ? topN : 9;
+  const arr = (items || []).map(it => ({
+    name: String(it?.name ?? ''),
+    count: Number(it?.count ?? 0)
+  }));
+  arr.sort((a, b) => (b.count - a.count));
+  if (arr.length <= n + 1) return arr;
+  const top = arr.slice(0, n);
+  const rest = arr.slice(n);
+  const restTotal = rest.reduce((s, x) => s + (Number(x.count) || 0), 0);
+  if (restTotal > 0) top.push({ name: '기타', count: restTotal, _others: rest });
+  return top;
+}
+
+// For XY data with {name, hw, sw}. Default N=9.
+function top10WithOthersXY(items, topN) {
+  const n = (topN && topN > 0) ? topN : 9;
+  const arr = (items || []).map(it => ({
+    name: String(it?.name ?? ''),
+    hw: Number(it?.hw ?? 0),
+    sw: Number(it?.sw ?? 0)
+  }));
+  arr.sort((a, b) => (b.hw + b.sw) - (a.hw + a.sw));
+  if (arr.length <= n + 1) return arr;
+  const top = arr.slice(0, n);
+  const rest = arr.slice(n);
+  const restHw = rest.reduce((s, x) => s + (Number(x.hw) || 0), 0);
+  const restSw = rest.reduce((s, x) => s + (Number(x.sw) || 0), 0);
+  if (restHw + restSw > 0) top.push({ name: '기타', hw: restHw, sw: restSw, _others: rest });
+  return top;
+}
+
+function disableChartAnimationsGlobally() {
+  if (!window.Chart) return;
+  try {
+    Chart.defaults.animation = false;
+  Chart.defaults.responsive = false;
+  Chart.defaults.maintainAspectRatio = false;
+    if (Chart.defaults.animations) {
+      Object.keys(Chart.defaults.animations).forEach(k => {
+        if (Chart.defaults.animations[k]) Chart.defaults.animations[k].duration = 0;
+      });
+    }
+    if (Chart.defaults.transitions) {
+      if (Chart.defaults.transitions.active && Chart.defaults.transitions.active.animation) {
+        Chart.defaults.transitions.active.animation.duration = 0;
+      }
+      if (Chart.defaults.transitions.resize && Chart.defaults.transitions.resize.animation) {
+        Chart.defaults.transitions.resize.animation.duration = 0;
+      }
+    }
+  } catch (_) {}
+}
+
+function fixCanvasSize(el) {
+  try {
+    const parent = el.parentElement;
+    const w = (parent && parent.clientWidth) ? parent.clientWidth : 300;
+    let h = (parent && parent.clientHeight) ? parent.clientHeight : 0;
+    if (!h) {
+      const attrH = Number(el.getAttribute('height')) || 0;
+      h = attrH || 220;
+    }
+    el.width = w;
+    el.height = h;
+  } catch (_) {}
+}
+
+function renderDoughnut(canvasId, items, onClick, options) {
+  const el = document.getElementById(canvasId);
+  if (!el || !window.Chart) return;
+  // Destroy previous Chart instance (SPA re-navigation)
+  try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
+  // Remove stale legend from previous render
+  try { const stale = (el.closest('.exec-card') || el.closest('.card.chart') || document).querySelector('#' + canvasId + '-legend'); if (stale) stale.remove(); } catch (_) {}
+  // Reserve legend space before sizing
+  try { const card0 = el.closest('.exec-card') || el.closest('.card.chart'); if (card0) card0.classList.add('has-legend'); } catch (_) {}
+  fixCanvasSize(el);
+  const opts = Object.assign({ showCenter: true }, options);
+  const limited = top10WithOthers(items, opts.topN);
+  const labels = limited.map(x => x.name);
+  const values = limited.map(x => x.count || 0);
+  const colors = palette(labels.length);
+  const total = values.reduce((s,v)=> s + (Number(v)||0), 0);
+  const centerTextPlugin = {
+    id: 'centerText',
+    afterDraw(chart) {
+      try {
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !meta.data.length) return;
+        const { x, y } = meta.data[0];
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.font = '600 13px Inter, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, sans-serif';
+        ctx.fillStyle = '#334155';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`총 ${total.toLocaleString('ko-KR')} 건`, x, y);
+        ctx.restore();
+      } catch (_) {}
+    }
+  };
+  const chart = new Chart(el, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderColor: '#ffffff', borderWidth: 2, hoverOffset: 0 }]
+    },
+    options: {
+      // Disable animations and interactions to avoid any moving effects
+      animation: false,
+      animations: { colors: { duration: 0 }, numbers: { duration: 0 }, radius: { duration: 0 } },
+  transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
+      // Enable hover + click (like access tooltip) without motion
+      events: ['mousemove','mouseout','click','touchstart','touchmove','touchend'],
+      interaction: { mode: 'nearest', intersect: true },
+      hover: { mode: 'nearest', animationDuration: 0 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(30, 41, 59, 0.95)',
+          titleColor: '#ffffff',
+          bodyColor: '#e2e8f0',
+          borderColor: 'rgba(139, 92, 246, 0.3)',
+          borderWidth: 1,
+          cornerRadius: 12,
+          displayColors: true,
+          padding: 12,
+          titleFont: { size: 14, weight: '600' },
+          bodyFont: { size: 13 },
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.raw ?? 0;
+              const fmt = (n) => new Intl.NumberFormat('ko-KR').format(n);
+              const pct = total ? Math.round((val / total) * 1000) / 10 : 0;
+              return `${ctx.label}: ${fmt(val)} 건 (${pct}%)`;
+            }
+          }
+        }
+      },
+      responsive: false,
+      maintainAspectRatio: false,
+  cutout: '60%'
+    }
+  , plugins: opts.showCenter ? [centerTextPlugin] : []
+  });
+  if (typeof onClick === 'function') {
+    el.onclick = (evt) => {
+      try {
+        const points = chart.getActiveElements();
+        // If Chart.js didn't pick up event yet, ask controller
+        const els = points && points.length ? points : chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!els || !els.length) return;
+        const idx = els[0].index;
+        const name = labels[idx];
+        const count = values[idx];
+  const meta = limited[idx] || null;
+  onClick({ canvasId, name, count, index: idx, items: limited, others: meta && meta._others ? meta._others : undefined });
+      } catch (_) {}
+    };
+  }
+  // Ensure no pending animation frames
+  try { chart.stop(); chart.update(0); } catch (_) {}
+
+  // Render external legend as strict 5x2 grid (max 10 items) AFTER the chart container
+  try {
+    const container = el.parentElement;
+    const card = el.closest('.exec-card') || el.closest('.card.chart');
+    if (container && card) {
+      let legend = card.querySelector(`#${canvasId}-legend`);
+      if (!legend) {
+        legend = document.createElement('div');
+        legend.id = `${canvasId}-legend`;
+        legend.className = 'chart-legend';
+        container.insertAdjacentElement('afterend', legend);
+      }
+      legend.innerHTML = '';
+      const list = (labels || []).map((name, i) => ({ name, count: values[i] || 0, color: colors[i] })).slice(0, 10);
+      list.forEach((it, idx) => {
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        const sw = document.createElement('span');
+        sw.className = 'legend-swatch';
+        sw.style.background = it.color;
+        const lb = document.createElement('span');
+        lb.textContent = it.name;
+        lb.title = `${it.name} ${(it.count || 0).toLocaleString('ko-KR')} 건`;
+        item.appendChild(sw);
+        item.appendChild(lb);
+        if (typeof onClick === 'function') {
+          item.style.cursor = 'pointer';
+          item.onclick = () => {
+            const meta = limited[idx] || null;
+            onClick({ canvasId, name: it.name, count: it.count || 0, index: idx, items: limited, others: meta && meta._others ? meta._others : undefined });
+          };
+        }
+        legend.appendChild(item);
+      });
+  requestAnimationFrame(() => { try { fixCanvasSize(el); if (chart && chart.resize) chart.resize(); if (chart && chart.update) chart.update(0); } catch (_) {} });
+    }
+  } catch (_) {}
+}
+
+// Pie (with 5x2 external legend, no center text)
+function renderPie(canvasId, items, onClick, options) {
+  const el = document.getElementById(canvasId);
+  if (!el || !window.Chart) return;
+  // Destroy previous Chart instance (SPA re-navigation)
+  try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
+  // Remove stale legend from previous render
+  try { const stale = (el.closest('.exec-card') || el.closest('.card.chart') || document).querySelector('#' + canvasId + '-legend'); if (stale) stale.remove(); } catch (_) {}
+  try { const card0 = el.closest('.exec-card') || el.closest('.card.chart'); if (card0) card0.classList.add('has-legend'); } catch (_) {}
+  fixCanvasSize(el);
+  const opts = Object.assign({}, options);
+  const limited = top10WithOthers(items, opts.topN);
+  const labels = limited.map(x => x.name);
+  const values = limited.map(x => x.count || 0);
+  const colors = palette(labels.length);
+  const total = values.reduce((s,v)=> s + (Number(v)||0), 0);
+  const chart = new Chart(el, {
+    type: 'pie',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#ffffff', borderWidth: 2 }] },
+    options: {
+      animation: false,
+      events: ['mousemove','mouseout','click','touchstart','touchmove','touchend'],
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(30, 41, 59, 0.95)',
+          titleColor: '#ffffff', bodyColor: '#e2e8f0', borderColor: 'rgba(139, 92, 246, 0.3)', borderWidth: 1,
+          callbacks: { label: (ctx) => {
+            const val = ctx.raw ?? 0; const fmt = (n) => new Intl.NumberFormat('ko-KR').format(n);
+            const pct = total ? Math.round((val / total) * 1000) / 10 : 0; return `${ctx.label}: ${fmt(val)} 건 (${pct}%)`;
+          }}
+        }
+      },
+      responsive: false, maintainAspectRatio: false
+    }
+  });
+  if (typeof onClick === 'function') {
+    el.onclick = (evt) => {
+      try {
+        const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!els || !els.length) return; const idx = els[0].index;
+        const meta = limited[idx] || null; onClick({ canvasId, name: labels[idx], count: values[idx], index: idx, items: limited, others: meta?._others });
+      } catch (_) {}
+    };
+  }
+  try { chart.stop(); chart.update(0); } catch (_) {}
+  // External 5x2 legend like doughnut
+  try {
+    const container = el.parentElement; const card = el.closest('.exec-card') || el.closest('.card.chart');
+    if (container && card) {
+      let legend = card.querySelector(`#${canvasId}-legend`);
+      if (!legend) { legend = document.createElement('div'); legend.id = `${canvasId}-legend`; legend.className = 'chart-legend'; container.insertAdjacentElement('afterend', legend); }
+      legend.innerHTML = '';
+      const list = (labels || []).map((name, i) => ({ name, count: values[i] || 0, color: colors[i] })).slice(0, 10);
+      list.forEach((it, idx) => {
+        const item = document.createElement('div'); item.className = 'legend-item';
+        const sw = document.createElement('span'); sw.className = 'legend-swatch'; sw.style.background = it.color;
+        const lb = document.createElement('span'); lb.textContent = it.name; lb.title = `${it.name} ${(it.count||0).toLocaleString('ko-KR')} 건`;
+        item.appendChild(sw); item.appendChild(lb);
+        if (typeof onClick === 'function') { item.style.cursor = 'pointer'; item.onclick = () => { const meta = limited[idx] || null; onClick({ canvasId, name: it.name, count: it.count||0, index: idx, items: limited, others: meta?._others }); }; }
+        legend.appendChild(item);
+      });
+  // Refit canvas now that legend is present
+  requestAnimationFrame(() => { try { fixCanvasSize(el); if (chart && chart.resize) chart.resize(); if (chart && chart.update) chart.update(0); } catch (_) {} });
+    }
+  } catch (_) {}
+}
+
+function commonCartesianOptions() {
+  return {
+    animation: false,
+    responsive: false,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(30, 41, 59, 0.95)', titleColor: '#ffffff', bodyColor: '#e2e8f0', borderColor: 'rgba(139, 92, 246, 0.3)', borderWidth: 1 } },
+    scales: {
+      x: { grid: { color: 'rgba(100,116,139,0.15)' }, ticks: { color: '#64748B', font: { size: 11 } }, border: { color: 'rgba(100,116,139,0.4)' } },
+      y: { grid: { color: 'rgba(100,116,139,0.15)' }, ticks: { color: '#64748B', font: { size: 11 } }, border: { color: 'rgba(100,116,139,0.4)' } }
+    }
+  };
+}
+
+function renderScatter(canvasId, points, colorIdx = 0) {
+  const el = document.getElementById(canvasId); if (!el || !window.Chart) return; fixCanvasSize(el);
+  const colors = palette(10);
+  const color = colors[colorIdx % colors.length];
+  new Chart(el, {
+    type: 'scatter',
+    data: { datasets: [{ label: '산점', data: points, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, pointRadius: 4, pointHoverRadius: 5 }] },
+    options: commonCartesianOptions()
+  });
+}
+
+function renderBubble(canvasId, items, onClick, options) {
+  const el = document.getElementById(canvasId);
+  if (!el || !window.Chart) return; 
+  try { const card0 = el.closest('.exec-card') || el.closest('.card.chart'); if (card0) card0.classList.add('has-legend'); } catch (_) {}
+  fixCanvasSize(el);
+  const opts = Object.assign({}, options);
+  const isXY = Array.isArray(items) && items.length && (items[0].hw !== undefined || items[0].sw !== undefined);
+  const limited = isXY ? top10WithOthersXY(items, opts.topN) : top10WithOthers(items, opts.topN);
+  const names = limited.map(x => x.name);
+  const totals = isXY ? limited.map(x => (x.hw || 0) + (x.sw || 0)) : limited.map(x => x.count || 0);
+  const colors = palette(names.length);
+  // Scale radius by total
+  const minT = Math.min(...totals), maxT = Math.max(...totals);
+  const scaleR = (v) => {
+    if (!isFinite(minT) || !isFinite(maxT) || maxT === minT) return 10;
+    const t = (v - minT) / (maxT - minT);
+    return 6 + t * 14;
+  };
+  const dataPoints = isXY
+    ? limited.map((it) => ({ x: (it.hw || 0), y: (it.sw || 0), r: scaleR((it.hw || 0) + (it.sw || 0)) }))
+    : totals.map((v, i) => ({ x: i + 1, y: v, r: scaleR(v) }));
+  const bgColors = colors.map(c => addAlpha(c, 0.72));
+  const bdColors = colors.map(c => c);
+  const chart = new Chart(el, {
+    type: 'bubble',
+    data: { datasets: [{ label: '분포', data: dataPoints, backgroundColor: bgColors, borderColor: bdColors, borderWidth: 2 }] },
+    options: Object.assign({}, commonCartesianOptions(), {
+      scales: isXY ? {
+        x: { type: 'linear', beginAtZero: true, grid: { color: 'rgba(100,116,139,0.08)' }, ticks: { color: '#64748B', font: { size: 11 }, maxTicksLimit: 10 } },
+        y: { type: 'linear', beginAtZero: true, grid: { color: 'rgba(100,116,139,0.08)' }, ticks: { color: '#64748B', font: { size: 11 }, maxTicksLimit: 10 } }
+      } : {
+        x: {
+          type: 'linear', min: 0.5, max: names.length + 0.5,
+          grid: { color: 'rgba(100,116,139,0.08)' },
+          ticks: { stepSize: 1, autoSkip: true, maxTicksLimit: 12, callback: (val) => { const idx = Math.round(val) - 1; const n = names[idx]; return n ? (n.length > 6 ? n.slice(0, 6) + '…' : n) : ''; }, color: '#64748B', font: { size: 11 } },
+          border: { color: 'rgba(100,116,139,0.4)' }
+        },
+        y: { beginAtZero: true, grid: { color: 'rgba(100,116,139,0.08)' }, ticks: { color: '#64748B', font: { size: 11 } }, border: { color: 'rgba(100,116,139,0.4)' } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => {
+          const i = ctx.dataIndex; const name = names[i];
+          if (isXY) { const it = limited[i] || {}; const fmt = (n) => new Intl.NumberFormat('ko-KR').format(n); return `${name}: HW ${fmt(it.hw || 0)}, SW ${fmt(it.sw || 0)}`; }
+          const val = totals[i] || 0; const fmt = (n) => new Intl.NumberFormat('ko-KR').format(n); return `${name}: ${fmt(val)} 건`;
+        }}}
+      }
+    })
+  });
+  if (typeof onClick === 'function') {
+    el.onclick = (evt) => {
+      try {
+        const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!els || !els.length) return; const idx = els[0].index;
+  const meta = limited[idx] || null;
+  onClick({ canvasId, name: names[idx], count: totals[idx], index: idx, items: limited, others: meta?._others });
+      } catch (_) {}
+    };
+  }
+  try { chart.stop(); chart.update(0); } catch (_) {}
+  // External 5x2 legend
+  try {
+    const container = el.parentElement; const card = el.closest('.exec-card') || el.closest('.card.chart');
+    if (container && card) {
+      let legend = card.querySelector(`#${canvasId}-legend`);
+      if (!legend) { legend = document.createElement('div'); legend.id = `${canvasId}-legend`; legend.className = 'chart-legend'; container.insertAdjacentElement('afterend', legend); }
+      legend.innerHTML = '';
+      names.slice(0,10).forEach((name, idx) => {
+        const item = document.createElement('div'); item.className = 'legend-item';
+        const sw = document.createElement('span'); sw.className = 'legend-swatch'; sw.style.background = colors[idx];
+        const lb = document.createElement('span'); lb.textContent = name; lb.title = `${name} ${(totals[idx]||0).toLocaleString('ko-KR')} 건`;
+        item.appendChild(sw); item.appendChild(lb);
+        if (typeof onClick === 'function') { item.style.cursor = 'pointer'; item.onclick = () => { const meta = limited[idx] || null; onClick({ canvasId, name, count: totals[idx]||0, index: idx, items: limited, others: meta?._others }); }; }
+        legend.appendChild(item);
+      });
+  // Refit canvas to adjusted container height
+  requestAnimationFrame(() => { try { fixCanvasSize(el); if (chart && chart.resize) chart.resize(); if (chart && chart.update) chart.update(0); } catch (_) {} });
+    }
+  } catch (_) {}
+}
+
+function renderBarVertical(canvasId, items, onClick) {
+  const el = document.getElementById(canvasId); if (!el || !window.Chart) return;
+  try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
+  fixCanvasSize(el);
+  const limited = top10WithOthers(items);
+  const labels = limited.map(x=>x.name);
+  const values = limited.map(x=>x.count||0);
+  const colors = palette(labels.length);
+  const chart = new Chart(el, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '건수', data: values, backgroundColor: colors.map(c=>addAlpha(c,0.82)), borderColor: colors, borderWidth: 1, borderRadius: 6, maxBarThickness: 28 }] },
+    options: Object.assign({}, commonCartesianOptions(), {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${new Intl.NumberFormat('ko-KR').format(ctx.raw)} 건` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#1e293b', font: { size: 12.5, weight: '600' }, maxRotation: 0, minRotation: 0, callback: (v,i) => { const t = labels[i]||''; return t.length>6? t.slice(0,6)+'…': t; } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(100,116,139,0.12)' }, ticks: { color: '#334155', font: { size: 12 } } }
+      }
+    })
+  });
+  if (typeof onClick === 'function') {
+    el.onclick = (evt) => {
+      const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+      if (!els || !els.length) return; const idx = els[0].index; const meta = limited[idx] || null;
+      onClick({ canvasId, name: labels[idx], count: values[idx], index: idx, items: limited, others: meta?._others });
+    };
+  }
+}
+
+function renderBarHorizontal(canvasId, items, onClick) {
+  const el = document.getElementById(canvasId); if (!el || !window.Chart) return;
+  try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
+  fixCanvasSize(el);
+  const limited = top10WithOthers(items);
+  const labels = limited.map(x=>x.name);
+  const values = limited.map(x=>x.count||0);
+  const colors = palette(labels.length);
+  const chart = new Chart(el, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '건수', data: values, backgroundColor: colors.map(c=>addAlpha(c,0.82)), borderColor: colors, borderWidth: 1, borderRadius: 6, barThickness: 18 }] },
+    options: Object.assign({}, commonCartesianOptions(), {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${new Intl.NumberFormat('ko-KR').format(ctx.raw)} 건` } } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(100,116,139,0.12)' }, ticks: { color: '#334155', font: { size: 12 } } },
+        y: { grid: { display: false }, ticks: { color: '#1e293b', font: { size: 12.5, weight: '600' }, callback: (v,i) => { const t = labels[i]||''; return t.length>8? t.slice(0,8)+'…': t; } } }
+      }
+    })
+  });
+  if (typeof onClick === 'function') {
+    el.onclick = (evt) => {
+      const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+      if (!els || !els.length) return; const idx = els[0].index; const meta = limited[idx] || null;
+      onClick({ canvasId, name: labels[idx], count: values[idx], index: idx, items: limited, others: meta?._others });
+    };
+  }
+}
+
+// Treemap: squarified layout rendered as styled divs
+function renderTreemap(containerId, items, onClick, options) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const opts = Object.assign({}, options);
+  const isXY = Array.isArray(items) && items.length && (items[0].hw !== undefined || items[0].sw !== undefined);
+  const limited = isXY ? top10WithOthersXY(items, opts.topN) : top10WithOthers(items, opts.topN);
+  const data = limited.map(it => ({
+    name: it.name,
+    value: isXY ? ((it.hw || 0) + (it.sw || 0)) : (it.count || 0),
+    hw: it.hw || 0,
+    sw: it.sw || 0,
+    _others: it._others
+  })).filter(d => d.value > 0);
+  data.sort((a, b) => b.value - a.value);
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return;
+  const colors = palette(data.length);
+
+  // Squarify algorithm
+  function squarify(items, rect) {
+    if (!items.length) return [];
+    const rects = [];
+    let remaining = items.slice();
+    let { x, y, w, h } = rect;
+    while (remaining.length) {
+      const isWide = w >= h;
+      const side = isWide ? h : w;
+      const totalArea = remaining.reduce((s, d) => s + d.value, 0);
+      const scale = (w * h) / totalArea;
+      let row = [remaining[0]];
+      remaining = remaining.slice(1);
+      let rowArea = row[0].value * scale;
+      function worstRatio(rowItems, rowTotalArea) {
+        const s = side;
+        let worst = 0;
+        for (const it of rowItems) {
+          const area = it.value * scale;
+          const rr = rowTotalArea / s;
+          const dim = area / rr;
+          const ratio = Math.max(rr / dim, dim / rr);
+          if (ratio > worst) worst = ratio;
+        }
+        return worst;
+      }
+      while (remaining.length) {
+        const candidate = remaining[0];
+        const newRowArea = rowArea + candidate.value * scale;
+        const oldWorst = worstRatio(row, rowArea);
+        const newWorst = worstRatio([...row, candidate], newRowArea);
+        if (newWorst <= oldWorst) {
+          row.push(candidate);
+          remaining = remaining.slice(1);
+          rowArea = newRowArea;
+        } else break;
+      }
+      const rowSpan = rowArea / side;
+      let offset = 0;
+      for (const it of row) {
+        const area = it.value * scale;
+        const dim = area / rowSpan;
+        if (isWide) {
+          rects.push({ ...it, x: x, y: y + offset, w: rowSpan, h: dim });
+        } else {
+          rects.push({ ...it, x: x + offset, y: y, w: dim, h: rowSpan });
+        }
+        offset += dim;
+      }
+      if (isWide) { x += rowSpan; w -= rowSpan; } else { y += rowSpan; h -= rowSpan; }
+    }
+    return rects;
+  }
+
+  // Render
+  const cw = container.clientWidth || 300;
+  const ch = container.clientHeight || 400;
+  container.innerHTML = '';
+  container.style.position = 'relative';
+  const cells = squarify(data, { x: 0, y: 0, w: cw, h: ch });
+  const gap = 2;
+  cells.forEach((cell, idx) => {
+    const div = document.createElement('div');
+    div.className = 'treemap-cell';
+    div.style.position = 'absolute';
+    div.style.left = (cell.x + gap / 2) + 'px';
+    div.style.top = (cell.y + gap / 2) + 'px';
+    div.style.width = Math.max(0, cell.w - gap) + 'px';
+    div.style.height = Math.max(0, cell.h - gap) + 'px';
+    div.style.background = colors[idx % colors.length];
+    const pct = total ? Math.round((cell.value / total) * 1000) / 10 : 0;
+    div.title = `${cell.name}: ${cell.value.toLocaleString('ko-KR')} 건 (${pct}%)`;
+    // Show name + count if cell is large enough
+    if (cell.w > 50 && cell.h > 30) {
+      div.innerHTML = `<span class="tm-name">${cell.name}</span><span class="tm-count">${cell.value.toLocaleString('ko-KR')}</span>`;
+    } else if (cell.w > 35 && cell.h > 20) {
+      div.innerHTML = `<span class="tm-name">${cell.name}</span>`;
+    }
+    if (typeof onClick === 'function') {
+      div.onclick = () => {
+        onClick({ canvasId: containerId, name: cell.name, count: cell.value, index: idx, items: limited, others: cell._others });
+      };
+    }
+    container.appendChild(div);
+  });
+}
+
+function initWorkDashboard() {
+  disableChartAnimationsGlobally();
+  const API = {
+    classification: '/api/work-categories',
+    division: '/api/work-divisions',
+    status: '/api/work-statuses',
+    operation: '/api/work-operations',
+    group: '/api/work-groups'
+  };
+
+  async function fetchJson(url) {
+    const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin'
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data && data.message ? data.message : 'Failed to load');
+    }
+    return data;
+  }
+
+  function toNonNegInt(val) {
+    const n = parseInt(val, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function toText(val) {
+    return (val == null ? '' : String(val).trim());
+  }
+
+  function mapToCountItems(items, nameKeyCandidates) {
+    const out = [];
+    (items || []).forEach((row) => {
+      const nameKey = (nameKeyCandidates || []).find((k) => row && row[k] != null);
+      const name = toText(nameKey ? row[nameKey] : row?.wc_name);
+      if (!name) return;
+      const hw = toNonNegInt(row?.hw_count);
+      const sw = toNonNegInt(row?.sw_count);
+      // Dashboard's "건" is treated as the sum of HW+SW counts.
+      const count = hw + sw;
+      out.push({ name, count });
+    });
+    return out;
+  }
+
+  function mapToGroupXY(items) {
+    const out = [];
+    (items || []).forEach((row) => {
+      const name = toText(row?.wc_name ?? row?.group_name);
+      if (!name) return;
+      out.push({
+        name,
+        hw: toNonNegInt(row?.hw_count),
+        sw: toNonNegInt(row?.sw_count)
+      });
+    });
+    return out;
+  }
+
+  // Simple data panel to show clicked chart segment
+  function ensureDataPanel() {
+    let panel = document.getElementById('work-data-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'work-data-panel';
+      panel.style.position = 'fixed';
+      panel.style.right = '24px';
+      panel.style.bottom = '24px';
+      panel.style.width = '320px';
+      panel.style.maxHeight = '50vh';
+      panel.style.overflow = 'auto';
+      panel.style.background = '#ffffff';
+      panel.style.border = '1px solid #e5e7eb';
+      panel.style.borderRadius = '12px';
+      panel.style.boxShadow = '0 10px 25px rgba(0,0,0,0.12)';
+      panel.style.padding = '16px';
+      panel.style.zIndex = '1000';
+      panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><strong>선택 데이터</strong><button id="work-data-close" style="border:none;background:#f3f4f6;border-radius:8px;padding:6px 8px;cursor:pointer;">닫기</button></div><div id="work-data-content" style="font-size:13px;color:#334155;"></div>';
+      document.body.appendChild(panel);
+      const closeBtn = panel.querySelector('#work-data-close');
+      if (closeBtn) closeBtn.addEventListener('click', ()=>{ panel.remove(); });
+    }
+    return panel;
+  }
+  function showData(payload) {
+    const panel = ensureDataPanel();
+    const box = panel.querySelector('#work-data-content');
+    if (!box) return;
+    const { canvasId, name, count, others } = payload || {};
+    const titleMap = {
+      'chart-classification': '업무 분류',
+      'chart-division': '업무 구분',
+      'chart-status': '업무 상태',
+      'chart-operation': '업무 운영',
+      'chart-group': '업무 그룹'
+    };
+    const sec = titleMap[canvasId] || canvasId;
+    let html = `<div style="margin:4px 0 8px; color:#0f172a; font-weight:700;">${sec}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6366f1;"></span><span>${name}</span><span style="margin-left:auto; font-weight:600;">${count.toLocaleString('ko-KR')} 건</span></div>`;
+    if (name === '기타' && Array.isArray(others) && others.length) {
+      html += '<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:8px;">';
+      html += '<div style="font-weight:600;color:#334155;margin-bottom:6px;">기타 상세</div>';
+    // 5x2 grid: show up to 10 items (5 per row)
+    const __list = others.slice(0, 10);
+    html += '<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;">';
+    html += __list.map(o => `
+          <div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px;min-width:0;font-size:12px;">
+            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o.name}</span>
+              <span style="color:#475569;font-variant-numeric:tabular-nums;">${(((o.count != null ? o.count : ((o.hw || 0) + (o.sw || 0)))) || 0).toLocaleString('ko-KR')} 건</span>
+          </div>
+        `).join('');
+        html += '</div>';
+      html += '</div>';
+    }
+    box.innerHTML = html;
+  }
+  // Fallback sample datasets (used only if API fetch fails)
+  const fallback = {
+    classification: [
+      { name: '권한', count: 18 },
+      { name: '서비스', count: 15 },
+      { name: '애플리케이션', count: 14 },
+      { name: '프로세스', count: 13 },
+      { name: '요청', count: 11 },
+      { name: '정책', count: 9 }
+    ],
+    division: [
+      { name: '업무 유형', count: 16 },
+      { name: '요청 유형', count: 14 },
+      { name: '연동 시스템', count: 12 },
+      { name: '서비스', count: 10 },
+      { name: '운영 조직', count: 9 },
+      { name: '변경 유형', count: 7 }
+    ],
+    status: [
+      { name: '운영중', count: 28 },
+      { name: '개발', count: 16 },
+      { name: '헬스체크', count: 12 },
+      { name: '대기', count: 10 },
+      { name: '점검중', count: 9 },
+      { name: '승인대기', count: 8 },
+      { name: '릴리즈', count: 6 },
+      { name: 'QA', count: 4 },
+      { name: '장애', count: 3 },
+      { name: '기타', count: 5 }
+    ],
+    operation: [
+      { name: '운영 정책', count: 12 },
+      { name: '운영 절차', count: 18 },
+      { name: '운영 일정', count: 9 },
+      { name: '운영 리포트', count: 6 },
+      { name: '운영 권한', count: 15 },
+      { name: '운영 인력', count: 7 }
+    ],
+    group: [
+      { name: '플랫폼', hw: 20, sw: 12 },
+      { name: '인프라', hw: 30, sw: 10 },
+      { name: '보안', hw: 16, sw: 8 },
+      { name: '업무시스템', hw: 18, sw: 16 },
+      { name: '데이터', hw: 12, sw: 14 },
+      { name: '지원', hw: 10, sw: 6 },
+      { name: 'QA', hw: 8, sw: 5 },
+      { name: '연구', hw: 7, sw: 9 },
+      { name: '운영', hw: 9, sw: 7 },
+      { name: '모니터링', hw: 5, sw: 4 }
+    ]
+  };
+
+  async function loadDashboardData() {
+    try {
+      const [cat, div, st, op, grp] = await Promise.all([
+        fetchJson(API.classification),
+        fetchJson(API.division),
+        fetchJson(API.status),
+        fetchJson(API.operation),
+        fetchJson(API.group)
+      ]);
+      return {
+        classification: mapToCountItems(cat.items, ['wc_name', 'category_name']),
+        division: mapToCountItems(div.items, ['wc_name', 'division_name']),
+        status: mapToCountItems(st.items, ['wc_name', 'status_name']),
+        operation: mapToCountItems(op.items, ['wc_name', 'operation_name']),
+        group: mapToGroupXY(grp.items)
+      };
+    } catch (e) {
+      console.warn('[work_dashboard] Falling back to sample data:', e);
+      return fallback;
+    }
+  }
+
+  const onSegClick = (p)=> showData(p);
+
+  loadDashboardData().then((data) => {
+    // Defer rendering to ensure CSS is applied and layout is computed
+    // (critical for SPA navigation where CSS links load asynchronously)
+    function doRender() {
+      // 분류 → 파이 (Top5+기타)
+      renderPie('chart-classification', data.classification || [], onSegClick, { topN: 5 });
+      // 구분 → 도넛 (Top5+기타)
+      renderDoughnut('chart-division', data.division || [], onSegClick, { showCenter: false, topN: 5 });
+
+      // 운영 → 세로 막대 (데이터 0이면 카드 숨김)
+      const opItems = (data.operation || []).filter(x => (x.count || 0) > 0);
+      if (opItems.length) {
+        renderBarVertical('chart-operation', opItems, onSegClick);
+      } else {
+        const opCard = document.getElementById('chart-operation');
+        if (opCard) { const c = opCard.closest('.exec-card') || opCard.closest('.card.chart'); if (c) c.style.display = 'none'; }
+      }
+
+      // 그룹 → 트리맵 (HW/SW, Top10)
+      renderTreemap('chart-group', data.group || [], onSegClick, { topN: 10 });
+
+      // 상태 → 가로 막대 (데이터 0이면 카드 숨김)
+      const stItems = (data.status || []).filter(x => (x.count || 0) > 0);
+      if (stItems.length) {
+        renderBarHorizontal('chart-status', stItems, onSegClick);
+      } else {
+        const stCard = document.getElementById('chart-status');
+        if (stCard) { const c = stCard.closest('.exec-card') || stCard.closest('.card.chart'); if (c) c.style.display = 'none'; }
+      }
+
+      // Post-render: re-measure after CSS settles and fix canvas sizes
+      setTimeout(function() {
+        ['chart-classification', 'chart-division', 'chart-operation', 'chart-status'].forEach(function(id) {
+          try {
+            var cv = document.getElementById(id);
+            if (!cv) return;
+            fixCanvasSize(cv);
+            var inst = Chart.getChart(cv);
+            if (inst) { inst.resize(); inst.update('none'); }
+          } catch (_) {}
+        });
+      }, 150);
+    }
+
+    // Wait for layout to stabilize before rendering
+    var inner = document.querySelector('.chart-wrap-inner');
+    if (inner && inner.clientHeight > 100) {
+      doRender();
+    } else {
+      // CSS may not be applied yet (SPA navigation) — poll until ready
+      var _t0 = Date.now();
+      function _waitCss() {
+        inner = document.querySelector('.chart-wrap-inner');
+        if ((inner && inner.clientHeight > 100) || (Date.now() - _t0 > 1500)) {
+          doRender();
+        } else {
+          requestAnimationFrame(_waitCss);
+        }
+      }
+      requestAnimationFrame(_waitCss);
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initWorkDashboard);
+} else {
+  initWorkDashboard();
+}
+})();
+

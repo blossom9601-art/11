@@ -1,0 +1,49 @@
+{% set msgm_modal_id = msgm_modal_id|default('system-message-modal') %}
+{% set msgm_title_id = msgm_title_id|default('message-title') %}
+{% set msgm_title = msgm_title|default('알림') %}
+{% set msgm_subtitle = msgm_subtitle|default('') %}
+{% set msgm_content_id = msgm_content_id|default('message-content') %}
+{% set msgm_content = msgm_content|default('메시지 내용') %}
+{% set msgm_close_id = msgm_close_id|default('system-message-close') %}
+{% set msgm_ok_id = msgm_ok_id|default('system-message-ok') %}
+{% set msgm_ok_label = msgm_ok_label|default('확인') %}
+{% set msgm_illustration_src = msgm_illustration_src|default('/static/image/svg/list/free-sticker-solution.svg') %}
+{% set msgm_illustration_alt = msgm_illustration_alt|default('안내 일러스트') %}
+{% set msgm_modal_class = msgm_modal_class|default('server-add-modal system-message-modal modal-overlay-full bls-download-modal bls-download-modal--message') %}
+{% set msgm_content_class = msgm_content_class|default('server-add-content') %}
+{% set msgm_header_class = msgm_header_class|default('server-add-header') %}
+{% set msgm_title_wrap_class = msgm_title_wrap_class|default('server-add-title') %}
+{% set msgm_body_class = msgm_body_class|default('server-add-body') %}
+{% set msgm_actions_class = msgm_actions_class|default('server-add-actions align-right') %}
+<div id="{{ msgm_modal_id }}" class="{{ msgm_modal_class }}" aria-hidden="true">
+    <div class="{{ msgm_content_class }}" role="dialog" aria-modal="true" aria-labelledby="{{ msgm_title_id }}">
+        <div class="{{ msgm_header_class }} bls-download-modal__header">
+            <div class="{{ msgm_title_wrap_class }} dispose-title bls-download-modal__header-copy">
+                <h3 id="{{ msgm_title_id }}" class="bls-download-modal__title">{{ msgm_title }}</h3>
+                {% if msgm_subtitle %}
+                <p class="server-add-subtitle bls-download-modal__subtitle">{{ msgm_subtitle }}</p>
+                {% endif %}
+            </div>
+            <button class="close-btn bls-download-modal__close" type="button" id="{{ msgm_close_id }}" title="닫기" aria-label="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="{{ msgm_body_class }} bls-download-modal__body">
+            <div class="dispose-content bls-download-modal__layout">
+                <div class="dispose-text bls-download-modal__copy">
+                    <p class="bls-download-modal__primary" id="{{ msgm_content_id }}">{{ msgm_content }}</p>
+                </div>
+                <div class="message-illust bls-download-modal__illust">
+                    <img src="{{ msgm_illustration_src }}" alt="{{ msgm_illustration_alt }}" loading="lazy" />
+                </div>
+            </div>
+        </div>
+        <div class="{{ msgm_actions_class }} bls-download-modal__footer">
+            <div class="action-buttons right bls-download-modal__actions">
+                <button type="button" class="btn-primary bls-download-modal__button bls-download-modal__button--primary" id="{{ msgm_ok_id }}">{{ msgm_ok_label }}</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,158 @@
+<!-- 공통 디자인 토큰 & 컴포넌트 -->
+<link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
+<link rel="stylesheet" href="/static/css/components.css?v=20260315">
+<link rel="stylesheet" href="/static/css/bls-modal.css?v=20260321d">
+<link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=20260321b">
+
+<!-- Global Footer assets -->
+<link rel="stylesheet" href="/static/css/footer.css?v=1.0.0">
+<script src="/static/js/footer.js?v=1.0.1" defer></script>
+
+<!-- Reusable main header -->
+<header class="main-header">
+	<div class="header-left">
+		<img src="/static/image/logo/blossom_logo.png" alt="Blossom 로고" class="header-logo">
+		<div class="header-brand-text">
+			<h1 class="system-title notranslate" translate="no">blossom</h1>
+			<span class="system-subtitle"></span>
+		</div>
+	</div>
+	<div class="header-right">
+		<button class="header-btn" id="btn-sidebar" title="메뉴">
+			<img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
+		</button>
+		<button class="header-btn" id="btn-work-timeline" title="작업 타임라인" type="button" data-href="{{ url_for('main.addon_work_timeline') }}">
+			<img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
+		</button>
+		<a class="header-btn" id="btn-notifications" title="알림" href="{{ url_for('main.addon_notifications') }}">
+			<img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
+			<span class="header-badge" id="noti-badge"></span>
+		</a>
+		<a class="header-btn" id="btn-chat" title="채팅" href="{{ url_for('main.addon_chat') }}">
+			<img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
+		</a>
+		<a class="header-btn" id="btn-calendar" title="달력" href="{{ url_for('main.addon_calendar') }}">
+			<img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
+		</a>
+		<button class="header-btn" id="btn-account" title="계정" type="button" data-emp-no="{{ current_user_emp_no or '' }}">
+			<img src="{{ current_profile_image or '/static/image/svg/profil/free-icon-bussiness-man.svg' }}" alt="{{ current_user_name or '계정' }}" class="header-avatar-icon" loading="lazy" data-debug-avatar="{{ current_profile_image }}">
+		</button>
+	</div>
+</header>
+
+<script src="/static/js/ui/searchable_select.js?v=1.2.0"></script>
+<script src="/static/js/ui/fk_select.js?v=1.1.0"></script>
+<script src="/static/js/2.hardware/ui/hw_inventory_catalog.js?v=1.0.2"></script>
+<script src="/static/js/tab05_account_global_api.js"></script>
+
+<!-- 공통 유틸리티 (순서: constants → dom-utils → api-client → modal-utils → table-utils) -->
+<script src="/static/js/common/constants.js?v=20260315"></script>
+<script src="/static/js/common/dom-utils.js?v=20260315"></script>
+<script src="/static/js/common/api-client.js?v=20260315"></script>
+<script src="/static/js/common/modal-utils.js?v=20260315"></script>
+<script src="/static/js/common/bls-modal-factory.js?v=20260317"></script>
+<script src="/static/js/common/bls-alert.js?v=20260317"></script>
+<script src="/static/js/common/table-utils.js?v=20260315"></script>
+<script src="/static/js/common/brand-loader.js?v=20260315b"></script>
+<script src="/static/js/_shared/bls-stats-modal.js?v=20260321a" defer></script>
+
+<!-- 화면 권한 가드 (blossom.js 로드 후, URL 기반 자동 판별) -->
+<script src="/static/js/blossom-permission-guard.js?v=20260315_dis" defer></script>
+
+<!-- Chat unread badge polling -->
+<script>
+(function(){
+  var POLL_MS = 5000;
+  var btn = document.getElementById('btn-chat');
+  if (!btn) return;
+  function check(){
+    fetch('/api/chat/unread-total', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.total > 0) btn.classList.add('has-unread');
+        else btn.classList.remove('has-unread');
+      })
+      .catch(function(){});
+  }
+  check();
+  setInterval(check, POLL_MS);
+})();
+</script>
+
+<!-- Notification unread badge polling -->
+<script>
+(function(){
+  var POLL_MS = 15000;
+  var badge = document.getElementById('noti-badge');
+  if (!badge) return;
+  function check(){
+    fetch('/api/notifications/unread-count', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.success && d.count > 0){
+          badge.textContent = d.count > 10 ? '10+' : String(d.count);
+          badge.classList.add('show');
+        } else {
+          badge.classList.remove('show');
+          badge.textContent = '';
+        }
+      })
+      .catch(function(){ badge.classList.remove('show'); badge.textContent = ''; });
+  }
+  check();
+  setInterval(check, POLL_MS);
+})();
+</script>
+
+{% if current_key and current_key.startswith('hw_') %}
+<script>
+/* Hardware detail: backup sync — posts title/subtitle to Flask session.
+   Primary mechanism is ?asset_id= query-param redirect (VPN pattern).
+   This fires as fallback for direct-URL access or bookmarked pages. */
+(function(){
+  var _HW_SUFFIXES = ['_detail','_system','_contract','_hw','_sw','_backup',
+    '_if','_account','_authority','_activate','_firewalld',
+    '_storage','_task','_vulnerability','_package','_log','_file','_manager',
+    '_hardware','_software','_component','_ip_range','_communication',
+    '_vpn_policy','_frontbay','_rearbay','_basic','_assign'];
+  var key = '{{ current_key }}';
+  var baseKey = key;
+  for(var i=0;i<_HW_SUFFIXES.length;i++){
+    var s = _HW_SUFFIXES[i];
+    if(key.length > s.length && key.substr(key.length - s.length) === s){
+      baseKey = key.substr(0, key.length - s.length);
+      break;
+    }
+  }
+  function doSync(){
+    try{
+      var t = document.getElementById('page-title') || document.querySelector('.page-header h1');
+      var sub = document.getElementById('page-subtitle') || document.querySelector('.page-header p');
+      var title = t ? (t.textContent||'').trim() : '';
+      var subtitle = sub ? (sub.textContent||'').trim() : '';
+      if(!title || title === '-') return false;
+      fetch('/api/_hw_session_sync', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body:JSON.stringify({base_key:baseKey, title:title, subtitle:subtitle||'-'})
+      }).catch(function(){});
+      return true;
+    }catch(e){ return false; }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    /* Try immediately — if server already rendered real title, sync it */
+    if(doSync()) return;
+    /* Otherwise observe DOM for client JS to populate title */
+    var el = document.getElementById('page-title') || document.querySelector('.page-header h1');
+    if(!el) return;
+    var obs = new MutationObserver(function(){
+      if(doSync()){ obs.disconnect(); }
+    });
+    obs.observe(el, {childList:true, characterData:true, subtree:true});
+    setTimeout(function(){ obs.disconnect(); }, 5000);
+  });
+})();
+</script>
+{% endif %}
+

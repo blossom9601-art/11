@@ -1,0 +1,167 @@
+{# Shared add/edit editor modal used by both Blog and Insight lists #}
+{% set prefix = modal_prefix|default('blog') %}
+{% set title_text = modal_title_text|default('블로그 글 추가') %}
+{% set subtitle_text = modal_subtitle_text|default('작성한 글은 목록과 상세 페이지에 표시됩니다.') %}
+{% set title_placeholder = modal_title_placeholder|default('게시글 제목') %}
+{% set editor_placeholder = modal_editor_placeholder|default('게시글 내용을 입력하세요') %}
+{% set editor_aria = modal_editor_aria_label|default('게시글 내용') %}
+{% set include_author_hidden = modal_include_author_hidden|default(false) %}
+{% set author_value = modal_author_value|default('') %}
+{% set title_required = modal_title_required|default(false) %}
+{% set submit_type = modal_submit_type|default('button') %}
+{% set submit_text = modal_submit_text|default('등록') %}
+{% set allow_table = modal_allow_table|default(true) %}
+
+<div id="{{ prefix }}-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="{{ prefix }}-add-title">
+	<div class="server-add-content">
+		<div class="server-add-header">
+			<div class="server-add-title">
+				<h3 id="{{ prefix }}-add-title">{{ title_text }}</h3>
+				<p class="server-add-subtitle" id="{{ prefix }}-add-subtitle">{{ subtitle_text }}</p>
+			</div>
+			<button class="close-btn" type="button" id="{{ prefix }}-add-close" title="닫기" aria-label="닫기">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			</button>
+		</div>
+
+		<div class="server-add-body">
+			<div class="modal-body-stack" id="{{ prefix }}-modal-body-stack">
+				<form id="{{ prefix }}-add-form" {% if modal_form_autocomplete_off|default(false) %}autocomplete="off"{% endif %}>
+					<div class="blog-add-sections">
+						<div class="blog-add-section">
+							<div class="blog-add-section-title">제목</div>
+							<div class="blog-add-field">
+								<input type="text" id="{{ prefix }}-add-title-input" autocomplete="off" placeholder="{{ title_placeholder }}"{% if title_required %} required{% endif %}>
+								{% if include_author_hidden %}
+								<input type="hidden" id="{{ prefix }}-add-author-input" value="{{ author_value }}">
+								{% endif %}
+							</div>
+						</div>
+
+						<div class="blog-add-section">
+							<div class="blog-add-section-title">내용</div>
+							<div class="blog-add-field">
+								<div id="{{ prefix }}-editor-toolbar" class="blog-editor-toolbar" role="toolbar" aria-label="편집 도구">
+									<div class="blog-editor-formatbar">
+										<button type="button" class="blog-editor-btn" data-action="insert-image" aria-label="이미지 삽입">이미지</button>
+										<input type="file" id="{{ prefix }}-editor-image-input" accept="image/*" hidden>
+										{% if allow_table %}
+										<button type="button" class="blog-editor-btn" data-action="insert-table" aria-label="표 삽입">표</button>
+										{% endif %}
+										<button type="button" class="blog-editor-btn" data-action="insert-sticker" aria-label="스티커 삽입"><img src="/static/image/svg/insight/free-icon-smile.svg" alt="" aria-hidden="true"></button>
+
+										<select id="{{ prefix }}-editor-font" class="blog-editor-select" aria-label="글꼴 선택">
+											<option value="">글꼴</option>
+											<option value="Arial">Arial</option>
+											<option value="Calibri">Calibri</option>
+											<option value="Georgia">Georgia</option>
+											<option value="Times New Roman">Times New Roman</option>
+											<option value="Verdana">Verdana</option>
+										</select>
+
+										<select id="{{ prefix }}-editor-size" class="blog-editor-select" aria-label="글자 크기 선택">
+											<option value="">크기</option>
+											<option value="14">14px</option>
+											<option value="16" selected>16px</option>
+											<option value="18">18px</option>
+											<option value="22">22px</option>
+										</select>
+
+										<button type="button" class="blog-editor-btn" data-cmd="bold" aria-label="굵은글씨"><b>B</b></button>
+										<button type="button" class="blog-editor-btn" data-cmd="italic" aria-label="기울임꼴"><i>I</i></button>
+										<button type="button" class="blog-editor-btn" data-cmd="underline" aria-label="밑줄"><u>U</u></button>
+										<button type="button" class="blog-editor-btn" data-cmd="strikeThrough" aria-label="취소선"><s>S</s></button>
+										<button type="button" class="blog-editor-btn" data-cmd="justifyLeft" aria-label="왼쪽 정렬">좌</button>
+										<button type="button" class="blog-editor-btn" data-cmd="justifyCenter" aria-label="가운데 정렬">중</button>
+										<button type="button" class="blog-editor-btn" data-cmd="justifyRight" aria-label="오른쪽 정렬">우</button>
+										<button type="button" class="blog-editor-btn" data-cmd="justifyFull" aria-label="양쪽 정렬">양</button>
+
+										<label class="blog-editor-color" aria-label="글자색">
+											<span>글자색</span>
+											<input type="color" id="{{ prefix }}-editor-color" value="#111827" aria-label="글자색 선택">
+										</label>
+										<label class="blog-editor-color" aria-label="형광색">
+											<span>형광</span>
+											<input type="color" id="{{ prefix }}-editor-highlight" value="#fff59d" aria-label="형광색 선택">
+										</label>
+
+										<button type="button" class="blog-editor-btn" data-cmd="outdent" aria-label="내어쓰기">내어쓰기</button>
+										<button type="button" class="blog-editor-btn" data-cmd="indent" aria-label="들여쓰기">들여쓰기</button>
+
+										<select id="{{ prefix }}-editor-tracking" class="blog-editor-select" aria-label="장평">
+											<option value="">장평</option>
+											<option value="-0.5">좁게</option>
+											<option value="0" selected>보통</option>
+											<option value="0.5">넓게</option>
+										</select>
+
+										<button type="button" class="blog-editor-btn" data-cmd="insertUnorderedList" aria-label="글머리 기호">•</button>
+										<button type="button" class="blog-editor-btn" data-cmd="insertOrderedList" aria-label="글머리 번호">1.</button>
+									</div>
+								</div>
+
+								<div id="{{ prefix }}-add-editor" class="blog-add-editor" contenteditable="true" role="textbox" aria-label="{{ editor_aria }}" data-placeholder="{{ editor_placeholder }}"></div>
+							</div>
+						</div>
+
+						<div class="blog-add-section">
+							<div class="blog-add-section-title">태그</div>
+							<div class="blog-add-field">
+								<input type="text" id="{{ prefix }}-add-tags" autocomplete="off" placeholder="예) 보안, AI, 네트워크">
+							</div>
+						</div>
+
+						<div class="blog-add-section">
+							<div class="blog-add-section-title">첨부파일</div>
+							<div class="blog-add-field">
+								<div class="blog-dropzone" id="{{ prefix }}-attach-drop" role="button" tabindex="0" aria-label="첨부파일 업로드">
+									<input type="file" id="{{ prefix }}-add-attachments" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx,.xls,.xlsx" hidden>
+									<div class="blog-dropzone-inner">
+										<img src="/static/image/svg/list/free-icon-upload.svg" alt="" class="blog-dropzone-icon" aria-hidden="true">
+										<div class="blog-dropzone-text">
+											<div class="blog-dropzone-title">파일을 업로드하려면 클릭하거나 끌어다 놓으세요</div>
+											<div class="blog-dropzone-sub">최대 10개 · 20MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</div>
+										</div>
+									</div>
+								</div>
+								<div class="blog-post-attachments blog-post-attachments--edit" id="{{ prefix }}-edit-attachments" hidden>
+									<ul class="blog-post-attachments-list" id="{{ prefix }}-edit-attachments-list"></ul>
+								</div>
+								<ul class="blog-attach-list" id="{{ prefix }}-attach-list" aria-live="polite"></ul>
+							</div>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		{# View-only (detail modal) bottom area: like + attachments. Kept outside scroll body. #}
+		<div class="insight-detail-bottom" id="{{ prefix }}-detail-bottom" hidden>
+			<div class="insight-detail-like-row" id="{{ prefix }}-detail-like-row" aria-label="좋아요">
+				<button type="button" class="blog-action" id="{{ prefix }}-detail-like-btn" aria-pressed="false" aria-label="좋아요">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="blog-action-icon" aria-hidden="true" focusable="false">
+						<path fill="currentColor" d="M22.773,7.721A4.994,4.994,0,0,0,19,6H15.011l.336-2.041A3.037,3.037,0,0,0,9.626,2.122L8,5.417V21H18.3a5.024,5.024,0,0,0,4.951-4.3l.705-5A4.994,4.994,0,0,0,22.773,7.721Z"/>
+						<path fill="currentColor" d="M0,11v5a5.006,5.006,0,0,0,5,5H6V6H5A5.006,5.006,0,0,0,0,11Z"/>
+					</svg>
+					<span class="blog-action-count" id="{{ prefix }}-detail-like-count">0</span>
+				</button>
+			</div>
+
+			<div class="blog-post-attachments" id="{{ prefix }}-view-attachments" hidden>
+				<div class="blog-post-attachments-title">첨부파일</div>
+				<ul class="blog-post-attachments-list" id="{{ prefix }}-view-attachments-list"></ul>
+			</div>
+		</div>
+
+		<div class="server-add-actions align-right">
+			<div class="action-buttons right">
+				<button type="button" class="btn-secondary" id="{{ prefix }}-add-cancel">취소</button>
+				{% if submit_type == 'submit' %}
+				<button type="submit" class="btn-primary" form="{{ prefix }}-add-form" id="{{ prefix }}-add-submit">{{ submit_text }}</button>
+				{% else %}
+				<button type="button" class="btn-primary" id="{{ prefix }}-add-submit">{{ submit_text }}</button>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+</div>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" fill="none">
+  <!-- Transparent background sticker: person with gears -->
+  <!-- Gears -->
+  <g transform="translate(126,44)">
+    <circle cx="18" cy="18" r="12" fill="#A5B4FC"/>
+    <path d="M18 7v6M18 23v6M7 18h6M23 18h6M11.8 11.8l4.2 4.2M22 22l4.2 4.2M11.8 24.2l4.2-4.2M22 14l4.2-4.2" stroke="#6366F1" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(98,24)">
+    <circle cx="14" cy="14" r="10" fill="#C7D2FE"/>
+    <path d="M14 6v4M14 18v4M6 14h4M18 14h4M9.2 9.2l2.8 2.8M18.8 18.8l2.8 2.8M9.2 18.8l2.8-2.8M18.8 9.2l2.8-2.8" stroke="#818CF8" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+  <!-- Person -->
+  <g transform="translate(40,62)">
+    <circle cx="36" cy="22" r="14" fill="#FDE68A"/>
+    <path d="M28 20c2 3 5 4 8 4s6-1 8-4" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round"/>
+    <rect x="8" y="44" width="88" height="56" rx="18" fill="#34D399"/>
+    <path d="M36 48c8 6 24 6 32 0" stroke="#10B981" stroke-width="2"/>
+    <path d="M28 74h48" stroke="#059669" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="36" cy="22" r="14" fill="url(#skintone)"/>
+    <path d="M28 26c2 3 5 4 8 4s6-1 8-4" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
+    <path d="M22 20c3-8 25-8 28 0" stroke="#111827" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <defs>
+    <linearGradient id="skintone" x1="22" y1="8" x2="50" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+ </svg>

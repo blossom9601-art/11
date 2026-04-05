@@ -1,0 +1,89 @@
+{% macro role_form_fields(prefix) %}
+    {% set name_id = prefix ~ '-name' %}
+    {% set desc_id = prefix ~ '-desc' %}
+    {% set search_id = prefix ~ '-user-search' %}
+    {% set search_clear_id = prefix ~ '-user-search-clear' %}
+    {% set results_id = prefix ~ '-user-results' %}
+    {% set hidden_id = prefix ~ '-user-ids' %}
+    {% set tbody_id = prefix ~ '-user-selected-body' %}
+    {% set empty_id = prefix ~ '-user-empty' %}
+    {% set count_id = prefix ~ '-user-count' %}
+    <div class="form-section role-info-section">
+        <div class="section-header">
+            <h4>화면권한</h4>
+        </div>
+        <div class="role-info-grid">
+            <div class="role-info-card role-basic-card">
+                <div class="dual-field-grid">
+                    <div class="form-row">
+                        <label for="{{ name_id }}">화면권한명<span class="required">*</span></label>
+                        <input type="text" id="{{ name_id }}" name="role_name" class="form-input" maxlength="128" placeholder="예: ADMIN" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="{{ desc_id }}">화면권한설명</label>
+                        <input type="text" id="{{ desc_id }}" name="role_desc" class="form-input" maxlength="512" placeholder="화면권한 설명">
+                    </div>
+                </div>
+            </div>
+            <div class="role-info-card user-picker-card">
+                <label for="{{ search_id }}">사용자</label>
+                <div class="user-search-control">
+                    <input type="text" id="{{ search_id }}" class="form-input user-search-input" placeholder="이름 검색 (예: 홍길동)" autocomplete="off">
+                    <button type="button" class="user-search-clear-btn" id="{{ search_clear_id }}" aria-label="검색어 지우기">
+                        <img src="/static/image/svg/list/free-icon-trash.svg" alt="" aria-hidden="true">
+                    </button>
+                </div>
+                <p class="user-search-hint">검색 결과는 "이름(사번)"과 부서를 함께 표시합니다.</p>
+                <div class="user-search-results" id="{{ results_id }}" role="listbox" aria-label="사용자 검색 결과"></div>
+            </div>
+        </div>
+        <input type="hidden" name="user_ids" id="{{ hidden_id }}" value="">
+        <div class="selected-users-wrapper">
+            <div class="selected-users-header">
+                <h5>선택된 사용자</h5>
+                <span class="count-pill" id="{{ count_id }}">0명</span>
+            </div>
+            <div class="selected-users-table-wrapper" aria-live="polite">
+                <table class="selected-users-table" aria-label="선택된 사용자 목록">
+                    <thead>
+                        <tr>
+                            <th scope="col">이름</th>
+                            <th scope="col">사번</th>
+                            <th scope="col">부서</th>
+                            <th scope="col" class="selected-users-actions">삭제</th>
+                        </tr>
+                    </thead>
+                    <tbody id="{{ tbody_id }}"></tbody>
+                </table>
+                <div class="selected-users-empty" id="{{ empty_id }}">선택된 사용자가 없습니다.</div>
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+
+{% macro role_permission_fields(grid_id, role_sections) %}
+    <div class="form-section role-permission-section">
+        <div class="section-header">
+            <h4>권한</h4>
+        </div>
+        <div class="permissions-grid icon-permission-grid" id="{{ grid_id }}">
+            {% for key, label in role_sections %}
+            <div class="perm-row" data-section="{{ key }}">
+                <div class="perm-label">{{ label }}</div>
+                <div class="perm-actions">
+                    <button type="button" class="perm-btn icon-only" data-mode="read" aria-pressed="false">
+                        <img src="/static/image/svg/admin/free-icon-read.svg" alt="" aria-hidden="true" loading="lazy">
+                        <span class="visually-hidden">{{ label }} 읽기</span>
+                    </button>
+                    <button type="button" class="perm-btn icon-only" data-mode="write" aria-pressed="false">
+                        <img src="/static/image/svg/admin/free-icon-write.svg" alt="" aria-hidden="true" loading="lazy">
+                        <span class="visually-hidden">{{ label }} 쓰기</span>
+                    </button>
+                    <input type="hidden" name="perm_{{ key }}_read" value="0">
+                    <input type="hidden" name="perm_{{ key }}_write" value="0">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endmacro %}

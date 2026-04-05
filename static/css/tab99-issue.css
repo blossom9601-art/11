@@ -1,0 +1,15 @@
+.tab99-issue-root .table-wrap {
+    overflow-x: auto;
+}
+
+.tab99-grid-1 {
+    grid-template-columns: 1fr;
+}
+
+.tab99-grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.tab99-work-select {
+    margin-bottom: 6px;
+}

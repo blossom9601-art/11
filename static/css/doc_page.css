@@ -1,0 +1,178 @@
+/* ===== Document-style Pages (Help Center, Privacy Policy) ===== */
+
+.doc-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+.doc-page-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1F2937;
+    margin: 0 0 6px;
+}
+
+.doc-page-subtitle {
+    font-size: 14px;
+    color: #7B8190;
+    margin: 0 0 36px;
+}
+
+.doc-section {
+    margin-bottom: 36px;
+}
+
+.doc-section-title {
+    font-size: 18px;
+    font-weight: 500;
+    color: #1F2937;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #F1F3F9;
+}
+
+.doc-section p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #4B5563;
+    margin: 0 0 16px;
+}
+
+.doc-section ul,
+.doc-section ol {
+    margin: 0 0 16px;
+    padding-left: 20px;
+}
+
+.doc-section li {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #4B5563;
+}
+
+/* Definition-style list (term + description) */
+.doc-def-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+}
+
+.doc-def-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.doc-def-list li:last-child {
+    border-bottom: none;
+}
+
+.doc-def-term {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1F2937;
+    margin-bottom: 3px;
+}
+
+.doc-def-desc {
+    font-size: 13px;
+    color: #6B7280;
+    line-height: 1.5;
+}
+
+/* Ordered steps */
+.doc-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+    counter-reset: step;
+}
+
+.doc-steps li {
+    counter-increment: step;
+    padding: 8px 0 8px 32px;
+    position: relative;
+    font-size: 14px;
+    color: #4B5563;
+    line-height: 1.6;
+}
+
+.doc-steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #EEF2FF;
+    color: #6a5acd;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Simple bullet list */
+.doc-bullet-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+}
+
+.doc-bullet-list li {
+    padding: 6px 0 6px 16px;
+    position: relative;
+    font-size: 14px;
+    color: #4B5563;
+    line-height: 1.6;
+}
+
+.doc-bullet-list li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #9CA3AF;
+}
+
+.doc-note {
+    font-size: 13px;
+    color: #6B7280;
+    padding: 14px 16px;
+    background: #F9FAFB;
+    border-left: 3px solid #E9ECF5;
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 16px;
+}
+
+/* Release note blocks (Version page) */
+.doc-rn-block {
+    padding: 14px 0;
+    border-bottom: 1px solid #F3F4F6;
+}
+.doc-rn-block:last-child { border-bottom: none; }
+
+.doc-rn-current {
+    display: inline-block;
+    background: #EEF2FF;
+    color: #6a5acd;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.doc-rn-block .doc-bullet-list { margin-top: 6px; margin-bottom: 0; }
+
+.doc-divider {
+    border: none;
+    border-top: 1px solid #F1F3F9;
+    margin: 32px 0;
+}

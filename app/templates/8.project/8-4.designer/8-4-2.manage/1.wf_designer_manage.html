@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/wf_designer.css?v=5.45">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content" data-profile-id="{{ current_user_profile_id or '' }}">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="project.workflow_builder"></div>
+                    <h1>워크플로우 제작</h1>
+                    <p>내가 만든 워크플로우를 관리합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 -->
+                <div class="system-tabs" role="tablist" aria-label="워크플로우 디자이너 탭">
+                    {% set tabs = [
+                        ('wf_designer_explore', '워크플로우 탐색'),
+                        ('wf_designer_manage', '워크플로우 관리')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>내 워크플로우 <span class="count-badge" id="wfm-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-group">
+                                    <input type="text" id="wfm-search" class="search-input" placeholder="검색...">
+                                </div>
+                                <button class="header-btn btn-primary" id="wfm-create-btn" type="button">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    새 워크플로우
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 테이블 -->
+                        <div class="table-responsive" id="wfm-table-wrap">
+                            <table class="data-table" id="wfm-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;"><input type="checkbox" id="wfm-check-all"></th>
+                                        <th>이름</th>
+                                        <th style="width:100px;">상태</th>
+                                        <th style="width:80px;">버전</th>
+                                        <th style="width:120px;">생성자</th>
+                                        <th style="width:160px;">최종 수정</th>
+                                        <th style="width:100px;">액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wfm-tbody">
+                                    <!-- JS 렌더링 -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 빈 상태 -->
+                        <div class="wfd-empty" id="wfm-empty" style="display:none;">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="빈 목록" class="wfd-empty-img">
+                            <p>내가 만든 워크플로우가 없습니다.</p>
+                            <button class="btn-primary" id="wfm-create-first" type="button">워크플로우 만들기</button>
+                        </div>
+
+                        <!-- 벌크 액션 바 -->
+                        <div class="bulk-action-bar" id="wfm-bulk-bar" style="display:none;">
+                            <span id="wfm-sel-count">0</span>개 선택
+                            <button class="btn-danger" id="wfm-bulk-delete" type="button">삭제</button>
+                        </div>
+
+                        <!-- 페이지네이션 -->
+                        <div class="pagination-wrap" id="wfm-pagination"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    <!-- 워크플로우 생성 모달 -->
+    <div class="modal-overlay" id="wfm-create-modal" style="display:none;">
+        <div class="modal-content server-add-content" style="max-width:480px;">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3>새 워크플로우</h3>
+                    <p class="server-add-subtitle">워크플로우 이름과 설명을 입력하세요.</p>
+                </div>
+                <button class="close-btn" type="button" id="wfm-create-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="form-group">
+                    <label for="wfm-name-input">이름 <span class="required">*</span></label>
+                    <input type="text" id="wfm-name-input" class="form-control" placeholder="예: 서버 도입 결재 프로세스" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="wfm-desc-input">설명</label>
+                    <textarea id="wfm-desc-input" class="form-control" rows="3" placeholder="(선택) 워크플로우에 대한 간략한 설명" maxlength="500"></textarea>
+                </div>
+            </div>
+            <div class="server-add-footer">
+                <button class="btn-cancel" type="button" id="wfm-create-cancel">취소</button>
+                <button class="btn-primary" type="button" id="wfm-create-confirm">만들기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 모달 -->
+    <div class="modal-overlay" id="wfm-delete-modal" style="display:none;">
+        <div class="modal-content server-add-content" style="max-width:420px;">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>워크플로우 삭제</h3>
+                    <p class="server-add-subtitle" id="wfm-delete-subtitle">선택한 워크플로우를 삭제하시겠습니까?</p>
+                </div>
+                <button class="close-btn" type="button" id="wfm-delete-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-footer">
+                <button class="btn-cancel" type="button" id="wfm-delete-cancel">취소</button>
+                <button class="btn-danger" type="button" id="wfm-delete-confirm">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/8.project/8-4.designer/8-4-2.manage/1.wf_designer_manage.js?v=20260308a"></script>
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

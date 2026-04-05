@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab46-vpn_policy.css?v=1.0">
+    <script defer src="/static/js/4.governance/4-4.vpn_policy/4-4-1.vpn/2.vpn_detail.js?v=1.2"></script>
+    <script defer src="/static/js/_detail/tab53-vpn-policy.js?v=1.1"></script>
+    <script defer src="/static/js/layouts/tab46-vpn_policy.js?v=1.0"></script>
+</head>
+<body class="page-vpn-policy" data-gov-detail-id="{{ gov_detail_id or '' }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-wrapper">
+            <a href="{{ url_for('pages.show', key=vpn_base) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '기관명' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '프로토콜' }}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key=vpn_base + '_detail') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_manager') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_manager' %}active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_communication') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_communication' %}active{% endif %}">통신정책</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_vpn_policy') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_vpn_policy' %}active{% endif %}">상세설정</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_log') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_file') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_file' %}active{% endif %}">구성/파일</a>
+            </div>
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="vp-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="vp-edit-btn" title="편집" type="button" aria-label="편집">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집">
+                    </button>
+
+                    <div class="detail-section">
+                        <h3>VPN 상세 설정</h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="vp-policy-table" data-context="vpn-policy">
+                                <colgroup>
+                                    <col style="width: 20%">
+                                    <col style="width: 25%">
+                                    <col style="width: 27.5%">
+                                    <col style="width: 27.5%">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>구분</th>
+                                        <th>항목</th>
+                                        <th>자사</th>
+                                        <th>기관</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="group-row"><td rowspan="2">Hardware</td><td>모델명</td><td data-field="model:self">-</td><td data-field="model:org">-</td></tr>
+                                    <tr><td>펌웨어</td><td data-field="fw:self">-</td><td data-field="fw:org">-</td></tr>
+
+                                    <tr class="group-row"><td rowspan="8">IPSEC SA<br><small>(Internet Protocol Security - Security Association)</small></td><td>수명</td><td data-field="ipsec_life:self">-</td><td data-field="ipsec_life:org">-</td></tr>
+                                    <tr><td>모드</td><td data-field="mode:self">-</td><td data-field="mode:org">-</td></tr>
+                                    <tr><td>방식</td><td data-field="method:self">-</td><td data-field="method:org">-</td></tr>
+                                    <tr><td>PFS(Perfect Forward Secrecy)</td><td data-field="pfs:self">-</td><td data-field="pfs:org">-</td></tr>
+                                    <tr><td>재전송 보호</td><td data-field="retrans:self">-</td><td data-field="retrans:org">-</td></tr>
+                                    <tr><td>암호 프로토콜</td><td data-field="cipher_proto:self">-</td><td data-field="cipher_proto:org">-</td></tr>
+                                    <tr><td>암호 알고리즘</td><td data-field="cipher_algo:self">-</td><td data-field="cipher_algo:org">-</td></tr>
+                                    <tr><td>인증 알고리즘</td><td data-field="auth_algo:self">-</td><td data-field="auth_algo:org">-</td></tr>
+
+                                    <tr class="group-row"><td rowspan="12">ISAKMP SA<br><small>(Internet Security Association and Key Management Protocol - Security Association)</small></td><td>수명</td><td data-field="isakmp_life:self">-</td><td data-field="isakmp_life:org">-</td></tr>
+                                    <tr><td>모드</td><td data-field="isakmp_mode:self">-</td><td data-field="isakmp_mode:org">-</td></tr>
+                                    <tr><td>IKE 인증방식</td><td data-field="ike_auth:self">-</td><td data-field="ike_auth:org">-</td></tr>
+                                    <tr><td>IKE 수행시점</td><td data-field="ike_time:self">-</td><td data-field="ike_time:org">-</td></tr>
+                                    <tr><td>PSK(Pre Shared Key)</td><td data-field="psk:self">-</td><td data-field="psk:org">-</td></tr>
+                                    <tr><td>DPD(Dead Peer Detection)</td><td data-field="dpd:self">-</td><td data-field="dpd:org">-</td></tr>
+                                    <tr><td>암호 알고리즘</td><td data-field="isakmp_cipher:self">-</td><td data-field="isakmp_cipher:org">-</td></tr>
+                                    <tr><td>해시 알고리즘</td><td data-field="hash_algo:self">-</td><td data-field="hash_algo:org">-</td></tr>
+                                    <tr><td>키 교환 그룹</td><td data-field="dh_group:self">-</td><td data-field="dh_group:org">-</td></tr>
+                                    <tr><td>Local ID 유형</td><td data-field="local_id_type:self">-</td><td data-field="local_id_type:org">-</td></tr>
+                                    <tr><td>Local ID (Active)</td><td data-field="local_id_active:self">-</td><td data-field="local_id_active:org">-</td></tr>
+                                    <tr><td>Local ID (Standby)</td><td data-field="local_id_standby:self">-</td><td data-field="local_id_standby:org">-</td></tr>
+
+                                    <tr class="group-row"><td rowspan="2">CID<br><small>(Context IDentifier)</small></td><td>Active CID</td><td data-field="cid_active:self">-</td><td data-field="cid_active:org">-</td></tr>
+                                    <tr><td>Standby CID</td><td data-field="cid_standby:self">-</td><td data-field="cid_standby:org">-</td></tr>
+
+                                    <tr class="group-row"><td rowspan="1">IP<br><small>(Internet Protocol)</small></td><td>VPN Peer IP</td><td data-field="peer_ip:self">-</td><td data-field="peer_ip:org">-</td></tr>
+
+                                    <tr class="group-row"><td rowspan="1">비고</td><td>메모</td><td data-field="note:self">-</td><td data-field="note:org">-</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/ui/searchable_select.js?v=1.2.0"></script>
+</body>
+</html>

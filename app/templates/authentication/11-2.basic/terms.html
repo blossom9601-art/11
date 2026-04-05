@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <title>blossom</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <script defer src="/static/js/blossom.js"></script>
+</head>
+<body class="page-auth-signin page-auth-terms">
+    <!-- 이미지 영역 유지 -->
+    <div class="login-left"></div>
+    <!-- 로그인 패널 영역에 약관 내용 배치 -->
+    <div class="login-right">
+        <div class="login-content">
+            <!-- 플래시 메시지 표시 -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            <form action="/terms" method="post" class="terms-form">
+            <div class="terms-content">
+                <h2>약   관</h2>
+                <div class="terms-scroll" role="region" aria-label="약관 내용" tabindex="0">
+                <div class="terms-box">
+                    <p>서비스 이용을 위해 아래 약관을 확인해주세요.</p>
+                    <ol>
+                        <li>
+                            <strong>서비스 이용 안내</strong>
+                            <ul>
+                                <li>개인정보는 계정 관리 및 서비스 제공 목적에만 사용됩니다.</li>
+                                <li>입력된 정보는 회사의 보안 정책에 따라 안전하게 관리됩니다.</li>
+                                <li>안정적인 서비스를 위해 계정 및 시스템 사용 기록이 저장될 수 있습니다.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>보안 관련 주의사항</strong>
+                            <ul>
+                                <li>비밀번호는 추측이 어려운 조합으로 설정하고 정기적으로 변경하세요.</li>
+                                <li>비밀번호를 타인과 공유하거나 노출하면 계정 도용 및 보안 사고로 이어질 수 있습니다.</li>
+                                <li>무단 로그인 시도 및 불법 접근은 즉시 차단되며, 관련 정보는 보안 감사에 활용됩니다.</li>
+                                <li>계정 및 비밀번호 관리 소홀로 발생한 문제는 사용자 본인에게 책임이 있습니다.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>법적 책임 및 정책 고지</strong>
+                            <ul>
+                                <li>허용되지 않은 정보 입력, 자산의 무단 사용, 불법적 행위는 회사 보안 정책과 관련 법규(개인정보보호법, 정보통신망법 등)에 따라 제재될 수 있습니다.</li>
+                                <li>모든 서비스 이용 내역은 보안 및 감사 목적으로 기록되며, 필요 시 법적 절차에 따라 검토될 수 있습니다.</li>
+                                <li>회원가입 시, 위 약관에 동의하는 것으로 간주되며, 위반 시 발생하는 모든 책임은 사용자 본인에게 있습니다.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+                </div>
+                <div class="terms-consent">
+                    <label class="consent-label" for="terms_agree">
+                        <input type="checkbox" id="terms_agree" name="terms_agree" value="Y" required>
+                        동의 합니다.
+                    </label>
+                </div>
+                <div class="terms-actions">
+                    <button type="submit" class="login-button" id="terms-ok">확인</button>
+                </div>
+                <div class="terms-back">
+                    <a href="/login" class="back-to-signin">로그인</a> 페이지로 돌아가기
+                </div>
+            </div>
+            </form>
+        </div>
+    </div>
+    
+</body>
+</html>

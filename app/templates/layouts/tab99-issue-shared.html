@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab99-issue.css?v=1.1">
+    <script defer src="/static/js/_detail/tab99-issue-shared.js?v=1.0"></script>
+</head>
+<body class="page-tab99-issue-shared {{ tab99.body_class|default('page-vendor-maintenance-issue') }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content tab99-issue-root">
+        <div class="content-wrapper">
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">{{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '유지보수사' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn {% if current_key == t.key %}active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <div class="detail-header-actions" aria-label="이슈관리 상단 동작">
+                        <button class="add-btn-icon" id="iss-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                        </button>
+                        <button class="add-btn-icon" id="iss-row-add" title="행 추가" type="button" aria-label="행 추가">
+                            <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                        </button>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>
+                            {{ tab99.section_title|default('이슈관리') }}
+                            <div class="page-size-selector" aria-label="보기 개수">
+                                <label for="iss-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="iss-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+
+                        <div class="table-wrap">
+                            <table class="hw-table" id="iss-spec-table" data-context="issue">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px"><input type="checkbox" id="iss-select-all" title="전체 선택"></th>
+                                        <th data-col="status" style="width:100px">상태</th>
+                                        <th data-col="content" style="min-width:220px">이슈내용</th>
+                                        <th data-col="work_names" style="min-width:180px">업무명</th>
+                                        <th data-col="issue_type" style="width:100px">유형</th>
+                                        <th data-col="impact" style="width:100px">영향도</th>
+                                        <th data-col="urgency" style="width:100px">긴급도</th>
+                                        <th data-col="actions" style="width:100px">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="iss-table-body"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="iss-empty" class="system-empty" role="status" aria-live="polite" style="display:none;">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">{{ tab99.empty_title|default('이슈 내역이 없습니다.') }}</h3>
+                                <p class="empty-desc">{{ tab99.empty_desc|default("우측 상단 '행 추가' 버튼으로 첫 이슈를 등록하세요.") }}</p>
+                            </div>
+                        </div>
+
+                        <div class="modern-pagination" id="iss-pagination">
+                            <div class="pagination-info"><span id="iss-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="iss-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="iss-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="iss-page-numbers"></div>
+                                <button class="pagination-btn" id="iss-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="iss-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+
+    <div id="iss-detail-modal" class="server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content iss-detail-content pv-detail-modal-content" role="dialog" aria-modal="true" aria-label="이슈 상세">
+            <div class="server-edit-header">
+                <div class="server-edit-title">
+                    <h3 id="iss-detail-title">이슈 상세</h3>
+                    <p class="server-edit-subtitle" id="iss-detail-subtitle">이슈 내용</p>
+                </div>
+                <button class="close-btn" type="button" id="iss-detail-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
+            <div class="pv-detail-tabs-row">
+                <div class="pv-detail-tabs" role="tablist" aria-label="이슈 상세 탭">
+                    <button type="button" class="server-detail-tab-btn active" data-iss-tab="info" role="tab">이슈정보</button>
+                    <button type="button" class="server-detail-tab-btn" data-iss-tab="cause" role="tab">원인분석</button>
+                    <button type="button" class="server-detail-tab-btn" data-iss-tab="action" role="tab">조치관리</button>
+                </div>
+            </div>
+
+            <div class="server-edit-body iss-detail-body pv-detail-modal-body">
+                <form id="iss-detail-form">
+                    <div class="pv-tab-pane active" data-iss-pane="info">
+                        <div class="form-section">
+                            <div class="form-grid tab99-grid-2">
+                                <div class="form-group">
+                                    <label class="form-label">상태</label>
+                                    <select class="form-input" name="status">
+                                        <option value="분석중">분석중</option>
+                                        <option value="조치중">조치중</option>
+                                        <option value="종료">종료</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">유형</label>
+                                    <select class="form-input" name="issue_type">
+                                        <option value="">선택</option>
+                                        <option value="장애">장애</option>
+                                        <option value="성능">성능</option>
+                                        <option value="보안">보안</option>
+                                        <option value="개선">개선</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">영향도</label>
+                                    <select class="form-input" name="impact">
+                                        <option value="">선택</option>
+                                        <option value="높음">높음</option>
+                                        <option value="중간">중간</option>
+                                        <option value="낮음">낮음</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">긴급도</label>
+                                    <select class="form-input" name="urgency">
+                                        <option value="">선택</option>
+                                        <option value="긴급">긴급</option>
+                                        <option value="일반">일반</option>
+                                        <option value="낮음">낮음</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-grid tab99-grid-1">
+                                <div class="form-group">
+                                    <label class="form-label">이슈내용</label>
+                                    <textarea class="form-input" name="content" rows="4" placeholder="이슈 내용을 입력하세요"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">업무명</label>
+                                    <div class="iss-work-toggle" id="iss-work-toggle">
+                                        <select id="iss-work-select" class="form-input tab99-work-select">
+                                            <option value="">업무 선택</option>
+                                        </select>
+                                        <div class="iss-work-chips" id="iss-work-chips"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pv-tab-pane" data-iss-pane="cause">
+                        <div class="form-section">
+                            <div class="form-grid tab99-grid-2">
+                                <div class="form-group"><label class="form-label">발생일시</label><input type="datetime-local" class="form-input" name="occurred_at"></div>
+                                <div class="form-group">
+                                    <label class="form-label">재발여부</label>
+                                    <select class="form-input" name="recurrence">
+                                        <option value="X">X</option>
+                                        <option value="O">O</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-grid tab99-grid-1">
+                                <div class="form-group"><label class="form-label">이슈원인</label><textarea class="form-input" name="cause" rows="3" placeholder="이슈 원인을 입력하세요"></textarea></div>
+                                <div class="form-group"><label class="form-label">분석결과</label><textarea class="form-input" name="analysis" rows="3" placeholder="분석 결과를 입력하세요"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pv-tab-pane" data-iss-pane="action">
+                        <div class="form-section">
+                            <div class="form-grid tab99-grid-2">
+                                <div class="form-group"><label class="form-label">조치일시</label><input type="datetime-local" class="form-input" name="action_at"></div>
+                                <div class="form-group"><label class="form-label">완료일시</label><input type="datetime-local" class="form-input" name="completed_at"></div>
+                            </div>
+                            <div class="form-grid tab99-grid-2">
+                                <div class="form-group"><label class="form-label">담당자</label><input type="text" class="form-input" name="person" placeholder="담당자"></div>
+                                <div class="form-group">
+                                    <label class="form-label">임시조치</label>
+                                    <select class="form-input" name="is_temporary">
+                                        <option value="X">X</option>
+                                        <option value="O">O</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-grid tab99-grid-1">
+                                <div class="form-group"><label class="form-label">조치내용</label><textarea class="form-input" name="action_content" rows="4" placeholder="조치 내용을 입력하세요"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="iss-detail-save">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% set dlm_modal_id = 'iss-download-modal' %}
+    {% set dlm_title_id = 'iss-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle = '' %}
+    {% set dlm_close_id = 'iss-download-close' %}
+    {% set dlm_confirm_id = 'iss-download-confirm' %}
+    {% set dlm_primary_message = '다운로드 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'iss-dl-range' %}
+    {% set dlm_row_all_id = 'iss-download-row-all' %}
+    {% set dlm_row_selected_id = 'iss-download-row-selected' %}
+    {% set dlm_all_id = 'iss-download-range-all' %}
+    {% set dlm_selected_id = 'iss-download-range-selected' %}
+    {% set dlm_all_label = '전체' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_alt = '다운로드 안내' %}
+    {% set dlm_modal_class = 'server-edit-modal system-download-modal modal-overlay-full bls-download-modal bls-download-modal--range' %}
+    {% set dlm_content_class = 'server-edit-content' %}
+    {% set dlm_header_class = 'server-edit-header' %}
+    {% set dlm_title_wrap_class = 'server-edit-title' %}
+    {% set dlm_body_class = 'server-edit-body' %}
+    {% set dlm_actions_class = 'server-edit-actions align-right' %}
+    {% include 'layouts/_download_modal_range.html' %}
+</body>
+</html>

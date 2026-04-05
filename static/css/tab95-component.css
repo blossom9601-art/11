@@ -1,0 +1,228 @@
+/*
+ * tab95-component.css — 컴포넌트 탭 공통 스타일
+ * ──────────────────────────────────────────────
+ * 모든 상세 페이지의 "컴포넌트" 탭이 이 단일 스타일시트를 사용한다.
+ *
+ * ★ 디자인 토큰 (CSS 변수)
+ *   페이지별 미세 차이를 방지하기 위해 모든 수치·색상을
+ *   변수로 관리한다. 개별 페이지 CSS에서 이 변수를
+ *   덮어쓰지 마세요.
+ *
+ * ★ 주의
+ *   - 이 파일 외부에서 .tab95-*, .t95-* 클래스를 재정의하지 마세요.
+ *   - font-family 지정 금지 (시스템 기본 sans-serif 사용).
+ */
+
+/* ================================================================
+   1. 디자인 토큰 / CSS 변수
+   ================================================================ */
+.tab95-component-root {
+    /* ── 레이아웃 ── */
+    --t95-section-gap: 24px;
+    --t95-outer-pad: 0;
+    --t95-header-h: 40px;
+
+    /* ── 테이블 (light theme — detail.css .hw-table과 동일 톤) ── */
+    --t95-table-border: #f3f4f6;
+    --t95-table-radius: 8px;
+    --t95-th-bg: #f8fafc;
+    --t95-th-color: #374151;
+    --t95-th-font-size: 12px;
+    --t95-td-font-size: 13px;
+    --t95-row-h: 40px;
+    --t95-hover-bg: #f9fafb;
+    --t95-selected-bg: rgba(99, 102, 241, 0.08);
+    --t95-selected-border: rgba(99, 102, 241, 0.25);
+
+    /* ── 빈 상태 ── */
+    --t95-empty-icon-size: 64px;
+    --t95-empty-title-size: 15px;
+    --t95-empty-desc-size: 13px;
+    --t95-empty-color: #9ca3af;
+    --t95-empty-pad-y: 48px;
+
+    /* ── 페이지네이션 ── */
+    --t95-pgn-gap: 4px;
+    --t95-pgn-btn-size: 32px;
+    --t95-pgn-radius: 6px;
+    --t95-pgn-font-size: 13px;
+    --t95-pgn-active-bg: rgba(99, 102, 241, 0.15);
+    --t95-pgn-active-color: #6366f1;
+
+    /* ── 버튼 ── */
+    --t95-action-btn-size: 32px;
+    --t95-action-icon-size: 16px;
+    --t95-action-radius: 6px;
+    --t95-action-hover-bg: #f3f4f6;
+
+    /* ── 상태 점 ── */
+    --t95-dot-size: 10px;
+
+    /* ── 분석 차트 ── */
+    --t95-donut-size: 280px;
+    --t95-legend-gap: 8px;
+}
+
+/* ================================================================
+   2. 테이블 레이아웃
+   ================================================================ */
+.tab95-component-root .t95-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tab95-component-root .t95-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px 10px;
+    font-size: var(--t95-th-font-size);
+    font-weight: 600;
+    color: var(--t95-th-color);
+    background: var(--t95-th-bg);
+    border-bottom: 1px solid var(--t95-table-border);
+    text-align: left;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.tab95-component-root .t95-table thead th.sortable {
+    cursor: pointer;
+}
+.tab95-component-root .t95-table thead th.sortable:hover {
+    color: #111827;
+}
+.tab95-component-root .t95-table thead th.sort-asc::after {
+    content: ' \25B2';
+    font-size: 10px;
+    opacity: 0.6;
+}
+.tab95-component-root .t95-table thead th.sort-desc::after {
+    content: ' \25BC';
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+.tab95-component-root .t95-table thead th.col-chk {
+    width: 44px;
+    text-align: center;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+.tab95-component-root .t95-table tbody td:first-child {
+    text-align: center;
+    padding-left: 14px;
+    padding-right: 14px;
+}
+.tab95-component-root .t95-table input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent, #6366f1);
+    cursor: pointer;
+    margin: 0;
+}
+
+.tab95-component-root .t95-table tbody td {
+    padding: 6px 10px;
+    font-size: var(--t95-td-font-size);
+    color: #374151;
+    border-bottom: 1px solid var(--t95-table-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: var(--t95-row-h);
+    vertical-align: middle;
+}
+
+.tab95-component-root .t95-table tbody tr:hover td {
+    background: var(--t95-hover-bg);
+}
+
+.tab95-component-root .t95-table tbody tr.selected td {
+    background: var(--t95-selected-bg);
+    border-color: var(--t95-selected-border);
+}
+
+/* ================================================================
+   3. 빈 상태
+   ================================================================ */
+.tab95-component-root .t95-empty {
+    display: none;
+    padding: var(--t95-empty-pad-y) 0;
+    text-align: center;
+}
+
+.tab95-component-root .t95-empty .empty-icon-img {
+    width: var(--t95-empty-icon-size);
+    height: var(--t95-empty-icon-size);
+    opacity: 0.4;
+}
+
+.tab95-component-root .t95-empty .empty-title {
+    margin: 12px 0 4px;
+    font-size: var(--t95-empty-title-size);
+    color: var(--t95-empty-color);
+}
+
+.tab95-component-root .t95-empty .empty-desc {
+    font-size: var(--t95-empty-desc-size);
+    color: var(--t95-empty-color);
+    opacity: 0.7;
+}
+
+/* ================================================================
+   4. 상태 점 (업무상태, 계약상태)
+   ================================================================ */
+.tab95-component-root .t95-dot {
+    display: inline-block;
+    width: var(--t95-dot-size);
+    height: var(--t95-dot-size);
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+/* ================================================================
+   5. 페이지네이션 (system.css 서버 목록 페이지와 동일)
+   ================================================================ */
+.tab95-component-root .modern-pagination {
+    margin-top: 20px;
+}
+.tab95-component-root .modern-pagination .page-btn.active {
+    background: var(--accent, #6366f1);
+    border-color: var(--accent, #6366f1);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, .2);
+}
+.tab95-component-root .modern-pagination .page-btn.active:hover {
+    filter: brightness(1.03);
+}
+
+/* ================================================================
+   6. 액션 버튼 통일
+   ================================================================ */
+.tab95-component-root .detail-header-actions .add-btn-icon {
+    width: var(--t95-action-btn-size);
+    height: var(--t95-action-btn-size);
+    border-radius: var(--t95-action-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab95-component-root .detail-header-actions .add-btn-icon img {
+    width: var(--t95-action-icon-size);
+    height: var(--t95-action-icon-size);
+}
+.tab95-component-root .detail-header-actions .add-btn-icon:hover {
+    background: var(--t95-action-hover-bg);
+}
+.tab95-component-root .detail-header-actions .add-btn-icon:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ================================================================
+   7. 분석 차트 (모달 내부)
+   ================================================================ */
+/* 통계 분석 모달의 공통 프레임/도넛 범례 스타일은 bls-stats-modal.css에서 관리한다. */

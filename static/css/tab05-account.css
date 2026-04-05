@@ -1,0 +1,146 @@
+/* ──────────────────────────────────────────────────────────────
+ *  tab05-account.css  —  계정관리 탭 공통 디자인 토큰 & 스타일
+ *  모든 페이지에서 동일한 계정관리 UI를 보장하는 공통 CSS.
+ *  범위: .tab05-account-root 아래에서만 적용.
+ * ────────────────────────────────────────────────────────────── */
+
+/* ── 디자인 토큰(CSS 변수) ───────────────────────────────── */
+.tab05-account-root {
+    --am-accent:       #6366f1;
+    --am-accent-ring:  rgba(99, 102, 241, 0.12);
+    --am-danger:       #ef4444;
+    --am-danger-ring:  rgba(239, 68, 68, 0.15);
+    --am-selected-bg:  rgba(99, 102, 241, 0.06);
+    --am-border:       #e5e7eb;
+    --am-bg:           #fff;
+    --am-text:         #111827;
+    --am-text-muted:   #94a3b8;
+    --am-radius:       6px;
+    --am-control-h:    34px;
+}
+
+/* ── 상태 배지 ─────────────────────────────────────────── */
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--am-text);
+}
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex: 0 0 8px;
+}
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status--active   .am-status-dot { background: #6366F1; }
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status--inactive .am-status-dot { background: #9ca3af; }
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status--ghost    .am-status-dot { background: #8b5cf6; }
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status--exception .am-status-dot { background: #f59e0b; }
+.tab05-account-root #am-spec-table td[data-col="status"] .am-status--unknown   .am-status-dot { background: #60a5fa; }
+
+/* ── 입력 컨트롤 공통 ──────────────────────────────────── */
+.tab05-account-root #am-spec-table td[data-col] input.am-control,
+.tab05-account-root #am-spec-table td[data-col] select.am-control,
+.tab05-account-root #am-spec-table td[data-col] textarea.am-control {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    height: var(--am-control-h);
+    padding: 6px 10px;
+    border: 1px solid var(--am-border);
+    background: var(--am-bg);
+    border-radius: var(--am-radius);
+    box-shadow: none;
+}
+.tab05-account-root #am-spec-table td[data-col] input.am-control:focus,
+.tab05-account-root #am-spec-table td[data-col] select.am-control:focus,
+.tab05-account-root #am-spec-table td[data-col] textarea.am-control:focus {
+    outline: none;
+    border-color: var(--am-accent);
+    box-shadow: 0 0 0 3px var(--am-accent-ring);
+}
+.tab05-account-root #am-spec-table td[data-col] textarea.am-control {
+    height: auto;
+    min-height: var(--am-control-h);
+    resize: vertical;
+}
+.tab05-account-root #am-spec-table td[data-col] select.am-control {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-color: var(--am-bg);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+    background-position: right 10px center;
+    background-size: 14px 14px;
+    background-repeat: no-repeat;
+    padding-right: 32px;
+}
+.tab05-account-root #am-spec-table td[data-col] select.am-control::-ms-expand {
+    display: none;
+}
+
+/* ── 검색형 셀렉트 위젯 ───────────────────────────────── */
+.tab05-account-root #am-spec-table .fk-searchable-control {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+.tab05-account-root #am-spec-table .fk-searchable-control .fk-searchable-display {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: var(--am-control-h);
+    padding: 6px 32px 6px 10px;
+    border: 1px solid var(--am-border);
+    background-color: var(--am-bg);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+    border-radius: var(--am-radius);
+    box-sizing: border-box;
+    box-shadow: none;
+    min-height: auto;
+    font-size: inherit;
+    line-height: normal;
+}
+.tab05-account-root #am-spec-table .fk-searchable-control .fk-searchable-display::after {
+    content: none !important;
+    display: none !important;
+}
+.tab05-account-root #am-spec-table .fk-searchable-control .fk-searchable-display:focus {
+    outline: none;
+    border-color: var(--am-accent);
+    box-shadow: 0 0 0 3px var(--am-accent-ring);
+}
+.tab05-account-root #am-spec-table .fk-searchable-control .fk-searchable-clear {
+    height: var(--am-control-h);
+    border-radius: var(--am-radius);
+    right: 28px;
+}
+
+/* ── 행 선택 하이라이트 ────────────────────────────────── */
+.tab05-account-root #am-spec-table tbody tr.am-selected {
+    background: var(--am-selected-bg);
+}
+
+/* ── 삭제 버튼 강조 ───────────────────────────────────── */
+.tab05-account-root .am-delete-btn,
+.tab05-account-root .js-am-delete {
+    color: var(--am-danger);
+    border-color: var(--am-danger);
+}
+.tab05-account-root .am-delete-btn:hover,
+.tab05-account-root .js-am-delete:hover {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+/* ── 반응형 ────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .tab05-account-root #am-spec-table {
+        font-size: 13px;
+    }
+}

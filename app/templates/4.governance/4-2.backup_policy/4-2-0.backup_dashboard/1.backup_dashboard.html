@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/dashboard_add.css?v=20260318-4">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper backup-dashboard" id="backup-dashboard-root">
+			<div class="page-header">
+                    <div class="page-utility-right" data-info-key="governance.backup_policy"></div>
+				<h1>Backup Operations Console</h1>
+				<p>백업 정책 및 테이프 리소스 운영 현황을 실시간 모니터링합니다.</p>
+			</div>
+
+			<!-- System Status Bar -->
+			<div class="bk-status-bar" id="systemStatusBar">
+				<div class="bk-status-indicator" id="sysHealthIndicator">
+					<span class="bk-status-pulse green" id="sysHealthDot"></span>
+					<span id="sysHealthText">System Operational</span>
+				</div>
+				<span class="bk-status-sep"></span>
+				<span class="bk-status-meta">
+					<svg width="12" height="12" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					<span id="statusBarTime">-</span>
+				</span>
+				<span class="bk-status-sep"></span>
+				<span class="bk-status-meta" id="statusBarPolicyCount">Policies: -</span>
+				<span class="bk-status-sep"></span>
+				<span class="bk-status-meta" id="statusBarTapeCount">Tapes: -</span>
+			</div>
+			<!-- 시스템 탭 네비게이션 (동적 라우팅) -->
+			{% set tabs = [
+				('gov_backup_dashboard', '대시보드'),
+				('gov_backup_policy', '백업 정책'),
+				('gov_backup_tape', '백업 테이프'),
+				
+			] %}
+			<div class="system-tabs" role="tablist" aria-label="백업 정책 탭">
+				{% for key, label in tabs %}
+					<a class="system-tab-btn {% if current_key == key %}active{% endif %}"
+					   role="tab"
+					   aria-selected="{{ 'true' if current_key == key else 'false' }}"
+					   href="/p/{{ key }}">{{ label }}</a>
+				{% endfor %}
+			</div>
+
+			<!-- ① KPI 요약 카드 -->
+			<section class="bk-kpi-row" aria-label="정책 운영 KPI">
+				<div class="bk-kpi-card" id="kpi-total-policies">
+					<span class="bk-kpi-dot accent"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiTotalPolicies">0</span>
+						<span class="bk-kpi-label">전체 백업 정책</span>
+					</div>
+					<span class="bk-kpi-icon">
+						<svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					</span>
+				</div>
+				<div class="bk-kpi-card" id="kpi-daily">
+					<span class="bk-kpi-dot daily"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiDaily">0</span>
+						<span class="bk-kpi-label">Daily 정책</span>
+					</div>
+					<span class="bk-kpi-icon">
+						<svg width="22" height="22" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					</span>
+				</div>
+				<div class="bk-kpi-card" id="kpi-weekly">
+					<span class="bk-kpi-dot weekly"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiWeekly">0</span>
+						<span class="bk-kpi-label">Weekly 정책</span>
+					</div>
+					<span class="bk-kpi-icon">
+						<svg width="22" height="22" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					</span>
+				</div>
+				<div class="bk-kpi-card" id="kpi-monthly">
+					<span class="bk-kpi-dot monthly"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiMonthly">0</span>
+						<span class="bk-kpi-label">Monthly 정책</span>
+					</div>
+					<span class="bk-kpi-icon">
+						<svg width="22" height="22" fill="none" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" stroke-width="2"/></svg>
+					</span>
+				</div>
+				<div class="bk-kpi-card" id="kpi-tapes">
+					<span class="bk-kpi-dot tapes"></span>
+					<div class="bk-kpi-body">
+						<span class="bk-kpi-number" id="kpiTotalTapes">0</span>
+						<span class="bk-kpi-label">전체 테이프</span>
+					</div>
+					<span class="bk-kpi-icon">
+						<svg width="22" height="22" fill="none" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="12" r="2" stroke="currentColor" stroke-width="2"/><path d="M10 12h4" stroke="currentColor" stroke-width="2"/></svg>
+					</span>
+				</div>
+			</section>
+
+			<!-- ② Next Backup Schedule -->
+			<div class="bk-section-label"><span>Schedule</span><div class="bk-section-line"></div></div>
+			<section class="bk-card bk-schedule-card" aria-label="다음 백업 스케줄">
+				<div class="bk-card-header">
+					<span class="bk-card-dot accent"></span>
+					<h2>다음 백업 스케줄</h2>
+					<div class="bk-schedule-countdown" id="scheduleCountdown"></div>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="bk-schedule-timeline" id="scheduleTimeline">
+					<div class="canvas-loading">스케줄 데이터를 불러오는 중...</div>
+				</div>
+			</section>
+
+			<!-- ③ 최근 정책 실행 분포 그래프 -->
+			<div class="bk-section-label"><span>Analytics</span><div class="bk-section-line"></div></div>
+			<section class="bk-card bk-chart-full" aria-label="최근 정책 실행 분포">
+				<div class="bk-card-header">
+					<span class="bk-card-dot accent"></span>
+					<h2 id="policy-hourly-title">최근 정책 실행 분포</h2>
+					<div class="control-inline">
+						<label for="policyWindow" class="vh">기간 필터</label>
+						<select id="policyWindow" class="select-unit" aria-label="기간 필터 선택">
+							<option value="24h" selected>24시간</option>
+							<option value="7d">7일</option>
+							<option value="30d">30일</option>
+						</select>
+					</div>
+				</div>
+				<div class="bk-card-divider"></div>
+				<div class="chart-wrap h-420">
+					<canvas id="policyHourlyWeekChart" role="img" aria-label="최근 기간 동안 시간대 단위로 본 백업 정책 실행 누적 분포"></canvas>
+				</div>
+				<div class="chart-legend" id="policyLegend"></div>
+				<div class="chart-desc" id="policyHourlyDesc">스케줄(Daily/Weekly/Monthly)과 시작시간 기반 분포. 기간 필터를 통해 24시간, 7일, 30일 단위로 확인할 수 있습니다.</div>
+			</section>
+
+			<!-- ④ 3-Column Resource 카드 -->
+			<div class="bk-section-label"><span>Resources</span><div class="bk-section-line"></div></div>
+			<section class="bk-triple-grid" aria-label="리소스 운영 상태">
+				<!-- Tape Status Distribution -->
+				<article class="bk-card" aria-labelledby="tape-status-title">
+					<div class="bk-card-header">
+						<span class="bk-card-dot accent"></span>
+						<h2 id="tape-status-title">테이프 상태 분포</h2>
+					</div>
+					<div class="bk-card-divider"></div>
+					<div class="chart-wrap h-260">
+						<canvas id="tapeStatusChart" role="img" aria-label="테이프 상태 분포"></canvas>
+					</div>
+					<div class="chart-desc">Active, Available, Expired, Error 상태별 테이프 분포</div>
+				</article>
+				<!-- Expiration Distribution -->
+				<article class="bk-card" aria-labelledby="tape-expiry-title">
+					<div class="bk-card-header">
+						<span class="bk-card-dot warning"></span>
+						<h2 id="tape-expiry-title">만료 예정 분포</h2>
+					</div>
+					<div class="bk-card-divider"></div>
+					<div class="bk-expiry-info">테이프 만료 예정 분포</div>
+					<div class="chart-wrap h-260">
+						<canvas id="tapeExpiryBucketChart" role="img" aria-label="만료 예정 구간별 테이프 수량"></canvas>
+					</div>
+					<div class="chart-desc">만료일 기준 ≤7일, 8~30일, 31~60일, 60일 초과 구간 분포</div>
+				</article>
+				<!-- Library Capacity Usage -->
+				<article class="bk-card" aria-labelledby="library-usage-title">
+					<div class="bk-card-header">
+						<span class="bk-card-dot info"></span>
+						<h2 id="library-usage-title">라이브러리 용량 사용</h2>
+					</div>
+					<div class="bk-card-divider"></div>
+					<div class="bk-capacity-summary" id="capacitySummary"></div>
+					<div class="chart-wrap h-260">
+						<canvas id="libraryUsageChart" role="img" aria-label="라이브러리별 용량 사용"></canvas>
+					</div>
+					<div class="bk-capacity-pct" id="capacityPct"></div>
+					<div class="chart-desc">라이브러리별 총 백업 용량 (TB/GB 자동 변환)</div>
+				</article>
+			</section>
+
+			<!-- ⑤ Footer 운영 정보 -->
+			<footer class="bk-dashboard-footer" aria-label="운영 정보">
+				<div class="bk-footer-inner">
+					<span class="bk-footer-title">Backup Operations Console v2.1</span>
+					<span class="bk-footer-sep">|</span>
+					<span>Last Refresh : <span id="footerRefreshTime">-</span></span>
+					<span class="bk-footer-sep">|</span>
+					<span>Engine : Veritas NetBackup</span>
+				</div>
+			</footer>
+
+			<noscript><div class="chart-placeholder" aria-hidden="true">차트를 보려면 JavaScript 를 활성화하세요.</div></noscript>
+		</div>
+	</main>
+
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+	<script src="/static/js/4.governance/4-2.backup_policy/4-2-0.backup_dashboard/1.backup_dashboard.js?v=20260318-3"></script>
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

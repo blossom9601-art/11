@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab45-communication.css?v=1.0">
+    <script defer src="/static/js/4.governance/4-4.vpn_policy/4-4-1.vpn/2.vpn_detail.js?v=1.2"></script>
+    <script defer src="/static/js/layouts/tab45-communication.js?v=1.0"></script>
+</head>
+<body class="page-vpn-communication" data-gov-detail-id="{{ gov_detail_id or '' }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    
+    <main class="main-content">
+        <div class="content-wrapper">
+            <a href="{{ url_for('pages.show', key=vpn_base) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '기관명' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '프로토콜' }}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key=vpn_base + '_detail') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_manager') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_manager' %}active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_communication') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_communication' %}active{% endif %}">통신정책</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_vpn_policy') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_vpn_policy' %}active{% endif %}">상세설정</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_log') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key=vpn_base + '_file') }}" class="server-detail-tab-btn {% if current_key == vpn_base + '_file' %}active{% endif %}">구성/파일</a>
+            </div>
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="hw-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <button class="add-btn-icon" id="hw-row-add" title="행 추가" type="button" aria-label="행 추가">
+                        <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                    </button>
+                    <div class="detail-section">
+                        <h3>
+                            VPN 통신정책
+                            <div class="page-size-selector" aria-label="보기 개수">
+                                <label for="hw-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="hw-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="table-wrap">
+                            <table class="hw-table" id="hw-spec-table" data-context="communication">
+                                <colgroup>
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="actions-col">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th colspan="8">자사정보</th>
+                                        <th></th>
+                                        <th colspan="3">기관정보</th>
+                                        <th></th>
+                                    </tr>
+                                    <tr>
+                                        <th>구분</th>
+                                        <th>회선</th>
+                                        <th>업무명</th>
+                                        <th>REAL IP</th>
+                                        <th>L4 IP</th>
+                                        <th>NAT IP</th>
+                                        <th>PORT</th>
+                                        <th>VPN IP</th>
+                                        <th>방향</th>
+                                        <th>VPN IP</th>
+                                        <th>N/W IP</th>
+                                        <th>PORT</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite" hidden>
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">통신정책 항목이 없습니다.</h3>
+                                <p class="empty-desc">우측 상단 '추가' 버튼으로 첫 항목을 등록하세요.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="hw-pagination">
+                            <div class="pagination-info"><span id="hw-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="hw-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="hw-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="hw-page-numbers"></div>
+                                <button class="pagination-btn" id="hw-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="hw-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+        {% set dlm_modal_id = 'hw-download-modal' %}
+    {% set dlm_title_id = 'hw-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle_id = 'hw-download-subtitle' %}
+    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'hw-download-close' %}
+    {% set dlm_confirm_id = 'hw-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'hw-csv-range' %}
+    {% set dlm_row_all_id = 'hw-csv-range-row-all' %}
+    {% set dlm_row_selected_id = 'hw-csv-range-row-selected' %}
+    {% set dlm_all_id = 'hw-csv-range-all' %}
+    {% set dlm_selected_id = 'hw-csv-range-selected' %}
+    {% set dlm_all_label = '전체 결과' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
+    {% set dlm_illustration_alt = 'Research Illustration' %}
+    {% include 'layouts/_download_modal_range.html' %}
+</body>
+</html>

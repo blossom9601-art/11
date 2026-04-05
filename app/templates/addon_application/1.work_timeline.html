@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+  <link rel="stylesheet" href="/static/css/addon_application.css?v=20250920-12">
+</head>
+<body>
+<div class="wrap">
+  <!-- 전광판 공지 바 (페이지 전용) -->
+  <section class="ticker" aria-label="Announcement Ticker: 공지 전광판">
+    <div class="ticker-body">
+      <div class="track" id="track"></div>
+    </div>
+  </section>
+
+  <!-- 작업 타임라인 페이지 전용 헤더 (기존 브랜드/필터 영역 유지) -->
+  <section class="page-header" aria-label="작업 타임라인 머리글">
+    <div class="brand">
+      <img class="logo" src="/static/image/logo/blossom_logo_dark.png" alt="Blossom 로고">
+      <h1>작업 타임라인</h1>
+    </div>
+    <div class="controls">
+      <select id="timeRange" class="input time-sel" title="시간 범위">
+        <option value="6">6시간</option>
+        <option value="12">12시간</option>
+        <option value="18">18시간</option>
+        <option value="24" selected>24시간</option>
+        <option value="32">32시간</option>
+        <option value="48">48시간</option>
+        <option value="54">54시간</option>
+      </select>
+      <div class="dropdown" id="deptDrop">
+        <button class="button drop-btn" id="deptBtn">
+          <span id="deptBtnLabel">부서 선택 </span>
+          <span class="chev">▾</span>
+        </button>
+        <div class="menu" id="deptMenu">
+          <div class="hdr center">
+            <div class="act">
+              <button id="selectAll" class="button sm">전체선택</button>
+              <button id="clearAll" class="button sm">전체 해제</button>
+            </div>
+          </div>
+          <div id="deptList"></div>
+          <div class="foot">
+            <span class="pill" id="selCount">0 선택됨</span>
+          </div>
+        </div>
+      </div>
+      <span id="clock" class="pill"></span>
+      <div style="margin-left:auto"></div>
+      <button id="openTickerSettings" class="icon-btn" title="전광판 설정" aria-label="전광판 설정">
+        <img src="/static/image/svg/free-icon-font-dashboard-monitor.svg" alt="전광판 설정">
+      </button>
+    </div>
+  </section>
+
+  <main>
+    <section class="panel">
+      <div class="hd">
+        <h2>IT인프라 작업통제</h2>
+        <div class="legend">
+          <span class="dot pending"></span><span>예비작업</span>
+          <span class="dot progress"></span><span>현재작업</span>
+          <span class="dot done"></span><span>종료작업</span>
+        </div>
+      </div>
+      <div class="content">
+        <div class="timelineWrap">
+          <!-- 전체 높이 NOW 라인 -->
+          <div class="now-line-full" id="nowLineFull"></div>
+          <div class="timelineHead">
+            <div class="th-left">부서 (작업자)</div>
+            <div class="th-scroll" id="headScroll">
+              <div class="th-grid" id="ticksTop">
+                <div class="now-chip" id="nowChip">NOW(현재작업)</div>
+              </div>
+            </div>
+          </div>
+          <div class="timelineBody" id="tlBody">
+            <div class="y-col" id="ycol"></div>
+            <div class="body-scroll" id="bodyScroll">
+              <div class="grid-col" id="gridcol">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="t">예비작업 (Pending: 대기)</div><div class="v" id="kpiPending">0</div></div>
+          <div class="kpi"><div class="t">현재작업 (In Progress: 진행)</div><div class="v" id="kpiProgress">0</div></div>
+          <div class="kpi"><div class="t">종료작업 (Completed: 완료)</div><div class="v" id="kpiDone">0</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 모달: 전광판 설정 -->
+<div class="modal-backdrop" id="modalBg"></div>
+<div class="modal" id="tickerModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
+  <div class="modal-card">
+    <div class="modal-hd">
+      <div>
+        <div id="modalTitle"><strong>전광판 설정</strong></div>
+        <div id="modalDesc" class="small">속도, 일시정지, 메시지를 관리하세요.</div>
+      </div>
+      <button id="closeModal" class="icon-btn" title="닫기" aria-label="닫기">
+        <img src="/static/image/svg/cancel.svg" alt="닫기">
+      </button>
+    </div>
+    <div class="modal-controls">
+      <div class="row">
+        <label for="speedSel" class="small">속도</label>
+        <select id="speedSel" class="input">
+          <option value="50">느림</option>
+          <option value="35" selected>보통</option>
+          <option value="12">빠름</option>
+        </select>
+        <button id="pauseBtn" class="icon-btn" title="일시정지" aria-label="일시정지">
+          <img id="pauseIcon" src="/static/image/svg/stop.svg" alt="일시정지">
+        </button>
+        <span id="pausedState" class="small"></span>
+      </div>
+      <div class="row msg-head" style="justify-content:space-between">
+        <div class="small">메시지 목록</div>
+        <div>
+          <button id="addBtn" class="icon-btn" title="추가" aria-label="추가">
+            <img src="/static/image/svg/add.svg" alt="추가">
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-bd">
+      <table id="msgTable" aria-label="Ticker Messages Table: 전광판 메시지 표">
+        <thead>
+          <tr>
+            <th style="width:80px">우선순위</th>
+            <th style="width:120px">심각도</th>
+            <th>메시지</th>
+            <th style="width:100px">관리</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="modal-ft">
+      <span class="small">변경 사항은 즉시 적용됩니다.</span>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script src="/static/js/addon_application/1.work_timeline.js?v=20260228c"></script>
+</body>
+</html>

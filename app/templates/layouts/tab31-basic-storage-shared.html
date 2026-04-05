@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <!--
+        tab31-basic-storage-shared.html — 스토리지 구성정보 탭 공통 템플릿
+        ────────────────────────────────────────────────────────────────────
+        모든 스토리지 상세 페이지의 "구성정보" 탭이 이 단일 템플릿을 사용한다.
+        페이지별 차이는 Jinja 컨텍스트 변수로 주입:
+
+        [공통 — pages.py 에서 자동 설정]
+          title          : 페이지 제목
+          subtitle       : 페이지 부제
+          back_key       : 뒤로가기 대상 라우트 키
+          back_label     : 뒤로가기 버튼 라벨
+          tabs           : [{key, label}, ...] 탭 목록
+          current_key    : 현재 활성 탭 키
+
+        [설정값 — data-* 속성으로 JS에 전달]
+          tab31_scope_key    : 스토리지 범위 키 (san / ptl)
+          tab31_api_base     : API 기본 경로
+          tab31_asset_prefix : sessionStorage 키 prefix
+          tab31_list_path    : 목록 페이지 경로 (리다이렉트 용)
+
+        주의: 이 파일을 복사/수정하지 마세요. 스타일/동작 변경은
+              tab31-basic-storage.css / tab31-basic-storage.js 에서만 수행합니다.
+    -->
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab31-basic-storage.css?v=2.1">
+    <script src="/static/js/_detail/tab31-basic-storage.js?v=15"></script>
+</head>
+<body class="page-storage-basic-tab">
+    <!-- 공통 헤더 & 사이드바 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <!-- Main Content -->
+    <main class="main-content tab31-basic-root"
+          data-scope-key="{{ tab31_scope_key|default('') }}"
+          data-api-base="{{ tab31_api_base|default('') }}"
+          data-asset-prefix="{{ tab31_asset_prefix|default('') }}"
+          data-list-path="{{ tab31_list_path|default('') }}">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <!-- 페이지 타이틀 / 서브타이틀 -->
+            <div class="page-header">
+                <h1 id="detail-title">{{ title or '-' }}</h1>
+                <p id="detail-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            <!-- 상세 탭 네비게이션 -->
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn {% if current_key == t.key %}active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- 구성정보 컨텐츠 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="구성정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+
+                    <div class="detail-section">
+                        <h3>구성정보</h3>
+                        <div class="basic-info-grid grid-1-1">
+                            <!-- 구성정보 카드 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>구성정보</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>전체 물리적 용량</label><span class="info-value" id="bs-physical-total">-</span></div>
+                                    <div class="info-row"><label>전체 논리적 용량</label><span class="info-value" id="bs-logical-total">-</span></div>
+                                    <div class="info-row"><label>RAID 레벨</label><span class="info-value" id="bs-raid-level">-</span></div>
+                                    <div class="info-row"><label>할당 용량</label><span class="info-value" id="bs-allocated-total">-</span><span class="info-pct" id="bs-allocated-pct"></span></div>
+                                    <div class="info-row"><label>미할당 용량</label><span class="info-value" id="bs-unallocated-total">-</span><span class="info-pct" id="bs-unallocated-pct"></span></div>
+                                    <div class="info-row"><label>캐시 메모리 용량</label><span class="info-value" id="bs-cache-memory">-</span></div>
+                                    <div class="info-row"><label>할당 볼륨 수</label><span class="info-value" id="bs-volume-count">-</span></div>
+                                    <div class="info-row"><label>연결 호스트 수</label><span class="info-value" id="bs-host-count">-</span></div>
+                                </div>
+                            </div>
+
+                            <!-- 할당정보 (도넛 차트) -->
+                            <div class="basic-info-card" id="bs-allocation-card">
+                                <div class="basic-info-card-header">
+                                    <h4>할당정보</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="alloc-unified">
+                                        <div class="donut-multi" aria-label="할당 비율">
+                                            <div class="donut-center">
+                                                <div class="donut-title">할당 비율</div>
+                                                <div class="donut-total">-</div>
+                                            </div>
+                                        </div>
+                                        <ul class="alloc-legend" aria-label="업무그룹별 할당 내역"></ul>
+                                        <div class="alloc-nodata" hidden>
+                                            <div class="alloc-nodata-anim" aria-label="데이터 없음 애니메이션"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js"></script>
+
+    <!-- 구성정보 수정 모달 -->
+    <div id="bs-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title">
+                    <h3>구성정보 수정</h3>
+                    <p class="server-edit-subtitle">블록 스토리지 기본 구성을 수정합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="bs-edit-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-edit-body">
+                <form id="bs-edit-form">
+                    <div class="form-section">
+                        <div class="section-header"><h4>구성정보</h4></div>
+                        <div class="form-grid">
+                            <div class="form-row">
+                                <label for="bs-physical-total-input">전체 물리적 용량</label>
+                                <input id="bs-physical-total-input" class="form-input" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" spellcheck="false" placeholder="예: 102,400">
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-logical-total-input">전체 논리적 용량</label>
+                                <input id="bs-logical-total-input" class="form-input" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" spellcheck="false" placeholder="예: 83,968" data-max-field="#bs-physical-total-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-raid-level-input">RAID 레벨</label>
+                                <select id="bs-raid-level-input" class="form-input search-select">
+                                    <option value="">선택</option>
+                                    <option>RAID0</option>
+                                    <option>RAID1</option>
+                                    <option>RAID5</option>
+                                    <option>RAID6</option>
+                                    <option>RAID1+0</option>
+                                    <option>RAID0+1</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-allocated-total-input">할당 용량</label>
+                                <input id="bs-allocated-total-input" class="form-input input-metric" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" spellcheck="false" placeholder="자동 반영" readonly>
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-unallocated-total-input">미할당 용량</label>
+                                <input id="bs-unallocated-total-input" class="form-input input-metric" type="text" placeholder="자동 계산" readonly data-compute="logical - allocated">
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-cache-memory-input">캐시 메모리 용량</label>
+                                <input id="bs-cache-memory-input" class="form-input" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" spellcheck="false" placeholder="예: 768">
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-volume-count-input">할당 볼륨 수</label>
+                                <input id="bs-volume-count-input" class="form-input input-metric" type="number" min="0" step="1" placeholder="자동 반영" readonly>
+                            </div>
+                            <div class="form-row">
+                                <label for="bs-host-count-input">연결 호스트 수</label>
+                                <input id="bs-host-count-input" class="form-input input-metric" type="number" min="0" step="1" placeholder="자동 반영" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="bs-edit-save">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/contract.css?v=1.0.5">
+    <link rel="stylesheet" href="/static/css/capex_executive.css?v=20250715">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper" id="capex-dashboard-root">
+            <div class="page-header">
+                <h1>CAPEX 관리</h1>
+                <p>CAPEX(Capital Expenditure) <strong>대시보드</strong> (5개년 도입 현황)</p>
+            </div>
+
+            <div class="system-tabs-row">
+                <div class="system-tabs" role="tablist" aria-label="비용관리 CAPEX 탭">
+                    {% set tabs = [
+                        ('cost_capex_dashboard','대시보드'),
+                        ('cost_capex_contract','도입계약'),
+                    ] %}
+                    {% for key,label in tabs %}
+                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+                <div class="year-filter-wrap">
+                    <select id="yearFilter" class="year-filter-select" aria-label="연도 필터">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Executive Dashboard -->
+            <div class="exec-dashboard">
+
+                <!-- ── KPI Cards ── -->
+                <section class="kpi-grid" aria-label="핵심 KPI">
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-total">총 CAPEX (5개년)</span>
+                            <span class="kpi-value" id="kpi-total">-</span>
+                            <span class="kpi-sub" id="kpi-total-count">-</span>
+                        </div>
+                        <div class="kpi-icon indigo"><img src="/static/image/svg/free-icon-font-usd-circle.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-this-year">올해 집행</span>
+                            <span class="kpi-value" id="kpi-this-year">-</span>
+                            <span class="kpi-sub" id="kpi-this-year-count">-</span>
+                        </div>
+                        <div class="kpi-icon emerald"><img src="/static/image/svg/free-icon-font-money-income.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-yoy">전년 대비</span>
+                            <span class="kpi-value" id="kpi-yoy-amount">-</span>
+                            <span class="kpi-sub">YoY 증감률 <span class="kpi-badge flat" id="kpi-yoy">-</span></span>
+                        </div>
+                        <div class="kpi-icon amber"><img src="/static/image/svg/free-icon-font-chart-line-up.svg" alt=""></div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-card-body">
+                            <span class="kpi-label" id="kpi-label-qoq">분기 대비</span>
+                            <span class="kpi-value" id="kpi-qoq-amount">-</span>
+                            <span class="kpi-sub" id="kpi-qoq-label">QoQ 증감률 <span class="kpi-badge flat" id="kpi-qoq">-</span></span>
+                        </div>
+                        <div class="kpi-icon rose"><img src="/static/image/svg/free-icon-font-chart-pie.svg" alt=""></div>
+                    </div>
+                </section>
+
+                <!-- ── 계약 구분 (full-width stacked bar) ── -->
+                <section class="exec-card trend-section" aria-label="계약 구분">
+                    <div class="exec-card-title">계약 구분</div>
+                    <div class="trend-canvas-wrap">
+                        <canvas id="barDivision" role="img" aria-label="계약 구분"></canvas>
+                    </div>
+                    <div class="chart-legend" id="legend-division"></div>
+                </section>
+
+                <!-- ── Analysis 3-column ── -->
+                <section class="analysis-grid" aria-label="분석">
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">계약 유형</div>
+                        <div class="chart-wrap-inner"><canvas id="donutContractType" role="img" aria-label="계약 유형"></canvas></div>
+                        <div class="chart-legend" id="legend-contract-type"></div>
+                    </article>
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">공급업체</div>
+                        <div class="chart-wrap-inner"><canvas id="donutSupplier" role="img" aria-label="공급업체"></canvas></div>
+                        <div class="chart-legend" id="legend-supplier"></div>
+                    </article>
+                    <article class="exec-card analysis-card">
+                        <div class="exec-card-title">제조업체</div>
+                        <div class="chart-wrap-inner"><canvas id="donutMfr" role="img" aria-label="제조업체"></canvas></div>
+                        <div class="chart-legend" id="legend-mfr"></div>
+                    </article>
+                </section>
+
+            </div><!-- /exec-dashboard -->
+
+            <noscript><div class="chart-placeholder" aria-hidden="true">차트를 보려면 JavaScript 를 활성화하세요.</div></noscript>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js"></script>
+    <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+    <script src="/static/js/7.cost/7-2.capex/7-2-0.dashboard/capex_dashboard.js?v=20260215a"></script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.23">
+	<link rel="stylesheet" href="/static/css/quality_type.css?v=1.8.2">
+	<script src="/static/js/blossom.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/4.quality_type.js?v=20260302q" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<h1>설정</h1>
+				<p>서비스 품질 측정을 위한 품질유형·항목·지표를 관리합니다.</p>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<!-- 탭 콘텐츠: 온프레미스 스타일 -->
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="qt-list-pane">
+					<!-- 탭 헤더 (툴바) -->
+					<div class="tab-header">
+						<div class="tab-header-left">
+							<h2>품질유형 <span class="count-badge" id="qt-count">0</span></h2>
+						</div>
+						<div class="tab-header-right">
+							<div class="search-container" role="search">
+								<div class="search-input-wrapper" id="qt-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="qt-search" placeholder="검색" class="search-input" aria-label="품질유형 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="qt-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+								</div>
+							</div>
+							<div class="page-size-selector compact" id="qt-page-size-wrapper">
+								<select id="qt-page-size" class="page-size-select" aria-controls="qt-table" aria-label="페이지 당 행 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<!-- 삭제 -->
+							<button class="header-btn" id="qt-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+								<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+							</button>
+							<!-- 업로드 -->
+							<button class="header-btn" id="qt-upload-btn" title="업로드" aria-label="엑셀 업로드">
+								<img src="/static/image/svg/list/free-icon-upload.svg" alt="업로드" class="header-icon">
+							</button>
+							<!-- CSV 다운로드 -->
+							<button class="header-btn" id="qt-download-btn" title="CSV 다운로드" aria-label="CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
+							<!-- 행 추가 -->
+							<button class="header-btn" id="qt-add-btn" title="추가" aria-label="행 추가">
+								<img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<!-- 테이블 -->
+					<div class="system-table-container server-table-container">
+						<table class="system-data-table server-data-table" id="qt-table">
+							<thead>
+								<tr>
+									<th style="width:40px"><input type="checkbox" id="qt-check-all" aria-label="전체 선택"></th>
+									<th data-col="group_name">그룹</th>
+									<th data-col="quality_type">품질유형</th>
+									<th data-col="item_name">항목</th>
+									<th data-col="metric">측정지표</th>
+									<th data-col="unit">단위</th>
+									<th data-col="target_value">기본목표값</th>
+									<th data-col="description">설명</th>
+									<th data-col="actions" style="width:80px">관리</th>
+								</tr>
+							</thead>
+							<tbody id="qt-tbody">
+								<!-- JS로 렌더링 -->
+							</tbody>
+						</table>
+					</div>
+
+					<!-- 빈 상태 (온프레미스 동일) -->
+					<div id="qt-empty" class="system-empty" hidden role="status" aria-live="polite">
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3>등록된 품질유형이 없습니다.</h3>
+							<p>우측 상단 '+' 버튼을 눌러 품질유형을 등록하세요.</p>
+						</div>
+					</div>
+					<!-- 페이지네이션 (온프레미스 동일) -->
+					<div class="modern-pagination" id="qt-pagination">
+						<div class="pagination-info"><span id="qt-pagination-info">0개 항목</span></div>
+						<div class="pagination-controls">
+							<button class="pagination-btn" id="qt-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+							<button class="pagination-btn" id="qt-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+							<div class="page-numbers" id="qt-page-numbers"></div>
+							<button class="pagination-btn" id="qt-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+							<button class="pagination-btn" id="qt-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<!-- 삭제처리 확인 모달 (온프레미스 동일) -->
+	<div id="qt-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title dispose-title">
+					<h3>삭제처리</h3>
+					<p class="server-add-subtitle" id="qt-delete-subtitle">선택된 0건의 항목을 정말 삭제처리하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" id="qt-delete-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p>삭제처리는 선택한 항목을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+						<p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+						<p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="qt-delete-confirm">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 업로드 모달 (온프레미스 동일) -->
+	<div id="qt-upload-modal" class="server-add-modal system-upload-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3>엑셀 업로드</h3>
+					<p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 품질유형을 등록합니다.</p>
+				</div>
+				<button class="close-btn" type="button" id="qt-upload-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body system-upload-body">
+				<div class="upload-dropzone" id="qt-upload-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+					<div class="upload-illu"><div id="qt-upload-anim" class="lottie-anim" aria-hidden="true"></div></div>
+					<div class="upload-text center">
+						<strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+					</div>
+					<input type="file" id="qt-upload-input" class="visually-hidden" accept=".xls,.xlsx" aria-hidden="true" />
+				</div>
+				<div class="upload-subinfo" aria-hidden="true">
+					<span class="sub-left">지원 가능한 확장자: XLS, XLSX</span>
+					<span class="sub-right">최대 파일 사이즈: 10 MB</span>
+				</div>
+				<div class="upload-meta" id="qt-upload-meta" hidden>
+					<div class="file-chip" id="qt-upload-file-chip" aria-live="polite"></div>
+				</div>
+				<div class="upload-progress" id="qt-upload-progress" hidden>
+					<div class="upload-progress-header">
+						<span class="upload-progress-label">업로드 진행중...</span>
+						<span class="upload-progress-pct" id="qt-upload-pct">0%</span>
+					</div>
+					<div class="upload-progress-track">
+						<div class="upload-progress-fill" id="qt-upload-fill" style="width:0%"></div>
+					</div>
+				</div>
+				<div class="upload-help">
+					<p class="upload-warning">엑셀업로드는 반드시 제공한 양식을 사용해야 합니다.<br>아래 양식을 다운로드한 뒤 작성하여 업로드 해주세요.</p>
+					<div class="template-card">
+						<div class="template-label"><img src="/static/image/svg/list/free-icon-excel.svg" alt="엑셀" class="template-icon">엑셀 업로드 양식</div>
+						<button type="button" class="btn-primary template-download-btn" id="qt-upload-template" aria-label="양식 다운로드">
+							<img src="/static/image/svg/list/free-icon-download.svg" alt="" class="template-icon" aria-hidden="true">
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="qt-upload-confirm" disabled>등록</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 추가 모달 (온프레미스 동일) -->
+	<div id="qt-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3>품질유형 등록</h3>
+					<p class="server-add-subtitle">품질유형 정보를 입력하세요.</p>
+				</div>
+				<button class="close-btn" type="button" id="qt-add-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="qt-add-form">
+					<div class="form-section">
+						<div class="section-header"><h4>품질유형 정보</h4></div>
+						<div class="form-grid">
+							<div class="form-row"><label>그룹</label><input name="group_name" class="form-input" placeholder="예: 가용성"></div>
+							<div class="form-row"><label>품질유형<span class="required">*</span></label><input name="quality_type" class="form-input" placeholder="예: 서비스 가용성" required></div>
+							<div class="form-row"><label>항목</label><input name="item_name" class="form-input" placeholder="예: 시스템 가동률"></div>
+							<div class="form-row"><label>측정지표</label><input name="metric" class="form-input" placeholder="예: 월간 가동시간/계획×100"></div>
+							<div class="form-row"><label>단위</label><input name="unit" class="form-input" placeholder="예: %"></div>
+							<div class="form-row"><label>기본목표값</label><input name="target_value" class="form-input" placeholder="예: 99.9"></div>
+							<div class="form-row form-row-wide"><label>설명</label><input name="description" class="form-input" placeholder="비고"></div>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="qt-add-save">등록</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 메시지 모달 (온프레미스 동일 — alert/toast 대체) -->
+	<div id="qt-message-modal" class="server-add-modal system-message-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="qt-message-title">알림</h3>
+				</div>
+				<button class="close-btn" type="button" id="qt-message-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p id="qt-message-content">메시지 내용</p>
+					</div>
+					<div class="message-illust">
+						<img src="/static/image/svg/list/free-sticker-solution.svg" alt="알림" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="qt-message-ok">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

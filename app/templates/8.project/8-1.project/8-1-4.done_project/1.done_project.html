@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/work.css">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="project.project_status"></div>
+                    <h1>프로젝트 관리</h1>
+                    <p>비우기 처리된 완료 프로젝트를 관리합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 -->
+                <div class="system-tabs" role="tablist" aria-label="작업 관리 탭">
+                    {% set tabs = [
+                        ('proj_status', '담당 프로젝트'),
+                        ('proj_participating', '참여 프로젝트'),
+                        ('proj_completed', '프로젝트 현황'),
+                        ('proj_cleared', '완료 프로젝트')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>완료 프로젝트 <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="프로젝트 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <button class="header-btn" id="system-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+                                    <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-restore-btn" title="복구" style="background:#6366F1;color:#fff;border-color:#6366F1;">
+                                    <img src="/static/image/svg/admin/free-icon-undo.svg" alt="복구" class="header-icon" style="filter:brightness(0) invert(1);" onerror="this.style.display='none'; this.parentElement.textContent='복구';">
+                                </button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th data-col="status">상태</th>
+                                        <th data-col="project_name">프로젝트 이름</th>
+                                        <th data-col="project_type">유형</th>
+                                        <th data-col="owner_dept">담당부서</th>
+                                        <th data-col="owner">담당자</th>
+                                        <th data-col="priority">우선순위</th>
+                                        <th data-col="start_date">시작일</th>
+                                        <th data-col="end_date">(예상)종료일</th>
+                                        <th data-col="progress">진행률</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State -->
+                        <div id="system-empty" class="system-empty system-empty--sticker" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">완료 프로젝트가 없습니다.</h3>
+                                <p id="system-empty-desc">담당/참여 프로젝트에서 비우기 처리된 프로젝트가 여기에 표시됩니다.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <div class="page-numbers" id="system-page-numbers"></div>
+                                <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script src="/static/js/blossom.js"></script>
+        <script>
+            window.__PROJ_COMPLETED_DETAIL_URL = "{{ url_for('pages.show', key='proj_completed_detail') }}";
+        </script>
+        <script src="/static/js/8.project/8-1.project/8-1-4.done_project/1.done_project.js?v=20260228a"></script>
+
+        <!-- 삭제처리 확인 모달 -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 프로젝트를 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 프로젝트를 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 복구 확인 모달 -->
+        <div id="restore-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>프로젝트 복구</h3>
+                        <p class="server-add-subtitle">선택한 프로젝트를 원래 칸반 보드로 복구합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="restore-modal-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p id="restore-modal-text">선택한 <strong id="restore-count">0</strong>개 프로젝트를 복구 하시겠습니까?</p>
+                            <p style="margin-top:6px; color:var(--text-tertiary); font-size:0.85rem;">복구 시 담당/참여 프로젝트 칸반 보드에 다시 표시됩니다.</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-research.svg" alt="Research" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="restore-modal-confirm">복구</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메시지 모달 -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

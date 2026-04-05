@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <!--
+        tab94-software-shared.html — 소프트웨어 탭 공통 컴포넌트
+        ─────────────────────────────────────────────────────────
+        모든 상세 페이지의 "소프트웨어" 탭이 이 단일 템플릿을 사용한다.
+        페이지별 차이는 Jinja 컨텍스트 변수로 주입:
+
+        [공통 — pages.py 에서 자동 설정]
+          title            : 페이지 제목 (h1)
+          subtitle         : 페이지 부제 (p)
+          back_key         : 뒤로가기 대상 라우트 키
+          back_label       : 뒤로가기 버튼 라벨
+          tabs             : [{key, label}, ...] 탭 목록
+          current_key      : 현재 활성 탭 키
+
+        [소프트웨어 전용 — tab94 딕셔너리로 전달]
+          tab94.data_context       : sw-model-assets / vendor-sw-assets / maint-sw-assets
+          tab94.section_title      : 섹션 제목 (e.g. "모델별 소프트웨어")
+          tab94.cols_class         : CSS 클래스 (cols-8 / cols-9 / cols-10)
+          tab94.columns            : [{key, label}, ...] 컬럼 정의
+          tab94.columns_json       : JS 전달용 JSON 문자열
+          tab94.empty_desc         : 비어있을 때 안내 문구
+          tab94.show_analytics     : 통계 분석 버튼 표시 여부
+          tab94.analytics_subtitle : 통계 모달 부제
+          tab94.analytics_group    : 통계 그루핑 키 (work_group / model)
+          tab94.csv_filename       : CSV 파일명 프리픽스
+
+        주의: 이 파일을 복사/수정하지 마세요. 스타일/동작 변경은
+              tab94-software.css / tab94-software.js 에서만 수행합니다.
+    -->
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab94-software.css?v=1.0">
+    <script defer src="/static/js/_detail/tab94-software.js?v=1.0"></script>
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper tab94-sw">
+            {# ── 뒤로가기 버튼 ── #}
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            {# ── 페이지 헤더 ── #}
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '소프트웨어' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '' }}</p>
+            </div>
+
+            {# ── 탭 네비게이션 (pages.py 에서 동적 생성) ── #}
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for tab in tabs %}
+                <a href="{{ url_for('pages.show', key=tab.key) }}"
+                   class="server-detail-tab-btn {{ 'active' if current_key == tab.key else '' }}">{{ tab.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# ── 소프트웨어 탭 콘텐츠 ── #}
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    {# 상단 액션 버튼 #}
+                    <div class="detail-header-actions" aria-label="소프트웨어 상단 동작">
+                        <button class="add-btn-icon" id="sw-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                        </button>
+                        {% if tab94.show_analytics %}
+                        <button class="add-btn-icon" id="sw-analytics-btn" title="통계 분석" type="button" aria-label="통계 분석">
+                            <img src="/static/image/svg/free-icon-font-analytics-magnifying-glass.svg" alt="통계 분석">
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    {# 메인 섹션 #}
+                    <div class="detail-section">
+                        <h3>
+                            {{ tab94.section_title or '소프트웨어' }}
+                            <div class="page-size-selector" aria-label="보기 개수">
+                                <label for="sw-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="sw-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+
+                        {# ── 데이터 테이블 ── #}
+                        <div class="table-wrap">
+                            <table class="hw-table {{ tab94.cols_class }} vendor-asset-table"
+                                   id="sw-spec-table"
+                                   data-context="{{ tab94.data_context }}"
+                                   data-columns='{{ tab94.columns_json }}'
+                                   data-show-analytics="{{ 'true' if tab94.show_analytics else 'false' }}"
+                                   data-analytics-group="{{ tab94.analytics_group or '' }}"
+                                   data-csv-filename="{{ tab94.csv_filename or 'software_assets' }}">
+                                <thead>
+                                    <tr>
+                                        <th class="col-chk"><input type="checkbox" id="sw-select-all" aria-label="전체 선택"></th>
+                                        {% for col in tab94.columns %}
+                                        <th data-sort-col="{{ col.key }}" class="sortable">{{ col.label }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        {# ── 빈 상태 ── #}
+                        <div id="sw-empty" class="system-empty" role="status" aria-live="polite" style="display:none;">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">소프트웨어 항목이 없습니다.</h3>
+                                <p class="empty-desc">{{ tab94.empty_desc or '해당 조건에 일치하는 소프트웨어 자산이 없습니다.' }}</p>
+                            </div>
+                        </div>
+
+                        {# ── 페이지네이션 ── #}
+                        <div class="modern-pagination" id="sw-pagination">
+                            <div class="pagination-info"><span id="sw-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="sw-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="sw-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="sw-page-numbers"></div>
+                                <button class="pagination-btn" id="sw-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="sw-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+
+    {# ══════════════════════════════════════════════════════════
+       CSV 다운로드 확인 모달 (모든 컨텍스트 공통)
+       ══════════════════════════════════════════════════════════ #}
+        {% set dlm_modal_id = 'sw-download-modal' %}
+    {% set dlm_title_id = 'sw-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle_id = 'sw-download-subtitle' %}
+    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'sw-download-close' %}
+    {% set dlm_confirm_id = 'sw-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'sw-csv-range' %}
+    {% set dlm_row_all_id = 'sw-csv-range-row-all' %}
+    {% set dlm_row_selected_id = 'sw-csv-range-row-selected' %}
+    {% set dlm_all_id = 'sw-csv-range-all' %}
+    {% set dlm_selected_id = 'sw-csv-range-selected' %}
+    {% set dlm_all_label = '전체 결과' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
+    {% set dlm_illustration_alt = 'Research Illustration' %}
+    {% include 'layouts/_download_modal_range.html' %}
+
+    {# ══════════════════════════════════════════════════════════
+       통계 분석 모달 (tab94.show_analytics 일 때만 렌더링)
+       ══════════════════════════════════════════════════════════ #}
+    {% if tab94.show_analytics %}
+    <div id="sw-analytics-modal" class="server-add-modal bls-stats modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sw-analytics-title">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="sw-analytics-title">소프트웨어 통계 분석</h3>
+                    <p class="server-add-subtitle" id="sw-analytics-subtitle">{{ tab94.analytics_subtitle or '구분별 유형 분포' }}</p>
+                </div>
+                <button class="close-btn" type="button" id="sw-analytics-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="vendor-analytics-body">
+                    <div class="va-tab-strip" id="sw-tab-strip"></div>
+                    <div class="va-tab-content" id="sw-tab-content"></div>
+                    <div class="vendor-analytics-empty" id="sw-analytics-empty" style="display:none;">
+                        <div class="empty-text">분석할 데이터가 없습니다.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="sw-analytics-ok">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</body>
+</html>

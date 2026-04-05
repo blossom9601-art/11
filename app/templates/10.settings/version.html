@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom - Version Management</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/doc_page.css?v=1.0.1">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="doc-page">
+
+                <h1 class="doc-page-title">Version Management</h1>
+                <p class="doc-page-subtitle">시스템 버전 정보 및 릴리즈 히스토리를 확인합니다.</p>
+
+                <!-- System Version Information -->
+                <section class="doc-section">
+                    <h2 class="doc-section-title">System Version Information</h2>
+                    <ul class="doc-def-list">
+                        <li>
+                            <div class="doc-def-term">Current Version</div>
+                            <div class="doc-def-desc" id="ver-version">—</div>
+                        </li>
+                        <li>
+                            <div class="doc-def-term">Release Date</div>
+                            <div class="doc-def-desc" id="ver-release-date">—</div>
+                        </li>
+                        <li>
+                            <div class="doc-def-term">Build</div>
+                            <div class="doc-def-desc" id="ver-build">—</div>
+                        </li>
+                        <li>
+                            <div class="doc-def-term">Environment</div>
+                            <div class="doc-def-desc" id="ver-environment">—</div>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Release Notes -->
+                <section class="doc-section" id="release-notes-container">
+                    <h2 class="doc-section-title">Release Notes</h2>
+                    <p class="version-loading">릴리즈 노트를 불러오는 중...</p>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis" defer></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/version.js?v=4.2.1" defer></script>
+</body>
+</html>

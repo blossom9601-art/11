@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/desk.css?v=3.12">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="project.ticket_status"></div>
+                    <h1>티켓 관리</h1>
+                    <p>티켓을 관리합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (확장 대비) -->
+                <div class="system-tabs" role="tablist" aria-label="작업 관리 탭">
+                    {% set tabs = [
+                        ('workflow_progress', '티켓 현황'),
+                        ('workflow_completed', '완료 티켓')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>완료 티켓 <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="티켓 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: HPE%가상). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <button class="header-btn danger-btn" id="system-delete-btn" title="선택 삭제">
+                                    <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-stats-btn" title="통계" aria-label="현재 결과 통계 보기">
+                                    <img src="/static/image/svg/list/free-icon-chart.svg" alt="통계" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
+                                <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th data-col="status">상태</th>
+                                        <th data-col="title">티켓 제목</th>
+                                        <th data-col="kind">유형</th>
+                                        <th data-col="task">분류</th>
+                                        <th data-col="priority">우선순위</th>
+                                        <th data-col="requester">요청자</th>
+                                        <th data-col="assignee">담당자</th>
+                                        <th data-col="due">기한</th>
+                                        <th data-col="actions">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State (테이블 헤더 아래, 페이지네이션 위) -->
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">티켓 내역이 없습니다.</h3>
+                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 티켓을 등록하세요.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <div class="page-numbers" id="system-page-numbers"></div>
+                                <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/8.project/8-3.desk/8-3-2.complete_ticket/1.workflow_list.js?v=20260224a"></script>
+
+        <!-- 티켓 등록 모달 (workflow_progress와 동일한 내용) -->
+        <div id="wf-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>티켓 등록</h3>
+                        <p class="server-add-subtitle">필수 정보를 입력하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="wf-add-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="wf-add-form">
+                        <div class="form-section">
+                            <div class="section-header"><h4>티켓 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row form-row-wide">
+                                    <label>제목<span class="required">*</span></label>
+                                    <input name="title" class="form-input" required maxlength="100" placeholder="티켓 제목">
+                                </div>
+                                <div class="form-row">
+                                    <label>유형</label>
+                                    <select name="kind" id="wf-kind" class="form-input search-select" data-placeholder="유형 선택">
+                                        <option value="">선택</option>
+                                        <option value="장애">장애</option>
+                                        <option value="요청">요청</option>
+                                        <option value="변경">변경</option>
+                                        <option value="유지보수">유지보수</option>
+                                        <option value="감사">감사</option>
+                                        <option value="문제">문제</option>
+                                        <option value="작업">작업</option>
+                                        <option value="점검">점검</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>분류</label>
+                                    <select name="task" id="wf-task" class="form-input search-select"
+                                            data-placeholder="분류 선택" data-empty-message="유형을 먼저 선택해 주세요.">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>우선순위<span class="required">*</span></label>
+                                    <select name="priority" class="form-input search-select" data-placeholder="우선순위 선택" required>
+                                        <option value="">선택</option>
+                                        <option value="긴급">긴급</option>
+                                        <option value="일반">일반</option>
+                                        <option value="낮음">낮음</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>기한<span class="required">*</span></label>
+                                    <input type="text" name="due" class="form-input date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off">
+                                </div>
+                                <div class="form-row">
+                                    <label>담당자<span class="required">*</span></label>
+                                    <div class="wf-select-toggle" id="wf-assignee-picker">
+                                        <div class="wf-select-wrap">
+                                            <input type="text" class="form-input" id="wf-assignee-input" placeholder="담당자 검색" autocomplete="off">
+                                            <div class="wf-select-dropdown" id="wf-assignee-dropdown" hidden></div>
+                                        </div>
+                                        <div class="wf-select-chips" id="wf-assignee-tags"></div>
+                                    </div>
+                                    <input type="hidden" name="assignee" id="wf-assignee-hidden">
+                                </div>
+                                <div class="form-row">
+                                    <label>대상</label>
+                                    <div class="wf-select-toggle" id="wf-target-picker">
+                                        <div class="wf-select-wrap">
+                                            <input type="text" class="form-input" id="wf-target-input" placeholder="장비/시스템 검색" autocomplete="off">
+                                            <div class="wf-select-dropdown" id="wf-target-dropdown" hidden></div>
+                                        </div>
+                                        <div class="wf-select-chips" id="wf-target-tags"></div>
+                                    </div>
+                                    <input type="hidden" name="target" id="wf-target-hidden">
+                                </div>
+                                <div class="form-row form-row-wide">
+                                    <label>세부내용</label>
+                                    <textarea name="detail" class="form-input textarea-large" rows="6" placeholder="세부내용"></textarea>
+                                </div>
+                                <div class="form-row form-row-wide">
+                                    <label for="wf-attachments">첨부파일</label>
+                                    <div class="attachment-field">
+                                        <input type="file" id="wf-attachments" name="attachments" class="visually-hidden" multiple>
+                                        <label for="wf-attachments" class="attachment-drop" id="wf-attachment-drop">
+                                            <div class="attachment-icon" aria-hidden="true">
+                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                    <polyline points="7 10 12 5 17 10" />
+                                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                                </svg>
+                                            </div>
+                                            <div class="attachment-copy">
+                                                <strong>파일을 업로드하려면 클릭하거나 끌어다 놓으세요</strong>
+                                                <span>최대 10개, 20MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</span>
+                                            </div>
+                                        </label>
+                                        <div class="attachment-actions">
+                                            <button type="button" class="attachment-clear" id="wf-attachment-clear" hidden>전체 삭제</button>
+                                        </div>
+                                        <ul class="attachment-list" id="wf-attachment-list" hidden></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="wf-add-save">등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- 티켓 수정 모달 -->
+        <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-edit-content">
+                <div class="server-edit-header">
+                    <div class="server-edit-title"><h3>티켓 수정</h3><p class="server-edit-subtitle">선택한 티켓 정보를 수정합니다.</p></div>
+                    <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <div class="server-edit-body">
+                    <form id="system-edit-form"><!-- 동적 채움 --></form>
+                </div>
+                <div class="server-edit-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컬럼 선택 모달 (온프레미스 시스템 페이지 스타일과 동일) -->
+        <div id="system-column-modal" class="server-add-modal system-column-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>컬럼 선택</h3>
+                        <p class="server-add-subtitle">표시할 컬럼을 선택하세요 (기본 열은 체크됨)</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-column-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-column-body">
+                    <form id="system-column-form"><!-- JS로 컬럼 체크박스 렌더링 --></form>
+                </div>
+                <div class="server-add-actions system-column-actions">
+                    <div class="action-buttons left">
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-reset">초기화</button>
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-selectall-btn">전체 선택</button>
+                    </div>
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-column-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- CSV 다운로드 확인 모달 -->
+        {% include 'layouts/_download_modal_range.html' %}
+
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+

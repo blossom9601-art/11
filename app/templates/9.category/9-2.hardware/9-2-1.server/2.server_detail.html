@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail3.css?v=1.6">
+    <script src="/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=4.10"></script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            <a href="{{ url_for('pages.show', key='cat_hw_server') }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '서버' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '' }}</p>
+            </div>
+
+            <!-- 하드웨어 상세 탭 네비게이션 -->            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='cat_hw_server_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_detail' else '' }}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='cat_hw_server_hardware') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_hardware' else '' }}">하드웨어</a>
+                <a href="{{ url_for('pages.show', key='cat_hw_server_log') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_log' else '' }}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='cat_hw_server_file') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_file' else '' }}">구성/파일</a>
+            </div>
+
+            <!-- 서버 상세 탭 컨텐츠 -->
+            <div class="server-detail-content" data-hw-id="{{ hw_id or '' }}" data-server-code="{{ server_code or '' }}">
+                <!-- 기본정보 탭 -->
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <!-- 기본정보 섹션 -->
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid">
+                            <!-- 서버 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>서버</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>모델명</label><span class="info-value" id="os-model">{{ title or '-' }}</span></div>
+                                    <div class="info-row"><label>제조사</label><span class="info-value" id="os-vendor">{{ subtitle or '-' }}</span></div>
+                                    {% set _hw_type = hw_type or '-' %}
+                                    <div class="info-row"><label>유형</label><span class="info-value" id="os-type">{{ '물리서버' if _hw_type == '서버' else _hw_type }}</span></div>
+                                    <div class="info-row"><label>릴리즈 일자</label><span class="info-value" id="os-release-date">{{ release_date or '-' }}</span></div>
+                                    <div class="info-row"><label>EOSL 일자</label><span class="info-value" id="os-eosl">{{ eosl or '-' }}</span></div>
+                                    <div class="info-row"><label>수량</label><span class="info-value" id="os-qty">{{ qty or '-' }}</span></div>
+                                    <div class="info-row"><label>비고</label><span class="info-value" id="os-note">{{ note or '-' }}</span></div>
+                                </div>
+                            </div>
+
+                            <!-- 상태 통계: 상태 기반 그래프 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>상태 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap">
+                                        <div class="pie-chart" id="stat-pie" aria-label="상태 분포 그래프" style="display:none"></div>
+                                        <ul class="pie-legend" id="stat-legend" style="display:none"></ul>
+                                    </div>
+                                    <p id="stat-empty" class="info-desc" style="display:none">상태 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+
+                            <!-- 운영 통계: 파이 차트 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>운영 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap">
+                                        <div class="pie-chart" id="group-pie" aria-label="운영 분포 그래프" style="display:none"></div>
+                                        <ul class="pie-legend" id="group-legend" style="display:none"></ul>
+                                    </div>
+                                    <p id="group-empty" class="info-desc" style="display:none">운영 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+    <!-- 서버 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true" data-modal>
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>서버 수정</h3><p class="server-edit-subtitle">선택한 서버 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" data-modal-close title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+    <!-- 메시지 모달 (alert 대체) -->
+    {% include 'layouts/_message_modal.html' %}
+
+
+<script>
+/* ========== HW MODAL DIAGNOSTIC ========== */
+(function(){
+  var D = '[hw-diag] ';
+  console.log(D + 'diagnostic script loaded');
+
+  // Wait for DOM
+  function runDiag(){
+    console.log(D + 'running diagnostic...');
+
+    var modal = document.getElementById('system-edit-modal');
+    var closeBtn = document.getElementById('system-edit-close');
+    var saveBtn = document.getElementById('system-edit-save');
+    var openBtn = document.getElementById('detail-edit-open');
+    var form = document.getElementById('system-edit-form');
+
+    console.log(D + 'modal: ' + (modal ? 'FOUND' : 'MISSING'));
+    console.log(D + 'openBtn: ' + (openBtn ? 'FOUND' : 'MISSING'));
+    console.log(D + 'closeBtn: ' + (closeBtn ? 'FOUND' : 'MISSING'));
+    console.log(D + 'saveBtn: ' + (saveBtn ? 'FOUND' : 'MISSING'));
+    console.log(D + 'form: ' + (form ? 'FOUND' : 'MISSING'));
+
+    if(openBtn) console.log(D + 'openBtn.onclick=' + typeof openBtn.onclick);
+    if(closeBtn) console.log(D + 'closeBtn.onclick=' + typeof closeBtn.onclick);
+    if(saveBtn) console.log(D + 'saveBtn.onclick=' + typeof saveBtn.onclick);
+
+    // Monitor ALL events on the save button
+    ['pointerdown','pointerup','mousedown','mouseup','click'].forEach(function(evType){
+      if(saveBtn) saveBtn.addEventListener(evType, function(e){
+        console.log(D + 'saveBtn got ' + evType + ' (bubbles=' + e.bubbles + ', defaultPrevented=' + e.defaultPrevented + ')');
+      }, false);
+      if(closeBtn) closeBtn.addEventListener(evType, function(e){
+        console.log(D + 'closeBtn got ' + evType + ' (bubbles=' + e.bubbles + ', defaultPrevented=' + e.defaultPrevented + ')');
+      }, false);
+    });
+
+    // Monitor capture phase on document
+    document.addEventListener('click', function(e){
+      var btn = e.target ? (e.target.closest ? e.target.closest('button') : null) : null;
+      if(btn && (btn.id === 'system-edit-save' || btn.id === 'system-edit-close')){
+        console.log(D + 'CAPTURE click on ' + btn.id + ' at document level');
+      }
+    }, true);
+
+    // Check computed styles of buttons
+    if(saveBtn){
+      var cs = window.getComputedStyle(saveBtn);
+      console.log(D + 'saveBtn computedStyle: pointerEvents=' + cs.pointerEvents + ', visibility=' + cs.visibility + ', display=' + cs.display + ', opacity=' + cs.opacity + ', zIndex=' + cs.zIndex);
+    }
+
+    // Check if any element covers the save button
+    if(modal && modal.classList.contains('show') && saveBtn){
+      var rect = saveBtn.getBoundingClientRect();
+      var cx = rect.left + rect.width/2;
+      var cy = rect.top + rect.height/2;
+      var topEl = document.elementFromPoint(cx, cy);
+      console.log(D + 'elementFromPoint at saveBtn center: ' + (topEl ? (topEl.tagName + '#' + topEl.id + '.' + topEl.className) : 'null'));
+    }
+
+    // Monitor modal open to re-check after opening
+    if(modal){
+      new MutationObserver(function(mutations){
+        mutations.forEach(function(m){
+          if(m.attributeName === 'class' && modal.classList.contains('show')){
+            console.log(D + 'MODAL OPENED — re-checking...');
+            setTimeout(function(){
+              console.log(D + 'saveBtn.onclick=' + typeof (saveBtn||{}).onclick);
+              console.log(D + 'closeBtn.onclick=' + typeof (closeBtn||{}).onclick);
+              // Check element coverage
+              if(saveBtn){
+                var r = saveBtn.getBoundingClientRect();
+                var cx = r.left + r.width/2;
+                var cy = r.top + r.height/2;
+                var topEl = document.elementFromPoint(cx, cy);
+                console.log(D + 'elementFromPoint at saveBtn center: ' + (topEl ? (topEl.tagName + '#' + topEl.id + '.' + topEl.className) : 'null'));
+                // Check if the hit element is the save button itself or its descendant
+                if(topEl !== saveBtn && !saveBtn.contains(topEl)){
+                  console.error(D + 'BLOCKED! Save button is COVERED by: ' + topEl.tagName + '#' + topEl.id + '.' + topEl.className);
+                  console.error(D + 'Blocker zIndex=' + window.getComputedStyle(topEl).zIndex + ', position=' + window.getComputedStyle(topEl).position);
+                } else {
+                  console.log(D + 'OK: Save button is clickable (top element is self or child)');
+                }
+              }
+              if(closeBtn){
+                var r2 = closeBtn.getBoundingClientRect();
+                var cx2 = r2.left + r2.width/2;
+                var cy2 = r2.top + r2.height/2;
+                var topEl2 = document.elementFromPoint(cx2, cy2);
+                if(topEl2 !== closeBtn && !closeBtn.contains(topEl2)){
+                  console.error(D + 'BLOCKED! Close button is COVERED by: ' + topEl2.tagName + '#' + topEl2.id + '.' + topEl2.className);
+                } else {
+                  console.log(D + 'OK: Close button is clickable');
+                }
+              }
+            }, 300);
+          }
+        });
+      }).observe(modal, {attributes: true, attributeFilter:['class']});
+    }
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', runDiag);
+  } else {
+    runDiag();
+  }
+})();
+</script>
+</body>
+</html>

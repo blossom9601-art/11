@@ -1,0 +1,304 @@
+/*
+ * tab91-system.css — 시스템/자산 탭 공통 스타일
+ * ──────────────────────────────────────────────
+ * 모든 상세 페이지의 시스템/하드웨어/소프트웨어/컴포넌트 탭이
+ * 이 단일 스타일시트를 사용한다.
+ *
+ * ★ 디자인 토큰 (CSS 변수)
+ *   페이지별 미세 차이를 방지하기 위해 모든 수치·색상을
+ *   변수로 관리한다. 개별 페이지 CSS에서 이 변수를
+ *   덮어쓰지 마세요.
+ *
+ * ★ 주의
+ *   - 이 파일 외부에서 .tab91-*, .t91-* 클래스를 재정의하지 마세요.
+ *   - font-family 지정 금지 (시스템 기본 sans-serif 사용).
+ */
+
+/* ================================================================
+   1. 디자인 토큰 / CSS 변수
+   ================================================================ */
+.tab91-system-root {
+    /* ── 레이아웃 ── */
+    --t91-section-gap: 24px;           /* 섹션 사이 간격        */
+    --t91-outer-pad: 0;                /* 외곽 추가 패딩        */
+    --t91-header-h: 40px;              /* 섹션 헤더 높이        */
+
+    /* ── 테이블 ── */
+    --t91-table-border: rgba(255, 255, 255, 0.06);
+    --t91-table-radius: 8px;
+    --t91-th-bg: rgba(255, 255, 255, 0.03);
+    --t91-th-color: rgba(255, 255, 255, 0.65);
+    --t91-th-font-size: 12px;
+    --t91-td-font-size: 13px;
+    --t91-row-h: 40px;                 /* 행 높이               */
+    --t91-hover-bg: rgba(255, 255, 255, 0.025);
+    --t91-selected-bg: rgba(99, 102, 241, 0.08);
+    --t91-selected-border: rgba(99, 102, 241, 0.25);
+
+    /* ── 빈 상태 ── */
+    --t91-empty-icon-size: 64px;
+    --t91-empty-title-size: 15px;
+    --t91-empty-desc-size: 13px;
+    --t91-empty-color: rgba(255, 255, 255, 0.38);
+    --t91-empty-pad-y: 48px;
+
+    /* ── 페이지네이션 ── */
+    --t91-pgn-gap: 4px;
+    --t91-pgn-btn-size: 32px;
+    --t91-pgn-radius: 6px;
+    --t91-pgn-font-size: 13px;
+    --t91-pgn-active-bg: rgba(99, 102, 241, 0.15);
+    --t91-pgn-active-color: #818cf8;
+
+    /* ── 버튼 ── */
+    --t91-action-btn-size: 32px;
+    --t91-action-icon-size: 16px;
+    --t91-action-radius: 6px;
+    --t91-action-hover-bg: rgba(255, 255, 255, 0.06);
+
+    /* ── 상태 점 ── */
+    --t91-dot-size: 10px;
+
+    /* ── 분석 차트 ── */
+    --t91-donut-size: 280px;
+    --t91-legend-gap: 8px;
+}
+
+/* ================================================================
+   2. 테이블 레이아웃
+   ================================================================ */
+.tab91-system-root .t91-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tab91-system-root .t91-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px 10px;
+    font-size: var(--t91-th-font-size);
+    font-weight: 600;
+    color: var(--t91-th-color);
+    background: var(--t91-th-bg);
+    border-bottom: 1px solid var(--t91-table-border);
+    text-align: left;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.tab91-system-root .t91-table thead th.sortable {
+    cursor: pointer;
+}
+.tab91-system-root .t91-table thead th.sortable:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+.tab91-system-root .t91-table thead th.sort-asc::after {
+    content: ' ▲';
+    font-size: 10px;
+    opacity: 0.6;
+}
+.tab91-system-root .t91-table thead th.sort-desc::after {
+    content: ' ▼';
+    font-size: 10px;
+    opacity: 0.6;
+}
+
+.tab91-system-root .t91-table thead th.col-chk {
+    width: 36px;
+    text-align: center;
+}
+
+.tab91-system-root .t91-table tbody td {
+    padding: 6px 10px;
+    font-size: var(--t91-td-font-size);
+    color: rgba(255, 255, 255, 0.82);
+    border-bottom: 1px solid var(--t91-table-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: var(--t91-row-h);
+    vertical-align: middle;
+}
+
+.tab91-system-root .t91-table tbody tr {
+    transition: background 0.15s ease;
+}
+.tab91-system-root .t91-table tbody tr:hover {
+    background: var(--t91-hover-bg);
+}
+.tab91-system-root .t91-table tbody tr.selected {
+    background: var(--t91-selected-bg);
+    outline: 1px solid var(--t91-selected-border);
+    outline-offset: -1px;
+}
+
+/* 체크박스 열 */
+.tab91-system-root .t91-table td:first-child,
+.tab91-system-root .t91-table th:first-child {
+    text-align: center;
+}
+
+/* ================================================================
+   3. 빈 상태
+   ================================================================ */
+.tab91-system-root .t91-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--t91-empty-pad-y) 24px;
+    text-align: center;
+}
+.tab91-system-root .t91-empty .empty-icon-img {
+    width: var(--t91-empty-icon-size);
+    height: var(--t91-empty-icon-size);
+    opacity: 0.35;
+}
+.tab91-system-root .t91-empty .empty-title {
+    font-size: var(--t91-empty-title-size);
+    color: var(--t91-empty-color);
+    margin: 12px 0 4px;
+}
+.tab91-system-root .t91-empty .empty-desc {
+    font-size: var(--t91-empty-desc-size);
+    color: var(--t91-empty-color);
+    opacity: 0.7;
+}
+
+/* ================================================================
+   4. 페이지네이션
+   ================================================================ */
+.tab91-system-root .modern-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    gap: 12px;
+}
+.tab91-system-root .pagination-info {
+    font-size: var(--t91-pgn-font-size);
+    color: rgba(255, 255, 255, 0.5);
+}
+.tab91-system-root .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--t91-pgn-gap);
+}
+.tab91-system-root .pagination-btn {
+    width: var(--t91-pgn-btn-size);
+    height: var(--t91-pgn-btn-size);
+    border: none;
+    border-radius: var(--t91-pgn-radius);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.tab91-system-root .pagination-btn:hover:not(:disabled) {
+    background: var(--t91-action-hover-bg);
+}
+.tab91-system-root .pagination-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.tab91-system-root .page-btn {
+    min-width: var(--t91-pgn-btn-size);
+    height: var(--t91-pgn-btn-size);
+    border: none;
+    border-radius: var(--t91-pgn-radius);
+    background: transparent;
+    font-size: var(--t91-pgn-font-size);
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.tab91-system-root .page-btn:hover {
+    background: var(--t91-action-hover-bg);
+}
+.tab91-system-root .page-btn.active {
+    background: var(--t91-pgn-active-bg);
+    color: var(--t91-pgn-active-color);
+    font-weight: 600;
+}
+
+/* ================================================================
+   5. 상단 액션 버튼
+   ================================================================ */
+.tab91-system-root .detail-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.tab91-system-root .detail-header-actions .add-btn-icon {
+    width: var(--t91-action-btn-size);
+    height: var(--t91-action-btn-size);
+    border-radius: var(--t91-action-radius);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.tab91-system-root .detail-header-actions .add-btn-icon:hover:not(:disabled) {
+    background: var(--t91-action-hover-bg);
+}
+.tab91-system-root .detail-header-actions .add-btn-icon:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.tab91-system-root .detail-header-actions .add-btn-icon img {
+    width: var(--t91-action-icon-size);
+    height: var(--t91-action-icon-size);
+    opacity: 0.65;
+}
+
+/* ================================================================
+   6. 상태 점 (status dot)
+   ================================================================ */
+.tab91-system-root .t91-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.tab91-system-root .t91-status-dot {
+    display: inline-block;
+    width: var(--t91-dot-size);
+    height: var(--t91-dot-size);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ================================================================
+   7. 섹션 헤더
+   ================================================================ */
+.tab91-system-root .detail-section > h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--t91-header-h);
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0 0 12px 0;
+}
+.tab91-system-root .page-size-selector {
+    margin-left: auto;
+}
+.tab91-system-root .page-size-select {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* 통계 분석 모달의 공통 프레임/도넛/스택바 스타일은 bls-stats-modal.css에서 관리한다. */
+    flex: 1;

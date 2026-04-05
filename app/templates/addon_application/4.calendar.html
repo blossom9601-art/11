@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/addon_application.css?v=20251214-12">
+    <!-- FullCalendar: use global bundle (includes plugins/styles via injectStyles). -->
+    <script src="/static/vendor/fullcalendar/6.1.15/index.global.min.js?{{ calendar_vendor_version }}"></script>
+    <script src="/static/vendor/fullcalendar/6.1.15/locales-all.global.min.js?{{ calendar_vendor_version }}"></script>
+    <!-- Page-specific styles moved to addon_application.css -->
+    
+</head>
+<body class="calendar-layout">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <section class="calendar-page">
+            <div class="calendar-container macos">
+                <div id="calendar"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: 새 일정 (backup-style) moved outside main to avoid inheriting any main blur -->
+    <div id="schedule-add-modal" class="server-add-modal">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="schedule-modal-title">일정 등록</h3>
+                    <p class="server-add-subtitle" id="schedule-modal-subtitle">일정 정보를 입력하세요.</p>
+                </div>
+
+                <div class="schedule-owner-header" id="schedule-owner-wrap" hidden>
+                    <div class="avatar avatar-sm">
+                        <img id="schedule-owner-avatar" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="일정 생성자" loading="lazy" />
+                    </div>
+                    <div class="schedule-owner-text">
+                        <div class="schedule-owner-name" id="schedule-owner-name"></div>
+                        <div class="schedule-owner-meta" id="schedule-owner-meta">일정 생성자</div>
+                    </div>
+                </div>
+                <button class="close-btn" id="schedule-modal-close" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div id="schedule-view" class="schedule-view" hidden>
+                    <div class="form-section">
+                        <div class="section-header"><h4>기본 정보</h4></div>
+                        <div class="view-journal" role="group" aria-label="일정 보기">
+                            <div class="view-journal-header">
+                                <div class="view-journal-head-row">
+                                    <div class="view-journal-title" id="view-sch-name"></div>
+                                    <div class="view-journal-meta-right" aria-label="일정 메타 정보">
+                                        <div class="view-journal-time" id="view-sch-time"></div>
+                                        <div class="view-journal-tags" aria-label="일정 태그">
+                                            <span class="view-journal-tag" id="view-sch-type"></span>
+                                            <span class="view-journal-tag" id="view-sch-share"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="view-journal-body">
+                                <div class="view-journal-section" id="view-sch-location-wrap">
+                                    <div class="view-journal-label">장소</div>
+                                    <div class="view-journal-value" id="view-sch-location"></div>
+                                </div>
+
+                                <div class="view-journal-section" id="view-sch-description-wrap">
+                                    <div class="view-journal-label">설명</div>
+                                    <div class="view-journal-value view-journal-multiline" id="view-sch-description"></div>
+                                </div>
+
+                                <div class="view-journal-section" id="view-sch-attachments-wrap">
+                                    <div class="view-journal-label">첨부 파일</div>
+                                    <div class="view-journal-value view-journal-multiline">
+                                        <ul class="attachment-list" id="view-sch-attachments" hidden></ul>
+                                        <div class="view-muted" id="view-sch-attachments-empty">첨부 파일 없음</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <form id="schedule-form">
+                    <div class="form-section">
+                        <div class="section-header"><h4>기본 정보</h4></div>
+                        <div class="form-grid">
+                            <div class="form-row">
+                                <label for="sch-name">일정 이름 <span class="required">*</span></label>
+                                <input id="sch-name" class="form-input" placeholder="일정 제목을 입력하세요" required />
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-start-time">일정 시간</label>
+                                <div class="time-range datetime-range">
+                                    <div class="datetime-field">
+                                        <input type="text" id="sch-start-time" class="form-input time-input datetime-input" placeholder="YYYY-MM-DD HH:MM">
+                                    </div>
+                                    <span class="time-sep datetime-sep" aria-hidden="true">~</span>
+                                    <div class="datetime-field">
+                                        <input type="text" id="sch-end-time" class="form-input time-input datetime-input" placeholder="YYYY-MM-DD HH:MM">
+                                    </div>
+                                    <button type="button" id="sch-allday-btn" class="allday-btn" aria-pressed="false" aria-label="종일 전환">
+                                        <img src="/static/image/svg/add/free-icon-calendar.svg" alt="" aria-hidden="true" width="20" height="20">
+                                    </button>
+                                </div>
+                                <div id="time-error" class="time-error" style="display:none;">종료 시간은 시작 시간보다 빠를 수 없습니다.</div>
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-location">일정 장소</label>
+                                <input id="sch-location" class="form-input" placeholder="예: 회의실 A 혹은 온라인" />
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-type-trigger">일정 유형</label>
+                                <div class="type-select-wrap">
+                                    <input type="hidden" id="sch-type" value="">
+                                    <div class="dropdown-field" data-dropdown="type">
+                                        <button type="button" class="dropdown-trigger" id="sch-type-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span id="sch-type-selected" class="dropdown-value placeholder">선택</span>
+                                            <span class="dropdown-chevron" aria-hidden="true"></span>
+                                        </button>
+                                        <div class="dropdown-panel" id="sch-type-panel" hidden>
+                                            <div class="dropdown-search">
+                                                <input type="text" id="sch-type-search" placeholder="검색어 입력" autocomplete="off">
+                                                <button type="button" class="dropdown-close" data-action="dropdown-close">닫기</button>
+                                            </div>
+                                            <ul class="dropdown-options" id="sch-type-options">
+                                                <li><button type="button" class="dropdown-option" data-value="">선택</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="작업">작업</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="미팅">미팅</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="교육">교육</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="휴가">휴가</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="점검">점검</button></li>
+                                                <li><button type="button" class="dropdown-option" data-value="기타">기타</button></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <span id="type-dot" class="type-dot" aria-hidden="true"></span>
+                                </div>
+                            </div>
+                            <div class="form-row" style="grid-column: 1 / -1;">
+                                <label>일정 공유</label>
+                                <div class="share-section">
+                                    <input type="hidden" id="share-mode-value" value="basic">
+                                    <div class="share-mode-group" role="group" aria-label="일정 공유 타입">
+                                        <button type="button" class="share-mode-chip" data-share-mode="basic">기본</button>
+                                        <button type="button" class="share-mode-chip" data-share-mode="all">전체공유</button>
+                                        <button type="button" class="share-mode-chip" data-share-mode="department">부서공유</button>
+                                        <button type="button" class="share-mode-chip" data-share-mode="custom">선택공유</button>
+                                    </div>
+                                    <div class="share-custom" id="share-custom" style="display:none;">
+                                        <div class="share-search-wrap">
+                                            <input type="text" id="share-search" class="form-input" placeholder="팀 또는 구성원을 검색하세요" autocomplete="off">
+                                            <ul class="share-suggest" id="share-suggest" hidden></ul>
+                                        </div>
+                                        <div class="share-chips" id="share-chips"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 설명 -->
+                            <div class="form-row" style="grid-column: 1 / -1;">
+                                <label for="sch-description">일정 설명</label>
+                                <textarea id="sch-description" class="form-input desc-input" placeholder="설명을 입력하세요"></textarea>
+                            </div>
+                            <div class="form-row attachments-row" style="grid-column: 1 / -1;">
+                                <label for="sch-attachments">첨부 파일</label>
+                                <div class="attachment-field">
+                                    <input type="file" id="sch-attachments" class="sr-only" multiple>
+                                    <label for="sch-attachments" class="attachment-drop" id="sch-attachment-drop">
+                                        <div class="attachment-icon" aria-hidden="true">
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 5 17 10" />
+                                                <line x1="12" y1="5" x2="12" y2="19" />
+                                            </svg>
+                                        </div>
+                                        <div class="attachment-copy">
+                                            <strong>파일을 업로드하려면 클릭하거나 끌어다 놓으세요</strong>
+                                            <span>최대 10개, 20MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</span>
+                                        </div>
+                                    </label>
+                                    <div class="attachment-actions">
+                                        <button type="button" class="attachment-clear" id="sch-attachment-clear" hidden>전체 삭제</button>
+                                    </div>
+                                    <ul class="attachment-list" id="sch-attachment-list" hidden></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons left">
+                    <button type="button" class="btn-secondary" id="sch-delete-btn" style="display:none;">삭제</button>
+                </div>
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="sch-cancel-btn">취소</button>
+                    <button type="button" class="btn-primary" id="sch-save-btn">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/blossom.js"></script>
+
+    <!-- 삭제 확인 모달 (onpremise dispose 스타일) -->
+    <div id="cal-confirm-modal" class="server-add-modal cal-delete-modal" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3 id="cal-confirm-title">일정 삭제</h3>
+                    <p class="server-add-subtitle">선택한 일정을 삭제합니다.</p>
+                </div>
+                <button class="close-btn" id="cal-confirm-close" type="button" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="cal-confirm-body">이 일정을 삭제하시겠습니까?</p>
+                        <p style="margin-top:8px; font-size:13px; color:#94a3b8;">삭제된 일정은 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="cal-confirm-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="cal-confirm-ok">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+            <div id="calendar-config"
+                data-schedules-base="{{ calendar_api_base or '/api/calendar/schedules' }}"
+                data-api-root="{{ calendar_api_root or '/api' }}"
+         data-emp-no="{{ current_emp_no or '' }}"
+         data-profile-id="{{ current_user_profile_id or '' }}"
+         data-profile-image="{{ current_profile_image or '' }}"
+         data-user-name="{{ current_user_name or '' }}"
+         data-user-role="{{ current_user_role or '' }}"
+         data-user-department="{{ current_user_department or '' }}">
+    </div>
+    <script src="/static/js/addon_application/4.calendar.js?{{ calendar_js_version or 'v=20251214-4' }}"></script>
+</body>
+</html>

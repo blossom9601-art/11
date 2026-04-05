@@ -1,0 +1,204 @@
+/*
+ * tab04-interface.css — 인터페이스 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────────
+ * 모든 상세 페이지의 인터페이스 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 공통값: 여백, 크기, 색상, 반지름, 그림자 등 모든 시각 속성
+ * ● 기존 detail.css의 if- 접두 규칙은 ID 셀렉터로 전역 적용되므로
+ *   이 파일에서는 .tab04-interface-root 스코프 규칙만 추가한다.
+ *
+ * 버전: 1.0 (2026-03-19)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab04-interface-root {
+    /* 색상 */
+    --if-accent:           #6366f1;
+    --if-accent-light:     #e0e7ff;
+    --if-accent-hover:     rgba(99,102,241,.18);
+    --if-danger:           #ef4444;
+    --if-danger-light:     #fee2e2;
+    --if-text:             #1f2937;
+    --if-text-secondary:   #6b7280;
+    --if-text-muted:       #94a3b8;
+    --if-border:           #e5e7eb;
+    --if-bg:               #ffffff;
+
+    /* 선택 행 */
+    --if-selected-bg:      rgba(99,102,241,0.10);
+    --if-selected-hover:   rgba(99,102,241,0.16);
+    --if-selected-td:      rgba(106,90,205,0.10);
+    --if-selected-td-hover:rgba(106,90,205,0.16);
+
+    /* 여백 */
+    --if-section-padding:  0;
+    --if-btn-top-offset:   0;
+
+    /* 크기 */
+    --if-table-font:       13px;
+    --if-action-btn-size:  36px;
+
+    /* 반지름 */
+    --if-radius-btn:       10px;
+
+    /* 그림자 */
+    --if-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+    --if-shadow-btn-hover: 0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --if-transition:       all .2s ease;
+}
+
+/* ═══════════════════════════════════
+   1. 테이블 행 선택 하이라이트
+   ═══════════════════════════════════ */
+.tab04-interface-root #if-spec-table tbody tr.selected,
+.tab04-interface-root #if-spec-table tbody tr.selected:nth-child(odd),
+.tab04-interface-root #if-spec-table tbody tr.selected:nth-child(even) {
+    background-color: var(--if-selected-bg) !important;
+    border-left: 3px solid var(--if-accent) !important;
+    box-shadow: var(--if-shadow-selected) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr.selected:hover,
+.tab04-interface-root #if-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab04-interface-root #if-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: var(--if-selected-hover) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr.selected td,
+.tab04-interface-root #if-spec-table tbody tr.selected > td {
+    background-color: var(--if-selected-td) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr.selected:hover td,
+.tab04-interface-root #if-spec-table tbody tr.selected:hover > td {
+    background-color: var(--if-selected-td-hover) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--if-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) {
+    background-color: var(--if-selected-bg) !important;
+    box-shadow: var(--if-shadow-selected) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr:hover:has(input.if-row-check:checked) {
+    background-color: var(--if-selected-hover) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) td {
+    background-color: var(--if-selected-bg) !important;
+}
+.tab04-interface-root #if-spec-table tbody tr:hover:has(input.if-row-check:checked) td {
+    background-color: var(--if-selected-hover) !important;
+}
+
+/* ═══════════════════════════════════
+   2. 선택 행 액션 버튼 강조
+   ═══════════════════════════════════ */
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="edit"],
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="delete"],
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="save"],
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="edit"],
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="delete"],
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="save"] {
+    background: var(--if-accent);
+    border-color: var(--if-accent);
+    box-shadow: var(--if-shadow-btn-hover);
+}
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="delete"] .action-icon,
+.tab04-interface-root #if-spec-table tbody tr.selected .action-btn[data-action="save"] .action-icon,
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="edit"] .action-icon,
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="delete"] .action-icon,
+.tab04-interface-root #if-spec-table tbody tr:has(input.if-row-check:checked) .action-btn[data-action="save"] .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ═══════════════════════════════════
+   3. 버튼 위치
+   ═══════════════════════════════════ */
+.tab04-interface-root #if-download-btn.add-btn-icon {
+    right: 74px !important;
+}
+.tab04-interface-root #if-row-add.add-btn-icon {
+    right: 20px !important;
+}
+
+/* ═══════════════════════════════════
+   4. 삭제 모달
+   ═══════════════════════════════════ */
+.tab04-interface-root #if-delete-modal .server-add-content { max-width: 680px; }
+.tab04-interface-root #if-delete-modal .server-add-header { padding: 20px 32px; }
+.tab04-interface-root #if-delete-modal .dispose-title { display: block; }
+.tab04-interface-root #if-delete-modal .dispose-title h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+.tab04-interface-root #if-delete-modal .server-add-body {
+    padding: 20px 0 24px;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+.tab04-interface-root #if-delete-modal .dispose-content {
+    margin: 0 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+.tab04-interface-root #if-delete-modal .dispose-text {
+    flex: 1 1 auto;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+}
+.tab04-interface-root #if-delete-modal .dispose-text p { margin: 0 0 8px 0; }
+.tab04-interface-root #if-delete-modal .dispose-illust {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab04-interface-root #if-delete-modal .dispose-illust img {
+    width: 220px;
+    max-width: min(36vw, 240px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.08));
+    border-radius: 10px;
+}
+
+/* ═══════════════════════════════════
+   5. CSV 다운로드 모달
+   ═══════════════════════════════════ */
+.tab04-interface-root #if-download-modal .form-radio-group {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+.tab04-interface-root #if-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ═══════════════════════════════════
+   6. 반응형 (Responsive)
+   ═══════════════════════════════════ */
+@media (max-width: 680px) {
+    .tab04-interface-root #if-delete-modal .dispose-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    .tab04-interface-root #if-delete-modal .dispose-illust img {
+        width: 160px;
+        max-width: 70vw;
+    }
+}

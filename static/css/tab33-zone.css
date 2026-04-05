@@ -1,0 +1,846 @@
+/*
+ * tab33-zone.css — 존 구성 탭 디자인 시스템 (v4.0)
+ * ─────────────────────────────────────────
+ * SAN 디렉터 / SAN 스위치 상세 페이지의 "존 구성" 탭 전용 스타일.
+ * 기존 detail.css 위에 .tab33-zone-root 스코프로 적용한다.
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰
+   ═══════════════════════════════════ */
+.tab33-zone-root {
+    --zone-accent:           #6366f1;
+    --zone-accent-light:     #e0e7ff;
+    --zone-accent-hover:     rgba(99,102,241,.18);
+    --zone-success:          #22c55e;
+    --zone-success-bg:       #dcfce7;
+    --zone-danger:           #ef4444;
+    --zone-danger-bg:        #fee2e2;
+    --zone-muted:            #94a3b8;
+    --zone-muted-bg:         #f1f5f9;
+    --zone-text:             #1f2937;
+    --zone-text-secondary:   #6b7280;
+    --zone-border:           #e5e7eb;
+    --zone-bg:               #ffffff;
+    --zone-selected-bg:      rgba(99,102,241,0.10);
+    --zone-selected-hover:   rgba(99,102,241,0.16);
+    --zone-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+}
+
+/* ═══════════════════════════════════
+   1. 필터 툴바
+   ═══════════════════════════════════ */
+.tab33-zone-root .zone-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #f9fafb;
+    border: 1px solid var(--zone-border);
+    border-top: none;
+    flex-wrap: wrap;
+}
+
+.tab33-zone-root .zone-toolbar-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tab33-zone-root .zone-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.tab33-zone-root .zone-toolbar-select {
+    padding: 6px 28px 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--zone-text);
+    background: var(--zone-bg);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s;
+}
+.tab33-zone-root .zone-toolbar-select:hover { border-color: #a5b4fc; }
+.tab33-zone-root .zone-toolbar-select:focus {
+    outline: none;
+    border-color: var(--zone-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+
+.tab33-zone-root .zone-toolbar-keyword {
+    width: 180px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--zone-text);
+    background: var(--zone-bg);
+    transition: border-color .2s, box-shadow .2s;
+}
+.tab33-zone-root .zone-toolbar-keyword:hover { border-color: #a5b4fc; }
+.tab33-zone-root .zone-toolbar-keyword:focus {
+    outline: none;
+    border-color: var(--zone-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+.tab33-zone-root .zone-toolbar-keyword::placeholder { color: #9ca3af; }
+
+.tab33-zone-root .zone-toolbar-search-btn {
+    padding: 6px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--zone-accent);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, box-shadow .2s;
+}
+.tab33-zone-root .zone-toolbar-search-btn:hover {
+    background: #4f46e5;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.25);
+}
+.tab33-zone-root .zone-toolbar-search-btn:active { background: #4338ca; }
+
+/* 페이지 사이즈 (툴바 내) */
+.tab33-zone-root .zone-toolbar .page-size-selector {
+    position: static;
+    transform: none;
+    margin: 0;
+}
+.tab33-zone-root .zone-toolbar .page-size-selector::after { content: none; }
+.tab33-zone-root .zone-toolbar .page-size-select {
+    padding: 6px 28px 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--zone-text);
+    background: var(--zone-bg);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s;
+    min-width: 80px;
+}
+.tab33-zone-root .zone-toolbar .page-size-select:focus {
+    outline: none;
+    border-color: var(--zone-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+
+/* ═══════════════════════════════════
+   1-b. 아이콘 액션 버튼 (다운로드/추가) 위치
+   ═══════════════════════════════════ */
+body.page-server-zone-tab .server-detail-pane#basic #zone-btn-download.add-btn-icon { right: 74px !important; }
+body.page-server-zone-tab .server-detail-pane#basic #zone-btn-add.add-btn-icon { right: 20px !important; }
+
+/* ═══════════════════════════════════
+   2. Zone 목록 테이블
+   ═══════════════════════════════════ */
+.tab33-zone-root .zone-list-section {
+    margin-bottom: 20px;
+}
+
+.tab33-zone-root #zone-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.tab33-zone-root #zone-list-table thead th {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--zone-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tab33-zone-root #zone-list-table tbody td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tab33-zone-root #zone-list-table tbody tr {
+    cursor: pointer;
+    transition: background-color .15s;
+}
+.tab33-zone-root #zone-list-table tbody tr:hover {
+    background-color: var(--zone-accent-hover);
+}
+
+/* 선택된 행 */
+.tab33-zone-root #zone-list-table tbody tr.selected,
+.tab33-zone-root #zone-list-table tbody tr.selected:nth-child(odd),
+.tab33-zone-root #zone-list-table tbody tr.selected:nth-child(even) {
+    background-color: var(--zone-selected-bg) !important;
+    border-left: 3px solid var(--zone-accent) !important;
+    box-shadow: var(--zone-shadow-selected) !important;
+}
+.tab33-zone-root #zone-list-table tbody tr.selected:hover {
+    background-color: var(--zone-selected-hover) !important;
+}
+
+/* ═══════════════════════════════════
+   2-a. 구분 뱃지
+   ═══════════════════════════════════ */
+.tab33-zone-root .zone-type-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+}
+.tab33-zone-root .zone-type-cfg {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+.tab33-zone-root .zone-type-zone {
+    background: var(--zone-accent-light);
+    color: var(--zone-accent);
+}
+.tab33-zone-root .zone-type-alias {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* ═══════════════════════════════════
+   3. 상태 돈 표시
+   ═══════════════════════════════════ */
+.tab33-zone-root .zone-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.tab33-zone-root .zone-dot-active {
+    background-color: #6366f1;
+}
+.tab33-zone-root .zone-dot-inactive {
+    background-color: var(--zone-muted);
+}
+
+/* ═══════════════════════════════════
+   3-b. 검토 뱃지
+   ═══════════════════════════════════ */
+.tab33-zone-root .zone-review-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .3px;
+    white-space: nowrap;
+}
+.tab33-zone-root .zone-review-ok {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+.tab33-zone-root .zone-review-warn {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+}
+
+/* ═══════════════════════════════════
+   3-a. 이름 링크 + 관리 컬럼 버튼
+   ═══════════════════════════════════ */
+.zone-name-link {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 400;
+    cursor: pointer;
+}
+.zone-name-link:hover {
+    color: #3730a3;
+    text-decoration: underline;
+}
+.tab33-zone-root .hw-table tbody tr {
+    cursor: pointer;
+}
+.tab33-zone-root .zone-manage-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+.tab33-zone-root .zone-manage-cell .action-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e8eaed;
+    background: #ffffff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all .2s ease;
+    margin: 0 3px;
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+}
+.tab33-zone-root .zone-manage-cell .action-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 0.46;
+    transition: all .2s ease;
+    display: block;
+    filter: grayscale(.55) brightness(1.35) contrast(.8);
+}
+.tab33-zone-root .zone-manage-cell .action-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #8b5cf6;
+    box-shadow: 0 2px 8px rgba(139,92,246,0.15);
+    transform: translateY(-1px);
+}
+.tab33-zone-root .zone-manage-cell .action-btn:hover .action-icon {
+    filter: grayscale(.05) brightness(1.15) contrast(.9);
+    opacity: 0.85;
+    transform: scale(1.1);
+}
+.tab33-zone-root .zone-manage-cell .action-btn[data-action="edit"]:hover,
+.tab33-zone-root .zone-manage-cell .action-btn[data-action="delete"]:hover {
+    background: #6366f1;
+    border-color: #e5e7eb;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.28);
+}
+.tab33-zone-root .zone-manage-cell .action-btn[data-action="edit"]:hover .action-icon,
+.tab33-zone-root .zone-manage-cell .action-btn[data-action="delete"]:hover .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ═══════════════════════════════════
+   4. 모달 오버레이 (공통 베이스)
+   ═══════════════════════════════════ */
+#zone-add-modal,
+#zone-edit-modal,
+#zone-delete-modal,
+#zone-detail-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(17,24,39,0.55);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 1300;
+}
+#zone-add-modal.show,
+#zone-edit-modal.show,
+#zone-delete-modal.show,
+#zone-detail-modal.show {
+    display: block;
+}
+#zone-add-modal .server-add-content,
+#zone-edit-modal .server-add-content,
+#zone-detail-modal .server-add-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    z-index: 1310;
+}
+#zone-detail-modal .server-add-content {
+    width: 90%;
+    max-width: 1000px;
+}
+#zone-add-modal .server-add-header,
+#zone-edit-modal .server-add-header,
+#zone-detail-modal .server-add-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 20px 32px;
+    position: relative;
+    border-bottom: 1px solid #e9ecef;
+}
+#zone-add-modal .server-add-header h3,
+#zone-edit-modal .server-add-header h3,
+#zone-detail-modal .server-add-header h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+#zone-add-modal .server-edit-subtitle,
+#zone-edit-modal .server-edit-subtitle,
+#zone-detail-modal .server-edit-subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #6c757d;
+}
+#zone-add-modal .close-btn,
+#zone-edit-modal .close-btn,
+#zone-detail-modal .close-btn {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: #ffffff;
+    border: 1px solid #e2e5e9;
+    color: #5f6672;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .18s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+#zone-add-modal .close-btn:hover,
+#zone-edit-modal .close-btn:hover,
+#zone-detail-modal .close-btn:hover {
+    background: #f3f5f7;
+    color: #374151;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+}
+#zone-add-modal .server-add-body,
+#zone-edit-modal .server-add-body,
+#zone-detail-modal .server-add-body {
+    padding: 24px 32px;
+    overflow-y: auto;
+    flex: 1;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+}
+#zone-add-modal .server-add-body::-webkit-scrollbar,
+#zone-edit-modal .server-add-body::-webkit-scrollbar,
+#zone-detail-modal .server-add-body::-webkit-scrollbar { width: 6px; }
+#zone-add-modal .server-add-body::-webkit-scrollbar-track,
+#zone-edit-modal .server-add-body::-webkit-scrollbar-track,
+#zone-detail-modal .server-add-body::-webkit-scrollbar-track { background: transparent; }
+#zone-add-modal .server-add-body::-webkit-scrollbar-thumb,
+#zone-edit-modal .server-add-body::-webkit-scrollbar-thumb,
+#zone-detail-modal .server-add-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+#zone-add-modal .server-add-body::-webkit-scrollbar-thumb:hover,
+#zone-edit-modal .server-add-body::-webkit-scrollbar-thumb:hover,
+#zone-detail-modal .server-add-body::-webkit-scrollbar-thumb:hover { background: #b0b7c3; }
+#zone-add-modal .server-add-footer,
+#zone-edit-modal .server-add-footer,
+#zone-detail-modal .server-add-footer {
+    padding: 16px 32px;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* 액션바 */
+#zone-add-modal .server-edit-actions,
+#zone-edit-modal .server-edit-actions,
+#zone-detail-modal .server-edit-actions {
+    background: #f5f5f5;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #e0e0e0;
+    box-shadow: 0 -2px 10px rgba(0,0,0,.1);
+    flex-shrink: 0;
+}
+#zone-add-modal .server-edit-actions.align-right,
+#zone-edit-modal .server-edit-actions.align-right,
+#zone-detail-modal .server-edit-actions.align-right {
+    justify-content: flex-end;
+}
+#zone-add-modal .action-buttons,
+#zone-edit-modal .action-buttons,
+#zone-detail-modal .action-buttons {
+    display: flex;
+    gap: 12px;
+}
+#zone-add-modal .btn-primary,
+#zone-edit-modal .btn-primary,
+#zone-detail-modal .btn-primary {
+    background-color: #334155;
+    color: #fff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+#zone-add-modal .btn-primary:hover,
+#zone-edit-modal .btn-primary:hover,
+#zone-detail-modal .btn-primary:hover {
+    background-color: #1e293b;
+    transform: translateY(-1px);
+}
+#zone-add-modal .btn-primary:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
+}
+#zone-add-modal .btn-secondary,
+#zone-edit-modal .btn-secondary {
+    background-color: #e2e8f0;
+    color: #334155;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+#zone-add-modal .btn-secondary:hover,
+#zone-edit-modal .btn-secondary:hover {
+    background-color: #cbd5e1;
+    transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════
+   5. cfgshow 입력 모달
+   ═══════════════════════════════════ */
+.zone-cfgshow-textarea {
+    width: 100%;
+    min-height: 180px;
+    max-height: 35vh;
+    resize: vertical;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fafbfc;
+    color: var(--zone-text);
+    transition: border-color .2s;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+}
+.zone-cfgshow-textarea::-webkit-scrollbar { width: 6px; height: 6px; }
+.zone-cfgshow-textarea::-webkit-scrollbar-track { background: transparent; }
+.zone-cfgshow-textarea::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+.zone-cfgshow-textarea::-webkit-scrollbar-thumb:hover { background: #b0b7c3; }
+.zone-cfgshow-textarea:focus {
+    outline: none;
+    border-color: var(--zone-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+}
+.zone-cfgshow-textarea::placeholder {
+    color: #9ca3af;
+    white-space: pre-line;
+}
+.zone-cfgshow-preview {
+    margin-top: 20px;
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--zone-border);
+    border-radius: 8px;
+    padding: 12px;
+    background: #fafbfc;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+}
+.zone-cfgshow-preview::-webkit-scrollbar { width: 6px; }
+.zone-cfgshow-preview::-webkit-scrollbar-track { background: transparent; }
+.zone-cfgshow-preview::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+.zone-cfgshow-preview::-webkit-scrollbar-thumb:hover { background: #b0b7c3; }
+.zone-preview-title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--zone-text);
+}
+.zone-preview-members {
+    font-size: 12px;
+    color: var(--zone-text-secondary);
+    word-break: break-all;
+    white-space: normal;
+}
+
+/* ═══════════════════════════════════
+   6. 수정 모달 — 기본 정보 행
+   ═══════════════════════════════════ */
+.zone-edit-info-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.zone-edit-field {
+    flex: 1;
+}
+.zone-edit-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--zone-text-secondary);
+    margin-bottom: 6px;
+}
+
+/* 모달 입력 필드 외곽선 */
+#zone-add-modal .form-input,
+#zone-edit-modal .form-input {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    transition: border-color .2s, box-shadow .2s;
+}
+#zone-add-modal .form-input:focus,
+#zone-edit-modal .form-input:focus {
+    outline: none;
+    border-color: #e5e7eb;
+    box-shadow: 0 0 0 2px rgba(229,231,235,0.5);
+}
+
+/* ═══════════════════════════════════
+   7. 멤버 이동 영역 (클릭 선택 + 화살표)
+   ═══════════════════════════════════ */
+.zone-dnd-area {
+    display: grid;
+    grid-template-columns: 1fr 48px 1fr;
+    gap: 12px;
+    margin-top: 20px;
+    align-items: stretch;
+}
+.zone-dnd-panel {
+    border: 1px solid var(--zone-border);
+    border-radius: 10px;
+    padding: 12px;
+    min-height: 140px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fafbfc;
+    transition: border-color .2s, background .2s;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+.zone-dnd-panel::-webkit-scrollbar { width: 6px; }
+.zone-dnd-panel::-webkit-scrollbar-track { background: transparent; }
+.zone-dnd-panel::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+.zone-dnd-panel::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.zone-dnd-title {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--zone-accent);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--zone-accent-light);
+}
+.zone-dnd-item {
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    background: #fff;
+    border: 1px solid var(--zone-border);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--zone-text);
+    cursor: pointer;
+    transition: background .15s, border-color .15s, box-shadow .15s;
+    user-select: none;
+}
+.zone-dnd-item:hover {
+    background: var(--zone-accent-light);
+    border-color: #c7d2fe;
+}
+.zone-dnd-item.zone-dnd-selected {
+    background: var(--zone-accent-light);
+    border-color: var(--zone-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.18);
+}
+
+/* 중앙 화살표 버튼 영역 */
+.zone-dnd-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.zone-arrow-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--zone-border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--zone-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .18s;
+}
+.zone-arrow-btn:hover {
+    background: var(--zone-accent);
+    color: #fff;
+    border-color: var(--zone-accent);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.25);
+}
+
+/* ═══════════════════════════════════
+   8. Zone 상세 모달 내부
+   ═══════════════════════════════════ */
+#zone-detail-modal .zone-detail-summary {
+    display: flex;
+    gap: 40px;
+    padding: 20px 28px;
+    margin-bottom: 24px;
+    background: var(--zone-accent-light, #e0e7ff);
+    border-radius: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+#zone-detail-modal .zone-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+#zone-detail-modal .zone-summary-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--zone-text-secondary, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+#zone-detail-modal .zone-summary-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--zone-text, #1f2937);
+}
+
+/* ═══════════════════════════════════
+   9. Initiator / Target 좌우 분할 (모달)
+   ═══════════════════════════════════ */
+#zone-detail-modal .zone-member-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+#zone-detail-modal .zone-member-panel {
+    border: 1px solid var(--zone-border, #e5e7eb);
+    border-radius: 12px;
+    padding: 20px;
+    background: var(--zone-bg, #ffffff);
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+#zone-detail-modal .zone-member-title {
+    margin: 0 0 14px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--zone-accent, #6366f1);
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--zone-accent-light, #e0e7ff);
+}
+
+#zone-detail-modal .zone-member-panel .hw-table {
+    width: 100%;
+}
+#zone-detail-modal .zone-member-panel .hw-table th {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--zone-text-secondary);
+    padding: 10px 12px;
+}
+#zone-detail-modal .zone-member-panel .hw-table td {
+    font-size: 14px;
+    padding: 10px 12px;
+    color: var(--zone-text);
+}
+
+#zone-detail-modal .zone-member-empty {
+    padding: 32px 0;
+    text-align: center;
+    color: var(--zone-text-secondary, #6b7280);
+    font-size: 14px;
+}
+
+/* WWN 전체 표시 */
+#zone-detail-modal .zone-member-panel .hw-table {
+    table-layout: auto;
+    overflow: visible;
+}
+#zone-detail-modal .zone-member-panel .hw-table td {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+}
+#zone-detail-modal .zone-wwn {
+    white-space: nowrap;
+    font-size: 14px;
+    letter-spacing: .3px;
+    color: var(--zone-text);
+}
+
+/* ═══════════════════════════════════
+   10. 모달 위험 버튼
+   ═══════════════════════════════════ */
+.tab33-zone-root .modal-danger-btn,
+.modal-danger-btn {
+    background: var(--zone-danger, #ef4444) !important;
+    border-color: var(--zone-danger, #ef4444) !important;
+    color: #fff !important;
+}
+.tab33-zone-root .modal-danger-btn:hover,
+.modal-danger-btn:hover {
+    background: #dc2626 !important;
+}
+
+/* ═══════════════════════════════════
+   11. 반응형
+   ═══════════════════════════════════ */
+@media (max-width: 900px) {
+    #zone-detail-modal .zone-member-grid,
+    .zone-dnd-area {
+        grid-template-columns: 1fr;
+    }
+    .tab33-zone-root .zone-toolbar {
+        margin-left: 0;
+        margin-top: 8px;
+    }
+    .zone-edit-info-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 680px) {
+    #zone-detail-modal .zone-detail-summary {
+        flex-direction: column;
+        gap: 12px;
+    }
+}

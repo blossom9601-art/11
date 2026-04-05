@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+	<script src="/static/js/blossom.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20260302a" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>인증관리</h1>
+					<p>다중 인증, SMS 발송, 사내 OTP 서버 연동 설정을 구성합니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<div class="settings-columns">
+				<section class="setting-card" id="mfa-settings-card" aria-labelledby="mfa-settings-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="mfa-settings-title">다중 인증(MFA)</h2>
+							<p>로그인 직후 두 번째 검증 수단을 요구해 계정 탈취를 방지합니다.</p>
+						</div>
+						<label class="switch">
+							<input type="checkbox" id="mfa-enabled" name="enabled">
+							<span class="switch-track" aria-hidden="true"></span>
+							<span class="switch-label">사용</span>
+						</label>
+					</div>
+					<form id="mfa-settings-form" class="setting-form" autocomplete="off">
+						<div class="form-grid single-col">
+							<div class="form-row">
+								<label for="mfa-grace">유예 기간(일)</label>
+								<input type="number" id="mfa-grace" name="grace_period" class="form-input" min="0" max="30">
+							</div>
+							<div class="form-row">
+								<label for="mfa-device-days">디바이스 기억 유지(일)</label>
+								<input type="number" id="mfa-device-days" name="remember_device_days" class="form-input" min="0" max="30">
+							</div>
+						</div>
+
+						<!-- ── 인증 방식 개별 토글 ── -->
+						<h3 class="mfa-methods-title">인증 방식 활성화</h3>
+						<p class="helper-text" style="margin-bottom:12px">로그인 시 사용자에게 제공할 인증 방식을 개별적으로 활성화하세요.</p>
+
+						<div class="mfa-method-cards">
+							<!-- OTP(TOTP) -->
+							<div class="mfa-method-card" data-method="totp">
+								<div class="mfa-method-card-header">
+									<div class="mfa-method-info">
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>
+										<span class="mfa-method-name">OTP 인증 (TOTP)</span>
+									</div>
+									<label class="switch switch-sm">
+										<input type="checkbox" id="mfa-totp-enabled" name="totp_enabled">
+										<span class="switch-track" aria-hidden="true"></span>
+									</label>
+								</div>
+								<div class="mfa-method-card-body" id="mfa-totp-body">
+									<div class="form-row">
+										<label for="mfa-secret">앱 시크릿 키</label>
+										<div class="secret-field">
+											<input type="text" id="mfa-secret" name="secret" class="form-input" readonly>
+												<button type="button" class="btn-icon-round" data-action="regen-secret" title="새 키 생성">
+													<img src="/static/image/svg/free-icon-font-holding-hand-key.svg" alt="새 키 생성" width="20" height="20">
+												</button>
+											</div>
+										</div>
+										<div class="totp-qr-area" id="totp-qr-area">
+											<div class="totp-qr-box" id="totp-qr-box">
+												<p class="helper-text" style="text-align:center;color:#94a3b8">키를 생성하면 QR코드가 표시됩니다.</p>
+											</div>
+											<p class="helper-text" style="margin-top:8px">Google Authenticator 등 TOTP 앱으로 QR코드를 스캔하세요.</p>
+										</div>
+								</div>
+							</div>
+
+							<!-- SMS -->
+							<div class="mfa-method-card" data-method="sms">
+								<div class="mfa-method-card-header">
+									<div class="mfa-method-info">
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+										<span class="mfa-method-name">SMS 인증</span>
+									</div>
+									<label class="switch switch-sm">
+										<input type="checkbox" id="mfa-sms-enabled" name="sms_enabled">
+										<span class="switch-track" aria-hidden="true"></span>
+									</label>
+								</div>
+								<div class="mfa-method-card-body" id="mfa-sms-body">
+									<p class="helper-text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> 로그인한 사용자(org_user)의 <b>휴대번호(mobile_phone)</b>로 인증 코드를 발송합니다.</p>
+								</div>
+							</div>
+
+							<!-- Email -->
+							<div class="mfa-method-card" data-method="email">
+								<div class="mfa-method-card-header">
+									<div class="mfa-method-info">
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+										<span class="mfa-method-name">이메일 인증</span>
+									</div>
+									<label class="switch switch-sm">
+										<input type="checkbox" id="mfa-email-enabled" name="email_enabled">
+										<span class="switch-track" aria-hidden="true"></span>
+									</label>
+								</div>
+								<div class="mfa-method-card-body" id="mfa-email-body">
+									<p class="helper-text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> 로그인한 사용자(org_user)의 <b>이메일(email)</b>로 인증 코드를 발송합니다.</p>
+								</div>
+							</div>
+
+							<!-- 사내 OTP -->
+							<div class="mfa-method-card" data-method="company_otp">
+								<div class="mfa-method-card-header">
+									<div class="mfa-method-info">
+										<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+										<span class="mfa-method-name">사내 OTP 인증</span>
+									</div>
+									<label class="switch switch-sm">
+										<input type="checkbox" id="mfa-company-otp-enabled" name="company_otp_enabled">
+										<span class="switch-track" aria-hidden="true"></span>
+									</label>
+								</div>
+								<div class="mfa-method-card-body" id="mfa-company-otp-body">
+									<p class="helper-text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> 사내 OTP 서버(이니텍/드림시큐리티/미래테크)와 연동하여 인증합니다. 아래 <b>사내 OTP 설정</b> 카드에서 연동 정보를 입력하세요.</p>
+								</div>
+							</div>
+						</div>
+						<div class="setting-actions">
+							<div class="action-buttons">
+								<button type="submit" class="btn-save" id="mfa-save-btn">
+									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+									저장
+								</button>
+								<button type="button" class="btn-secondary btn-sm" id="mfa-test-login">테스트 로그인</button>
+							</div>
+							<p class="setting-status" id="mfa-settings-status">MFA가 비활성화되어 있습니다.</p>
+						</div>
+					</form>
+				</section>
+
+				<section class="setting-card" id="sms-settings-card" aria-labelledby="sms-settings-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="sms-settings-title">SMS 발송 설정</h2>
+							<p>MFA SMS 인증에 사용할 CoolSMS API 자격증명과 발신번호를 입력합니다.</p>
+						</div>
+						<span class="smtp-status-badge" id="sms-status-badge">미설정</span>
+					</div>
+					<form id="sms-config-form" class="setting-form" autocomplete="off">
+						<div class="form-grid single-col">
+							<div class="form-row">
+								<label for="sms-api-key">API Key<span class="required">*</span></label>
+								<input type="text" id="sms-api-key" name="api_key" class="form-input" placeholder="CoolSMS API Key" required>
+							</div>
+							<div class="form-row">
+								<label for="sms-api-secret">API Secret<span class="required">*</span></label>
+								<input type="password" id="sms-api-secret" name="api_secret" class="form-input" placeholder="CoolSMS API Secret" required>
+							</div>
+							<div class="form-row">
+								<label for="sms-sender">발신번호<span class="required">*</span></label>
+								<input type="text" id="sms-sender" name="sender_number" class="form-input" placeholder="01012345678 (사전 등록 필수)">
+							</div>
+						</div>
+						<div class="setting-actions">
+							<div class="action-buttons">
+								<button type="submit" class="btn-save">
+									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+									저장
+								</button>
+								<button type="button" class="btn-secondary btn-sm" id="sms-test-btn">테스트 발송</button>
+							</div>
+							<p class="setting-status" id="sms-settings-status">SMS 발송이 설정되지 않았습니다.</p>
+						</div>
+					</form>
+				</section>
+
+			<section class="setting-card" id="company-otp-settings-card" aria-labelledby="company-otp-settings-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="company-otp-settings-title">사내 OTP 서버 설정</h2>
+							<p>사내 OTP 솔루션(이니텍·드림시큐리티·미래테크) 연동 정보를 입력합니다.</p>
+						</div>
+						<span class="smtp-status-badge" id="company-otp-status-badge">미설정</span>
+					</div>
+					<form id="company-otp-config-form" class="setting-form" autocomplete="off">
+						<div class="form-grid single-col">
+							<div class="form-row">
+								<label for="cotp-provider">OTP 솔루션<span class="required">*</span></label>
+								<select id="cotp-provider" name="provider" class="form-input">
+									<option value="initech">이니텍 (INISAFE OTP)</option>
+									<option value="dreamsecurity">드림시큐리티 (MagicOTP)</option>
+									<option value="miraetech">미래테크 (SafeOTP)</option>
+								</select>
+							</div>
+							<div class="form-row">
+								<label for="cotp-endpoint">API Endpoint<span class="required">*</span></label>
+								<input type="url" id="cotp-endpoint" name="api_endpoint" class="form-input" placeholder="https://otp.company.co.kr" required>
+							</div>
+							<div class="form-row">
+								<label for="cotp-api-key">API Key / Client ID<span class="required">*</span></label>
+								<input type="text" id="cotp-api-key" name="api_key" class="form-input" placeholder="API Key 또는 Client ID" required>
+							</div>
+							<div class="form-row">
+								<label for="cotp-api-secret">API Secret</label>
+								<input type="password" id="cotp-api-secret" name="api_secret" class="form-input" placeholder="API Secret (선택)">
+							</div>
+							<div class="form-row">
+								<label for="cotp-server-code">서버 식별 코드 (CP Code)</label>
+								<input type="text" id="cotp-server-code" name="server_code" class="form-input" placeholder="OTP 서버 CP 코드">
+							</div>
+							<div class="form-row">
+								<label for="cotp-timeout">타임아웃 (초)</label>
+								<input type="number" id="cotp-timeout" name="timeout" class="form-input" min="1" max="30" value="5">
+							</div>
+						</div>
+						<div class="setting-actions">
+							<div class="action-buttons">
+								<button type="submit" class="btn-save">
+									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+									저장
+								</button>
+								<button type="button" class="btn-secondary btn-sm" id="cotp-test-btn">테스트 인증</button>
+							</div>
+							<p class="setting-status" id="company-otp-settings-status">사내 OTP 서버가 설정되지 않았습니다.</p>
+						</div>
+					</form>
+				</section>
+
+			</div>
+		</div>
+	</main>
+
+	<div id="mfa-challenge-modal" class="server-add-modal security-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="mfa-modal-title">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="mfa-modal-title">MFA 확인</h3>
+					<p class="server-add-subtitle" id="mfa-modal-subtitle">선택한 두 번째 인증 수단을 입력하세요.</p>
+				</div>
+				<button class="close-btn" type="button" data-mfa-modal="close" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="mfa-modal-form" autocomplete="off">
+					<input type="hidden" name="mfa_type" id="mfa-modal-type" value="totp">
+					<div class="form-row">
+						<label for="mfa-modal-code">인증 코드</label>
+						<input type="text" id="mfa-modal-code" name="code" class="form-input" inputmode="numeric" placeholder="6자리 코드" maxlength="6" required>
+					</div>
+					<p class="helper-text" id="mfa-modal-hint">인증 앱에 표시된 6자리 숫자를 입력하세요.</p>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" data-mfa-modal="cancel">취소</button>
+					<button type="submit" form="mfa-modal-form" class="btn-primary" id="mfa-modal-confirm">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="sms-test-modal" class="server-add-modal security-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sms-test-modal-title">
+		<div class="server-add-content" style="max-width:420px">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="sms-test-modal-title">SMS 테스트 발송</h3>
+					<p class="server-add-subtitle">인증코드가 정상 수신되는지 확인합니다.</p>
+				</div>
+				<button class="close-btn" type="button" id="sms-test-modal-close" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="sms-test-form" autocomplete="off">
+					<div class="form-row">
+						<label for="sms-test-phone">수신번호</label>
+						<input type="text" id="sms-test-phone" name="phone" class="form-input" inputmode="tel" placeholder="01012345678" required>
+					</div>
+					<p class="helper-text">테스트 코드 123456이 발송됩니다.</p>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" id="sms-test-modal-cancel">취소</button>
+					<button type="submit" form="sms-test-form" class="btn-primary" id="sms-test-modal-send">발송</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 사내 OTP 테스트 모달 -->
+	<div id="cotp-test-modal" class="server-add-modal security-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cotp-test-modal-title">
+		<div class="server-add-content" style="max-width:420px">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="cotp-test-modal-title">사내 OTP 테스트 인증</h3>
+					<p class="server-add-subtitle">사내 OTP 서버 연동이 정상인지 확인합니다.</p>
+				</div>
+				<button class="close-btn" type="button" id="cotp-test-modal-close" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="cotp-test-form" autocomplete="off">
+					<div class="form-row">
+						<label for="cotp-test-empno">사번 (emp_no)</label>
+						<input type="text" id="cotp-test-empno" name="emp_no" class="form-input" placeholder="테스트 사번" required>
+					</div>
+					<div class="form-row">
+						<label for="cotp-test-code">OTP 코드</label>
+						<input type="text" id="cotp-test-code" name="code" class="form-input" inputmode="numeric" placeholder="6자리 OTP 코드" maxlength="8" required>
+					</div>
+					<p class="helper-text">사내 OTP 토큰/앱에 표시된 코드를 입력하세요.</p>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" id="cotp-test-modal-cancel">취소</button>
+					<button type="submit" form="cotp-test-form" class="btn-primary" id="cotp-test-modal-send">인증 테스트</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

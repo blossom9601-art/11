@@ -1,0 +1,118 @@
+/* =========================================================
+ *  tab03-backup.css  — 백업정책 탭 공통 디자인 시스템
+ *  Scoped under .tab03-backup-root
+ *  ※ 모든 상세 페이지의 "하드웨어/소프트웨어" 탭과 동일한 UI/UX 보장
+ * ========================================================= */
+
+/* ── 디자인 토큰 ─────────────────────────────────────── */
+.tab03-backup-root {
+    /* 색상 */
+    --bk-accent:           #6366f1;
+    --bk-accent-light:     #e0e7ff;
+    --bk-accent-hover:     rgba(99,102,241,.18);
+    --bk-danger:           #ef4444;
+    --bk-danger-light:     #fee2e2;
+    --bk-text:             #1f2937;
+    --bk-text-secondary:   #6b7280;
+    --bk-text-muted:       #94a3b8;
+    --bk-border:           #e5e7eb;
+    --bk-bg:               #ffffff;
+
+    /* 선택 행 */
+    --bk-selected-bg:      rgba(99,102,241,0.10);
+    --bk-selected-hover:   rgba(99,102,241,0.16);
+    --bk-selected-td:      rgba(106,90,205,0.10);
+    --bk-selected-td-hover:rgba(106,90,205,0.16);
+
+    /* 여백 */
+    --bk-section-padding:  0;
+    --bk-btn-top-offset:   0;
+
+    /* 크기 */
+    --bk-table-font:       13px;
+    --bk-action-btn-size:  36px;
+
+    /* 반지름 */
+    --bk-radius-btn:       10px;
+
+    /* 그림자 */
+    --bk-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+    --bk-shadow-btn-hover: 0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --bk-transition:       all .2s ease;
+}
+
+/* ── 테이블 행 선택 하이라이트 ────────────────────────── */
+.tab03-backup-root #bk-spec-table tbody tr.selected,
+.tab03-backup-root #bk-spec-table tbody tr.selected:nth-child(odd),
+.tab03-backup-root #bk-spec-table tbody tr.selected:nth-child(even) {
+    background-color: var(--bk-selected-bg) !important;
+    border-left: 3px solid var(--bk-accent) !important;
+    box-shadow: var(--bk-shadow-selected) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr.selected:hover,
+.tab03-backup-root #bk-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab03-backup-root #bk-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: var(--bk-selected-hover) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr.selected td,
+.tab03-backup-root #bk-spec-table tbody tr.selected > td {
+    background-color: var(--bk-selected-td) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr.selected:hover td,
+.tab03-backup-root #bk-spec-table tbody tr.selected:hover > td {
+    background-color: var(--bk-selected-td-hover) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--bk-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab03-backup-root #bk-spec-table tbody tr:has(input.bk-row-check:checked) {
+    background-color: var(--bk-selected-bg) !important;
+    box-shadow: var(--bk-shadow-selected) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr:hover:has(input.bk-row-check:checked) {
+    background-color: var(--bk-selected-hover) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr:has(input.bk-row-check:checked) td {
+    background-color: var(--bk-selected-bg) !important;
+}
+.tab03-backup-root #bk-spec-table tbody tr:hover:has(input.bk-row-check:checked) td {
+    background-color: var(--bk-selected-hover) !important;
+}
+
+/* ── 버튼 위치 (다운로드 버튼 1개만) ──────────────── */
+.tab03-backup-root #bk-download-btn.add-btn-icon {
+    right: 20px !important;
+}
+
+/* page-size-selector: 버튼 1개이므로 74px */
+.tab03-backup-root .detail-section h3 .page-size-selector {
+    right: 74px !important;
+}
+
+/* ── 다운로드 모달 ───────────────────────────────────── */
+.tab03-backup-root ~ #bk-download-modal .form-radio-group {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+.tab03-backup-root ~ #bk-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── 반응형 ──────────────────────────────────────────── */
+@media (max-width: 1280px) {
+    .tab03-backup-root {
+        --bk-table-font: 12px;
+    }
+}
+@media (max-width: 768px) {
+    .tab03-backup-root {
+        --bk-table-font: 12px;
+    }
+}

@@ -1,0 +1,90 @@
+/*
+ * tab11-task.css  v1.1
+ * ─────────────────────────────────────────────────
+ * 작업이력 탭 기능 스타일만 정의 (레이아웃은 detail.css 공통 사용)
+ *
+ * ★ 수정 시 모든 도메인의 작업이력 탭에 영향.
+ */
+
+/* ── 상태 pill (두 모드 공통) ──────────────────────── */
+.tab11-task-root .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: inherit;
+}
+
+.tab11-task-root .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    box-shadow: none;
+}
+
+.tab11-task-root .status-dot.ws-run    { background: #6366f1; }
+.tab11-task-root .status-dot.ws-wait   { background: #94a3b8; }
+.tab11-task-root .status-dot.ws-idle   { background: #0ea5e9; }
+
+
+/* ── 작업 결과 dot (Pattern A) ─────────────────────── */
+.tab11-task-root .result-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.tab11-task-root .result-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.tab11-task-root .result-dot.rs-ok       { background: #6366f1; }
+.tab11-task-root .result-dot.rs-partial  { background: #f59e0b; }
+.tab11-task-root .result-dot.rs-fail     { background: #ef4444; }
+.tab11-task-root .result-dot.rs-rollback { background: #8b5cf6; }
+.tab11-task-root .result-dot.rs-none     { background: #d1d5db; }
+
+
+/* ── 프로젝트 링크 (Pattern A) ─────────────────────── */
+.tab11-task-root .prj-task-link {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.tab11-task-root .prj-task-link:hover {
+    text-decoration: underline;
+}
+
+
+/* ── 편집 모드 행 하이라이트 (Pattern B) ───────────── */
+.tab11-task-root .hw-table tbody tr.editing {
+    background: rgba(99,102,241,.04);
+}
+
+.tab11-task-root .hw-table tbody tr.new-row {
+    background: rgba(16,185,129,.04);
+}
+
+
+/* ── 체크박스 열 오른쪽 여백 ────────────────────────── */
+#prj-task-table th:first-child,
+#prj-task-table td:first-child,
+#tk-spec-table th:first-child,
+#tk-spec-table td:first-child {
+    padding-right: 16px;
+}
+
+/* ── 통계 모달 (Pattern A) ─────────────────────────── */
+.tab11-task-root ~ #prj-stats-modal .prj-stats-content {
+    max-width: 720px;
+}

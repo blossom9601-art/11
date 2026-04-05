@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail7.css?v=1.1">
+    <script src="/static/js/9.category/9-6.customer/9-6-1.customer/2.client1_detail.js?v=1.0"></script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <a href="{{ url_for('pages.show', key='cat_customer_client1') }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title or '고객' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '-' }}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='cat_customer_client1_detail') }}" class="server-detail-tab-btn {% if current_key == 'cat_customer_client1_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='cat_customer_client1_manager') }}" class="server-detail-tab-btn {% if current_key == 'cat_customer_client1_manager' %}active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.show', key='cat_customer_client1_task') }}" class="server-detail-tab-btn {% if current_key == 'cat_customer_client1_task' %}active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.show', key='cat_customer_client1_log') }}" class="server-detail-tab-btn {% if current_key == 'cat_customer_client1_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='cat_customer_client1_file') }}" class="server-detail-tab-btn {% if current_key == 'cat_customer_client1_file' %}active{% endif %}">구성/파일</a>
+            </div>
+
+            <!-- 상세 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid">
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header"><h4>고객</h4></div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>고객</label><span class="info-value" id="cm-customer-name">–</span></div>
+                                    <div class="info-row"><label>주소</label><span class="info-value" id="cm-address">–</span></div>
+                                    <div class="info-row"><label>담당자수</label><span class="info-value" id="cm-manager-count">–</span></div>
+                                    <div class="info-row"><label>회선(수량)</label><span class="info-value" id="cm-line-count">–</span></div>
+                                    <div class="info-row"><label>비고</label><span class="info-value" id="cm-remark">–</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+</body>
+</html>

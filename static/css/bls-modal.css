@@ -1,0 +1,2694 @@
+/*
+ * Blossom Enterprise Modal Design System (bls-modal.css)
+ * ========================================================
+ * 서비스 전반의 등록/수정/삭제 모달에 공통 적용되는
+ * 엔터프라이즈 B2B SaaS 스타일 디자인 시스템.
+ *
+ * 기존 class 명(.server-add-*, .server-edit-*, .form-section 등)을
+ * 그대로 유지하면서 일관된 디자인 토큰과 구조를 제공한다.
+ *
+ * 로드 순서: design-tokens.css → components.css → blossom.css → bls-modal.css
+ *
+ * v1.0.0  2026-03-17
+ */
+
+/* =========================================================================
+   0. 모달 전용 디자인 토큰
+   ========================================================================= */
+:root {
+  /* 모달 컨테이너 */
+  --bls-modal-overlay: rgba(15, 23, 42, 0.48);
+  --bls-modal-blur: 6px;
+  --bls-modal-z: 1300;
+  --bls-modal-width: 860px;
+  --bls-modal-max-width: 92vw;
+  --bls-modal-max-height: 88vh;
+  --bls-modal-min-width: 420px;
+  --bls-modal-radius: 14px;
+  --bls-modal-shadow: 0 12px 40px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --bls-modal-bg: #fafbfc;
+
+  /* 헤더 */
+  --bls-modal-header-bg: linear-gradient(180deg, #f8f9fb 0%, #f1f3f6 100%);
+  --bls-modal-header-border: #e3e6eb;
+  --bls-modal-header-padding: 24px 36px 20px;
+  --bls-modal-title-color: #1e293b;
+  --bls-modal-title-size: 20px;
+  --bls-modal-subtitle-color: #64748b;
+  --bls-modal-subtitle-size: 13px;
+
+  /* 본문 */
+  --bls-modal-body-bg: #ffffff;
+  --bls-modal-body-padding: 28px 0;
+
+  /* 하단 액션바 */
+  --bls-modal-footer-bg: #f5f6f8;
+  --bls-modal-footer-border: #e3e6eb;
+  --bls-modal-footer-padding: 18px 36px;
+  --bls-modal-footer-shadow: 0 -1px 6px rgba(15, 23, 42, 0.04);
+
+  /* 폼 섹션 */
+  --bls-section-gap: 28px;
+  --bls-section-padding: 0 36px;
+  --bls-section-title-size: 15px;
+  --bls-section-title-color: #334155;
+  --bls-section-accent: linear-gradient(180deg, #64748b 0%, #475569 100%);
+  --bls-section-border: #eef0f3;
+
+  /* 폼 필드 */
+  --bls-field-gap: 18px;
+  --bls-field-label-color: #475569;
+  --bls-field-label-size: 13px;
+  --bls-field-label-weight: 500;
+  --bls-input-height: 42px;
+  --bls-input-padding: 0 14px;
+  --bls-input-bg: #ffffff;
+  --bls-input-border: #dce1e8;
+  --bls-input-radius: 8px;
+  --bls-input-font-size: 14px;
+  --bls-input-color: #1e293b;
+  --bls-input-placeholder: #a0aec0;
+
+  /* 폼 상태 */
+  --bls-input-focus-border: #94a3b8;
+  --bls-input-focus-ring: rgba(100, 116, 139, 0.14);
+  --bls-input-error-border: #ef4444;
+  --bls-input-error-ring: rgba(239, 68, 68, 0.10);
+  --bls-input-error-color: #dc2626;
+  --bls-input-success-border: #22c55e;
+  --bls-input-success-ring: rgba(34, 197, 94, 0.10);
+  --bls-input-disabled-bg: #f8f9fb;
+  --bls-input-disabled-color: #9ca3af;
+
+  /* 버튼 */
+  --bls-btn-height: 40px;
+  --bls-btn-radius: 8px;
+  --bls-btn-font-size: 14px;
+  --bls-btn-font-weight: 600;
+  --bls-btn-min-width: 100px;
+  --bls-btn-primary-bg: #475569;
+  --bls-btn-primary-hover: #334155;
+  --bls-btn-primary-color: #ffffff;
+  --bls-btn-secondary-bg: #ffffff;
+  --bls-btn-secondary-hover: #f1f5f9;
+  --bls-btn-secondary-color: #475569;
+  --bls-btn-secondary-border: #d1d5db;
+
+  /* 닫기 버튼 */
+  --bls-close-size: 34px;
+  --bls-close-bg: #ffffff;
+  --bls-close-border: #e5e7eb;
+  --bls-close-color: #64748b;
+  --bls-close-hover-bg: #f1f5f9;
+  --bls-close-hover-color: #334155;
+
+  /* 트랜지션 */
+  --bls-modal-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 필수 표시 */
+  --bls-required-color: #ef4444;
+}
+
+
+/* =========================================================================
+   1. 모달 오버레이 (백드롭)
+   ========================================================================= */
+
+.server-add-modal,
+.server-edit-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bls-modal-overlay);
+  backdrop-filter: blur(var(--bls-modal-blur));
+  -webkit-backdrop-filter: blur(var(--bls-modal-blur));
+  z-index: var(--bls-modal-z);
+  overflow: hidden;
+  /* 페이드 인 */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--bls-modal-transition), visibility var(--bls-modal-transition);
+}
+
+.server-add-modal.show,
+.server-edit-modal.show {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+}
+/* =========================================================================
+   1. 공통 모달 오버레이 (Modal Overlay)
+   ========================================================================= */
+.bls-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: var(--bls-modal-overlay-z);
+  background: var(--bls-modal-overlay-bg);
+  backdrop-filter: blur(var(--bls-modal-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--bls-modal-overlay-blur));
+  transition: opacity var(--bls-modal-overlay-transition), visibility var(--bls-modal-overlay-transition);
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  /* 중앙 정렬용 flex */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bls-modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+/* 위험 액션용 강조 오버레이 */
+.bls-modal-overlay--danger {
+  background: var(--bls-modal-overlay-bg-danger);
+}
+/* Fallback: backdrop-filter 미지원 브라우저 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bls-modal-overlay {
+    background: var(--bls-modal-overlay-fallback);
+  }
+  .bls-modal-overlay--danger {
+    background: var(--bls-modal-overlay-fallback-danger);
+  }
+}
+
+/* 모달 컨테이너 z-index 분리 */
+.bls-modal-overlay .bls-modal-container {
+  z-index: var(--bls-modal-container-z);
+}
+
+/* Fade + scale 애니메이션 */
+@keyframes blsModalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes blsModalScaleIn {
+  from { opacity: 0; transform: scale(var(--bls-modal-anim-scale)); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.bls-modal-overlay.show {
+  animation: blsModalFadeIn var(--bls-modal-anim-duration) var(--bls-modal-anim-ease);
+}
+.bls-modal-container {
+  animation: blsModalScaleIn var(--bls-modal-anim-duration) var(--bls-modal-anim-ease);
+}
+
+/* body 잠금 */
+body.modal-open {
+  overflow: hidden;
+}
+
+body.modal-open .main-header,
+body.modal-open .sidebar,
+body.modal-open .main-content {
+  filter: blur(3px);
+  opacity: 0.88;
+  pointer-events: none;
+  transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+body.modal-open .main-content {
+  overflow: hidden;
+}
+
+/* 모달 내부는 블러 해제 */
+body.modal-open .server-add-modal .server-add-content,
+body.modal-open .server-edit-modal .server-edit-content {
+  filter: none;
+  opacity: 1;
+}
+
+
+/* =========================================================================
+   2. 모달 콘텐츠 컨테이너
+   ========================================================================= */
+
+.server-add-content,
+.server-edit-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bls-modal-bg);
+  border-radius: var(--bls-modal-radius);
+  width: var(--bls-modal-width);
+  max-width: var(--bls-modal-max-width);
+  min-width: var(--bls-modal-min-width);
+  max-height: var(--bls-modal-max-height);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--bls-modal-shadow);
+  /* 슬라이드 업 애니메이션 */
+  transition: transform var(--bls-modal-transition), opacity var(--bls-modal-transition);
+}
+
+.server-add-modal.show .server-add-content,
+.server-edit-modal.show .server-edit-content {
+  transform: translate(-50%, -50%);
+}
+
+
+/* =========================================================================
+   3. 모달 헤더
+   ========================================================================= */
+
+.server-add-header,
+.server-edit-header {
+  background: var(--bls-modal-header-bg);
+  padding: var(--bls-modal-header-padding);
+  position: relative;
+  border-radius: var(--bls-modal-radius) var(--bls-modal-radius) 0 0;
+  border-bottom: 1px solid var(--bls-modal-header-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+  min-height: 64px;
+}
+
+/* 제목 영역 */
+.server-add-title h3,
+.server-edit-title h3 {
+  margin: 0 0 4px;
+  font-size: var(--bls-modal-title-size);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--bls-modal-title-color);
+  line-height: 1.35;
+}
+
+.server-add-subtitle,
+.server-edit-subtitle {
+  margin: 0;
+  font-size: var(--bls-modal-subtitle-size);
+  color: var(--bls-modal-subtitle-color);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* 닫기 버튼 */
+.server-add-header .close-btn,
+.server-edit-header .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: var(--bls-close-size);
+  height: var(--bls-close-size);
+  background: var(--bls-close-bg);
+  border: 1px solid var(--bls-close-border);
+  color: var(--bls-close-color);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+.server-add-header .close-btn:hover,
+.server-edit-header .close-btn:hover {
+  background: var(--bls-close-hover-bg);
+  color: var(--bls-close-hover-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.server-add-header .close-btn:focus-visible,
+.server-edit-header .close-btn:focus-visible {
+  outline: 2px solid var(--bls-input-focus-border);
+  outline-offset: 2px;
+}
+
+.server-add-header .close-btn svg,
+.server-edit-header .close-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+
+/* =========================================================================
+   4. 모달 본문 (스크롤 영역)
+   ========================================================================= */
+
+.server-add-body,
+.server-edit-body {
+  background: var(--bls-modal-body-bg);
+  padding: var(--bls-modal-body-padding);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+/* 커스텀 스크롤바 */
+.server-add-body::-webkit-scrollbar,
+.server-edit-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.server-add-body::-webkit-scrollbar-track,
+.server-edit-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.server-add-body::-webkit-scrollbar-thumb,
+.server-edit-body::-webkit-scrollbar-thumb {
+  background: #e0e3e8;
+  border-radius: 4px;
+  border: 2px solid var(--bls-modal-body-bg);
+}
+
+.server-add-body::-webkit-scrollbar-thumb:hover,
+.server-edit-body::-webkit-scrollbar-thumb:hover {
+  background: #c8cdd4;
+}
+
+
+/* =========================================================================
+   5. 모달 하단 액션바 (sticky)
+   ========================================================================= */
+
+.server-add-actions,
+.server-edit-actions {
+  background: var(--bls-modal-footer-bg);
+  padding: var(--bls-modal-footer-padding);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 1px solid var(--bls-modal-footer-border);
+  box-shadow: var(--bls-modal-footer-shadow);
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+.server-add-actions.align-right,
+.server-edit-actions.align-right {
+  justify-content: flex-end;
+}
+
+.server-add-actions .action-buttons,
+.server-edit-actions .action-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.server-add-actions .action-buttons.left,
+.server-edit-actions .action-buttons.left {
+  margin-right: auto;
+}
+
+.server-add-actions .action-buttons.right,
+.server-edit-actions .action-buttons.right {
+  margin-left: auto;
+}
+
+/* 액션바 버튼 공통 */
+.server-add-actions button,
+.server-edit-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--bls-btn-height);
+  padding: 0 22px;
+  border-radius: var(--bls-btn-radius);
+  font-size: var(--bls-btn-font-size);
+  font-weight: var(--bls-btn-font-weight);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: var(--bls-btn-min-width);
+  line-height: 1;
+  border: 1px solid var(--bls-btn-secondary-border);
+  background: var(--bls-btn-secondary-bg);
+  color: var(--bls-btn-secondary-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.server-add-actions button:hover,
+.server-edit-actions button:hover {
+  background: var(--bls-btn-secondary-hover);
+  border-color: #bcc2ca;
+}
+
+.server-add-actions button:focus-visible,
+.server-edit-actions button:focus-visible {
+  outline: 2px solid var(--bls-input-focus-border);
+  outline-offset: 2px;
+}
+
+.server-add-actions button:disabled,
+.server-edit-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 주 액션 버튼 */
+.server-add-actions .btn-primary,
+.server-edit-actions .btn-primary {
+  background: var(--bls-btn-primary-bg);
+  color: var(--bls-btn-primary-color);
+  border-color: var(--bls-btn-primary-bg);
+  box-shadow: 0 1px 3px rgba(51, 65, 85, 0.18);
+}
+
+.server-add-actions .btn-primary:hover,
+.server-edit-actions .btn-primary:hover {
+  background: var(--bls-btn-primary-hover);
+  border-color: var(--bls-btn-primary-hover);
+  box-shadow: 0 2px 6px rgba(51, 65, 85, 0.25);
+}
+
+/* 보조 액션 (취소) */
+.server-add-actions .btn-secondary,
+.server-edit-actions .btn-secondary {
+  background: var(--bls-btn-secondary-bg);
+  color: var(--bls-btn-secondary-color);
+  border-color: var(--bls-btn-secondary-border);
+}
+
+.server-add-actions .btn-secondary:hover,
+.server-edit-actions .btn-secondary:hover {
+  background: var(--bls-btn-secondary-hover);
+  color: #334155;
+  border-color: #b0b6c0;
+}
+
+/* 위험 액션 (삭제) */
+.server-add-actions .btn-danger,
+.server-edit-actions .btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.server-add-actions .btn-danger:hover,
+.server-edit-actions .btn-danger:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+
+/* =========================================================================
+   6. 폼 섹션 (Section Header + Content)
+   ========================================================================= */
+
+.form-section {
+  margin-bottom: var(--bls-section-gap);
+  padding: var(--bls-section-padding);
+}
+
+.form-section:last-child {
+  margin-bottom: 8px;
+}
+
+/* 섹션 헤더: 좌측 포인트 바 + 제목 + 구분선 */
+.form-section .section-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bls-section-border);
+  position: relative;
+}
+
+.form-section .section-header h4 {
+  margin: 0;
+  font-size: var(--bls-section-title-size);
+  font-weight: 600;
+  color: var(--bls-section-title-color);
+  position: relative;
+  padding-left: 14px;
+  line-height: 1.4;
+}
+
+.form-section .section-header h4::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--bls-section-accent);
+  border-radius: 2px;
+}
+
+/* 섹션 간 구분 (edit 모달에서 동적 생성 시) */
+.server-edit-body .form-section + .form-section {
+  padding-top: 24px;
+  margin-top: 4px;
+}
+
+
+/* =========================================================================
+   7. 폼 그리드 (2열 기본)
+   ========================================================================= */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--bls-field-gap);
+}
+
+/* 전체 폭 필드 (textarea, 비고, 상세 설명) */
+.form-grid .form-row.form-row-wide {
+  grid-column: 1 / -1;
+}
+
+
+/* =========================================================================
+   8. 폼 행 (label + input)
+   ========================================================================= */
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-row label {
+  font-size: var(--bls-field-label-size);
+  font-weight: var(--bls-field-label-weight);
+  color: var(--bls-field-label-color);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 필수 표시 */
+.form-row label .required {
+  color: var(--bls-required-color);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+
+/* =========================================================================
+   9. 폼 입력 필드 (통합 스타일)
+   ========================================================================= */
+
+.server-add-modal .form-input,
+.server-edit-modal .form-input,
+.server-add-modal select.form-input,
+.server-edit-modal select.form-input {
+  height: var(--bls-input-height);
+  padding: var(--bls-input-padding);
+  background: var(--bls-input-bg);
+  border: 1px solid var(--bls-input-border);
+  border-radius: var(--bls-input-radius);
+  font-size: var(--bls-input-font-size);
+  color: var(--bls-input-color);
+  font-family: inherit;
+  letter-spacing: normal;
+  line-height: var(--bls-input-height);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* placeholder */
+.server-add-modal .form-input::placeholder,
+.server-edit-modal .form-input::placeholder {
+  color: var(--bls-input-placeholder);
+  font-weight: 400;
+}
+
+/* 포커스 */
+.server-add-modal .form-input:focus,
+.server-edit-modal .form-input:focus {
+  outline: none;
+  border-color: var(--bls-input-focus-border);
+  box-shadow: 0 0 0 3px var(--bls-input-focus-ring);
+}
+
+/* 비활성 */
+.server-add-modal .form-input:disabled,
+.server-edit-modal .form-input:disabled,
+.server-add-modal .form-input[readonly],
+.server-edit-modal .form-input[readonly] {
+  background: var(--bls-input-disabled-bg);
+  color: var(--bls-input-disabled-color);
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+/* 에러 상태 */
+.server-add-modal .form-input.is-error,
+.server-edit-modal .form-input.is-error {
+  border-color: var(--bls-input-error-border);
+  box-shadow: 0 0 0 3px var(--bls-input-error-ring);
+}
+
+.server-add-modal .form-input.is-error:focus,
+.server-edit-modal .form-input.is-error:focus {
+  border-color: var(--bls-input-error-border);
+  box-shadow: 0 0 0 3px var(--bls-input-error-ring);
+}
+
+/* 성공 상태 */
+.server-add-modal .form-input.is-success,
+.server-edit-modal .form-input.is-success {
+  border-color: var(--bls-input-success-border);
+  box-shadow: 0 0 0 3px var(--bls-input-success-ring);
+}
+
+/* Textarea */
+.server-add-modal .form-input.textarea-large,
+.server-edit-modal .form-input.textarea-large,
+.server-add-modal textarea.form-input,
+.server-edit-modal textarea.form-input {
+  height: auto;
+  min-height: 120px;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* 드롭다운 (select) — 화살표 아이콘 */
+.server-add-modal select.form-input,
+.server-edit-modal select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+  padding-right: 36px;
+}
+
+/* search-select 래퍼 (커스텀 드롭다운) */
+.server-add-modal .form-input.search-select,
+.server-edit-modal .form-input.search-select {
+  cursor: pointer;
+}
+
+/* 날짜 입력 */
+.server-add-modal input[type="date"].form-input,
+.server-edit-modal input[type="date"].form-input {
+  padding-right: 12px;
+}
+
+
+/* =========================================================================
+   10. 필드 에러 메시지
+   ========================================================================= */
+
+.field-error-msg {
+  display: none;
+  font-size: 12px;
+  color: var(--bls-input-error-color);
+  margin-top: 2px;
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+.form-row.has-error .field-error-msg {
+  display: block;
+}
+
+.form-row.has-error .form-input {
+  border-color: var(--bls-input-error-border);
+  box-shadow: 0 0 0 3px var(--bls-input-error-ring);
+}
+
+/* 도움말 텍스트 */
+.field-help-text {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+
+/* =========================================================================
+   11. 삭제/확인 모달 (Dispose 레이아웃)
+   ========================================================================= */
+
+.system-delete-modal .server-add-content,
+.system-dispose-modal .server-add-content,
+.blossom-message-modal .server-add-content {
+  max-width: 660px;
+}
+.blossom-message-modal .server-add-content {
+  width: 620px;
+}
+.blossom-message-modal {
+  --bls-modal-width: 620px;
+}
+
+.system-delete-modal .server-add-header,
+.system-dispose-modal .server-add-header,
+.blossom-message-modal .server-add-header {
+  padding: 20px 32px 16px;
+}
+
+.system-delete-modal .server-add-body,
+.system-dispose-modal .server-add-body,
+.blossom-message-modal .server-add-body {
+  padding: 16px 0 20px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.dispose-title {
+  display: block;
+}
+
+.dispose-title h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--bls-modal-title-color);
+}
+
+.dispose-title p {
+  margin: 0;
+  font-size: var(--bls-modal-subtitle-size);
+  color: var(--bls-modal-subtitle-color);
+}
+
+.dispose-content {
+  margin: 0 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.dispose-text {
+  flex: 1 1 auto;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.dispose-text p {
+  margin: 0 0 8px;
+}
+
+.dispose-illust {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dispose-illust img {
+  width: 200px;
+  max-width: min(34vw, 220px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.06));
+  border-radius: 10px;
+}
+
+
+/* =========================================================================
+   12. 컬럼 선택 모달 (기본) — Section 22에서 통합 디자인 제공
+   ========================================================================= */
+
+
+/* =========================================================================
+   13. 다운로드 모달 — 삭제 모달과 동일한 dispose 레이아웃
+   ========================================================================= */
+
+/* 다운로드/삭제 모달 공용 디자인 토큰 (tab15-file.css 등에서 참조) */
+:root {
+  --bls-download-modal-width: 660px;
+  --bls-download-modal-radius: 14px;
+  --bls-download-modal-shadow: 0 12px 40px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --bls-download-modal-border: rgba(148, 163, 184, 0.26);
+  --bls-download-modal-divider: #e3e6eb;
+  --bls-download-modal-surface: #fafbfc;
+  --bls-download-modal-header-padding: 20px 32px 16px;
+  --bls-download-modal-body-padding: 16px 0 20px;
+  --bls-download-modal-footer-padding: 18px 36px;
+  --bls-download-modal-gap: 24px;
+  --bls-download-modal-title-size: 20px;
+  --bls-download-modal-title-weight: 600;
+  --bls-download-modal-title-color: #1e293b;
+  --bls-download-modal-subtitle-size: 13px;
+  --bls-download-modal-subtitle-color: #64748b;
+  --bls-download-modal-primary-size: 14px;
+  --bls-download-modal-primary-color: #475569;
+  --bls-download-modal-secondary-size: 13px;
+  --bls-download-modal-secondary-color: #94a3b8;
+  --bls-download-modal-close-size: 34px;
+  --bls-download-modal-close-border: #e5e7eb;
+  --bls-download-modal-close-bg: #ffffff;
+  --bls-download-modal-close-hover-bg: #f1f5f9;
+  --bls-download-modal-close-hover-border: #d1d5db;
+  --bls-download-modal-option-border: rgba(203, 213, 225, 0.9);
+  --bls-download-modal-option-bg: #ffffff;
+  --bls-download-modal-option-hover-bg: #f8fbff;
+  --bls-download-modal-option-text: #334155;
+  --bls-download-modal-button-height: 40px;
+  --bls-download-modal-button-min-width: 100px;
+  --bls-download-modal-button-radius: 8px;
+}
+
+/* 다운로드/메시지 모달: 삭제 모달과 동일하게 max-width 660px */
+.bls-download-modal .server-add-content,
+.bls-download-modal .server-edit-content,
+.system-download-modal .server-add-content,
+.system-download-modal .server-edit-content,
+.system-message-modal .server-add-content,
+.system-message-modal .server-edit-content {
+  max-width: 660px;
+}
+
+.bls-download-modal .server-add-header,
+.bls-download-modal .server-edit-header,
+.system-download-modal .server-add-header,
+.system-download-modal .server-edit-header,
+.system-message-modal .server-add-header,
+.system-message-modal .server-edit-header {
+  padding: 20px 32px 16px;
+}
+
+.bls-download-modal .server-add-body,
+.bls-download-modal .server-edit-body,
+.system-download-modal .server-add-body,
+.system-download-modal .server-edit-body,
+.system-message-modal .server-add-body,
+.system-message-modal .server-edit-body {
+  padding: 16px 0 20px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.bls-download-modal .dispose-content,
+.system-download-modal .dispose-content,
+.system-message-modal .dispose-content {
+  margin: 0 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.bls-download-modal .dispose-text,
+.system-download-modal .dispose-text,
+.system-message-modal .dispose-text {
+  flex: 1 1 auto;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.bls-download-modal .dispose-text p,
+.system-download-modal .dispose-text p,
+.system-message-modal .dispose-text p {
+  margin: 0 0 8px;
+}
+
+.bls-download-modal .dispose-illust,
+.bls-download-modal .message-illust,
+.system-download-modal .dispose-illust,
+.system-message-modal .message-illust {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bls-download-modal .dispose-illust img,
+.bls-download-modal .message-illust img,
+.system-download-modal .dispose-illust img,
+.system-message-modal .message-illust img {
+  width: 200px;
+  max-width: min(34vw, 220px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.06));
+  border-radius: 10px;
+}
+
+/* 라디오 그룹 (다운로드 범위 선택) */
+.bls-download-modal .form-radio-group,
+.system-download-modal .form-radio-group {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.bls-download-modal .form-radio-group label,
+.system-download-modal .form-radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bls-download-modal .form-radio-group label:hover,
+.system-download-modal .form-radio-group label:hover {
+  background: #f8fbff;
+  border-color: rgba(99, 102, 241, 0.24);
+}
+
+.bls-download-modal .form-radio-group input[type="radio"],
+.system-download-modal .form-radio-group input[type="radio"] {
+  accent-color: var(--bls-input-focus-border);
+}
+
+.bls-download-modal .form-radio-group label:has(input[type="radio"]:checked),
+.system-download-modal .form-radio-group label:has(input[type="radio"]:checked) {
+  border-color: rgba(99, 102, 241, 0.42);
+  background: #eff4ff;
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.1);
+}
+
+/* ---- 페이지 CSS 충돌 방지 (higher specificity) ---- */
+.bls-download-modal.system-download-modal .server-add-content,
+.bls-download-modal.system-download-modal .server-edit-content {
+  max-width: 660px;
+}
+
+.bls-download-modal.system-download-modal .server-add-header,
+.bls-download-modal.system-download-modal .server-edit-header {
+  padding: 20px 32px 16px;
+}
+
+.bls-download-modal.system-download-modal .server-add-body,
+.bls-download-modal.system-download-modal .server-edit-body {
+  padding: 16px 0 20px;
+  min-height: auto;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.bls-download-modal.system-download-modal .dispose-content {
+  margin: 0 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.bls-download-modal.system-download-modal .dispose-text {
+  flex: 1 1 auto;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.bls-download-modal.system-download-modal .dispose-illust {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bls-download-modal.system-download-modal .dispose-illust img {
+  width: 200px;
+  max-width: min(34vw, 220px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.06));
+  border-radius: 10px;
+}
+
+
+/* =========================================================================
+   14. 반응형 디자인
+   ========================================================================= */
+
+/* 태블릿 */
+@media (max-width: 768px) {
+  .server-add-content,
+  .server-edit-content {
+    width: 96vw;
+    max-width: 96vw;
+    min-width: 0;
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+
+  .server-add-header,
+  .server-edit-header {
+    padding: 20px 24px 16px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .server-add-title h3,
+  .server-edit-title h3 {
+    font-size: 18px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .form-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+  }
+
+  .server-add-actions,
+  .server-edit-actions {
+    padding: 16px 24px;
+    flex-direction: row;
+    gap: 10px;
+  }
+
+  .server-add-actions button,
+  .server-edit-actions button {
+    min-width: 80px;
+    padding: 0 16px;
+  }
+
+  .dispose-content {
+    margin: 0 24px;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .dispose-illust img {
+    width: 160px;
+    max-width: 60vw;
+  }
+
+  .bls-download-modal .server-add-content,
+  .bls-download-modal .server-edit-content,
+  .system-download-modal .server-add-content,
+  .system-download-modal .server-edit-content,
+  .system-message-modal .server-add-content,
+  .system-message-modal .server-edit-content {
+    width: min(100% - 20px, 100%);
+    max-width: min(100% - 20px, 660px);
+  }
+
+  .bls-download-modal .server-add-header,
+  .bls-download-modal .server-edit-header,
+  .system-download-modal .server-add-header,
+  .system-download-modal .server-edit-header,
+  .system-message-modal .server-add-header,
+  .system-message-modal .server-edit-header {
+    padding: 18px 24px 14px;
+  }
+
+  .bls-download-modal .server-add-body,
+  .bls-download-modal .server-edit-body,
+  .system-download-modal .server-add-body,
+  .system-download-modal .server-edit-body,
+  .system-message-modal .server-add-body,
+  .system-message-modal .server-edit-body {
+    padding: 14px 0 16px;
+  }
+
+  .bls-download-modal .dispose-content,
+  .system-download-modal .dispose-content,
+  .system-message-modal .dispose-content {
+    margin: 0 24px;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .bls-download-modal .dispose-illust,
+  .bls-download-modal .message-illust,
+  .system-download-modal .dispose-illust,
+  .system-message-modal .message-illust {
+    order: -1;
+  }
+
+  .bls-download-modal .dispose-illust img,
+  .bls-download-modal .message-illust img,
+  .system-download-modal .dispose-illust img,
+  .system-message-modal .message-illust img {
+    width: 160px;
+    max-width: 60vw;
+  }
+
+  .bls-download-modal .server-add-actions,
+  .bls-download-modal .server-edit-actions,
+  .system-download-modal .server-add-actions,
+  .system-download-modal .server-edit-actions,
+  .system-message-modal .server-add-actions,
+  .system-message-modal .server-edit-actions {
+    padding: 14px 24px;
+  }
+}
+
+/* 모바일 */
+@media (max-width: 480px) {
+  .server-add-content,
+  .server-edit-content {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .server-add-header,
+  .server-edit-header {
+    border-radius: 0;
+    padding: 16px 20px 14px;
+  }
+
+  .form-section {
+    padding: 0 20px;
+  }
+
+  .server-add-actions,
+  .server-edit-actions {
+    padding: 14px 20px;
+  }
+
+  .bls-download-modal .server-add-content,
+  .bls-download-modal .server-edit-content,
+  .system-download-modal .server-add-content,
+  .system-download-modal .server-edit-content,
+  .system-message-modal .server-add-content,
+  .system-message-modal .server-edit-content {
+    width: calc(100% - 12px);
+    max-width: calc(100% - 12px);
+  }
+
+  .bls-download-modal .server-add-header,
+  .bls-download-modal .server-edit-header,
+  .system-download-modal .server-add-header,
+  .system-download-modal .server-edit-header,
+  .system-message-modal .server-add-header,
+  .system-message-modal .server-edit-header {
+    padding: 16px 20px 12px;
+  }
+
+  .bls-download-modal .server-add-body,
+  .bls-download-modal .server-edit-body,
+  .system-download-modal .server-add-body,
+  .system-download-modal .server-edit-body,
+  .system-message-modal .server-add-body,
+  .system-message-modal .server-edit-body {
+    padding: 12px 0 14px;
+  }
+
+  .bls-download-modal .dispose-content,
+  .system-download-modal .dispose-content,
+  .system-message-modal .dispose-content {
+    margin: 0 20px;
+  }
+}
+
+
+/* =========================================================================
+   15. 접근성 & 포커스 관리
+   ========================================================================= */
+
+/* 모달 내 포커스 가시성 */
+.server-add-modal :focus-visible,
+.server-edit-modal :focus-visible {
+  outline: 2px solid var(--bls-input-focus-border);
+  outline-offset: 2px;
+}
+
+/* 입력 필드 포커스는 자체 스타일로 대체 */
+.server-add-modal .form-input:focus-visible,
+.server-edit-modal .form-input:focus-visible {
+  outline: none;
+}
+
+/* 스크린리더 전용 */
+.bls-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* 포커스 트랩 — 모달이 열려 있을 때 뒤쪽 요소 탭 방지 */
+.server-add-modal[aria-hidden="true"],
+.server-edit-modal[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+
+/* =========================================================================
+   16. 유틸리티 클래스
+   ========================================================================= */
+
+/* 모달 내에서 사용 가능한 도우미 클래스 */
+.bls-modal-wide {
+  --bls-modal-width: 1060px;
+}
+
+.bls-modal-narrow {
+  --bls-modal-width: 580px;
+}
+
+.bls-modal-compact {
+  --bls-modal-width: 440px;
+}
+
+/* 도우미 텍스트 */
+.helper-text {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-top: 4px;
+  padding: 0 36px;
+}
+
+
+/* =========================================================================
+   17. 애니메이션
+   ========================================================================= */
+
+@keyframes bls-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bls-modal-slide-up {
+  from {
+    transform: translate(-50%, -48%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
+
+.server-add-modal.show .server-add-content,
+.server-edit-modal.show .server-edit-content {
+  animation: bls-modal-slide-up 0.22s ease-out;
+}
+
+
+/* =========================================================================
+   18. 인쇄 시 숨김
+   ========================================================================= */
+
+@media print {
+  .server-add-modal,
+  .server-edit-modal {
+    display: none !important;
+  }
+}
+
+
+/* =========================================================================
+   19. 우선순위 오버라이드
+   ========================================================================
+   페이지별 CSS(detail.css, center.css 등)에서 동일 선택자로 재정의하는
+   기본 모달 스타일을 이 블록이 확실히 이기도록
+   부모-자식 선택자(specificity 0-2-0)로 핵심 속성을 선언한다.
+   ========================================================================= */
+
+/* 모달 카드 */
+.server-add-modal .server-add-content,
+.server-edit-modal .server-edit-content {
+  background: var(--bls-modal-bg);
+  border-radius: var(--bls-modal-radius);
+  box-shadow: var(--bls-modal-shadow);
+  width: var(--bls-modal-width);
+  max-width: var(--bls-modal-max-width);
+  max-height: var(--bls-modal-max-height);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 헤더 */
+.server-add-modal .server-add-header,
+.server-edit-modal .server-edit-header {
+  background: var(--bls-modal-header-bg);
+  padding: var(--bls-modal-header-padding);
+  border-bottom: 1px solid var(--bls-modal-header-border);
+  border-radius: var(--bls-modal-radius) var(--bls-modal-radius) 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.server-add-modal .server-add-title h3,
+.server-edit-modal .server-edit-title h3 {
+  margin: 0 0 4px;
+  font-size: var(--bls-modal-title-size);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--bls-modal-title-color);
+}
+
+.server-add-modal .server-add-subtitle,
+.server-edit-modal .server-edit-subtitle {
+  margin: 0;
+  font-size: var(--bls-modal-subtitle-size);
+  color: var(--bls-modal-subtitle-color);
+  font-weight: 400;
+}
+
+/* 본문 */
+.server-add-modal .server-add-body,
+.server-edit-modal .server-edit-body {
+  background: var(--bls-modal-body-bg);
+  padding: var(--bls-modal-body-padding);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 하단 액션바 */
+.server-add-modal .server-add-actions,
+.server-edit-modal .server-edit-actions {
+  background: var(--bls-modal-footer-bg);
+  padding: var(--bls-modal-footer-padding);
+  border-top: 1px solid var(--bls-modal-footer-border);
+  box-shadow: var(--bls-modal-footer-shadow);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 폼 섹션 */
+.server-add-modal .form-section,
+.server-edit-modal .form-section {
+  margin-bottom: var(--bls-section-gap);
+  padding: var(--bls-section-padding);
+}
+
+.server-add-modal .form-section .section-header,
+.server-edit-modal .form-section .section-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bls-section-border);
+}
+
+.server-add-modal .form-section .section-header h4,
+.server-edit-modal .form-section .section-header h4 {
+  font-size: var(--bls-section-title-size);
+  font-weight: 600;
+  color: var(--bls-section-title-color);
+  padding-left: 14px;
+}
+
+.server-add-modal .form-section .section-header h4::before,
+.server-edit-modal .form-section .section-header h4::before {
+  width: 3px;
+  height: 16px;
+  background: var(--bls-section-accent);
+  border-radius: 2px;
+}
+
+/* 폼 그리드 */
+.server-add-modal .form-grid,
+.server-edit-modal .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--bls-field-gap);
+}
+
+/* 폼 라벨 */
+.server-add-modal .form-row label,
+.server-edit-modal .form-row label {
+  font-size: var(--bls-field-label-size);
+  font-weight: var(--bls-field-label-weight);
+  color: var(--bls-field-label-color);
+}
+
+/* 태블릿 오버라이드 */
+@media (max-width: 768px) {
+  .server-add-modal .server-add-content,
+  .server-edit-modal .server-edit-content {
+    width: 96vw;
+    max-width: 96vw;
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+
+  .server-add-modal .form-grid,
+  .server-edit-modal .form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+
+/* =========================================================================
+   20. 상태 기반 알림 모달 시스템 (AlertModal)
+   =========================================================================
+   INFO / SUCCESS / WARNING / ERROR 네 가지 타입.
+   컴팩트(420-520px), 아이콘 중심, 빠른 인지 최적화.
+   ========================================================================= */
+
+/* ── 20-0. 알림 모달 디자인 토큰 ── */
+:root {
+  --bls-alert-width: 460px;
+  --bls-alert-max-width: 92vw;
+  --bls-alert-radius: 14px;
+  --bls-alert-shadow: 0 16px 48px rgba(15, 23, 42, 0.20), 0 2px 10px rgba(15, 23, 42, 0.06);
+  --bls-alert-bg: #ffffff;
+  --bls-alert-z: 1400;
+
+  /* 타입별 컬러 */
+  --bls-alert-info: #3b82f6;
+  --bls-alert-info-bg: #eff6ff;
+  --bls-alert-info-border: #bfdbfe;
+  --bls-alert-success: #10b981;
+  --bls-alert-success-bg: #ecfdf5;
+  --bls-alert-success-border: #a7f3d0;
+  --bls-alert-warning: #f59e0b;
+  --bls-alert-warning-bg: #fffbeb;
+  --bls-alert-warning-border: #fde68a;
+  --bls-alert-error: #ef4444;
+  --bls-alert-error-bg: #fef2f2;
+  --bls-alert-error-border: #fecaca;
+}
+
+
+/* ── 20-1. 오버레이 ── */
+.bls-alert-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.40);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: var(--bls-alert-z);
+  /* 가운데 정렬용 flex */
+  justify-content: center;
+  align-items: center;
+}
+.bls-alert-overlay.show {
+  display: flex;
+}
+
+
+/* ── 20-2. 카드 컨테이너 ── */
+.bls-alert-card {
+  position: relative;
+  background: var(--bls-alert-bg);
+  border-radius: var(--bls-alert-radius);
+  box-shadow: var(--bls-alert-shadow);
+  width: var(--bls-alert-width);
+  max-width: var(--bls-alert-max-width);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: blsAlertSlideUp 0.22s ease-out;
+}
+
+@keyframes blsAlertSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+
+/* ── 20-3. 상단 컬러 인디케이터 바 ── */
+.bls-alert-card::before {
+  content: "";
+  display: block;
+  height: 4px;
+  flex-shrink: 0;
+  background: var(--_alert-color, var(--bls-alert-info));
+  border-radius: var(--bls-alert-radius) var(--bls-alert-radius) 0 0;
+}
+
+
+/* ── 20-4. 닫기 버튼 ── */
+.bls-alert-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  z-index: 1;
+  padding: 0;
+  line-height: 1;
+}
+.bls-alert-close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+.bls-alert-close:focus-visible {
+  outline: 2px solid var(--_alert-color, var(--bls-alert-info));
+  outline-offset: 2px;
+}
+.bls-alert-close svg {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+
+/* ── 20-5. 본문 영역 ── */
+.bls-alert-body {
+  padding: 28px 32px 20px;
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+
+/* ── 20-6. 아이콘 영역 ── */
+.bls-alert-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--_alert-icon-bg, var(--bls-alert-info-bg));
+  border: 1px solid var(--_alert-icon-border, var(--bls-alert-info-border));
+}
+.bls-alert-icon svg {
+  width: 22px;
+  height: 22px;
+  color: var(--_alert-color, var(--bls-alert-info));
+}
+
+
+/* ── 20-7. 텍스트 콘텐츠 ── */
+.bls-alert-text {
+  flex: 1;
+  min-width: 0;
+  padding-right: 24px; /* 닫기 버튼과 겹침 방지 */
+}
+.bls-alert-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.bls-alert-message {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+
+/* ── 20-8. 하단 액션 버튼 영역 ── */
+.bls-alert-actions {
+  padding: 16px 32px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+
+/* ── 20-9. 버튼 ── */
+.bls-alert-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: 80px;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.bls-alert-btn:focus-visible {
+  outline: 2px solid var(--_alert-color, var(--bls-alert-info));
+  outline-offset: 2px;
+}
+
+/* 세컨더리(취소) */
+.bls-alert-btn-cancel {
+  background: #ffffff;
+  color: #475569;
+  border-color: #d1d5db;
+}
+.bls-alert-btn-cancel:hover {
+  background: #f8fafc;
+  border-color: #9ca3af;
+}
+
+/* 프라이머리(확인/진행) — 타입별 컬러 적용 */
+.bls-alert-btn-primary {
+  background: var(--_alert-color, var(--bls-alert-info));
+  color: #ffffff;
+  border-color: var(--_alert-color, var(--bls-alert-info));
+}
+.bls-alert-btn-primary:hover {
+  filter: brightness(0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* 위험 액션 (삭제 등) — WARNING/ERROR 전용 */
+.bls-alert-btn-danger {
+  background: var(--bls-alert-error);
+  color: #ffffff;
+  border-color: var(--bls-alert-error);
+}
+.bls-alert-btn-danger:hover {
+  filter: brightness(0.90);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+}
+
+
+/* ── 20-10. 타입별 CSS 커스텀 프로퍼티 매핑 ── */
+.bls-alert-overlay[data-alert-type="info"] .bls-alert-card {
+  --_alert-color: var(--bls-alert-info);
+  --_alert-icon-bg: var(--bls-alert-info-bg);
+  --_alert-icon-border: var(--bls-alert-info-border);
+}
+.bls-alert-overlay[data-alert-type="success"] .bls-alert-card {
+  --_alert-color: var(--bls-alert-success);
+  --_alert-icon-bg: var(--bls-alert-success-bg);
+  --_alert-icon-border: var(--bls-alert-success-border);
+}
+.bls-alert-overlay[data-alert-type="warning"] .bls-alert-card {
+  --_alert-color: var(--bls-alert-warning);
+  --_alert-icon-bg: var(--bls-alert-warning-bg);
+  --_alert-icon-border: var(--bls-alert-warning-border);
+}
+.bls-alert-overlay[data-alert-type="error"] .bls-alert-card {
+  --_alert-color: var(--bls-alert-error);
+  --_alert-icon-bg: var(--bls-alert-error-bg);
+  --_alert-icon-border: var(--bls-alert-error-border);
+}
+
+
+/* ── 20-11. 반응형 ── */
+@media (max-width: 520px) {
+  .bls-alert-card {
+    width: 96vw;
+    border-radius: 12px;
+  }
+  .bls-alert-body {
+    padding: 24px 20px 16px;
+    gap: 14px;
+  }
+  .bls-alert-actions {
+    padding: 12px 20px 20px;
+  }
+  .bls-alert-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .bls-alert-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  .bls-alert-title {
+    font-size: 15px;
+  }
+}
+
+
+/* ── 20-12. 접근성 ── */
+.bls-alert-overlay:focus {
+  outline: none;
+}
+.bls-alert-card:focus {
+  outline: none;
+}
+/* High-contrast mode support */
+@media (forced-colors: active) {
+  .bls-alert-card::before {
+    background: Highlight;
+  }
+  .bls-alert-icon {
+    border-color: Highlight;
+  }
+  .bls-alert-btn-primary {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}
+
+
+/* ── 20-13. 프린트 ── */
+@media print {
+  .bls-alert-overlay {
+    display: none !important;
+  }
+}
+
+
+/* =========================================================================
+   21. 업로드 모달 통합 디자인 (Upload Modal)
+   =========================================================================
+   서비스 전반의 엑셀/파일 업로드 모달에 대한 공통 레이아웃·여백·간격.
+   .system-upload-modal 셀렉터를 사용하며, 페이지별 CSS 중복 정의를
+   확실히 오버라이드하기 위해 부모-자식 선택자로 작성한다.
+   ========================================================================= */
+
+/* ── 21-1. 모달 컨테이너 폭 ── */
+.system-upload-modal .server-add-content {
+  max-width: 720px;
+}
+
+/* ── 21-2. 본문 영역 여백 (핵심 수정) ── */
+.system-upload-modal .server-add-body {
+  padding: 24px 32px 20px;
+}
+@media (max-width: 640px) {
+  .system-upload-modal .server-add-body {
+    padding: 20px 18px 16px;
+  }
+}
+
+/* ── 21-3. 드롭존 ── */
+.system-upload-modal .upload-dropzone {
+  border: 2px dashed #d0d7e3;
+  border-radius: 12px;
+  background: #fafbfd;
+  padding: 36px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.3);
+  margin: 0;
+}
+.system-upload-modal .upload-dropzone:hover {
+  background-color: #f4f7ff;
+  border-color: #b4c0d6;
+}
+.system-upload-modal .upload-dropzone.dragover {
+  border-color: var(--accent, #6366f1);
+  border-width: 2.5px;
+  background-color: rgba(99, 102, 241, 0.04);
+}
+
+/* 일러스트 / Lottie */
+.system-upload-modal .upload-illu {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.system-upload-modal .upload-illu .lottie-anim {
+  width: 80px;
+  height: 80px;
+  opacity: 0.95;
+}
+.system-upload-modal .upload-illu img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  opacity: 0.92;
+}
+@media (max-width: 640px) {
+  .system-upload-modal .upload-illu,
+  .system-upload-modal .upload-illu .lottie-anim,
+  .system-upload-modal .upload-illu img {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* 드롭존 텍스트 */
+.system-upload-modal .upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.system-upload-modal .upload-text.center {
+  text-align: center;
+}
+.system-upload-modal .upload-text strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: #1e293b;
+}
+.system-upload-modal .upload-dropzone.dragover .upload-text strong {
+  color: var(--accent, #6366f1);
+}
+@media (max-width: 640px) {
+  .system-upload-modal .upload-text strong {
+    font-size: 14px;
+  }
+}
+
+/* ── 21-4. 부가 정보 (확장자·사이즈) ── */
+.system-upload-modal .upload-subinfo {
+  display: flex;
+  justify-content: space-between;
+  margin: 14px 4px 0;
+  font-size: 12.5px;
+  color: #6b7280;
+}
+.system-upload-modal .upload-subinfo .sub-left,
+.system-upload-modal .upload-subinfo .sub-right {
+  color: #64748b;
+}
+
+/* ── 21-5. 파일 선택 정보 (file-chip) ── */
+.system-upload-modal .upload-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.system-upload-modal .file-chip {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-radius: 9999px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 21-6. 안내·경고 영역 ── */
+.system-upload-modal .upload-help {
+  margin-top: 20px;
+}
+.system-upload-modal .upload-warning {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: #d97706;
+  line-height: 1.65;
+}
+
+/* ── 21-7. 템플릿 카드 ── */
+.system-upload-modal .template-card {
+  margin-top: 12px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f5f7fb;
+  border: 1px solid #e5eaf3;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+.system-upload-modal .template-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 14px;
+}
+.system-upload-modal .template-icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.95;
+}
+.system-upload-modal .template-card .template-download-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border: 1px solid var(--accent, #6366f1);
+}
+.system-upload-modal .template-card .template-download-btn:hover {
+  filter: brightness(0.94);
+  transform: translateY(-1px);
+}
+.system-upload-modal .template-card .template-download-btn .template-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 1;
+  filter: brightness(0) invert(1) saturate(1) contrast(1);
+  transition: transform 0.2s ease;
+}
+.system-upload-modal .template-card .template-download-btn:hover .template-icon {
+  transform: scale(1.06);
+}
+
+/* ── 21-8. 하단 액션바 여백 ── */
+.system-upload-modal .server-add-actions {
+  padding: 16px 32px;
+}
+@media (max-width: 640px) {
+  .system-upload-modal .server-add-actions {
+    padding: 14px 18px;
+  }
+}
+
+/* ── 21-9. 프로그레스 바 ── */
+.system-upload-modal .upload-progress {
+  margin-top: 18px;
+}
+.system-upload-modal .upload-progress[hidden] {
+  display: none !important;
+}
+.system-upload-modal .upload-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.system-upload-modal .upload-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+.system-upload-modal .upload-progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent, #6366f1);
+  font-variant-numeric: tabular-nums;
+}
+.system-upload-modal .upload-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.system-upload-modal .upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #818cf8, #6366f1);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ── 21-10. 옵션 영역 (날짜 보정 등) ── */
+.system-upload-modal .upload-option {
+  margin-top: 14px;
+}
+
+/* ── 21-11. 반응형 ── */
+@media (max-width: 520px) {
+  .system-upload-modal .server-add-content {
+    max-width: 98vw;
+  }
+  .system-upload-modal .upload-dropzone {
+    padding: 28px 16px;
+    gap: 10px;
+  }
+}
+
+
+/* =========================================================================
+   22. 컬럼 선택 모달 통합 디자인 (Column Select Modal)
+   =========================================================================
+   대상: .system-column-modal (87+ 페이지에서 사용)
+   HTML: #system-column-modal.server-add-modal.system-column-modal.modal-overlay-full
+         > .server-add-content
+           > .server-add-header / .server-add-body.system-column-body
+           > .server-add-actions.system-column-actions
+   JS 생성: .form-section > .section-header h4 + .column-select-grid
+            > label.column-checkbox > input + .col-check + .col-text
+   ========================================================================= */
+
+/* ── 22-1. 컨테이너 (모달 크기/높이) ── */
+.system-column-modal.server-add-modal .server-add-content {
+  max-width: 720px;
+  height: auto;
+  max-height: var(--bls-modal-max-height);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 22-2. 본문 영역 (스크롤 + 여백) ── */
+.system-column-modal .system-column-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--bls-modal-body-padding);         /* 28px 0 — 수평 여백은 섹션이 담당 */
+}
+
+/* ── 22-3. 섹션 그룹 ── */
+.system-column-modal .system-column-body .form-section {
+  position: relative;
+  padding: var(--bls-section-padding);             /* 0 36px */
+  margin-bottom: var(--bls-section-gap);           /* 28px */
+}
+.system-column-modal .system-column-body .form-section:last-of-type {
+  margin-bottom: 8px;
+}
+.system-column-modal .system-column-body .form-section + .form-section {
+  padding-top: 24px;
+  margin-top: 4px;
+}
+
+/* ── 22-4. 섹션 헤더 (등록 모달과 동일) ── */
+.system-column-modal .form-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bls-section-border);  /* #eef0f3 */
+  position: relative;
+}
+.system-column-modal .form-section .section-header::before {
+  content: none !important;
+}
+.system-column-modal .form-section .section-header h4 {
+  font-size: var(--bls-section-title-size);        /* 15px */
+  font-weight: 600;
+  color: var(--bls-section-title-color);           /* #334155 */
+  margin: 0;
+  position: relative;
+  padding-left: 14px;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.system-column-modal .form-section .section-header h4::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--bls-section-accent);           /* gray gradient */
+  border-radius: 2px;
+}
+
+/* ── 22-5. 체크박스 그리드 ── */
+.system-column-modal .column-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 14px;
+}
+
+/* ── 22-6. 체크박스 칩 (label.column-checkbox) ── */
+.system-column-modal label.column-checkbox {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--bls-input-border);       /* #dce1e8 — input과 동일 */
+  padding: 9px 12px;
+  border-radius: var(--bls-input-radius);          /* 8px — input과 동일 */
+  font-size: 13px;
+  font-weight: var(--bls-field-label-weight);      /* 500 */
+  color: var(--bls-field-label-color);             /* #475569 */
+  cursor: pointer;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.16s ease, border-color 0.16s ease,
+    color 0.16s ease, box-shadow 0.16s ease;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.system-column-modal label.column-checkbox input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 체크 아이콘 박스 */
+.system-column-modal label.column-checkbox .col-check {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  position: relative;
+  transition: all 0.16s ease;
+}
+.system-column-modal label.column-checkbox .col-check::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-top: 0;
+  border-left: 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* 텍스트 */
+.system-column-modal label.column-checkbox .col-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 22-7. 체크박스 상태 (hover / focus / active) ── */
+.system-column-modal label.column-checkbox:hover {
+  background: #f8f9fb;
+  border-color: #c8cdd4;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+.system-column-modal label.column-checkbox:hover .col-check {
+  border-color: #94a3b8;
+}
+.system-column-modal label.column-checkbox:focus-within {
+  outline: none;
+  border-color: var(--bls-input-focus-border);     /* #94a3b8 — input focus와 동일 */
+  box-shadow: 0 0 0 3px var(--bls-input-focus-ring);  /* rgba(100,116,139,0.14) */
+  background: #fafbfc;
+}
+
+/* 선택됨 (is-active / selected) — 등록 모달 accent color 사용 */
+.system-column-modal label.column-checkbox.is-active,
+.system-column-modal label.column-checkbox.selected {
+  background: #f8f9fb;
+  border-color: var(--bls-btn-primary-bg);         /* #475569 */
+  color: var(--bls-modal-title-color);             /* #1e293b */
+}
+.system-column-modal label.column-checkbox.is-active .col-check,
+.system-column-modal label.column-checkbox.selected .col-check {
+  border-color: var(--bls-btn-primary-bg);         /* #475569 */
+  background: var(--bls-btn-primary-bg);           /* #475569 */
+}
+.system-column-modal label.column-checkbox.is-active .col-check::after,
+.system-column-modal label.column-checkbox.selected .col-check::after {
+  opacity: 1;
+}
+/* hardware.css 호환: ::after dot indicator 제거 (체크마크로 통일) */
+.system-column-modal label.column-checkbox.is-active::after {
+  content: none;
+}
+
+/* ── 22-8. 액션 푸터 (등록 모달 토큰 사용) ── */
+.system-column-modal .system-column-actions {
+  background: var(--bls-modal-footer-bg);          /* #f5f6f8 */
+  border-top: 1px solid var(--bls-modal-footer-border);  /* #e3e6eb */
+  box-shadow: var(--bls-modal-footer-shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--bls-modal-footer-padding);        /* 18px 36px */
+  gap: 10px;
+}
+.system-column-modal .system-column-actions .action-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+/* 버튼 공통 */
+.system-column-modal .system-column-actions .btn-secondary,
+.system-column-modal .system-column-actions .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--bls-btn-height);                   /* 40px */
+  padding: 0 22px;
+  border-radius: var(--bls-btn-radius);            /* 8px */
+  font-size: var(--bls-btn-font-size);             /* 14px */
+  font-weight: var(--bls-btn-font-weight);         /* 600 */
+  min-width: var(--bls-btn-min-width);             /* 100px */
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  line-height: 1;
+}
+/* 보조 버튼 */
+.system-column-modal .system-column-actions .btn-secondary {
+  background: var(--bls-btn-secondary-bg);         /* #ffffff */
+  border: 1px solid var(--bls-btn-secondary-border);  /* #d1d5db */
+  color: var(--bls-btn-secondary-color);           /* #475569 */
+}
+.system-column-modal .system-column-actions .btn-secondary:hover {
+  background: var(--bls-btn-secondary-hover);      /* #f1f5f9 */
+  color: #334155;
+  border-color: #b0b6c0;
+}
+/* 주 액션 버튼 */
+.system-column-modal .system-column-actions .btn-primary {
+  background: var(--bls-btn-primary-bg);           /* #475569 */
+  border: 1px solid var(--bls-btn-primary-bg);
+  color: var(--bls-btn-primary-color);             /* #ffffff */
+  box-shadow: 0 1px 3px rgba(51, 65, 85, 0.18);
+}
+.system-column-modal .system-column-actions .btn-primary:hover {
+  background: var(--bls-btn-primary-hover);        /* #334155 */
+  border-color: var(--bls-btn-primary-hover);
+  box-shadow: 0 2px 6px rgba(51, 65, 85, 0.25);
+}
+
+/* ── 22-9. 스크롤바 ── */
+.system-column-modal .system-column-body::-webkit-scrollbar {
+  width: 8px;
+}
+.system-column-modal .system-column-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.system-column-modal .system-column-body::-webkit-scrollbar-thumb {
+  background: #e0e3e8;
+  border-radius: 4px;
+  border: 2px solid var(--bls-modal-body-bg);
+}
+.system-column-modal .system-column-body::-webkit-scrollbar-thumb:hover {
+  background: #c8cdd4;
+}
+
+/* ── 22-10. 반응형 ── */
+@media (max-width: 680px) {
+  .system-column-modal.server-add-modal .server-add-content {
+    max-width: 96vw;
+    min-width: 0;
+  }
+  .system-column-modal .system-column-body {
+    padding: 20px 0 10px;
+  }
+  .system-column-modal .system-column-body .form-section {
+    padding: 0 20px;
+  }
+  .system-column-modal .column-select-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px 10px;
+  }
+  .system-column-modal .system-column-actions {
+    padding: 14px 20px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .system-column-modal .system-column-actions .action-buttons {
+    justify-content: center;
+    width: 100%;
+  }
+  .system-column-modal .system-column-actions .action-buttons.right {
+    justify-content: stretch;
+  }
+  .system-column-modal .system-column-actions .action-buttons.right .btn-primary {
+    flex: 1;
+  }
+}
+
+/* =====================================================================
+   Section 23 — 통계 분석 모달 통합 디자인 (Vendor Analytics Modal)
+   카테고리 리스트 + 상세 탭 공통 적용
+   ===================================================================== */
+
+/* 23-1. 모달 컨테이너 고정 사이즈 (리스트 + 상세 공통) */
+#system-analytics-modal .server-add-content,
+#hw-analytics-modal .server-add-content,
+#sw-analytics-modal .server-add-content,
+#comp-analytics-modal .server-add-content,
+#sys-analytics-modal .server-add-content {
+  max-width: 820px;
+  height: min(78vh, 640px);
+  max-height: 78vh;
+  overflow: hidden !important;
+}
+
+/* 23-2. 모달 body 레이아웃 (패딩 제거, flex stretch) */
+#system-analytics-modal .server-add-body,
+#hw-analytics-modal .server-add-body,
+#sw-analytics-modal .server-add-body,
+#comp-analytics-modal .server-add-body,
+#sys-analytics-modal .server-add-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden !important;
+  padding: 0;
+}
+
+/* 23-3. 스크롤바 숨김 */
+#system-analytics-modal .server-add-content,
+#system-analytics-modal .server-add-content *,
+#hw-analytics-modal .server-add-content,
+#hw-analytics-modal .server-add-content *,
+#sw-analytics-modal .server-add-content,
+#sw-analytics-modal .server-add-content *,
+#comp-analytics-modal .server-add-content,
+#comp-analytics-modal .server-add-content *,
+#sys-analytics-modal .server-add-content,
+#sys-analytics-modal .server-add-content * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#system-analytics-modal .server-add-content::-webkit-scrollbar,
+#system-analytics-modal .server-add-content *::-webkit-scrollbar,
+#hw-analytics-modal .server-add-content::-webkit-scrollbar,
+#hw-analytics-modal .server-add-content *::-webkit-scrollbar,
+#sw-analytics-modal .server-add-content::-webkit-scrollbar,
+#sw-analytics-modal .server-add-content *::-webkit-scrollbar,
+#comp-analytics-modal .server-add-content::-webkit-scrollbar,
+#comp-analytics-modal .server-add-content *::-webkit-scrollbar,
+#sys-analytics-modal .server-add-content::-webkit-scrollbar,
+#sys-analytics-modal .server-add-content *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* 23-4. analytics body 레이아웃 */
+.vendor-analytics-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+.vendor-analytics-empty {
+  text-align: center;
+  padding: 48px 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* 23-5. 탭 스트립 */
+.va-tab-strip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0;
+  padding: 0 32px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--bls-section-border, #e5e7eb);
+  background: #fafbfc;
+}
+.va-tab {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.va-tab:hover {
+  color: #475569;
+  background: rgba(0, 0, 0, .02);
+}
+.va-tab.active {
+  color: var(--bls-section-title-color, #1e293b);
+  font-weight: 700;
+  border-bottom-color: var(--bls-btn-primary-bg, #475569);
+  background: transparent;
+}
+.va-tab-count {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 2px 7px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.va-tab.active .va-tab-count {
+  color: var(--bls-btn-primary-bg, #475569);
+  background: #f0f2f5;
+}
+
+/* 23-6. 탭 콘텐츠 (스크롤) */
+.va-tab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 20px 32px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.va-tab-content::-webkit-scrollbar { display: none; }
+
+/* 23-7. 유형 섹션 카드 */
+.va-type-section {
+  background: #f8fafc;
+  border: 1px solid var(--bls-section-border, #e5e7eb);
+  border-radius: var(--bls-input-radius, 10px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.va-type-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.va-type-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bls-section-title-color, #1e293b);
+}
+.va-type-count {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  background: #e2e8f0;
+  border-radius: 8px;
+  padding: 2px 10px;
+}
+
+/* 23-8. Stacked bar 차트 */
+.va-sb-bar {
+  display: flex;
+  height: 28px;
+  min-height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.va-sb-seg {
+  display: block;
+  height: 100%;
+  min-height: 28px;
+  min-width: 3px;
+  transition: opacity .15s;
+  cursor: pointer;
+}
+.va-sb-seg:first-child { border-radius: 6px 0 0 6px; }
+.va-sb-seg:last-child { border-radius: 0 6px 6px 0; }
+.va-sb-seg:only-child { border-radius: 6px; }
+.va-sb-seg:hover { opacity: .75; }
+
+/* 23-9. 범례 칩 */
+.va-sb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 0 0;
+}
+.va-sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #475569;
+  white-space: nowrap;
+}
+.va-sb-chip b {
+  font-weight: 700;
+  color: var(--bls-section-title-color, #1e293b);
+}
+.va-sb-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 23-10. 플로팅 툴팁 */
+.va-sb-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+  white-space: nowrap;
+}
+.va-sb-tip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.va-sb-tip-name { font-weight: 600; }
+.va-sb-tip-val { color: #94a3b8; }
+
+/* 23-11. 도넛 차트 (컴포넌트 통계 분석) */
+.va-donut-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 0 8px;
+}
+.va-donut-chart {
+  position: relative;
+  flex: 0 0 auto;
+  width: 280px;
+  height: 280px;
+}
+.va-donut-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.va-donut-seg {
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.va-donut-seg:hover { opacity: .75; }
+.va-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.va-donut-total {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--bls-section-title-color, #1e293b);
+  line-height: 1.1;
+}
+.va-donut-label {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 2px;
+}
+.va-donut-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 560px;
+  border: 1px solid var(--bls-section-border, #e5e7eb);
+  border-radius: var(--bls-input-radius, 10px);
+  overflow: hidden;
+  background: #fff;
+}
+.va-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #475569;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  cursor: default;
+  transition: background .12s;
+}
+.va-donut-legend-item:nth-child(2n) { border-right: none; }
+.va-donut-legend-item:nth-last-child(1),
+.va-donut-legend-item:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+.va-donut-legend-item:last-child:nth-child(odd) { border-right: 1px solid #f1f5f9; }
+.va-donut-legend-item:hover { background: #f8fafc; }
+.va-donut-ldot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.va-donut-lname {
+  flex: 1 1 auto;
+  font-weight: 600;
+  color: var(--bls-section-title-color, #1e293b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.va-donut-lval {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--bls-section-title-color, #1e293b);
+  font-size: 13px;
+}
+.va-donut-lpct {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* 23-12. 반응형 */
+@media (max-width: 640px) {
+  #system-analytics-modal .server-add-content,
+  #hw-analytics-modal .server-add-content,
+  #sw-analytics-modal .server-add-content,
+  #comp-analytics-modal .server-add-content,
+  #sys-analytics-modal .server-add-content {
+    max-width: 98vw;
+    height: 85vh;
+    max-height: 85vh;
+  }
+  .va-tab-strip { padding: 0 16px; }
+  .va-tab-content { padding: 16px; }
+  .va-donut-chart { width: 220px; height: 220px; }
+  .va-donut-legend { grid-template-columns: 1fr; }
+}
+

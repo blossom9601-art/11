@@ -1,0 +1,664 @@
+/*
+ * tab15-file.css — 구성/파일 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────
+ * 모든 상세 페이지의 파일 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 공통값: 여백, 크기, 색상, 반지름, 그림자 등 모든 시각 속성
+ * ● 페이지 설정값: data-* 속성 또는 JS config 객체로 주입
+ *
+ * 버전: 1.0 (2026-03-18)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab15-file-root {
+    /* 색상 */
+    --t15-accent:          #6366f1;
+    --t15-accent-light:    #e0e7ff;
+    --t15-accent-hover:    rgba(99,102,241,.18);
+    --t15-danger:          #ef4444;
+    --t15-danger-light:    #fee2e2;
+    --t15-danger-border:   #fca5a5;
+    --t15-text:            #1f2937;
+    --t15-text-secondary:  #6b7280;
+    --t15-text-muted:      #94a3b8;
+    --t15-border:          #e5e7eb;
+    --t15-bg:              #ffffff;
+    --t15-bg-dropzone:     #fafbff;
+    --t15-bg-dragover:     #f5f3ff;
+    --t15-badge-bg:        #e0e7ff;
+    --t15-badge-text:      #4338ca;
+
+    /* 여백 */
+    --t15-section-padding:     0;
+    --t15-section-gap:         24px;
+    --t15-card-padding:        0;
+    --t15-dropzone-padding:    18px;
+    --t15-attach-item-padding: 10px 12px;
+
+    /* 크기 */
+    --t15-diagram-min-h:       320px;
+    --t15-dropzone-min-h:      110px;
+    --t15-icon-btn-size:       36px;
+    --t15-icon-btn-sm:         32px;
+    --t15-badge-min-w:         44px;
+    --t15-badge-h:             28px;
+    --t15-attach-item-h:       auto;
+
+    /* 반지름 */
+    --t15-radius-card:    16px;
+    --t15-radius-dropzone:12px;
+    --t15-radius-item:    12px;
+    --t15-radius-btn:     10px;
+    --t15-radius-full:    9999px;
+
+    /* 그림자 */
+    --t15-shadow-item:    0 2px 8px rgba(0,0,0,.04);
+    --t15-shadow-hover:   0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --t15-transition:     all .2s ease;
+}
+
+/* ── 구성도/첨부파일 그리드 비율 보정 ── */
+.tab15-file-root .basic-info-grid.grid-3-1 {
+    grid-template-columns: 7fr 3fr;
+}
+
+/* 양쪽 카드 헤더 높이 일치 (border-bottom 동일 선상)
+   좌측: padding 16px*2 + 버튼 36px = 68px  →  우측도 동일 */
+.tab15-file-root .basic-info-card-header {
+    min-height: 68px;
+    box-sizing: border-box;
+}
+
+/* ═══════════════════════════════════
+   1. 구성도 영역
+   ═══════════════════════════════════ */
+.tab15-file-root .t15-diagram-box {
+    min-height: var(--t15-diagram-min-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    border: 2px dashed var(--t15-border);
+    border-radius: var(--t15-radius-dropzone);
+    background: var(--t15-bg-dropzone);
+    cursor: pointer;
+    transition: var(--t15-transition);
+}
+.tab15-file-root .t15-diagram-box:focus {
+    outline: 2px solid #cbd5e1;
+    outline-offset: 2px;
+}
+.tab15-file-root .t15-diagram-box.dragover {
+    border-color: #8b5cf6;
+    background: var(--t15-bg-dragover);
+}
+.tab15-file-root .t15-diagram-box.has-image {
+    border-style: solid;
+    border-color: #d1d5db;
+    border-width: 1px;
+    background: var(--t15-bg);
+    display: block;
+    padding: 0;
+    min-height: 0;
+    cursor: default;
+}
+
+/* 구성도 placeholder */
+.tab15-file-root .t15-diagram-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--t15-text-secondary);
+    text-align: center;
+}
+.tab15-file-root .t15-diagram-box.has-image .t15-diagram-placeholder {
+    display: none !important;
+}
+.tab15-file-root .t15-diagram-empty-icon {
+    width: 56px;
+    height: 56px;
+    opacity: .55;
+}
+.tab15-file-root .t15-diagram-empty-text {
+    margin: 0;
+    font-size: 13px;
+    color: var(--t15-text-secondary);
+}
+
+/* 구성도 이미지 */
+.tab15-file-root .t15-diagram-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    margin: 0;
+}
+.tab15-file-root .t15-diagram-image[hidden],
+.tab15-file-root .t15-diagram-image:not([src]),
+.tab15-file-root .t15-diagram-image[src=""] {
+    display: none !important;
+}
+
+/* 구성도 안내 힌트 */
+.tab15-file-root .t15-diagram-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--t15-text-secondary);
+    position: relative;
+    padding-left: 12px;
+}
+.tab15-file-root .t15-diagram-hint::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #9ca3af;
+}
+
+/* ═══════════════════════════════════
+   2. 아이콘 버튼 (삭제/다운로드 공용)
+   ═══════════════════════════════════ */
+.tab15-file-root .t15-icon-btn {
+    width: var(--t15-icon-btn-size);
+    height: var(--t15-icon-btn-size);
+    border: 1px solid var(--t15-border);
+    background: var(--t15-bg);
+    color: #374151;
+    border-radius: var(--t15-radius-btn);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--t15-transition);
+    padding: 0;
+}
+.tab15-file-root .t15-icon-btn:hover {
+    background: var(--t15-accent) !important;
+    border-color: var(--t15-accent) !important;
+    color: #fff !important;
+    box-shadow: var(--t15-shadow-hover) !important;
+}
+.tab15-file-root .t15-icon-btn:hover .t15-action-icon {
+    filter: brightness(0) invert(1) contrast(1) !important;
+    opacity: 1 !important;
+    transform: scale(1.06);
+}
+.tab15-file-root .t15-icon-btn.danger:hover {
+    background: var(--t15-danger) !important;
+    border-color: var(--t15-danger) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(239,68,68,.32) !important;
+}
+.tab15-file-root .t15-icon-btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.tab15-file-root .t15-icon-btn:disabled:hover {
+    background: var(--t15-bg) !important;
+    border-color: var(--t15-border) !important;
+    box-shadow: none !important;
+}
+.tab15-file-root .t15-action-icon {
+    width: 18px;
+    opacity: .35;
+    height: 18px;
+    transition: var(--t15-transition);
+}
+
+/* ═══════════════════════════════════
+   3. 첨부파일 드롭존
+   ═══════════════════════════════════ */
+.tab15-file-root .t15-attach-dropzone {
+    margin-top: 12px;
+    border: 2px dashed var(--t15-border);
+    border-radius: var(--t15-radius-dropzone);
+    background: var(--t15-bg-dropzone);
+    color: var(--t15-text-secondary);
+    min-height: var(--t15-dropzone-min-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--t15-dropzone-padding);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--t15-transition);
+}
+.tab15-file-root .t15-attach-dropzone:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+.tab15-file-root .t15-attach-dropzone.dragover {
+    border-color: #8b5cf6;
+    background: var(--t15-bg-dragover);
+    color: #4f46e5;
+}
+
+/* ═══════════════════════════════════
+   4. 첨부파일 리스트
+   ═══════════════════════════════════ */
+.tab15-file-root .t15-attach-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.tab15-file-root .t15-attach-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid var(--t15-accent);
+    border-radius: 8px;
+    box-shadow: none;
+    overflow: hidden;
+    transition: var(--t15-transition);
+}
+.tab15-file-root .t15-attach-item:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+    border-left-color: var(--t15-accent);
+    box-shadow: 0 2px 8px rgba(99,102,241,.10);
+}
+
+/* 파일 칩 */
+.tab15-file-root .t15-file-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+.tab15-file-root .t15-file-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .3px;
+    flex-shrink: 0;
+}
+.tab15-file-root .t15-file-name {
+    font-weight: 600;
+    color: var(--t15-text);
+    font-size: 13px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 40ch;
+}
+.tab15-file-root .t15-file-size {
+    margin-left: 8px;
+    font-size: 11.5px;
+    color: var(--t15-text-muted);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+/* 칩 액션 버튼 */
+.tab15-file-root .t15-chip-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+.tab15-file-root .t15-chip-actions .t15-icon-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border-color: transparent;
+    background: transparent;
+}
+.tab15-file-root .t15-chip-actions .t15-icon-btn:hover {
+    border-color: var(--t15-accent) !important;
+}
+.tab15-file-root .t15-chip-actions .t15-icon-btn.danger:hover {
+    border-color: var(--t15-danger) !important;
+}
+
+/* 카운트 뱃지 */
+.tab15-file-root .t15-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 26px;
+    padding: 0 6px;
+    border-radius: var(--t15-radius-full);
+    background: var(--t15-accent-light);
+    color: var(--t15-accent);
+    font-size: 12px;
+    font-weight: 800;
+    vertical-align: middle;
+    margin-left: 6px;
+    transition: var(--t15-transition);
+}
+.tab15-file-root .t15-count-badge.large-number {
+    min-width: 26px;
+    font-size: 11px;
+}
+.tab15-file-root .t15-count-badge.very-large-number {
+    min-width: 32px;
+    font-size: 10px;
+}
+
+/* ═══════════════════════════════════
+   5. 빈 상태 (empty state)
+   ═══════════════════════════════════ */
+.tab15-file-root .t15-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    color: var(--t15-text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+.tab15-file-root .t15-empty-state svg {
+    width: 40px;
+    height: 40px;
+    opacity: .4;
+    margin-bottom: 8px;
+}
+
+/* ═══════════════════════════════════
+   6. 반응형
+   ═══════════════════════════════════ */
+@media (max-width: 1200px) {
+    .tab15-file-root .t15-file-name { max-width: 32ch; }
+}
+@media (max-width: 1024px) {
+    .tab15-file-root .basic-info-grid.grid-3-1 { grid-template-columns: 1fr; }
+}
+@media (max-width: 992px) {
+    .tab15-file-root .t15-file-name { max-width: 26ch; }
+}
+@media (max-width: 768px) {
+    .tab15-file-root .t15-file-name { max-width: 20ch; }
+    .tab15-file-root .t15-file-size { display: none; }
+    .tab15-file-root .t15-diagram-box { min-height: 200px; }
+}
+
+/* ═══════════════════════════════════
+   7. 안내 모달 (file-notice) — dispose 레이아웃 사용
+   ═══════════════════════════════════ */
+#file-notice-modal .server-add-content {
+    max-width: 660px;
+}
+#file-notice-modal .dispose-text p {
+    word-break: keep-all;
+}
+
+/* 다운로드 모달 */
+#fl-download-modal .server-add-content {
+    max-width: 660px;
+}
+
+/* ═══════════════════════════════════
+   8. 삭제 모달 — 다운로드 모달 토큰 재사용
+   ═══════════════════════════════════ */
+
+/* --- 컨텐츠 래퍼 --- */
+.tab15-file-delete-modal .server-add-content {
+    width: min(100% - 32px, var(--bls-download-modal-width));
+    max-width: var(--bls-download-modal-width);
+    border-radius: var(--bls-download-modal-radius);
+    border: 1px solid var(--bls-download-modal-border);
+    background: var(--bls-download-modal-surface);
+    box-shadow: var(--bls-download-modal-shadow);
+    overflow: hidden;
+}
+
+/* --- 헤더 --- */
+.tab15-file-delete-modal .server-add-header {
+    min-height: 92px;
+    padding: var(--bls-download-modal-header-padding);
+    border-bottom: 1px solid var(--bls-download-modal-divider);
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.tab15-file-delete-modal .server-add-title {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: calc(100% - 56px);
+}
+
+.tab15-file-delete-modal .server-add-title h3 {
+    margin: 0;
+    font-size: var(--bls-download-modal-title-size);
+    font-weight: var(--bls-download-modal-title-weight);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--bls-download-modal-title-color);
+}
+
+.tab15-file-delete-modal .server-add-subtitle {
+    margin: 0;
+    font-size: var(--bls-download-modal-subtitle-size);
+    line-height: 1.6;
+    color: var(--bls-download-modal-subtitle-color);
+}
+
+/* --- 닫기 버튼 --- */
+.tab15-file-delete-modal .close-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: var(--bls-download-modal-close-size);
+    height: var(--bls-download-modal-close-size);
+    min-width: var(--bls-download-modal-close-size);
+    min-height: var(--bls-download-modal-close-size);
+    padding: 0;
+    box-sizing: border-box;
+    flex: 0 0 var(--bls-download-modal-close-size);
+    aspect-ratio: 1 / 1;
+    border-radius: 999px;
+    border: 1px solid var(--bls-download-modal-close-border);
+    background: var(--bls-download-modal-close-bg);
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.tab15-file-delete-modal .close-btn svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+}
+
+.tab15-file-delete-modal .close-btn:hover {
+    background: var(--bls-download-modal-close-hover-bg);
+    border-color: var(--bls-download-modal-close-hover-border);
+    color: #4f46e5;
+    transform: translateY(-1px);
+}
+
+/* --- 바디 --- */
+.tab15-file-delete-modal .server-add-body {
+    padding: var(--bls-download-modal-body-padding);
+    background: transparent;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.tab15-file-delete-modal__layout {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+    align-items: center;
+    gap: var(--bls-download-modal-gap);
+}
+
+.tab15-file-delete-modal__copy {
+    min-width: 0;
+    color: var(--bls-download-modal-option-text);
+}
+
+.tab15-file-delete-modal__primary {
+    margin: 0;
+    font-size: var(--bls-download-modal-primary-size);
+    font-weight: 600;
+    line-height: 1.65;
+    color: var(--bls-download-modal-primary-color);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.tab15-file-delete-modal__filename {
+    display: inline;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: normal;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    text-decoration-thickness: 1px;
+}
+
+.tab15-file-delete-modal__secondary {
+    margin: 10px 0 0;
+    font-size: var(--bls-download-modal-secondary-size);
+    line-height: 1.7;
+    color: var(--bls-download-modal-secondary-color);
+}
+
+/* --- 일러스트 --- */
+.tab15-file-delete-modal__illust {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab15-file-delete-modal__illust img {
+    width: min(100%, 196px);
+    max-width: 196px;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 8px 20px rgba(148, 163, 184, 0.22));
+}
+
+/* --- 푸터 / 버튼 --- */
+.tab15-file-delete-modal .server-add-actions {
+    padding: var(--bls-download-modal-footer-padding);
+    border-top: 1px solid var(--bls-download-modal-divider);
+    background: rgba(255, 255, 255, 0.84);
+}
+
+.tab15-file-delete-modal .action-buttons.right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.tab15-file-delete-modal .server-add-actions button {
+    min-width: var(--bls-download-modal-button-min-width);
+    height: var(--bls-download-modal-button-height);
+    padding: 0 18px;
+    border-radius: var(--bls-download-modal-button-radius);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.tab15-file-delete-modal .btn-secondary {
+    background: #ffffff;
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    color: #475569;
+}
+
+.tab15-file-delete-modal .btn-secondary:hover {
+    background: #f8fafc;
+    border-color: rgba(148, 163, 184, 0.9);
+    color: #334155;
+}
+
+.tab15-file-delete-modal .btn-danger {
+    background: #dc4a4a;
+    border: 1px solid #dc4a4a;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(220, 74, 74, 0.2);
+    transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.tab15-file-delete-modal .btn-danger:hover {
+    background: #c53d3d;
+    border-color: #c53d3d;
+    box-shadow: 0 4px 12px rgba(197, 61, 61, 0.28);
+    transform: translateY(-1px);
+}
+
+/* --- 반응형 --- */
+@media (max-width: 680px) {
+    .tab15-file-delete-modal .server-add-content {
+        width: min(100% - 20px, 100%);
+        max-width: min(100% - 20px, var(--bls-download-modal-width));
+        border-radius: 16px;
+    }
+
+    .tab15-file-delete-modal .server-add-header {
+        padding: 20px 22px 16px;
+        min-height: 80px;
+    }
+
+    .tab15-file-delete-modal .server-add-body {
+        padding: 22px 22px 24px;
+    }
+
+    .tab15-file-delete-modal__layout {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .tab15-file-delete-modal__copy {
+        order: 1;
+    }
+
+    .tab15-file-delete-modal__illust {
+        order: 2;
+        justify-self: center;
+    }
+
+    .tab15-file-delete-modal__illust img {
+        width: 160px;
+        max-width: 60vw;
+    }
+
+    .tab15-file-delete-modal .server-add-actions {
+        padding: 16px 22px 18px;
+    }
+}

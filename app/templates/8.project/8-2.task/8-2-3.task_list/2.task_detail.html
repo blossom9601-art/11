@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/task.css?v=1.3.8">
+</head>
+<body class="report-only" data-loading>
+	<!-- 메인: 헤더/사이드바 제거, 보고서만 표시 -->
+	<main class="report-main">
+		<!-- A4 시트 -->
+		<section class="report-sheet" id="report" aria-label="작업보고서">
+			<!-- 시트 내부 툴바 -->
+			<div class="report-toolbar" role="toolbar" aria-label="보고서 작업 버튼">
+				<div class="toolbar-left">
+					<button class="btn-secondary iconified icon-only" id="btn-clear" type="button" title="초기화" aria-label="초기화">
+						<img src="/static/image/svg/project/free-icon-reset.svg" alt="" class="icon-img" aria-hidden="true">
+					</button>
+					<button class="btn-secondary iconified icon-only" id="btn-save" type="button" title="임시저장" aria-label="임시저장">
+						<img src="/static/image/svg/save.svg" alt="" class="icon-img" aria-hidden="true">
+					</button>
+					<button class="btn-secondary iconified icon-only" id="btn-targets-upload" type="button" title="대상/시스템 업로드" aria-label="대상/시스템 업로드">
+						<img src="/static/image/svg/list/free-icon-upload.svg" alt="" class="icon-img" aria-hidden="true">
+					</button>
+				</div>
+				<div class="toolbar-right">
+					<button class="btn-secondary iconified icon-only" id="btn-mail" type="button" title="메일보내기" aria-label="메일보내기"><img src="/static/image/svg/project/free-icon-paper-plane.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-secondary iconified icon-only" id="btn-comment-add" type="button" title="의견추가" aria-label="의견추가"><img src="/static/image/svg/project/free-icon-comment-alt-medical.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-secondary iconified icon-only" id="btn-comment-toggle" type="button" title="의견보기" aria-label="의견보기"><img src="/static/image/svg/project/free-icon-comment-alt.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-secondary iconified icon-only" id="btn-pdf" type="button" title="PDF 만들기" aria-label="PDF 만들기"><img src="/static/image/svg/project/free-icon-file-pdf.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-secondary iconified icon-only" id="btn-preview" type="button" title="미리보기" aria-label="미리보기"><img src="/static/image/svg/project/free-icon-search-alt.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-secondary iconified icon-only" id="btn-print" type="button" title="인쇄" aria-label="인쇄"><img src="/static/image/svg/free-icon-printer.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-danger iconified icon-only" id="btn-cancel-work" type="button" title="작업취소" aria-label="작업취소" style="display:none"><img src="/static/image/svg/project/free-icon-font-comment-xmark.svg" alt="" class="icon-img" aria-hidden="true"></button>
+					<button class="btn-primary iconified icon-only" id="btn-persist" type="button" title="상신" aria-label="상신"><img src="/static/image/svg/project/free-icon-paper-plane.svg" alt="" class="icon-img" aria-hidden="true"></button>
+				</div>
+			</div>
+
+			<header class="report-header">
+				<div class="report-title-row">
+					<h2 class="report-title">작업보고서</h2>
+					<span class="status-pill" id="report-status-pill" aria-label="상태: 임시저장">
+						<span class="status-dot ws-idle" aria-hidden="true"></span>
+						<span class="status-text" id="report-status-text">임시저장</span>
+					</span>
+					<input type="hidden" class="meta-input form-input" data-field="report_status" value="임시저장" />
+				</div>
+				<div class="approval-grid">
+					<div class="approval-card">
+						<div class="approval-role">팀원</div>
+						<div class="sign-area" data-field="sign_member" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" aria-label="팀원 싸인"></div>
+						<div class="approval-footer">
+							<input class="meta-input form-input approval-name" data-field="name_member" placeholder="이름"/>
+							<input class="meta-input form-input approval-date" data-field="date_member" placeholder="'YY/MM/DD HH:MM"/>
+						</div>
+					</div>
+					<div class="approval-card">
+						<div class="approval-role">팀장</div>
+						<div class="sign-area" data-field="sign_lead" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" aria-label="팀장 싸인"></div>
+						<div class="approval-footer">
+							<input class="meta-input form-input approval-name" data-field="name_lead" placeholder="이름"/>
+							<input class="meta-input form-input approval-date" data-field="date_lead" placeholder="'YY/MM/DD HH:MM"/>
+						</div>
+					</div>
+				</div>
+			</header>
+
+				<!-- 문서 메타 (1번박스) -->
+				<div class="section boxed box-1" id="box-1">
+					<table class="meta-table">
+					<input type="hidden" class="meta-input form-input" data-field="draft_date" value="" />
+					<tbody>
+						<tr>
+							<th>문서번호</th>
+							<td colspan="3"><input class="meta-input form-input readonly-plain" data-field="doc_no" readonly placeholder="자동 생성" autocomplete="off"/></td>
+							<th>문서등급</th>
+							<td><input class="meta-input form-input readonly-plain" data-field="doc_level" data-fixed="true" value="일반" placeholder="일반" disabled /></td>
+						</tr>
+						<tr>
+							<th>기안부서</th>
+							<td><input class="meta-input form-input readonly-plain" data-field="draft_dept" placeholder="자동 매핑" readonly autocomplete="off"/></td>
+							<th>보존연한</th>
+							<td><input class="meta-input form-input readonly-plain" data-field="retention" data-fixed="true" value="3년" placeholder="3년" disabled /></td>
+							<th>열람권한</th>
+							<td><input class="meta-input form-input readonly-plain" data-field="read_perm" data-fixed="true" value="팀원이상" placeholder="팀원이상" disabled /></td>
+						</tr>
+						<tr>
+							<th>수신부서</th>
+							<td colspan="5">
+								<div class="share-section js-chip-select" data-chip-mode="org_dept" data-chip-single="0" data-chip-hidden-text-field="recv_dept" data-chip-display="text">
+									<div class="share-custom" style="display:block;">
+										<div class="share-search-wrap">
+											<input type="text" class="form-input js-chip-search" placeholder="부서 검색" autocomplete="off">
+											<ul class="share-suggest js-chip-suggest" hidden></ul>
+										</div>
+										<div class="share-chips js-chip-chips"></div>
+									</div>
+									<input type="hidden" class="meta-input form-input" data-field="recv_dept" />
+								</div>
+							</td>
+						</tr>
+					</tbody>
+					</table>
+				</div>
+
+				<!-- 제목/요약: 별도 섹션 제거 (요청에 따라 표로 통합) -->
+
+				<!-- 작업 상세(시작일시 표 + 본문 섹션들) 묶음 박스 (2번박스) -->
+				<div class="section boxed box-2" id="task-details-box">
+					<table class="meta-table">
+						<tbody>
+							<tr>
+								<th>프로젝트</th>
+								<td colspan="5"><input class="meta-input form-input project-readonly" data-field="project" placeholder="프로젝트 탭에서 자동 매핑" readonly disabled/></td>
+							</tr>
+							<tr>
+								<th>작업명</th>
+								<td colspan="5"><input class="meta-input form-input" data-field="task_title" placeholder="작업명을 입력"/></td>
+							</tr>
+							<tr>
+								<th>시작일시</th>
+								<td><input class="meta-input form-input" data-field="start_dt" type="text" placeholder="YYYY-MM-DD HH:MM"/></td>
+								<th>종료일시</th>
+								<td><input class="meta-input form-input" data-field="end_dt" type="text" placeholder="YYYY-MM-DD HH:MM"/></td>
+								<th>소요시간</th>
+								<td><input class="meta-input form-input" data-field="duration" placeholder="자동 계산"/></td>
+							</tr>
+							<tr>
+								<th>작업대상</th>
+								<td colspan="5">
+									<div class="field-with-more">
+										<div class="input-with-action">
+											<input class="meta-input form-input" data-field="targets" placeholder="클릭하여 시스템 선택" autocomplete="off" readonly title="클릭하여 시스템 선택" aria-readonly="true"/>
+											<span class="mini-help" id="targets-count" aria-live="polite"></span>
+										</div>
+										<button type="button" class="more-btn" id="targets-more" hidden>더보기</button>
+									</div>
+									<input type="hidden" class="meta-input form-input" data-field="target_pairs" />
+								</td>
+							</tr>
+							<tr>
+								<th>시스템명</th>
+								<td colspan="5">
+									<div class="field-with-more">
+										<input class="meta-input form-input" data-field="business" placeholder="클릭하여 시스템 선택" autocomplete="off" readonly title="클릭하여 시스템 선택" aria-readonly="true"/>
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>작업분류</th>
+								<td colspan="5">
+									<div class="checkbox-group categories-group" role="group" aria-label="작업분류 선택">
+										<label class="check"><input type="checkbox" value="서버">서버</label>
+										<label class="check"><input type="checkbox" value="스토리지">스토리지</label>
+										<label class="check"><input type="checkbox" value="SAN">SAN</label>
+										<label class="check"><input type="checkbox" value="네트워크">네트워크</label>
+										<label class="check"><input type="checkbox" value="보안장비">보안장비</label>
+										<label class="check"><input type="checkbox" value="운영체제">운영체제</label>
+										<label class="check"><input type="checkbox" value="데이터베이스">데이터베이스</label>
+										<label class="check"><input type="checkbox" value="미들웨어">미들웨어</label>
+										<label class="check"><input type="checkbox" value="가상화">가상화</label>
+										<label class="check"><input type="checkbox" value="보안">보안</label>
+										<label class="check"><input type="checkbox" value="고가용성">고가용성</label>
+										<label class="check"><input type="checkbox" value="기타">기타</label>
+									</div>
+									<input type="hidden" class="meta-input form-input" data-field="categories" placeholder="예: 서버, 스토리지 등"/>
+								</td>
+							</tr>
+							<tr>
+								<th>작업구분</th>
+								<td colspan="5">
+									<div class="checkbox-group worktypes-group" role="group" aria-label="작업구분 선택">
+										<label class="check"><input type="checkbox" value="점검">점검</label>
+										<label class="check"><input type="checkbox" value="테스트">테스트</label>
+										<label class="check"><input type="checkbox" value="개선">개선</label>
+										<label class="check"><input type="checkbox" value="변경">변경</label>
+										<label class="check"><input type="checkbox" value="장애대응">장애대응</label>
+										<label class="check"><input type="checkbox" value="구축">구축</label>
+										<label class="check"><input type="checkbox" value="복구">복구</label>
+										<label class="check"><input type="checkbox" value="지원">지원</label>
+										<label class="check"><input type="checkbox" value="교육">교육</label>
+										<label class="check"><input type="checkbox" value="기타">기타</label>
+									</div>
+									<input type="hidden" class="meta-input form-input" data-field="work_types" placeholder="예: 점검, 테스트 등"/>
+								</td>
+							</tr>
+							<tr>
+								<th>작업 영향도</th>
+								<td colspan="5">
+									<div class="radio-group impact-group" role="radiogroup" aria-label="작업 영향도 선택">
+										<label class="check"><input type="radio" name="impact" value="서비스 전체 영향">서비스 전체 영향</label>
+										<label class="check"><input type="radio" name="impact" value="서비스 일부 영향">서비스 일부 영향</label>
+										<label class="check"><input type="radio" name="impact" value="이중화 영향 없음">이중화 영향 없음</label>
+									</div>
+									<input type="hidden" class="meta-input form-input" data-field="impact"/>
+								</td>
+							</tr>
+							<tr>
+								<th>담당부서</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="org_dept" data-chip-single="1" data-chip-readonly="1" data-chip-hidden-text-field="rel_dept" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap" style="display:none;">
+												<input type="text" class="form-input js-chip-search" placeholder="부서 검색" autocomplete="off" disabled>
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="rel_dept" />
+										<input type="hidden" class="meta-input form-input" data-field="rel_dept_id" />
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>담당자</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="org_user" data-chip-single="1" data-chip-readonly="1" data-chip-hidden-text-field="worker" data-chip-parent-id-field="rel_dept_id" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap" style="display:none;">
+												<input type="text" class="form-input js-chip-search" placeholder="구성원 검색" autocomplete="off" disabled>
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="worker" />
+										<input type="hidden" class="meta-input form-input" data-field="worker_user_id" />
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>참여부서</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="org_dept" data-chip-single="0" data-chip-hidden-text-field="partner_dept" data-chip-hidden-ids-field="participant_dept_ids" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap">
+												<input type="text" class="form-input js-chip-search" placeholder="부서 검색" autocomplete="off">
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="partner_dept" />
+										<input type="hidden" class="meta-input form-input" data-field="participant_dept_ids" />
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>참여자</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="org_user" data-chip-single="0" data-chip-hidden-text-field="participants" data-chip-hidden-ids-field="participant_user_ids" data-chip-parent-id-field="rel_dept_id" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap">
+												<input type="text" class="form-input js-chip-search" placeholder="구성원 검색" autocomplete="off">
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="participants" />
+										<input type="hidden" class="meta-input form-input" data-field="participant_user_ids" />
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>협력업체</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="vendor" data-chip-single="0" data-chip-hidden-text-field="vendor" data-chip-hidden-ids-field="vendors" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap">
+												<input type="text" class="form-input js-chip-search" placeholder="업체 검색(제조사/유지보수)" autocomplete="off">
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="vendor" />
+										<input type="hidden" class="meta-input form-input" data-field="vendors" />
+									</div>
+								</td>
+							</tr>
+							<tr class="thick-divider">
+								<th>협력직원</th>
+								<td colspan="5">
+									<div class="share-section js-chip-select" data-chip-mode="vendor_staff" data-chip-single="0" data-chip-hidden-text-field="vendor_staff" data-chip-hidden-ids-field="vendor_staff_names" data-chip-vendor-name-field="vendor" data-chip-display="text">
+										<div class="share-custom" style="display:block;">
+											<div class="share-search-wrap">
+												<input type="text" class="form-input js-chip-search" placeholder="직원 이름 검색" autocomplete="off">
+												<ul class="share-suggest js-chip-suggest" hidden></ul>
+											</div>
+											<div class="share-chips js-chip-chips"></div>
+										</div>
+										<input type="hidden" class="meta-input form-input" data-field="vendor_staff" />
+										<input type="hidden" class="meta-input form-input" data-field="vendor_staff_names" />
+									</div>
+								</td>
+							</tr>
+							<tr>
+								<th>작업 개요</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="overview" placeholder="작업 개요를 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>대상 서비스</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="service" placeholder="대상 서비스를 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>사전 점검사항</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="precheck" placeholder="작업전 점검사항을 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>
+									<p>상세절차</p>
+									<p>(상세 시간 포함)</p>
+								</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="procedure" placeholder="상세절차를 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>사후 점검사항</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="postcheck" placeholder="작업 점검 내용을 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>원복 절차/시간</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="resources" placeholder="소요 자원을 입력"></div>
+								</td>
+							</tr>
+							<tr>
+								<th>기타 사항</th>
+								<td colspan="5">
+									<div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="etc" placeholder="기타 사항을 입력"></div>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div> <!-- /#task-details-box -->
+
+				<!-- 결과 보고 (3번박스) -->
+				<div class="section boxed box-3" id="box-3" style="display:none;">
+					<div class="section-title">결과 보고</div>
+					<table class="meta-table">
+					<tbody>
+						<tr>
+							<th>실제 시작시간</th>
+							<td colspan="2"><input class="meta-input form-input" data-field="actual_start_time" placeholder="YYYY-MM-DD HH:MM" autocomplete="off"/></td>
+							<th>실제 종료시간</th>
+							<td colspan="2"><input class="meta-input form-input" data-field="actual_end_time" placeholder="YYYY-MM-DD HH:MM" autocomplete="off"/></td>
+						</tr>
+						<tr>
+							<th>실제 소요시간</th>
+							<td colspan="2"><input class="meta-input form-input" data-field="actual_duration" placeholder="예: 2시간 30분" readonly/></td>
+							<th>결과 유형</th>
+							<td colspan="2"><input class="meta-input form-input" data-field="result_type" placeholder="정상완료 / 일부완료 / 미완료 / 롤백" readonly/></td>
+						</tr>
+						<tr>
+							<th>결과 내용</th>
+							<td colspan="5"><div class="editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" data-field="report_result" placeholder="결과 보고를 입력"></div></td>
+						</tr>
+					</tbody>
+					</table>
+				</div>
+
+				<!-- 의견 섹션 -->
+				<div class="section" id="comments-section" hidden>
+					<div class="section-title">의견</div>
+					<div class="comments-list" id="comments-list" aria-live="polite"></div>
+				</div>
+
+				<!-- 첨부파일 섹션 (맨 아래) -->
+				<div class="section boxed" id="attachments-section">
+					<div class="section-title">첨부파일</div>
+					<div class="system-upload-body">
+						<label for="attachments-input" class="upload-dropzone" id="attachments-dropzone">
+							<div class="upload-illu">
+								<!-- optional icon placeholder -->
+								<svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+									<polyline points="17 8 12 3 7 8" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+									<line x1="12" y1="3" x2="12" y2="15" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+								</svg>
+							</div>
+							<div class="upload-text center">
+								<strong>파일을 드래그하거나 클릭하여 추가</strong>
+								<span>최대 10개, 50MB/파일</span>
+								<small>문서, 이미지, 압축파일 등</small>
+							</div>
+						</label>
+						<input id="attachments-input" type="file" multiple hidden />
+						<div class="upload-meta">
+							<span class="upload-file-label">선택된 파일</span>
+							<span class="upload-inline" id="attachments-count">0개</span>
+						</div>
+						<div class="attachments-list" id="attachments-list"></div>
+					</div>
+				</div>
+		</section>
+
+		<!-- 작업대상 업로드 모달 (tab75와 동일한 모달 스타일/기능) -->
+		<div id="targets-upload-modal" class="server-add-modal system-upload-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="targets-upload-title">
+				<div class="server-add-header">
+					<div class="server-add-title">
+						<h3 id="targets-upload-title">엑셀 업로드</h3>
+						<p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 작업대상/시스템명을 등록합니다.</p>
+					</div>
+					<button class="close-btn" type="button" id="targets-upload-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body system-upload-body">
+					<div class="upload-dropzone" id="targets-upload-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+						<div class="upload-illu">
+							<!-- Use a static illustration for parity (lottie optional) -->
+							<img src="/static/image/svg/list/free-sticker-analysis.svg" alt="" aria-hidden="true" />
+							<div class="lottie-anim" aria-hidden="true" style="display:none"></div>
+						</div>
+						<div class="upload-text center">
+							<strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+						</div>
+						<input type="file" id="targets-upload-input" class="visually-hidden" accept=".xls,.xlsx" aria-hidden="true" />
+					</div>
+					<div class="upload-subinfo" aria-hidden="true">
+						<span class="sub-left">지원 가능한 확장자: XLS, XLSX</span>
+						<span class="sub-right">최대 파일 사이즈: 10 MB</span>
+					</div>
+					<div class="upload-meta" id="targets-upload-meta" hidden>
+						<div class="file-chip" id="targets-upload-file-chip" aria-live="polite"></div>
+					</div>
+					<div class="upload-help">
+						<p class="upload-warning">엑셀업로드는 제공한 양식을 사용해야 합니다.<br>아래 양식을 다운로드한 뒤 작성하여 업로드 해주세요.</p>
+						<div class="template-card">
+							<div class="template-label"><img src="/static/image/svg/list/free-icon-excel.svg" alt="엑셀" class="template-icon">엑셀 업로드 양식</div>
+							<button type="button" class="btn-primary template-download-btn" id="targets-template-download" aria-label="양식 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="" class="template-icon" aria-hidden="true">
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-primary" id="targets-upload-confirm" disabled>등록</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 시스템 선택 모달 (작업대상/시스템명 클릭 시) -->
+		<div id="system-select-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="system-select-title">
+				<div class="server-add-header">
+					<div class="server-add-title">
+						<h3 id="system-select-title">시스템 선택</h3>
+						<p class="server-add-subtitle">필터를 선택하고 자산을 체크한 뒤 적용하세요.</p>
+					</div>
+					<button class="close-btn" type="button" id="system-select-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<!-- 탭: 서버/스토리지/SAN/네트워크/보안장비 -->
+					<div class="system-tabs" role="tablist" aria-label="자산 종류">
+						<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-asset-category="SERVER">서버</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-asset-category="STORAGE">스토리지</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-asset-category="SAN">SAN</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-asset-category="NETWORK">네트워크</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-asset-category="SECURITY">보안장비</button>
+					</div>
+
+					<!-- 필터: 업무 분류/구분/상태/운영/그룹 + 업무 이름/시스템 이름 -->
+					<table class="meta-table" aria-label="시스템 선택 필터">
+						<tbody>
+							<tr>
+								<th>업무 분류</th>
+								<td><select id="sysel-work-category" class="form-input" aria-label="업무 분류"></select></td>
+								<th>업무 구분</th>
+								<td><select id="sysel-work-division" class="form-input" aria-label="업무 구분"></select></td>
+								<th>업무 상태</th>
+								<td><select id="sysel-work-status" class="form-input" aria-label="업무 상태"></select></td>
+							</tr>
+							<tr>
+								<th>업무 운영</th>
+								<td><select id="sysel-work-operation" class="form-input" aria-label="업무 운영"></select></td>
+								<th>업무 그룹</th>
+								<td><select id="sysel-work-group" class="form-input" aria-label="업무 그룹"></select></td>
+								<th>업무 이름</th>
+								<td><input id="sysel-work-name" class="form-input" placeholder="업무 이름" autocomplete="off" /></td>
+							</tr>
+							<tr>
+								<th>시스템 이름</th>
+								<td colspan="5"><input id="sysel-system-name" class="form-input" placeholder="시스템 이름" autocomplete="off" /></td>
+							</tr>
+						</tbody>
+					</table>
+
+					<!-- 리스트: 체크박스 다중 선택 -->
+					<div class="table-wrap mini" aria-label="자산 목록">
+						<table class="mini-table" id="system-select-table">
+							<colgroup>
+								<col class="col-check">
+								<col class="col-sys-type">
+								<col class="col-system-status">
+								<col class="col-work-name">
+								<col class="col-system-name">
+							</colgroup>
+							<thead>
+								<tr>
+									<th>선택</th>
+									<th>시스템 구분</th>
+									<th>시스템 상태</th>
+									<th>업무 이름</th>
+									<th>시스템 이름</th>
+								</tr>
+							</thead>
+							<tbody id="system-select-tbody"></tbody>
+						</table>
+					</div>
+					<div id="system-select-empty" class="mini-help" hidden>조회 결과가 없습니다.</div>
+					<div class="sysel-pager" aria-label="자산 목록 페이지네이션">
+						<button type="button" class="btn-secondary sysel-page-btn" id="system-select-page-prev">이전</button>
+						<span class="sysel-page-label" id="system-select-page-label" aria-live="polite">1 / 1</span>
+						<button type="button" class="btn-secondary sysel-page-btn" id="system-select-page-next">다음</button>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<span class="mini-help" id="system-select-selected" aria-live="polite"></span>
+						<button type="button" class="btn-secondary" id="system-select-clear">선택 해제</button>
+						<button type="button" class="btn-primary" id="system-select-apply">선택 적용</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- PDF 만들기 확인 모달 -->
+		<div id="pdf-confirm-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="pdf-confirm-title">
+				<div class="server-add-header">
+					<div class="server-add-title">
+						<h3 id="pdf-confirm-title">PDF 만들기</h3>
+						<p class="server-add-subtitle">그냥 바로 PDF로 만들어서 다운로드 하시겠습니까?</p>
+					</div>
+					<button class="close-btn" type="button" id="pdf-confirm-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div class="dispose-content">
+						<div class="dispose-text">
+							<p>확인을 누르면 브라우저의 저장 대화상자가 열립니다.</p>
+						</div>
+						<div class="dispose-illust">
+							<img src="/static/image/svg/project/free-sticker-contact-us.svg" alt="PDF 안내 일러스트" loading="lazy" />
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-primary" id="pdf-confirm-yes">PDF로 저장</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 더보기(필드 내용) 모달 -->
+		<div id="field-more-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="field-more-title">
+				<div class="server-add-header">
+					<div class="server-add-title">
+						<h3 id="field-more-title">전체 내용</h3>
+						<p class="server-add-subtitle" id="field-more-sub">입력값 전체를 확인합니다.</p>
+					</div>
+					<button class="close-btn" type="button" id="field-more-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div class="dispose-content">
+						<div class="dispose-text" style="min-width:0;">
+							<div id="field-more-text"></div>
+						</div>
+						<div class="dispose-illust">
+							<img src="/static/image/svg/list/free-sticker-analysis.svg" alt="상세 보기" loading="lazy" />
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-primary" id="field-more-ok">닫기</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 의견 추가 모달 -->
+		<div id="comment-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="comment-add-title">
+				<div class="server-add-header">
+					<div class="server-add-title">
+						<h3 id="comment-add-title">의견 추가</h3>
+						<p class="server-add-subtitle">작업보고서 하단에 의견을 추가합니다.</p>
+					</div>
+					<button class="close-btn" type="button" id="comment-add-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div class="dispose-content">
+						<div class="dispose-text" style="min-width:0;">
+							<label for="comment-add-text" class="visually-hidden">의견</label>
+							<textarea id="comment-add-text" class="form-input" rows="6" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="의견을 입력하세요"></textarea>
+						</div>
+						<div class="dispose-illust">
+							<img src="/static/image/svg/project/free-sticker-innovation.svg" alt="Innovation Illustration" loading="lazy" />
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-primary" id="comment-add-confirm">추가</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 의견 삭제처리 모달 (on-premise '삭제처리'와 동일 스타일/스티커) -->
+		<div id="comment-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="comment-delete-title">
+				<div class="server-add-header">
+					<div class="server-add-title dispose-title">
+						<h3 id="comment-delete-title">삭제처리</h3>
+					</div>
+					<button class="close-btn" type="button" id="comment-delete-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div class="dispose-content">
+						<div class="dispose-text">
+							<p>의견을 삭제하시겠습니까?</p>
+						</div>
+						<div class="dispose-illust">
+							<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-primary" id="comment-delete-confirm">확인</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 작업 액션 확인 모달 (confirm 대체) -->
+
+		<!-- 작업취소 사유 입력 모달 -->
+		<div id="cancel-work-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="cancel-work-title">
+				<div class="server-add-header">
+					<div class="server-add-title dispose-title">
+						<h3 id="cancel-work-title">작업취소</h3>
+					</div>
+					<button class="close-btn" type="button" id="cancel-work-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div style="padding:8px 0;">
+						<label for="cancel-work-reason" style="display:block; margin-bottom:6px; font-weight:600; font-size:13px;">취소 사유</label>
+						<textarea id="cancel-work-reason" rows="4" style="width:100%; resize:vertical; border:1px solid #d1d5db; border-radius:6px; padding:8px; font-size:13px;" placeholder="취소 사유를 입력하세요"></textarea>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-secondary" id="cancel-work-cancel">닫기</button>
+						<button type="button" class="btn-primary" id="cancel-work-confirm" style="background:#ef4444; border-color:#ef4444;">작업취소</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 작업 액션 확인 모달 (confirm 대체) -->
+		<div id="task-action-confirm-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+			<div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="task-action-confirm-title">
+				<div class="server-add-header">
+					<div class="server-add-title dispose-title">
+						<h3 id="task-action-confirm-title">확인</h3>
+					</div>
+					<button class="close-btn" type="button" id="task-action-confirm-close" title="닫기" aria-label="닫기">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+				</div>
+				<div class="server-add-body">
+					<div class="dispose-content">
+						<div class="dispose-text">
+							<p id="task-action-confirm-body"></p>
+						</div>
+						<div class="dispose-illust">
+							<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+						</div>
+					</div>
+				</div>
+				<div class="server-add-actions align-right">
+					<div class="action-buttons right">
+						<button type="button" class="btn-secondary" id="task-action-confirm-cancel">취소</button>
+						<button type="button" class="btn-primary" id="task-action-confirm-ok">확인</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	</main>
+
+	<script src="/static/js/blossom.js"></script>
+	<script src="/static/js/8.project/8-2.task/8-2-3.task_list/2.task_detail.js?v=1.3.44"></script>
+</body>
+</html>

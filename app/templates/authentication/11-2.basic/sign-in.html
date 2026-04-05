@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <title>blossom</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.21">
+    <script defer src="/static/js/blossom.js"></script>
+    <script defer src="/static/js/authentication/11-2.basic/sign-in.js?v=20250228a"></script>
+</head>
+<body class="page-auth-signin">
+    <div class="login-left"></div>
+    <div class="login-right">
+        <div class="login-content">
+            <img src="/static/image/logo/blossom_logo.png" alt="Blossom 로고" class="login-logo">
+            <h2>로그인</h2>
+            <!-- 플래시 메시지 표시 -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            <form action="/login" method="post" class="login-form" id="login-form">
+                <div class="input-group">
+                    <label for="employee_id">사번</label>
+                    <input type="text" id="employee_id" name="employee_id" placeholder="사번을 입력하세요" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">비밀번호</label>
+                    <input type="password" id="password" name="password" placeholder="비밀번호를 입력하세요" required>
+                </div>
+                <button type="submit" class="login-button">로그인</button>
+            </form>
+            <div class="login-footer">
+                <p>한달에 한번씩 확인하기, <a href="/terms">약관보기</a></p>
+            </div>
+        </div>
+        <div class="signin-panel-footer">2025-2026 © BLOSSOM PROJECT</div>
+    </div>
+
+    <!-- ═══ MFA 인증 방식 선택 모달 ═══ -->
+    <div id="mfa-select-modal" class="mfa-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="mfa-modal-card">
+            <div class="mfa-modal-header">
+                <h3>다중 인증 (MFA)</h3>
+                <p>로그인 보안을 위해 추가 인증이 필요합니다.<br>인증 방식을 선택해주세요.</p>
+            </div>
+            <div class="mfa-modal-body">
+                <div class="mfa-method-list" id="mfa-method-list">
+                    <button type="button" class="mfa-method-btn" data-method="totp">
+                        <span class="mfa-method-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                        </span>
+                        <span class="mfa-method-info">
+                            <strong>OTP 인증</strong>
+                            <small>인증 앱(TOTP)에 표시된 코드를 입력합니다</small>
+                        </span>
+                        <span class="mfa-method-arrow">›</span>
+                    </button>
+                    <button type="button" class="mfa-method-btn" data-method="email">
+                        <span class="mfa-method-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        </span>
+                        <span class="mfa-method-info">
+                            <strong>이메일 인증</strong>
+                            <small>등록된 이메일로 인증 코드를 전송합니다</small>
+                        </span>
+                        <span class="mfa-method-arrow">›</span>
+                    </button>
+                    <button type="button" class="mfa-method-btn" data-method="sms">
+                        <span class="mfa-method-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </span>
+                        <span class="mfa-method-info">
+                            <strong>휴대폰 인증</strong>
+                            <small>등록된 휴대폰 번호로 SMS 코드를 전송합니다</small>
+                        </span>
+                        <span class="mfa-method-arrow">›</span>
+                    </button>
+                    <button type="button" class="mfa-method-btn" data-method="company_otp">
+                        <span class="mfa-method-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </span>
+                        <span class="mfa-method-info">
+                            <strong>사내 OTP</strong>
+                            <small>사내 OTP 토큰/앱에 표시된 코드를 입력합니다</small>
+                        </span>
+                        <span class="mfa-method-arrow">›</span>
+                    </button>
+                </div>
+            </div>
+            <div class="mfa-modal-footer">
+                <button type="button" class="mfa-cancel-btn" id="mfa-select-cancel">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MFA 코드 입력 모달 ═══ -->
+    <div id="mfa-code-modal" class="mfa-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="mfa-modal-card">
+            <div class="mfa-modal-header">
+                <button type="button" class="mfa-back-btn" id="mfa-code-back" aria-label="뒤로">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h3 id="mfa-code-title">인증 코드 입력</h3>
+                <p id="mfa-code-subtitle">전송된 인증 코드를 입력해주세요.</p>
+            </div>
+            <div class="mfa-modal-body">
+                <form id="mfa-code-form" autocomplete="off">
+                    <input type="hidden" name="mfa_type" id="mfa-code-type" value="">
+                    <input type="hidden" name="emp_no" id="mfa-code-emp" value="">
+                    <div class="mfa-code-input-group">
+                        <input type="text" id="mfa-code-input" name="code" class="mfa-code-input" inputmode="numeric" placeholder="000000" maxlength="6" required autocomplete="one-time-code">
+                    </div>
+                    <p class="mfa-code-hint" id="mfa-code-hint">인증 앱에 표시된 6자리 숫자를 입력하세요.</p>
+                    <div class="mfa-timer" id="mfa-timer">
+                        <span class="mfa-timer-icon">⏱</span>
+                        <span id="mfa-timer-text">5:00</span>
+                    </div>
+                    <button type="button" class="mfa-resend-btn" id="mfa-resend-btn">코드 재전송</button>
+                </form>
+            </div>
+            <div class="mfa-modal-footer">
+                <button type="button" class="mfa-cancel-btn" id="mfa-code-cancel">취소</button>
+                <button type="submit" form="mfa-code-form" class="mfa-confirm-btn" id="mfa-code-confirm">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MFA 서버 데이터를 data 속성으로 전달 (sign-in.js 에서 참조) -->
+    <div id="mfa-data"
+         data-required="{{ 'true' if mfa_required is defined and mfa_required else 'false' }}"
+         data-emp-no="{{ mfa_emp_no | default('') }}"
+         style="display:none"></div>
+</body>
+</html>

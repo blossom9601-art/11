@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.0">
+    <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.0"></script>
+</head>
+<body class="page-tab92-employee-shared {{ tab92.body_class|default('page-workgroup-manager') }}" data-cat-detail-id="{{ cat_detail_id or '' }}">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content tab92-employee-root">
+        <div class="content-wrapper">
+            {% if back_key %}
+            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">{{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <div class="page-header" id="wg-page-header">
+                <h1 id="page-header-title">{{ title or '업무 그룹' }}</h1>
+                <p id="page-header-subtitle">{{ subtitle or '' }}</p>
+            </div>
+
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                   class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <div class="detail-header-actions" aria-label="담당자 상단 동작">
+                        <button class="add-btn-icon" id="mg-email-send-btn" title="이메일 전송" type="button" aria-label="이메일 전송">
+                            <img src="/static/image/svg/free-icon-font-envelope-bulk.svg" alt="이메일 전송">
+                        </button>
+                        <button class="add-btn-icon" id="hw-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                        </button>
+                        <button class="add-btn-icon" id="hw-row-add" title="행 추가" type="button" aria-label="행 추가">
+                            <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                        </button>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>
+                            {{ tab92.section_title|default('담당자 정보') }}
+                            <div class="page-size-selector" id="hw-page-size-wrap" aria-label="보기 개수">
+                                <label for="hw-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="hw-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+
+                        <div class="table-wrap">
+                            <table class="hw-table cols-6" id="hw-spec-table" data-context="manager">
+                                <colgroup>
+                                    <col>
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="equal-col">
+                                    <col class="actions-col">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="hw-select-all" aria-label="전체 선택"></th>
+                                        <th>부서</th>
+                                        <th>이름</th>
+                                        <th>역할</th>
+                                        <th>연락처</th>
+                                        <th>이메일</th>
+                                        <th>수신여부</th>
+                                        <th>비고</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">{{ tab92.empty_title|default('담당자 항목이 없습니다.') }}</h3>
+                                <p class="empty-desc">{{ tab92.empty_desc|default("우측 상단 '추가' 버튼을 눌러 첫 담당자를 등록하세요.") }}</p>
+                            </div>
+                        </div>
+
+                        <div class="modern-pagination" id="hw-pagination">
+                            <div class="pagination-info"><span id="hw-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="hw-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="hw-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="hw-page-numbers"></div>
+                                <button class="pagination-btn" id="hw-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="hw-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+
+    <div id="mgr-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>담당자 삭제</h3>
+                    <p class="server-add-subtitle">선택한 담당자를 삭제합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="mgr-delete-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="mgr-delete-msg">이 담당자를 삭제하시겠습니까?</p>
+                        <p class="tab92-note">삭제된 항목은 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="mgr-delete-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="mgr-delete-confirm">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        {% set dlm_modal_id = 'hw-download-modal' %}
+    {% set dlm_title_id = 'hw-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle_id = 'hw-download-subtitle' %}
+    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'hw-download-close' %}
+    {% set dlm_confirm_id = 'hw-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'hw-csv-range' %}
+    {% set dlm_row_all_id = 'hw-csv-range-row-all' %}
+    {% set dlm_row_selected_id = 'hw-csv-range-row-selected' %}
+    {% set dlm_all_id = 'hw-csv-range-all' %}
+    {% set dlm_selected_id = 'hw-csv-range-selected' %}
+    {% set dlm_all_label = '전체 결과' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
+    {% set dlm_illustration_alt = 'Research Illustration' %}
+    {% include 'layouts/_download_modal_range.html' %}
+</body>
+</html>

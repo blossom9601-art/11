@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/center.css?v=20251208">
+</head>
+<body class="{{ page_class }}">
+    <!-- JS CONFIG (data-* 속성으로 전달) -->
+    <div id="rack-lab-config" hidden
+         data-page-class="{{ page_class }}"
+         data-center-name="{{ center_name }}"
+         data-center-code="{{ center_code }}"
+         data-bg-image="{{ bg_image }}"
+         data-layout-style="{{ layout_style }}"
+         data-overlay-store-key="{{ overlay_store_key }}"
+         data-surface-api-base="{{ surface_api_base }}"></div>
+
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="datacenter.rack"></div>
+                    <h1>RACK 관리</h1>
+                    <p>RACK 자산을 관리 합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
+                <div id="dynamic-system-tabs"
+                     data-page-code="DC_RACK"
+                     data-current-key="{{ current_key }}"
+                     data-aria-label="RACK 관리 탭"></div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>{{ center_name }} 배치도</h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="소프트웨어 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: HPE%가상). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <!-- 수정/저장 토글 버튼 -->
+                                <button class="header-btn" id="system-edit-toggle-btn" title="수정" aria-label="수정">
+                                    <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정" class="header-icon" id="system-edit-toggle-icon">
+                                </button>
+                                <button class="header-btn" id="system-download-btn" title="프린터" aria-label="프린터"><img src="/static/image/svg/free-icon-printer.svg" alt="프린터" class="header-icon"></button>
+                                <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <div id="rack-layout" class="rack-layout"{% if layout_style %} style="{{ layout_style }}"{% endif %}>
+                                <img src="{{ bg_image }}" alt="{{ center_name }} RACK 배치도" class="rack-layout-image" loading="eager" decoding="async"/>
+                                <div id="rack-overlay" class="rack-overlay" aria-live="polite" data-center-code="{{ center_code }}" data-rack-filter-code="{{ center_code }}"></div>
+                                <!-- Context menu for overlay boxes -->
+                                <div id="overlay-context-menu" class="overlay-context-menu" role="menu" aria-hidden="true">
+                                    <button type="button" id="overlay-menu-edit" role="menuitem">수정</button>
+                                    <button type="button" id="overlay-menu-delete" class="danger" role="menuitem">삭제</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Empty State -->
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">RACK 시스템이 없습니다.</h3>
+                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 시스템을 등록하세요.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
+    <script src="/static/js/6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.js?v=20251206b"></script>
+
+        <!-- 시스템 추가 모달 -->
+        <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title"><h3 id="system-add-title">상면 등록</h3><p class="server-add-subtitle" id="system-add-subtitle">상면 정보를 입력하세요.</p></div>
+                    <button class="close-btn" type="button" id="system-add-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="system-add-form" data-center-code="{{ center_code }}" data-rack-center-code="{{ center_code }}">
+                        <div class="form-section">
+                            <div class="section-header"><h4>상면 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row slab-name-row">
+                                    <label>상면 이름 <span class="required">*</span></label>
+                                    <div class="status-input-wrap">
+                                        <input name="slab_name" class="form-input" placeholder="상면 이름" required>
+                                        <button type="button" class="status-color-btn" title="색상 선택" aria-label="색상 선택"></button>
+                                        <div class="status-color-palette" role="menu" aria-label="상태 색상" hidden>
+                                            <button type="button" class="status-color-swatch ws-c1" data-color="ws-c1" aria-label="색상 1"></button>
+                                            <button type="button" class="status-color-swatch ws-c2" data-color="ws-c2" aria-label="색상 2"></button>
+                                            <button type="button" class="status-color-swatch ws-c3" data-color="ws-c3" aria-label="색상 3"></button>
+                                            <button type="button" class="status-color-swatch ws-c4" data-color="ws-c4" aria-label="색상 4"></button>
+                                            <button type="button" class="status-color-swatch ws-c5" data-color="ws-c5" aria-label="색상 5"></button>
+                                            <button type="button" class="status-color-swatch ws-c6" data-color="ws-c6" aria-label="색상 6"></button>
+                                            <button type="button" class="status-color-swatch ws-c7" data-color="ws-c7" aria-label="색상 7"></button>
+                                            <button type="button" class="status-color-swatch ws-c8" data-color="ws-c8" aria-label="색상 8"></button>
+                                            <button type="button" class="status-color-swatch ws-c9" data-color="ws-c9" aria-label="색상 9"></button>
+                                            <button type="button" class="status-color-swatch ws-c10" data-color="ws-c10" aria-label="색상 10"></button>
+                                        </div>
+                                        <input type="hidden" name="slab_color" value="">
+                                        <input type="hidden" name="edit_target_box_id" id="edit-target-box-id" value="">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <label>RACK 검색</label>
+                                    <div class="rack-search-wrap">
+                                        <input type="text" id="rack-search-native" class="form-input search-select" placeholder="선택" data-placeholder="선택" readonly>
+                                        <input type="hidden" name="selected_rack" id="selected-rack-hidden" value="">
+                                    </div>
+                                </div>
+                                <div class="form-row form-row-wide">
+                                    <label>비고</label>
+                                    <textarea name="remark" class="form-input textarea-large" rows="6" placeholder="비고"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-add-save">등록</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메시지 모달 -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

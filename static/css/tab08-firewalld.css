@@ -1,0 +1,263 @@
+/*
+ * tab08-firewalld.css — 방화벽 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────────
+ * 모든 상세 페이지의 방화벽 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 기본 스타일은 detail.css가 모두 제공하므로
+ *   이 파일에서는 .tab08-fw-root 스코프 추가 규칙만 정의한다.
+ *
+ * 버전: 2.0 (2026-03-22)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab08-fw-root {
+    /* 색상 */
+    --fw-accent:           #6366f1;
+    --fw-accent-light:     #e0e7ff;
+    --fw-accent-hover:     rgba(99,102,241,.18);
+    --fw-danger:           #ef4444;
+    --fw-danger-light:     #fee2e2;
+    --fw-text:             #1f2937;
+    --fw-text-secondary:   #6b7280;
+    --fw-text-muted:       #94a3b8;
+    --fw-border:           #e5e7eb;
+    --fw-bg:               #ffffff;
+
+    /* 선택 행 */
+    --fw-selected-bg:      rgba(99,102,241,0.10);
+    --fw-selected-hover:   rgba(99,102,241,0.16);
+    --fw-selected-td:      rgba(106,90,205,0.10);
+    --fw-selected-td-hover:rgba(106,90,205,0.16);
+
+    /* 여백 */
+    --fw-section-padding:  0;
+    --fw-btn-top-offset:   0;
+
+    /* 크기 */
+    --fw-table-font:       13px;
+    --fw-action-btn-size:  36px;
+
+    /* 반지름 */
+    --fw-radius-btn:       10px;
+
+    /* 그림자 */
+    --fw-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+    --fw-shadow-btn-hover: 0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --fw-transition:       all .2s ease;
+}
+
+/* ═══════════════════════════════════
+   1. 테이블 행 선택 하이라이트
+   ═══════════════════════════════════ */
+.tab08-fw-root #fw-spec-table tbody tr.selected,
+.tab08-fw-root #fw-spec-table tbody tr.selected:nth-child(odd),
+.tab08-fw-root #fw-spec-table tbody tr.selected:nth-child(even) {
+    background-color: var(--fw-selected-bg) !important;
+    border-left: 3px solid var(--fw-accent) !important;
+    box-shadow: var(--fw-shadow-selected) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr.selected:hover,
+.tab08-fw-root #fw-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab08-fw-root #fw-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: var(--fw-selected-hover) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr.selected td,
+.tab08-fw-root #fw-spec-table tbody tr.selected > td {
+    background-color: var(--fw-selected-td) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr.selected:hover td,
+.tab08-fw-root #fw-spec-table tbody tr.selected:hover > td {
+    background-color: var(--fw-selected-td-hover) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--fw-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) {
+    background-color: var(--fw-selected-bg) !important;
+    box-shadow: var(--fw-shadow-selected) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr:hover:has(input.fw-row-check:checked) {
+    background-color: var(--fw-selected-hover) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) td {
+    background-color: var(--fw-selected-bg) !important;
+}
+.tab08-fw-root #fw-spec-table tbody tr:hover:has(input.fw-row-check:checked) td {
+    background-color: var(--fw-selected-hover) !important;
+}
+
+/* ═══════════════════════════════════
+   2. 선택 행 액션 버튼 강조
+   ═══════════════════════════════════ */
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="edit"],
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="delete"],
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="save"],
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="edit"],
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="delete"],
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="save"] {
+    background: var(--fw-accent);
+    border-color: var(--fw-accent);
+    box-shadow: var(--fw-shadow-btn-hover);
+}
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="delete"] .action-icon,
+.tab08-fw-root #fw-spec-table tbody tr.selected .action-btn[data-action="save"] .action-icon,
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="edit"] .action-icon,
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="delete"] .action-icon,
+.tab08-fw-root #fw-spec-table tbody tr:has(input.fw-row-check:checked) .action-btn[data-action="save"] .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ═══════════════════════════════════
+   3. 버튼 위치
+   ═══════════════════════════════════ */
+.tab08-fw-root #fw-download-btn.add-btn-icon {
+    right: 74px !important;
+}
+.tab08-fw-root #fw-row-add.add-btn-icon {
+    right: 20px !important;
+}
+
+/* ═══════════════════════════════════
+   3-1. 체크박스 열 여백
+   ═══════════════════════════════════ */
+.tab08-fw-root #fw-spec-table th:first-child,
+.tab08-fw-root #fw-spec-table td:first-child {
+    padding-right: 0;
+    padding-left: 14px;
+    width: 48px;
+    text-align: center;
+}
+
+/* ═══════════════════════════════════
+   3-2. 상태 색깔 점 (활성/비활성)
+   ═══════════════════════════════════ */
+.fw-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+.fw-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.05) inset;
+}
+.fw-status-dot.fw-dot-active {
+    background: #10b981;
+    box-shadow: 0 0 0 2px rgba(16,185,129,.2);
+}
+.fw-status-dot.fw-dot-inactive {
+    background: #94a3b8;
+    box-shadow: 0 0 0 2px rgba(148,163,184,.2);
+}
+
+/* ═══════════════════════════════════
+   4. 편집 모드 입력 필드
+   ═══════════════════════════════════ */
+.tab08-fw-root #fw-spec-table tbody td input[type="text"],
+.tab08-fw-root #fw-spec-table tbody td select {
+    height: 36px;
+    line-height: 1.4;
+}
+
+/* ═══════════════════════════════════
+   5. 날짜 입력
+   ═══════════════════════════════════ */
+.tab08-fw-root .fw-expires-date {
+    min-width: 110px;
+}
+
+/* ═══════════════════════════════════
+   6. 삭제 모달
+   ═══════════════════════════════════ */
+.tab08-fw-root ~ #fw-delete-modal .server-add-content { max-width: 680px; }
+.tab08-fw-root ~ #fw-delete-modal .server-add-header { padding: 20px 32px; }
+.tab08-fw-root ~ #fw-delete-modal .dispose-title { display: block; }
+.tab08-fw-root ~ #fw-delete-modal .dispose-title h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+.tab08-fw-root ~ #fw-delete-modal .server-add-body {
+    padding: 20px 0 24px;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+.tab08-fw-root ~ #fw-delete-modal .dispose-content {
+    margin: 0 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+.tab08-fw-root ~ #fw-delete-modal .dispose-text {
+    flex: 1 1 auto;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+}
+.tab08-fw-root ~ #fw-delete-modal .dispose-text p { margin: 0 0 8px 0; }
+.tab08-fw-root ~ #fw-delete-modal .dispose-illust {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab08-fw-root ~ #fw-delete-modal .dispose-illust img {
+    width: 220px;
+    max-width: min(36vw, 240px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.08));
+    border-radius: 10px;
+}
+
+/* ═══════════════════════════════════
+   7. CSV 다운로드 모달
+   ═══════════════════════════════════ */
+.tab08-fw-root ~ #fw-download-modal .form-radio-group {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+.tab08-fw-root ~ #fw-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ═══════════════════════════════════
+   8. 반응형 (Responsive)
+   ═══════════════════════════════════ */
+@media (max-width: 680px) {
+    .tab08-fw-root ~ #fw-delete-modal .dispose-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    .tab08-fw-root ~ #fw-delete-modal .dispose-illust img {
+        width: 160px;
+        max-width: 70vw;
+    }
+}

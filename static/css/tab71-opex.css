@@ -1,0 +1,275 @@
+/*
+ * tab71-opex.css — 계약정보(OPEX) 탭 공통 스타일
+ * ───────────────────────────────────────────────────
+ * 이 파일은 layouts/tab71-opex-shared.html 전용이다.
+ * 모든 OPEX 도메인(하드웨어/소프트웨어/기타)에서 동일한 UI를 보장한다.
+ *
+ * 디자인 토큰(CSS 변수)으로 관리하며, 개별 페이지 CSS에서
+ * 덮어쓰지 않도록 .page-tab71-opex 스코프를 사용한다.
+ */
+
+/* ── 디자인 토큰 ── */
+.page-tab71-opex {
+    /* 여백 체계 */
+    --tab61-section-padding: 24px;
+    --tab61-section-gap: 20px;
+    --tab61-header-height: 48px;
+    --tab61-table-row-height: 44px;
+
+    /* 색상 */
+    --tab61-border-color: rgba(255, 255, 255, 0.08);
+    --tab61-header-bg: rgba(255, 255, 255, 0.03);
+    --tab61-row-hover-bg: rgba(255, 255, 255, 0.04);
+    --tab61-total-bg: rgba(255, 255, 255, 0.05);
+    --tab61-sum-color: #60a5fa;
+    --tab71-status-active: #34d399;
+    --tab71-status-expired: #f87171;
+    --tab71-status-pending: #fbbf24;
+    --tab71-status-terminated: #94a3b8;
+
+    /* 타이포그래피 */
+    --tab61-header-font-size: 13px;
+    --tab61-cell-font-size: 13px;
+    --tab61-total-font-size: 13px;
+
+    /* 라운딩 & 그림자 */
+    --tab61-border-radius: 12px;
+    --tab61-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ── 섹션 레이아웃 (공통 간격 강제) ── */
+.page-tab71-opex .detail-section {
+    padding: var(--tab61-section-padding);
+    margin-bottom: var(--tab61-section-gap);
+}
+
+.page-tab71-opex .detail-section > h3.has-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--tab61-header-height);
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* ── 상단 액션 버튼 ── */
+.page-tab71-opex .detail-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.page-tab71-opex .detail-header-actions .add-btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tab61-border-color);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.page-tab71-opex .detail-header-actions .add-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.page-tab71-opex .detail-header-actions .add-btn-icon:active {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.page-tab71-opex .detail-header-actions .add-btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.page-tab71-opex .detail-header-actions .add-btn-icon img {
+    width: 18px;
+    height: 18px;
+}
+
+/* ── 테이블 공통 ── */
+.page-tab71-opex .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--tab61-border-radius);
+    border: 1px solid var(--tab61-border-color);
+    box-shadow: var(--tab61-shadow);
+}
+
+.page-tab71-opex .hw-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.page-tab71-opex .hw-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--tab61-header-bg);
+    font-size: var(--tab61-header-font-size);
+    font-weight: 600;
+    height: var(--tab61-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--tab61-border-color);
+}
+
+.page-tab71-opex .hw-table tbody td {
+    font-size: var(--tab61-cell-font-size);
+    height: var(--tab61-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--tab61-border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.page-tab71-opex .hw-table tbody tr:hover {
+    background: var(--tab61-row-hover-bg);
+}
+
+/* ── 합계행 ── */
+.page-tab71-opex .hw-table tfoot td {
+    font-size: var(--tab61-total-font-size);
+    font-weight: 600;
+    height: var(--tab61-table-row-height);
+    padding: 0 10px;
+    text-align: center;
+    background: var(--tab61-total-bg);
+    border-top: 1px solid var(--tab61-border-color);
+}
+
+.page-tab71-opex .hw-table tfoot .total-label {
+    text-align: right;
+    padding-right: 16px;
+}
+
+.page-tab71-opex .hw-table tfoot .total-cell {
+    color: var(--tab61-sum-color);
+}
+
+.page-tab71-opex .hw-table thead .sum-col {
+    color: var(--tab61-sum-color);
+}
+
+/* ── Empty State (공통 높이/간격 강제) ── */
+.page-tab71-opex .system-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.page-tab71-opex .system-empty .empty-icon-img {
+    width: 64px;
+    height: 64px;
+    opacity: 0.5;
+    margin-bottom: 16px;
+}
+
+.page-tab71-opex .system-empty .empty-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.page-tab71-opex .system-empty .empty-desc {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+/* ── Pagination (공통 높이/간격 강제) ── */
+.page-tab71-opex .modern-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 8px;
+    margin-top: 12px;
+}
+
+.page-tab71-opex .modern-pagination .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-tab71-opex .modern-pagination .pagination-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--tab61-border-color);
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.page-tab71-opex .modern-pagination .pagination-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.page-tab71-opex .modern-pagination .pagination-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── CSV 다운로드 모달 (공통화) ── */
+.page-tab71-opex .system-download-modal .dispose-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 16px 0;
+}
+
+.page-tab71-opex .system-download-modal .dispose-illust img {
+    width: 120px;
+    height: auto;
+    opacity: 0.7;
+}
+
+.page-tab71-opex .system-download-modal .form-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.page-tab71-opex .system-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* ── 연도 선택 드롭다운 (공통 크기) ── */
+.page-tab71-opex .page-size-selector {
+    display: inline-flex;
+    align-items: center;
+}
+
+.page-tab71-opex .page-size-select {
+    min-width: 80px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--tab61-border-color);
+    background: transparent;
+    font-size: 13px;
+    padding: 0 8px;
+    cursor: pointer;
+}

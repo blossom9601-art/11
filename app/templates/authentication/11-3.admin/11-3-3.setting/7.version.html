@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.23">
+	<link rel="stylesheet" href="/static/css/version.css?v=4.2.2">
+	<script src="/static/js/blossom.js" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content" data-user-role="{{ current_user_role or '' }}">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<h1>버전관리</h1>
+				<p>시스템 버전 정보 및 릴리즈 히스토리를 확인합니다.</p>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="vr-list-pane">
+					<!-- 탭 헤더 (툴바) -->
+					<div class="tab-header">
+						<div class="tab-header-left">
+							<h2>Release Note <span class="count-badge" id="vr-count">0</span></h2>
+						</div>
+						<div class="tab-header-right">
+							<div class="search-container" role="search">
+								<div class="search-input-wrapper" id="vr-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="vr-search" placeholder="검색" class="search-input" aria-label="릴리즈 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="vr-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+								</div>
+							</div>
+							<div class="page-size-selector compact" id="vr-page-size-wrapper">
+								<select id="vr-page-size" class="page-size-select" aria-label="페이지 당 행 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<button class="header-btn" id="vr-delete-btn" title="삭제" aria-label="선택 항목 삭제">
+								<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon">
+							</button>
+							<button class="header-btn" id="vr-add-btn" title="추가" aria-label="릴리즈 추가">
+								<img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<!-- 테이블 -->
+					<div class="system-table-container server-table-container">
+						<table class="system-data-table server-data-table" id="vr-table">
+							<thead>
+								<tr>
+									<th style="width:40px"><input type="checkbox" id="vr-check-all" aria-label="전체 선택"></th>
+									<th style="width:130px" data-col="version">버전</th>
+									<th data-col="items">릴리즈 내용</th>
+									<th style="width:100px" data-col="status">상태</th>
+									<th style="width:90px" data-col="actions">관리</th>
+								</tr>
+							</thead>
+							<tbody id="vr-tbody"></tbody>
+						</table>
+					</div>
+
+					<!-- 빈 상태 -->
+					<div id="vr-empty" class="system-empty" hidden>
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3>릴리즈 노트가 없습니다.</h3>
+							<p>우측 상단 '추가' 버튼을 눌러 첫 릴리즈를 등록하세요.</p>
+						</div>
+					</div>
+
+					<!-- 페이지네이션 -->
+					<div class="modern-pagination" id="vr-pagination">
+						<div class="pagination-info"><span id="vr-pagination-info">0개 항목</span></div>
+						<div class="pagination-controls">
+							<button class="pagination-btn" id="vr-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+							<button class="pagination-btn" id="vr-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+							<div class="page-numbers" id="vr-page-numbers"></div>
+							<button class="pagination-btn" id="vr-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+							<button class="pagination-btn" id="vr-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<!-- ── 릴리즈 추가/수정 모달 ── -->
+	<div id="vr-edit-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title"><h3 id="release-modal-title">새 릴리즈 추가</h3><p class="server-add-subtitle">버전 및 릴리즈 내용을 입력하세요.</p></div>
+				<button class="close-btn" type="button" id="vr-edit-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="vr-edit-form">
+					<div class="form-section">
+						<div class="section-header"><h4>릴리즈 정보</h4></div>
+						<div class="form-grid">
+							<div class="form-row"><label>버전<span class="required">*</span></label><input type="text" class="form-input" id="edit-rn-version" placeholder="예: v1.3.0"></div>
+							<div class="form-row"><label>상태</label><select class="form-input" id="edit-rn-status"><option value="published">Published</option><option value="draft">Draft</option><option value="deprecated">Deprecated</option></select></div>
+						</div>
+						<div class="form-row" id="rn-items-row" style="margin-top:10px">
+							<label>릴리즈 내용<span class="required">*</span></label>
+							<textarea class="form-input" id="edit-rn-items" rows="8" placeholder="각 줄에 릴리즈 내용을 입력하세요." style="resize:vertical;min-height:140px;"></textarea>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<button type="button" class="btn-primary" id="btn-save-release">저장</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- ── 삭제 확인 모달 ── -->
+	<div id="vr-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title dispose-title">
+					<h3>삭제처리</h3>
+					<p class="server-add-subtitle" id="vr-delete-subtitle">선택된 0개의 릴리즈를 삭제하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" id="vr-delete-close" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p>선택한 릴리즈 노트를 삭제합니다.</p>
+						<p>삭제된 항목은 복구할 수 없습니다.</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="삭제 확인" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="btn-confirm-delete">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="/static/js/version.js?v=4.2.1" defer></script>
+</body>
+</html>

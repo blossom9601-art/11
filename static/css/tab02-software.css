@@ -1,0 +1,204 @@
+/*
+ * tab02-software.css — 소프트웨어 탭 공통 디자인 시스템
+ * ─────────────────────────────────────────────────────
+ * 모든 상세 페이지의 소프트웨어 탭이 이 파일 하나를 참조하며,
+ * 페이지별 CSS 오버라이드는 하지 않는다.
+ *
+ * ● 공통값: 여백, 크기, 색상, 반지름, 그림자 등 모든 시각 속성
+ * ● 기존 detail.css의 sw- 접두 규칙은 ID 셀렉터로 전역 적용되므로
+ *   이 파일에서는 .tab02-software-root 스코프 규칙만 추가한다.
+ *
+ * 버전: 1.0 (2026-03-19)
+ */
+
+/* ═══════════════════════════════════
+   0. 디자인 토큰 (CSS Custom Properties)
+   ═══════════════════════════════════ */
+.tab02-software-root {
+    /* 색상 */
+    --sw-accent:           #6366f1;
+    --sw-accent-light:     #e0e7ff;
+    --sw-accent-hover:     rgba(99,102,241,.18);
+    --sw-danger:           #ef4444;
+    --sw-danger-light:     #fee2e2;
+    --sw-text:             #1f2937;
+    --sw-text-secondary:   #6b7280;
+    --sw-text-muted:       #94a3b8;
+    --sw-border:           #e5e7eb;
+    --sw-bg:               #ffffff;
+
+    /* 선택 행 */
+    --sw-selected-bg:      rgba(99,102,241,0.10);
+    --sw-selected-hover:   rgba(99,102,241,0.16);
+    --sw-selected-td:      rgba(106,90,205,0.10);
+    --sw-selected-td-hover:rgba(106,90,205,0.16);
+
+    /* 여백 */
+    --sw-section-padding:  0;
+    --sw-btn-top-offset:   0;
+
+    /* 크기 */
+    --sw-table-font:       13px;
+    --sw-action-btn-size:  36px;
+
+    /* 반지름 */
+    --sw-radius-btn:       10px;
+
+    /* 그림자 */
+    --sw-shadow-selected:  inset 0 0 0 1px rgba(99,102,241,0.45);
+    --sw-shadow-btn-hover: 0 2px 8px rgba(99,102,241,.28);
+
+    /* 전환 */
+    --sw-transition:       all .2s ease;
+}
+
+/* ═══════════════════════════════════
+   1. 테이블 행 선택 하이라이트
+   ═══════════════════════════════════ */
+.tab02-software-root #sw-spec-table tbody tr.selected,
+.tab02-software-root #sw-spec-table tbody tr.selected:nth-child(odd),
+.tab02-software-root #sw-spec-table tbody tr.selected:nth-child(even) {
+    background-color: var(--sw-selected-bg) !important;
+    border-left: 3px solid var(--sw-accent) !important;
+    box-shadow: var(--sw-shadow-selected) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr.selected:hover,
+.tab02-software-root #sw-spec-table tbody tr.selected:nth-child(odd):hover,
+.tab02-software-root #sw-spec-table tbody tr.selected:nth-child(even):hover {
+    background-color: var(--sw-selected-hover) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr.selected td,
+.tab02-software-root #sw-spec-table tbody tr.selected > td {
+    background-color: var(--sw-selected-td) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr.selected:hover td,
+.tab02-software-root #sw-spec-table tbody tr.selected:hover > td {
+    background-color: var(--sw-selected-td-hover) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr.selected td:first-child {
+    border-left: 3px solid var(--sw-accent) !important;
+}
+
+/* :has 기반 체크박스 선택 (폴백) */
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) {
+    background-color: var(--sw-selected-bg) !important;
+    box-shadow: var(--sw-shadow-selected) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr:hover:has(input.sw-row-check:checked) {
+    background-color: var(--sw-selected-hover) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) td {
+    background-color: var(--sw-selected-bg) !important;
+}
+.tab02-software-root #sw-spec-table tbody tr:hover:has(input.sw-row-check:checked) td {
+    background-color: var(--sw-selected-hover) !important;
+}
+
+/* ═══════════════════════════════════
+   2. 선택 행 액션 버튼 강조
+   ═══════════════════════════════════ */
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="edit"],
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="delete"],
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="save"],
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="edit"],
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="delete"],
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="save"] {
+    background: var(--sw-accent);
+    border-color: var(--sw-accent);
+    box-shadow: var(--sw-shadow-btn-hover);
+}
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="delete"] .action-icon,
+.tab02-software-root #sw-spec-table tbody tr.selected .action-btn[data-action="save"] .action-icon,
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="edit"] .action-icon,
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="delete"] .action-icon,
+.tab02-software-root #sw-spec-table tbody tr:has(input.sw-row-check:checked) .action-btn[data-action="save"] .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+/* ═══════════════════════════════════
+   3. 버튼 위치
+   ═══════════════════════════════════ */
+.tab02-software-root #sw-download-btn.add-btn-icon {
+    right: 74px !important;
+}
+.tab02-software-root #sw-row-add.add-btn-icon {
+    right: 20px !important;
+}
+
+/* ═══════════════════════════════════
+   4. 삭제 모달
+   ═══════════════════════════════════ */
+.tab02-software-root ~ #sw-delete-modal .server-add-content { max-width: 680px; }
+.tab02-software-root ~ #sw-delete-modal .server-add-header { padding: 20px 32px; }
+.tab02-software-root ~ #sw-delete-modal .dispose-title { display: block; }
+.tab02-software-root ~ #sw-delete-modal .dispose-title h3 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+.tab02-software-root ~ #sw-delete-modal .server-add-body {
+    padding: 20px 0 24px;
+    flex: 0 0 auto;
+    overflow: visible;
+}
+.tab02-software-root ~ #sw-delete-modal .dispose-content {
+    margin: 0 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+.tab02-software-root ~ #sw-delete-modal .dispose-text {
+    flex: 1 1 auto;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.7;
+}
+.tab02-software-root ~ #sw-delete-modal .dispose-text p { margin: 0 0 8px 0; }
+.tab02-software-root ~ #sw-delete-modal .dispose-illust {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab02-software-root ~ #sw-delete-modal .dispose-illust img {
+    width: 220px;
+    max-width: min(36vw, 240px);
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.08));
+    border-radius: 10px;
+}
+
+/* ═══════════════════════════════════
+   5. CSV 다운로드 모달
+   ═══════════════════════════════════ */
+.tab02-software-root ~ #sw-download-modal .form-radio-group {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+.tab02-software-root ~ #sw-download-modal .form-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ═══════════════════════════════════
+   6. 반응형 (Responsive)
+   ═══════════════════════════════════ */
+@media (max-width: 680px) {
+    .tab02-software-root ~ #sw-delete-modal .dispose-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+    .tab02-software-root ~ #sw-delete-modal .dispose-illust img {
+        width: 160px;
+        max-width: 70vw;
+    }
+}

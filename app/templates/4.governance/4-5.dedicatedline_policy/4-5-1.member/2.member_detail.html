@@ -1,0 +1,131 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail4.css">
+    <script src="/static/js/4.governance/4-5.dedicatedline_policy/4-5-1.member/2.member_detail.js?v=1.1"></script>
+    <script src="/static/js/4.governance/4-5.dedicatedline_policy/dedicatedline_header.js?v=1.0"></script>
+</head>
+<body data-gov-detail-id="{{ gov_detail_id or '' }}">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 (동적) -->
+            <a href="{{ url_for('pages.show', key=dl_base) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title }}</h1>
+                <p id="page-header-subtitle">{{ subtitle }}</p>
+            </div>
+
+            <!-- 전용회선 상세 탭 네비게이션 (명시적, 순서 고정) -->
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key=dl_base + '_detail') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key=dl_base + '_manager') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_manager' %} active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.show', key=dl_base + '_task') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_task' %} active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.show', key=dl_base + '_log') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key=dl_base + '_file') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_file' %} active{% endif %}">구성/파일</a>
+            </div>
+
+            <!-- 전용회선 상세 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <!-- 기본정보 탭 -->
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <!-- 기본정보 섹션 -->
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid">
+                            <!-- 기본 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>기본</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>상태</label><span class="info-value" id="md-status">-</span></div>
+                                    <div class="info-row"><label>기관명</label><span class="info-value" id="md-org_name">-</span></div>
+                                    <div class="info-row"><label>통신사</label><span class="info-value" id="md-telco">-</span></div>
+                                    <div class="info-row"><label>프로토콜</label><span class="info-value" id="md-protocol">-</span></div>
+                                    <div class="info-row"><label>관리주체</label><span class="info-value" id="md-manager">-</span></div>
+                                </div>
+                            </div>
+                            <!-- 회선 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>회선</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>회선번호</label><span class="info-value" id="md-line_no">-</span></div>
+                                    <div class="info-row"><label>회선명</label><span class="info-value" id="md-line_name">-</span></div>
+                                    <div class="info-row"><label>업무</label><span class="info-value" id="md-business">-</span></div>
+                                    <div class="info-row"><label>속도</label><span class="info-value" id="md-speed">-</span></div>
+                                    <div class="info-row"><label>개통일자</label><span class="info-value" id="md-open_date">-</span></div>
+                                    <div class="info-row"><label>해지일자</label><span class="info-value" id="md-close_date">-</span></div>
+                                    <div class="info-row"><label>DR회선</label><span class="info-value" id="md-dr_line">-</span></div>
+                                </div>
+                            </div>
+                            <!-- 장비 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>장비</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>장비명</label><span class="info-value" id="md-device_name">-</span></div>
+                                    <div class="info-row"><label>통신장비</label><span class="info-value" id="md-network_device">-</span></div>
+                                    <div class="info-row"><label>슬롯</label><span class="info-value" id="md-slot">-</span></div>
+                                    <div class="info-row"><label>포트</label><span class="info-value" id="md-port">-</span></div>
+                                    <div class="info-row"><label>하위장비</label><span class="info-value" id="md-child_device">-</span></div>
+                                    <div class="info-row"><label>하위포트</label><span class="info-value" id="md-child_port">-</span></div>
+                                </div>
+                            </div>
+                            <!-- 관할 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>관할</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>당사관할국</label><span class="info-value" id="md-our_agency">-</span></div>
+                                    <div class="info-row"><label>기관관할국</label><span class="info-value" id="md-org_agency">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+    <!-- 기본정보 수정 모달 (전용회선 회원사 리스트와 동일한 구조/스타일) -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>{{ dl_label }} 회선 수정</h3><p class="server-edit-subtitle">선택한 회선 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

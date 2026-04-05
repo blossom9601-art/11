@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/propro.css?v=1.95">
+    <link rel="stylesheet" href="/static/css/tab89-procurement.css?v=1.0">
+    <script src="/static/js/8.project/8-1.project/8-1-3.project_list/2.project_detail.js?v=20260322a"></script>
+    <script src="/static/js/8.project/8-1.project/8-1-3.project_list/tab89-procurement.js?v=20260306a"></script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content: 3 BOX Layout -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="page-header">
+                {% if title and title != '프로젝트' %}
+                <h1>{{ title }}</h1>
+                {% endif %}
+            </div>
+
+            <!-- 상단 2칸: 1번박스(개요) / 2번박스(진행상황·첨부·파일) -->
+            <div class="two-col">
+                <!-- 1번박스 / 프로젝트 개요 -->
+                <section class="basic-info-card relative project-overview-card" aria-labelledby="box1-title">
+                    <!-- 설정 버튼 (모달 트리거) -->
+                    <button type="button" id="project-edit-fab" class="add-btn-icon fab-top-right" title="프로젝트 설정" aria-label="프로젝트 설정">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="설정" class="action-icon">
+                    </button>
+                    <div class="basic-info-card-header">
+                        <!-- 뒤로가기 버튼 -->
+                        <a href="{{ url_for('pages.show', key='proj_completed') }}" class="back-btn no-margin">
+                            <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                            <span>목록으로 돌아가기</span>
+                        </a>
+                    </div>
+                    <div class="basic-info-card-content">
+                        <!-- 제목 / 상태 -->
+                        <div class="page-header-flex">
+                            <div class="row-gap8" id="project-title-row">
+                                <h1 id="project-title" class="no-margin">-</h1>
+                                <span id="project-status" class="status-pill" aria-label="상태">
+                                    <span class="status-dot" aria-hidden="true"></span>
+                                    <span class="status-text">-</span>
+                                </span>
+                            </div>
+                        </div>
+                        <!-- 프로젝트 내용 탭 -->
+                        <div class="server-detail-tabs" role="tablist" aria-label="프로젝트 내용 탭">
+                            <a href="{{ url_for('pages.show', key='proj_completed_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_detail' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_detail' else 'false' }}">통합 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_integrity') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_integrity' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_integrity' else 'false' }}">요구사항</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_scope') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_scope' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_scope' else 'false' }}">범위 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_schedule') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_schedule' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_schedule' else 'false' }}">일정 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_cost') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_cost' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_cost' else 'false' }}">비용 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_quality') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_quality' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_quality' else 'false' }}">품질 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_resource') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_resource' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_resource' else 'false' }}">자원 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_communication') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_communication' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_communication' else 'false' }}">의사소통 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_risk') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_risk' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_risk' else 'false' }}">위험 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_procurement') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_procurement' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_procurement' else 'false' }}">조달 관리</a>
+                            <a href="{{ url_for('pages.show', key='proj_completed_stakeholder') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_stakeholder' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_stakeholder' else 'false' }}">이해관계자 관리</a>
+                        </div>
+
+                        <!-- 프로젝트 개요 -->
+                        <div class="info-title-row">
+                            <h4 id="box1-title" class="info-title">프로젝트 개요</h4>
+                            <a href="#" id="project-desc-more" class="submenu-link small-text" role="button">더보기</a>
+                        </div>
+                        <div id="project-desc" class="form-input-static project-desc-box">-</div>
+
+                        <!-- 프로젝트 정보 -->
+                        <div class="mt-14">
+                            <h4 class="info-title">프로젝트 정보</h4>
+                            <div class="project-info-box">
+                            <div class="info-grid cols-5">
+                                <div class="info-cell">
+                                    <span class="info-label">유형</span>
+                                    <span class="info-value" id="ov-type">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">담당부서</span>
+                                    <span class="info-value" id="ov-dept">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">담당자</span>
+                                    <span class="info-value" id="ov-owner">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">우선순위</span>
+                                    <span class="info-value" id="ov-priority">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">참여자</span>
+                                    <span class="info-value" id="ov-members">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">예산</span>
+                                    <span class="info-value" id="ov-budget">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">시작일</span>
+                                    <span class="info-value" id="ov-start">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">(예상)종료일</span>
+                                    <span class="info-value" id="ov-end">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">일정 진행률</span>
+                                    <span class="info-value" id="ov-progress" aria-label="일정 진행률">-</span>
+                                </div>
+                                <div class="info-cell">
+                                    <span class="info-label">프로젝트 번호</span>
+                                    <span class="info-value" id="ov-project-number" aria-label="프로젝트 번호">-</span>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2번박스: 진행상황 · 첨부파일 -->
+                <aside class="side-panels" aria-label="진행/첨부">
+                    <div class="basic-info-card" id="box2">
+                        <div class="basic-info-card-header">
+                            <div class="server-detail-tabs" role="tablist" aria-label="진행/첨부">
+                                <button class="server-detail-tab-btn active" role="tab" aria-selected="true" data-tab="prog">진행상황</button>
+                                <button class="server-detail-tab-btn" role="tab" aria-selected="false" data-tab="files">첨부파일</button>
+                            </div>
+                        </div>
+                        <div class="basic-info-card-content">
+                            <div class="server-detail-content">
+                                <!-- 진행상황 -->
+                                <div class="server-detail-pane active" id="box2-prog" role="tabpanel">
+                                    <div id="prog-pie-pane" class="prog-pane">
+                                        <div class="pie-wrap">
+                                        <div class="pie-chart" id="box2-pie" aria-label="진행상황"></div>
+                                        <ul class="pie-legend">
+                                            <li class="legend-item"><span class="legend-dot status-done" aria-hidden="true"></span><span class="legend-host">완료</span><span class="legend-size" id="stat-done">0</span></li>
+                                            <li class="legend-item"><span class="legend-dot status-doing" aria-hidden="true"></span><span class="legend-host">진행</span><span class="legend-size" id="stat-doing">0</span></li>
+                                            <li class="legend-item"><span class="legend-dot status-overdue" aria-hidden="true"></span><span class="legend-host">지연</span><span class="legend-size" id="stat-overdue">0</span></li>
+                                            <li class="legend-item"><span class="legend-dot status-pending" aria-hidden="true"></span><span class="legend-host">대기</span><span class="legend-size" id="stat-pending">0</span></li>
+                                        </ul>
+                                        <span id="stat-total" hidden aria-hidden="true">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 첨부파일 -->
+                                <div class="server-detail-pane" id="box2-files" role="tabpanel" hidden>
+                                    <input id="fi-attach-input" type="file" multiple hidden>
+                                    <div id="fi-attach-drop" class="dropzone" role="button" tabindex="0" aria-label="파일 업로드">
+                                        여기에 파일을 끌어다 놓거나 클릭하여 업로드                                    </div>
+                                    <div class="attachments-scroll">
+                                        <ul class="attach-list" id="fi-attach-list"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- 3번박스: 구매 목록 -->
+            <section class="detail-section mt-16" id="wbs-section" aria-labelledby="box3-title">
+                <h3 id="box3-title">구매 목록
+                    <div class="page-size-selector" aria-label="보기 개수">
+                        <label for="tco-page-size" class="visually-hidden">보기 개수</label>
+                        <select id="tco-page-size" class="page-size-select" title="보기 개수">
+                            <option value="10">10건</option>
+                            <option value="20">20건</option>
+                            <option value="50">50건</option>
+                            <option value="100">100건</option>
+                        </select>
+                    </div>
+                </h3>
+
+                <div class="server-detail-content" id="tco">
+                    <div class="server-detail-pane active" id="basic">
+                        <div class="table-wrap">
+                            <table class="hw-table" id="tco-table">
+                                <colgroup>
+                                    <col class="col-select">
+                                    <col class="col-manage-no"><col><col><col><col><col>
+                                    <col><col><col><col><col><col><col>
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="tco-select-all" aria-label="전체 선택"></th>
+                                        <th>구매번호</th>
+                                        <th>조달상태</th>
+                                        <th>조달방법</th>
+                                        <th>조달구분</th>
+                                        <th>품목유형</th>
+                                        <th>계약업체</th>
+                                        <th>제조사</th>
+                                        <th>모델명</th>
+                                        <th>상세사양</th>
+                                        <th>단가</th>
+                                        <th>수량</th>
+                                        <th>합계금액</th>
+                                        <th>유지보수율</th>
+                                        <th>무상기간</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                                <tfoot>
+                                    <tr id="tco-sum-row" hidden>
+                                        <td></td>
+                                        <td colspan="10" class="tco-sum-label">합계</td>
+                                        <td id="tco-sum-qty" class="tco-sum-num">-</td>
+                                        <td id="tco-sum-total" class="tco-sum-num">-</td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div id="tco-empty" class="system-empty system-empty--sticker" role="status" aria-live="polite" hidden>
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">조달 데이터가 없습니다.</h3>
+                                <p class="empty-desc">해당 프로젝트 번호로 등록된 CAPEX 계약정보가 없습니다.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="tco-pagination">
+                            <div class="pagination-info"><span id="tco-pagination-info">0건의 데이터</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="tco-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="tco-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="tco-page-numbers"></div>
+                                <button class="pagination-btn" id="tco-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="tco-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+
+    <!-- 프로젝트 설정 모달 (리스트 페이지와 동일 마크업 -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>프로젝트 설정</h3><p class="server-edit-subtitle">선택된 프로젝트 정보를 설정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 프로젝트 개요 플라이아웃 박스 (비모달) -->
+    <div id="desc-flyout" class="desc-flyout" aria-hidden="true" hidden>
+        <div class="flyout-card" role="dialog" aria-modal="false" aria-labelledby="desc-flyout-title">
+            <div class="flyout-header">
+                <div class="flyout-title"><h3 id="desc-flyout-title">프로젝트 개요</h3><p class="flyout-subtitle">상세한 내용을 확인합니다.</p></div>
+                <button class="close-btn" type="button" id="desc-flyout-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="flyout-body">
+                <div id="desc-flyout-body" class="desc-rich"></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

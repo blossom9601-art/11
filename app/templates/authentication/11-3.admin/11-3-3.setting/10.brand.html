@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+	<meta http-equiv="Pragma" content="no-cache">
+	<meta http-equiv="Expires" content="0">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+	<link rel="stylesheet" href="/static/css/brand_admin.css?v=3.4.1">
+	<script src="/static/js/blossom.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/10.brand.js?v=20260315f" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>브랜드 관리</h1>
+					<p>헤더 아이콘, 브랜드명, 대시보드 카드 로고 등을 설정합니다.</p>
+				</div>
+			</div>
+
+			<!-- ── 공통 탭 네비게이션 ── -->
+			<div class="system-tabs" role="tablist" aria-label="관리 설정 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<div class="settings-columns" style="grid-template-columns:1fr 1fr;">
+			<!-- ── 섹션 1: 헤더 브랜딩 ── -->
+			<section class="setting-card brand-section" id="brand-header-section" style="align-self:stretch;display:flex;flex-direction:column;">
+				<div class="brand-section-header">
+					<h2>헤더 브랜딩</h2>
+					<p>좌측 상단에 표시되는 로고 아이콘과 브랜드명을 설정합니다.</p>
+				</div>
+				<div class="brand-section-body">
+					<!-- 헤더 아이콘 업로드 -->
+					<div>
+						<label class="brand-label">헤더 아이콘</label>
+						<div class="brand-upload-box" id="header-icon-upload" data-key="brand.headerIcon" data-category="header">
+							<div class="brand-upload-preview" id="header-icon-preview">
+								<img src="/static/image/logo/blossom_logo.png" alt="헤더 아이콘 미리보기" id="header-icon-img">
+							</div>
+							<div class="brand-upload-actions">
+								<label class="brand-upload-btn">
+									<input type="file" accept=".png,.jpg,.jpeg,.svg" hidden>
+									<img src="/static/image/svg/free-icon-font-wallet-change.svg" alt="이미지 선택" class="btn-icon" title="이미지 선택">
+								</label>
+								<button type="button" class="brand-reset-btn" data-key="brand.headerIcon" title="초기화"><img src="/static/image/svg/free-icon-font-hourglass-start.svg" alt="초기화" class="btn-icon"></button>
+							</div>
+							<span class="brand-hint">PNG, JPG, SVG / 최대 2MB / 권장 40×40px</span>
+						</div>
+					</div>
+					<!-- 브랜드명 -->
+					<div>
+						<label class="brand-label" for="brand-name-input">브랜드명</label>
+						<input type="text" id="brand-name-input" class="brand-text-input" maxlength="50" placeholder="blossom" value="">
+						<span class="brand-hint">최대 50자 / 헤더 좌측에 표시됩니다.</span>
+					</div>
+					<!-- 보조 문구 -->
+					<div>
+						<label class="brand-label" for="brand-subtitle-input">보조 문구 (선택)</label>
+						<input type="text" id="brand-subtitle-input" class="brand-text-input" maxlength="100" placeholder="" value="">
+						<span class="brand-hint">최대 100자 / 브랜드명 아래 작은 텍스트로 표시됩니다.</span>
+					</div>
+				</div>
+				<!-- 미리보기 -->
+				<div>
+					<label class="brand-label">미리보기</label>
+					<div class="brand-header-preview">
+						<img src="/static/image/logo/blossom_logo.png" alt="미리보기" id="preview-header-icon" class="preview-logo">
+						<div class="preview-text-wrap">
+							<span class="preview-brand-name" id="preview-brand-name">blossom</span>
+							<span class="preview-brand-subtitle" id="preview-brand-subtitle"></span>
+						</div>
+					</div>
+				</div>
+				<div class="brand-section-actions" style="margin-top:auto;">
+					<button type="button" class="brand-save-btn" id="btn-save-header">헤더 설정 저장</button>
+					<p class="setting-status" id="header-status"></p>
+				</div>
+			</section>
+
+			<div style="display:flex;flex-direction:column;gap:20px;align-self:stretch;">
+			<!-- ── 섹션 2: 대시보드 카드 로고 ── -->
+			<section class="setting-card brand-section" id="brand-card-section">
+				<div class="brand-section-header">
+					<h2>대시보드 카드 로고</h2>
+					<p>메인 대시보드 우측 카드에 표시되는 로고 이미지를 관리합니다.</p>
+				</div>
+				<div class="brand-section-body" id="card-logos-container">
+					<!-- JS에서 동적으로 카드 로고 행 생성 -->
+					<div class="brand-card-row" data-key="dashboard.cardLogos.maintenance_cost_card">
+						<div class="brand-card-info">
+							<span class="brand-card-key-label">maintenance_cost_card</span>
+							<span class="brand-card-desc">유지보수 비용 카드</span>
+						</div>
+						<div class="brand-upload-box small" data-key="dashboard.cardLogos.maintenance_cost_card" data-category="dashboard">
+							<div class="brand-upload-preview small" id="preview-maintenance_cost_card">
+								<img src="/static/image/logo/bccard_logo.jpg" alt="카드 로고" class="brand-card-logo-img">
+							</div>
+							<div class="brand-upload-actions">
+								<label class="brand-upload-btn small">
+									<input type="file" accept=".png,.jpg,.jpeg,.svg" hidden>
+									<img src="/static/image/svg/free-icon-font-wallet-change.svg" alt="변경" class="btn-icon" title="변경">
+								</label>
+								<button type="button" class="brand-reset-btn small" data-key="dashboard.cardLogos.maintenance_cost_card"><img src="/static/image/svg/free-icon-font-hourglass-start.svg" alt="초기화" class="btn-icon" title="초기화"></button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="brand-card-guide">
+					<span class="brand-hint">PNG, JPG, SVG / 최대 2MB / 권장 비율 가로형</span>
+					<span class="brand-hint">카드 로고는 이미지 변경 시 자동 저장됩니다. 초기화 버튼으로 기본 로고로 되돌릴 수 있습니다.</span>
+				</div>
+				<div class="brand-section-actions">
+					<button type="button" class="brand-save-btn" id="btn-save-cards">카드 로고 저장</button>
+					<p class="setting-status" id="cards-status"></p>
+				</div>
+			</section>
+
+			<!-- ── 섹션 3: 기본값 복원 ── -->
+			<section class="setting-card brand-section brand-reset-section" id="brand-reset-section">
+				<div class="brand-section-header">
+					<h2>기본값 복원</h2>
+					<p>모든 브랜드 설정을 초기 기본값으로 되돌립니다.</p>
+				</div>
+				<div class="brand-section-body">
+					<div class="brand-reset-warning">
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="currentColor" stroke-width="1.5"/><path d="M10 8v4M10 14v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+						<span>전체 초기화 시 헤더 아이콘, 브랜드명, 카드 로고가 모두 기본값으로 복원됩니다.</span>
+					</div>
+				</div>
+				<div class="brand-section-actions">
+					<button type="button" class="brand-danger-btn" id="btn-reset-all">전체 초기화</button>
+					<p class="setting-status" id="reset-status"></p>
+				</div>
+			</section>
+			</div><!-- /우측 컨테이너 -->
+
+			</div><!-- /.settings-columns -->
+		</div>
+	</main>
+</body>
+</html>

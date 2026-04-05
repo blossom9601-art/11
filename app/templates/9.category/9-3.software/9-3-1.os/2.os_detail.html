@@ -1,0 +1,122 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail3.css?v=1.4">
+    <script src="/static/js/9.category/9-3.software/9-3-1.os/2.os_detail.js?v=3.10"></script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            <a href="{{ url_for('pages.show', key='cat_sw_os') }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title }}</h1>
+                <p id="page-header-subtitle">{{ subtitle }}</p>
+            </div>
+
+            <!-- 소프트웨어 상세 탭 네비게이션 -->
+            <div class="server-detail-tabs">
+                <a href="{{ url_for('pages.show', key='cat_sw_os_detail') }}" class="server-detail-tab-btn {% if current_key=='cat_sw_os_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.show', key='cat_sw_os_system') }}" class="server-detail-tab-btn {% if current_key=='cat_sw_os_system' %}active{% endif %}">소프트웨어</a>
+                <a href="{{ url_for('pages.show', key='cat_sw_os_log') }}" class="server-detail-tab-btn {% if current_key=='cat_sw_os_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.show', key='cat_sw_os_file') }}" class="server-detail-tab-btn {% if current_key=='cat_sw_os_file' %}active{% endif %}">구성/파일</a>
+            </div>
+
+            <!-- 서버 상세 탭 컨텐츠 -->
+            <div class="server-detail-content">
+                <!-- 기본정보 탭 -->
+                <div class="server-detail-pane active" id="basic">
+                    <input type="hidden" id="cat-sw-item-id" value="{{ (os_detail.get('os_id','') if os_detail else '') }}">
+                    <input type="hidden" id="cat-sw-vendor-code" value="{{ (os_detail.get('vendor_code','') if os_detail else '') }}">
+                    <button class="add-btn-icon" id="detail-edit-open" title="기본정보 수정" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    </button>
+                    <!-- 기본정보 섹션 -->
+                    <div class="detail-section">
+                        <h3>기본정보</h3>
+                        <div class="basic-info-grid">
+                            <!-- 운영체제 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>운영체제</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="info-row"><label>모델명</label><span class="info-value" id="os-model">{{ (os_detail.get('model') if os_detail else request.args.get('model')) or '-' }}</span></div>
+                                    <div class="info-row"><label>제조사</label><span class="info-value" id="os-vendor">{{ (os_detail.get('vendor') if os_detail else request.args.get('vendor')) or '-' }}</span></div>
+                                    <div class="info-row"><label>유형</label><span class="info-value" id="os-type">{{ (os_detail.get('hw_type') if os_detail else request.args.get('hw_type')) or '-' }}</span></div>
+                                    <div class="info-row"><label>릴리즈 일자</label><span class="info-value" id="os-release-date">{{ (os_detail.get('release_date') if os_detail else request.args.get('release_date')) or '-' }}</span></div>
+                                    <div class="info-row"><label>EOSL 일자</label><span class="info-value" id="os-eosl">{{ (os_detail.get('eosl') if os_detail else request.args.get('eosl')) or '-' }}</span></div>
+                                    <div class="info-row"><label>수량</label><span class="info-value" id="os-qty">{{ (os_detail.get('qty') if os_detail else request.args.get('qty')) or '-' }}</span></div>
+                                    <div class="info-row"><label>비고</label><span class="info-value" id="os-note">{{ (os_detail.get('note') if os_detail else request.args.get('note')) or '-' }}</span></div>
+                                </div>
+                            </div>
+
+                            <!-- 상태 통계: 상태 기반 그래프 -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>상태 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap" style="display:none">
+                                        <div class="pie-chart" id="stat-pie" aria-label="상태 분포 그래프"></div>
+                                        <ul class="pie-legend" id="stat-legend"></ul>
+                                    </div>
+                                    <p id="stat-empty" class="info-desc" style="display:none">상태 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+
+                            <!-- 운영 통계: 업무운영 분포 (파이차트) -->
+                            <div class="basic-info-card">
+                                <div class="basic-info-card-header">
+                                    <h4>운영 통계</h4>
+                                </div>
+                                <div class="basic-info-card-content">
+                                    <div class="pie-wrap" style="display:none">
+                                        <div class="pie-chart" id="oper-pie" aria-label="업무운영 분포 그래프"></div>
+                                        <ul class="pie-legend" id="oper-legend"></ul>
+                                    </div>
+                                    <p id="oper-empty" class="info-desc" style="display:none">업무운영 데이터가 없습니다.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/js/blossom.js"></script>
+    <!-- 운영체제 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>운영체제 수정</h3><p class="server-edit-subtitle">선택한 운영체제 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

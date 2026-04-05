@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+</head>
+<body>
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-menu">
+                <ul class="menu-list">
+                    <li class="menu-item"><a href="{{ url_for('pages.show', key='dashboard') }}" class="menu-link"><img src="/static/image/svg/dashboard.svg" class="menu-icon" alt="대시"/><span class="menu-text">대시보드</span></a></li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/build.svg" class="menu-icon" alt="HW"/><span class="menu-text">하드웨어</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='hw_server_onpremise') }}" class="submenu-link">서버</a></li>
+                            <li><a href="{{ url_for('pages.show', key='hw_storage_san') }}" class="submenu-link">스토리지</a></li>
+                            <li><a href="{{ url_for('pages.show', key='hw_san_director') }}" class="submenu-link">SAN</a></li>
+                            <li><a href="{{ url_for('pages.show', key='hw_network_l2') }}" class="submenu-link">네트워크</a></li>
+                            <li><a href="{{ url_for('pages.show', key='hw_security_firewall') }}" class="submenu-link">보안장비</a></li>
+                        </ul>
+                    </li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/governance.svg" class="menu-icon" alt="NW"/><span class="menu-text">거버넌스</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='gov_dr_training') }}" class="submenu-link">재해복구 모의훈련</a></li>
+                            <li><a href="{{ url_for('pages.show', key='gov_backup_policy') }}" class="submenu-link">백업 정책</a></li>
+                            <li><a href="{{ url_for('pages.show', key='gov_ip_policy') }}" class="submenu-link">IP 정책</a></li>
+                            <li><a href="{{ url_for('pages.show', key='gov_vpn_policy') }}" class="submenu-link">VPN 정책</a></li>
+                            <li><a href="{{ url_for('pages.show', key='gov_dedicatedline_member') }}" class="submenu-link">전용회선 정책</a></li>
+                            <li><a href="{{ url_for('pages.show', key='gov_unused_server') }}" class="submenu-link">불용자산 관리</a></li>
+                        </ul>
+                    </li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='dc_access_control') }}" class="submenu-link">출입 관리</a></li>
+                            <li><a href="{{ url_for('pages.show', key='dc_data_deletion') }}" class="submenu-link">데이터 삭제 관리</a></li>
+                            <li><a href="{{ url_for('pages.show', key='dc_rack_lab1') }}" class="submenu-link">RACK 관리</a></li>
+                            <li><a href="{{ url_for('pages.show', key='dc_thermo_lab1') }}" class="submenu-link">온/습도 관리</a></li>
+                            <li><a href="{{ url_for('pages.show', key='dc_cctv_lab1') }}" class="submenu-link">CCTV 관리</a></li>
+                        </ul>
+                    </li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/maintenance.svg" class="menu-icon" alt="유지"/><span class="menu-text">유지보수</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='maint_contract_list') }}" class="submenu-link">계약관리</a></li>
+                        </ul>
+                    </li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/folder.svg" class="menu-icon" alt="프로젝트"/><span class="menu-text">프로젝트</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='proj_status') }}" class="submenu-link">프로젝트 현황</a></li>
+                            <li><a href="{{ url_for('pages.show', key='task_status') }}" class="submenu-link">작업 현황</a></li>
+                            <li><a href="{{ url_for('pages.show', key='workflow_progress') }}" class="submenu-link">티켓 현황</a></li>
+                            <li><a href="{{ url_for('pages.show', key='wf_designer_explore') }}" class="submenu-link">워크플로우 제작</a></li>
+                        </ul>
+                    </li>
+                    <li class="menu-item has-submenu">
+                        <div class="menu-link submenu-trigger"><img src="/static/image/svg/settings.svg" class="menu-icon" alt="카테고리"/><span class="menu-text">카테고리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('pages.show', key='cat_business_work') }}" class="submenu-link">비즈니스</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_hw_server') }}" class="submenu-link">하드웨어</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_sw_os') }}" class="submenu-link">소프트웨어</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_component_cpu') }}" class="submenu-link">컴포넌트</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_company_center') }}" class="submenu-link">회사</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_customer_client1') }}" class="submenu-link">고객</a></li>
+                            <li><a href="{{ url_for('pages.show', key='cat_vendor_manufacturer') }}" class="submenu-link">벤더</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+    <div style="padding: 20px; margin-left: 260px; margin-top: 64px;">
+        <h1>Blossom Sidebar</h1>
+        <p>사이드바 테스트</p>
+    </div>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+</body>
+</html>

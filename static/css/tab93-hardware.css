@@ -1,0 +1,144 @@
+/*
+ * tab93-hardware.css  v1.0
+ * ──────────────────────────────────────────────────────────────
+ * 하드웨어 탭 공통 컴포넌트 — 디자인 토큰 및 레이아웃 통합
+ *
+ * 모든 상세 페이지의 "하드웨어" 탭이 동일한 여백 체계, 간격, 크기,
+ * 색상을 사용하도록 CSS 변수로 관리한다.
+ *
+ * ⚠ 개별 페이지 CSS에서 .tab93-hw 내부 요소를 덮어쓰지 말 것.
+ *   디자인 변경이 필요하면 이 파일의 토큰을 수정하세요.
+ *
+ * 사용처: layouts/tab93-hardware-shared.html
+ */
+
+/* ══════════════════════════════════════════════════════════════
+   1. 디자인 토큰 (CSS 변수)
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw {
+    /* 여백 체계 */
+    --tab93-section-padding: 0;
+    --tab93-section-gap: 16px;
+    --tab93-header-height: 48px;
+    --tab93-row-height: 48px;
+    --tab93-pagination-height: 48px;
+    --tab93-empty-min-height: 240px;
+
+    /* 색상 */
+    --tab93-border-color: #e5e7eb;
+    --tab93-header-bg: #f8fafc;
+    --tab93-row-hover: #f0f4ff;
+    --tab93-row-selected: #eef2ff;
+    --tab93-accent: #4f46e5;
+    --tab93-text-primary: #1e293b;
+    --tab93-text-secondary: #64748b;
+
+    /* 크기 */
+    --tab93-border-radius: 8px;
+    --tab93-font-size: 13px;
+    --tab93-header-font-size: 12px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   2. 섹션 레이아웃 — 모든 페이지에서 동일한 패딩/간격 강제
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .detail-section {
+    padding: var(--tab93-section-padding);
+}
+
+.tab93-hw .detail-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--tab93-header-height);
+    margin: 0 0 var(--tab93-section-gap) 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--tab93-text-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3. 테이블 — border, radius, 행 높이, hover/selected 통일
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .hw-table {
+    border-radius: var(--tab93-border-radius);
+    border: 1px solid var(--tab93-border-color);
+}
+
+.tab93-hw .hw-table thead th {
+    background: var(--tab93-header-bg);
+    color: var(--tab93-text-secondary);
+    font-size: var(--tab93-header-font-size);
+    font-weight: 700;
+    padding: 10px 12px;
+    white-space: nowrap;
+}
+
+.tab93-hw .hw-table thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.tab93-hw .hw-table thead th.sort-asc,
+.tab93-hw .hw-table thead th.sort-desc {
+    color: var(--tab93-accent);
+}
+
+.tab93-hw .hw-table tbody td {
+    font-size: var(--tab93-font-size);
+    color: var(--tab93-text-primary);
+    padding: 10px 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tab93-hw .hw-table tbody tr {
+    min-height: var(--tab93-row-height);
+    transition: background-color 0.15s ease;
+}
+
+.tab93-hw .hw-table tbody tr:hover {
+    background: var(--tab93-row-hover);
+}
+
+.tab93-hw .hw-table tbody tr.selected {
+    background: var(--tab93-row-selected);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   4. 페이지네이션 — 높이 통일
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .modern-pagination {
+    min-height: var(--tab93-pagination-height);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. 빈 상태 — 최소 높이 통일
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .system-empty {
+    min-height: var(--tab93-empty-min-height);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6. 액션 버튼 — 간격/정렬 통일
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .detail-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. 체크박스 열 — 고정 폭
+   ══════════════════════════════════════════════════════════════ */
+.tab93-hw .hw-table .col-chk {
+    width: 36px;
+    text-align: center;
+}
+
+.tab93-hw .hw-table tbody td:first-child {
+    text-align: center;
+}

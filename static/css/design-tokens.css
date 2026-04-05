@@ -1,0 +1,121 @@
+/*
+ * 디자인 토큰 (design-tokens.css)
+ * ================================
+ * 프로젝트 전역에서 사용하는 색상, 크기, 그림자 등을
+ * CSS 커스텀 프로퍼티로 정의한다.
+ *
+ * 기존 하드코딩 색상값을 점진적으로 이 변수로 대체하면
+ * 디자인 일관성과 테마 변경 유연성을 확보할 수 있다.
+ *
+ * v1.0.0  2026-03-15
+ */
+
+:root {
+  /* ── 프라이머리 팔레트 (슬레이트 계열) ── */
+  --color-primary:     #64748b;
+  --color-primary-hover: #475569;
+  --color-primary-light: #94a3b8;
+  --color-primary-dark:  #334155;
+  --color-primary-bg:    #f8fafc;
+
+  /* ── 세컨더리 팔레트 ── */
+  --color-secondary:       #f8fafc;
+  --color-secondary-hover: #e2e8f0;
+  --color-secondary-border: #cbd5e1;
+
+  /* ── 엑센트 (인디고 계열 — 프로젝트·워크플로·비용 등 강조색) ── */
+  --accent:       #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-light: #818cf8;
+  --accent-bg:    rgba(99, 102, 241, 0.08);
+
+  /* ── 그레이스케일 ── */
+  --color-gray-50:  #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* ── 시맨틱 색상 ── */
+  --color-success:     #16a34a;
+  --color-success-bg:  #f0fdf4;
+  --color-error:       #dc2626;
+  --color-error-bg:    #fef2f2;
+  --color-warning:     #f59e0b;
+  --color-warning-bg:  #fffbeb;
+  --color-info:        #2563eb;
+  --color-info-bg:     #eff6ff;
+
+  /* ── 텍스트 ── */
+  --text-primary:   #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+  --text-inverse:   #ffffff;
+
+  /* ── 배경 ── */
+  --bg-body:    #f5f5f5;
+  --bg-card:    #ffffff;
+  --bg-sidebar: #1a1a2e;
+
+  /* ── 보더 ── */
+  --border-color:       #e5e7eb;
+  --border-color-focus: #94a3b8;
+  --border-radius-sm:   4px;
+  --border-radius-md:   8px;
+  --border-radius-lg:   12px;
+  --border-radius-xl:   16px;
+  --border-radius-pill: 9999px;
+
+  /* ── 그림자 ── */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md:  0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-lg:  0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-xl:  0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* ── 모달 ── */
+  --modal-overlay:   rgba(17, 24, 39, 0.55);
+  --modal-blur:      5px;
+  --modal-z-index:   1300;
+  --modal-transition: 200ms;
+
+  /* ── 간격 ── */
+  --spacing-xs:  4px;
+  --spacing-sm:  8px;
+  --spacing-md:  16px;
+  --spacing-lg:  24px;
+  --spacing-xl:  32px;
+  --spacing-2xl: 48px;
+
+  /* ── 폰트 ── */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+  --font-size-xs:  12px;
+  --font-size-sm:  13px;
+  --font-size-md:  14px;
+  --font-size-lg:  16px;
+  --font-size-xl:  18px;
+  --font-size-2xl: 24px;
+  --font-weight-normal:  400;
+  --font-weight-medium:  500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:    700;
+
+  /* ── 트랜지션 ── */
+  --transition-fast:   0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow:   0.35s ease;
+
+  /* ── z-index 체계 ── */
+  --z-dropdown:    100;
+  --z-sticky:      200;
+  --z-fixed:       300;
+  --z-modal-bg:    1200;
+  --z-modal:       1300;
+  --z-popover:     1400;
+  --z-tooltip:     1500;
+  --z-toast:       9999;
+}

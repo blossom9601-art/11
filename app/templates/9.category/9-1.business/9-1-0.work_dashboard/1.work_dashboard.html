@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/capex_executive.css?v=20260316a">
+    <link rel="stylesheet" href="/static/css/dashboard_add.css?v=20251109-1">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper" id="work-dashboard-root">
+            <div class="page-header">
+                    <div class="page-utility-right" data-info-key="category.business"></div>
+                <h1>업무 관리</h1>
+                <p>업무 분류를 관리 합니다.</p>
+            </div>
+
+            <div class="system-tabs-row">
+                <div class="system-tabs" role="tablist" aria-label="비즈니스 관리 탭">
+                    {% set tabs = [
+                        ('cat_business_dashboard', '대시보드'),
+                        ('cat_business_work', '업무 분류'),
+                        ('cat_business_division', '업무 구분'),
+                        ('cat_business_status', '업무 상태'),
+                        ('cat_business_operation', '업무 운영'),
+                        ('cat_business_group', '업무 그룹')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Executive Dashboard -->
+            <div class="exec-dashboard">
+
+                <section class="work-dash-grid" aria-label="업무 대시보드">
+                    <article class="exec-card analysis-card card chart">
+                        <div class="exec-card-title">업무 분류</div>
+                        <div class="chart-wrap-inner"><canvas id="chart-classification"></canvas></div>
+                    </article>
+                    <article class="exec-card analysis-card card chart">
+                        <div class="exec-card-title">업무 구분</div>
+                        <div class="chart-wrap-inner"><canvas id="chart-division"></canvas></div>
+                    </article>
+                    <article class="exec-card analysis-card card chart work-group-card">
+                        <div class="exec-card-title">업무 그룹</div>
+                        <div class="treemap-wrap" id="chart-group"></div>
+                    </article>
+                    <article class="exec-card analysis-card card chart">
+                        <div class="exec-card-title">업무 운영</div>
+                        <div class="chart-wrap-inner"><canvas id="chart-operation"></canvas></div>
+                    </article>
+                    <article class="exec-card analysis-card card chart">
+                        <div class="exec-card-title">업무 상태</div>
+                        <div class="chart-wrap-inner"><canvas id="chart-status"></canvas></div>
+                    </article>
+                </section>
+
+            </div><!-- /exec-dashboard -->
+
+            <noscript><div class="chart-placeholder" aria-hidden="true">차트를 보려면 JavaScript 를 활성화하세요.</div></noscript>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
+    <script src="/static/js/9.category/9-1.business/9-1-0.work_dashboard/1.work_dashboard.js?v=1.3.4"></script>
+    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>

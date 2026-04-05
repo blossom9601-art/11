@@ -1,0 +1,25 @@
+{# 통계 모달 (공통 컴포넌트)
+   모든 list.html 페이지에서 include 로 사용.
+   Body(#system-stats-body)는 비어 있으며, 각 페이지 JS의 buildStats()가
+   blsStats.renderCard()를 호출하면 섹션/카드가 자동 생성됩니다. #}
+<link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=2.2">
+<div id="system-stats-modal" class="server-add-modal system-stats-modal bls-stats modal-overlay-full" aria-hidden="true">
+    <div class="server-add-content">
+        <div class="server-add-header">
+            <div class="server-add-title">
+                <h3>통계</h3>
+                <p class="server-add-subtitle">현재 필터/정렬 기준 요약</p>
+            </div>
+            <button class="close-btn" type="button" id="system-stats-close" title="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+        <div class="server-add-body system-stats-body" id="system-stats-body"></div>
+        <div class="server-add-actions align-right">
+            <div class="action-buttons right">
+                <button type="button" class="btn-primary" id="system-stats-ok">확인</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="/static/js/_shared/bls-stats-modal.js?v=2.0"></script>

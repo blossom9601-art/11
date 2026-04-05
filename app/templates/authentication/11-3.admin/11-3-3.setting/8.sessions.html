@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.26">
+	<link rel="stylesheet" href="/static/css/sessions.css?v=1.0.4">
+	<script src="/static/js/blossom.js" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>활성 세션 관리</h1>
+					<p>현재 로그인 중인 세션을 조회하고, 필요 시 강제 종료할 수 있습니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="sess-list-pane">
+
+					<!-- ── 툴바 (온프레미스 스타일) ── -->
+					<div class="tab-header">
+						<div class="tab-header-left">
+							<h2>세션 목록 <span class="count-badge" id="sess-count-badge">0</span></h2>
+						</div>
+						<div class="tab-header-right">
+							<div class="search-container" role="search">
+								<div class="search-input-wrapper" id="sess-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="sess-search" placeholder="검색" class="search-input" aria-label="세션 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="sess-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+								</div>
+							</div>
+							<div class="page-size-selector compact" id="sess-page-size-wrapper">
+								<select id="sess-page-size" class="page-size-select" aria-label="페이지 당 행 수">
+									<option value="10">10 개</option>
+									<option value="20" selected>20 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<button class="header-btn" id="sess-refresh-btn" title="새로고침" aria-label="새로고침">
+								<img src="/static/image/svg/free-icon-font-message-circle-refresh.svg" alt="새로고침" class="header-icon">
+							</button>
+							<button class="header-btn" id="sess-bulk-terminate-btn" title="선택 종료" disabled aria-label="선택 종료">
+								<img src="/static/image/svg/list/free-icon-trash.svg" alt="선택 종료" class="header-icon">
+							</button>
+							<button class="header-btn sess-btn-terminate-all" id="sess-terminate-all-btn" title="전체 종료 (본인 제외)" aria-label="전체 종료">
+								<img src="/static/image/svg/free-icon-font-exit-alt.svg" alt="전체 종료" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<!-- ── 테이블 ── -->
+					<div class="system-table-container server-table-container">
+						<table class="system-data-table server-data-table" id="sess-table">
+							<thead>
+								<tr>
+									<th style="width:40px"><input type="checkbox" id="sess-check-all" aria-label="전체 선택"></th>
+									<th data-col="department">부서명</th>
+									<th data-col="user">사용자</th>
+									<th data-col="role">역할</th>									<th data-col="browser">브라우저 / OS</th>
+									<th data-col="ip">IP 주소</th>
+									<th data-col="created">접속 시간</th>
+									<th data-col="last_active">마지막 활동</th>
+									<th data-col="status" style="width:100px">상태</th>
+									<th data-col="actions" style="width:70px">관리</th>
+								</tr>
+							</thead>
+							<tbody id="sess-tbody"></tbody>
+						</table>
+					</div>
+
+					<!-- ── 빈 상태 ── -->
+					<div id="sess-empty" class="system-empty" hidden>
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3>활성 세션이 없습니다.</h3>
+							<p>현재 로그인 중인 세션이 존재하지 않습니다.</p>
+						</div>
+					</div>
+
+					<!-- ── 페이지네이션 ── -->
+					<div class="modern-pagination" id="sess-pagination">
+						<div class="pagination-info"><span id="sess-pagination-info">0개 항목</span></div>
+						<div class="pagination-controls">
+							<button class="pagination-btn" id="sess-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+							<button class="pagination-btn" id="sess-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+							<div class="page-numbers" id="sess-page-numbers"></div>
+							<button class="pagination-btn" id="sess-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+							<button class="pagination-btn" id="sess-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<!-- ── 세션 종료 확인 모달 ── -->
+	<div id="sess-confirm-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title dispose-title">
+					<h3 id="sess-confirm-title">세션 종료 확인</h3>
+					<p class="server-add-subtitle" id="sess-confirm-message">선택한 세션을 종료하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" id="sess-confirm-cancel" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p id="sess-confirm-detail">선택한 세션을 강제 종료합니다.</p>
+						<p>종료된 사용자는 다시 로그인해야 합니다.</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="세션 종료" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="sess-confirm-ok">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/8.sessions.js?v=20260315b" defer></script>
+</body>
+</html>

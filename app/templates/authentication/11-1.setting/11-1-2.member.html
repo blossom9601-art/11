@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/admin.css?v=20260104-10">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+</head>
+<body class="page-admin-settings">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content admin-page">
+        <section class="profile">
+            <div class="profile-cover" aria-hidden="true"></div>
+            <div class="profile-header container">
+                <div class="profile-primary">
+                    <div class="avatar" role="button" tabindex="0" title="프로필 이미지 변경" aria-label="프로필 이미지 변경" style="background-image: url({{ (user.profile_image if user and user.profile_image else '/static/image/svg/profil/free-icon-bussiness-man.svg')|tojson }});"></div>
+                    <div class="identity">
+                        <div class="name-row"><h2 class="name">{{ (user.name if user and user.name else '-') }}</h2></div>
+                        <div class="bio-row">
+                            <p class="bio">{{ ((user.motto if user and user.motto else '') or (user.note if user and user.note else '') or '디자인은 억지로 하면 안 됩니다. 자연스럽지 않다면 다시 생각해야 합니다.') }}</p>
+                            <button class="action-btn" id="btn-edit-bio" title="메시지 수정" aria-label="메시지 수정" type="button">
+                                <img src="/static/image/svg/admin/free-icon-pen-square.svg" alt="메시지 수정" class="action-icon">
+                            </button>
+                        </div>
+                        {% if user and user.location and user.location|trim != '-' %}
+                            <p class="meta">{{ user.location }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs container" role="tablist" aria-label="설정 섹션">
+                <a id="overview" class="tab" href="{{ url_for('auth.settings_profile') }}" role="tab" aria-selected="false">프로필</a>
+                <a id="member" class="tab active" href="{{ url_for('auth.settings_member') }}" role="tab" aria-selected="true">멤버</a>
+                <a id="memo" class="tab" href="{{ url_for('auth.settings_memo') }}" role="tab" aria-selected="false">메모</a>
+                <a id="password" class="tab" href="{{ url_for('auth.settings_password') }}" role="tab" aria-selected="false">패스워드</a>
+            </div>
+
+            <div class="tab-panels container">
+                <section class="tab-panel active" role="tabpanel" aria-labelledby="member">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">멤버</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="members-grid" aria-label="부서 멤버 목록">
+
+                                {% if members and members|length > 0 %}
+                                    {% for m in members %}
+                                        <div class="member-card" data-emp-no="{{ (m.emp_no or '') }}">
+                                            <img class="member-avatar" data-emp-no="{{ (m.emp_no or '') }}" src="{{ (m.profile_image or '/static/image/svg/profil/free-icon-bussiness-man.svg') }}" alt="{{ (m.name or m.emp_no) }} 프로필">
+                                            <div class="member-info">
+                                                <div class="member-name">{{ (m.name or m.emp_no) }}</div>
+                                                <div class="member-nickname">{{ (m.nickname if m.nickname and m.nickname|trim != '-' else '') }}</div>
+                                            </div>
+                                            <div class="member-actions">
+                                                {% if m.email %}
+                                                    <a class="action-btn" href="mailto:{{ m.email }}" title="이메일 보내기" aria-label="{{ (m.name or m.emp_no) }}에게 이메일 보내기">
+                                                        <img class="action-icon" src="/static/image/svg/admin/free-icon-envelope.svg" alt="메일">
+                                                    </a>
+                                                {% endif %}
+                                                <a class="action-btn" href="{{ url_for('main.addon_chat') }}" title="채팅" aria-label="{{ (m.name or m.emp_no) }}과 채팅 열기">
+                                                    <img class="action-icon" src="/static/image/svg/admin/free-icon-paper-plane.svg" alt="채팅">
+                                                </a>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="meta">같은 부서 멤버가 없습니다.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Global interactions (sidebar, fullscreen, header buttons) -->
+    <script src="/static/js/blossom.js"></script>
+    <!-- Page specific -->
+    <script src="/static/js/authentication/11-1.setting/11-1-2.member.js"></script>
+    <!-- Profile Image Picker (modal) -->
+    <div id="profile-picker" class="profile-picker" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="picker-backdrop" data-picker-close></div>
+        <div class="picker-dialog" role="document">
+            <div class="picker-header">
+                <h3 class="picker-title">프로필 이미지 선택</h3>
+                <button class="btn-icon" data-picker-close title="닫기">×</button>
+            </div>
+            <div class="picker-body">
+                <div class="picker-grid" aria-label="프로필 이미지 목록" role="list"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

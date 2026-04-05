@@ -1,0 +1,144 @@
+/* ===== Page Tab Admin v2.0.0 ===== */
+/* system.css handles table, pagination, modal, toolbar, empty-state, search, page-size. */
+/* This file only adds page-tab-specific tweaks. */
+
+/* ── Count badge ── */
+#pt-count {
+	vertical-align:middle;
+	display:inline-flex; align-items:center; justify-content:center;
+	min-width: 44px !important; padding: 0 14px !important; border-radius:999px; line-height:1;
+	background:#6366f1 !important; background-color:#6366f1 !important; color:#ffffff !important;
+	border:0 !important;
+	font-weight:800; font-size:12px; letter-spacing:.2px;
+	box-shadow:0 2px 8px rgba(99,102,241,.28) !important;
+	font-variant-numeric: tabular-nums; font-feature-settings: 'tnum';
+}
+
+/* ── Status pill (same as project-wide .status-pill + .status-dot) ── */
+#pt-table .status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 14px;
+	border: 1px solid #e5e7eb;
+	border-radius: 9999px;
+	background: #ffffff;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	color: #374151;
+	font-size: 13px;
+	white-space: nowrap;
+}
+#pt-table .status-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	display: inline-block;
+	box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+
+/* ── Table column tweaks ── */
+#pt-table td {
+	font-size: 13px;
+	color: #334155;
+}
+
+/* ── Row action buttons ── */
+#pt-table .action-btn { width:36px; height:36px; border:1px solid #e8eaed; background:#ffffff; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; transition:all .2s ease; margin:0 3px; position:relative; overflow:hidden; }
+#pt-table .action-btn::before { content:""; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent); transition:left .5s ease; }
+#pt-table .action-btn:hover { background-color:#f8f9fa; border-color:#8b5cf6; box-shadow:0 2px 8px rgba(139, 92, 246, 0.15); transform:translateY(-1px); }
+#pt-table .action-btn:hover::before { left:100%; }
+#pt-table .action-icon { width:18px; height:18px; filter:grayscale(.55) brightness(1.35) contrast(.8); opacity:.46; transition:all .2s ease; display:block; }
+#pt-table .action-btn:hover .action-icon { filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85; transform:scale(1.1); }
+#pt-table td[data-col=actions] { text-align:left; white-space:nowrap; }
+
+/* ── Add button purple ── */
+#pt-add-btn {
+	background:#6366f1 !important; border-color:#6366f1 !important;
+	box-shadow:0 2px 8px rgba(99,102,241,.28) !important;
+}
+#pt-add-btn .header-icon {
+	filter:brightness(0) invert(1) contrast(1) !important; opacity:1 !important; transform:none !important;
+}
+
+/* ── Delete button icons ── */
+#pt-delete-btn .header-icon {
+	filter:grayscale(.55) brightness(1.35) contrast(.8); opacity:.46;
+	transition:filter .22s ease, opacity .22s ease, transform .22s ease;
+}
+#pt-delete-btn:hover .header-icon {
+	filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85;
+}
+
+/* ── Action hover purple fill ── */
+#pt-table .action-btn[data-action="edit"]:hover,
+#pt-table .action-btn[data-action="edit"]:focus-visible,
+#pt-table .action-btn[data-action="delete"]:hover,
+#pt-table .action-btn[data-action="delete"]:focus-visible {
+	background:#6366f1; border-color:#e5e7eb; box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+#pt-table .action-btn[data-action="edit"]:hover .action-icon,
+#pt-table .action-btn[data-action="edit"]:focus-visible .action-icon,
+#pt-table .action-btn[data-action="delete"]:hover .action-icon,
+#pt-table .action-btn[data-action="delete"]:focus-visible .action-icon {
+	filter:brightness(0) invert(1); opacity:1; transform:scale(1.08);
+}
+
+/* ── Selected row (온프레미스 동일 스타일) ── */
+#pt-table tbody tr.selected,
+#pt-table tbody tr.selected:nth-child(odd),
+#pt-table tbody tr.selected:nth-child(even) {
+	background-color: rgba(99,102,241,0.10) !important;
+	border-left: 3px solid var(--accent, #6366f1) !important;
+	box-shadow: inset 0 0 0 1px rgba(99,102,241,0.45) !important;
+}
+#pt-table tbody tr.selected:hover,
+#pt-table tbody tr.selected:nth-child(odd):hover,
+#pt-table tbody tr.selected:nth-child(even):hover {
+	background-color: rgba(99,102,241,0.16) !important;
+}
+#pt-table tbody tr.selected td,
+#pt-table tbody tr.selected > td {
+	background-color: rgba(106,90,205,0.10) !important;
+}
+#pt-table tbody tr.selected:hover td,
+#pt-table tbody tr.selected:hover > td {
+	background-color: rgba(106,90,205,0.16) !important;
+}
+#pt-table tbody tr.selected td:first-child {
+	border-left: 3px solid var(--accent, #6366f1) !important;
+}
+#pt-table tbody tr.selected .action-btn[data-action="edit"],
+#pt-table tbody tr.selected .action-btn[data-action="delete"] {
+	background:#6366f1; border-color:#6366f1; box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+#pt-table tbody tr.selected .action-btn[data-action="edit"] .action-icon,
+#pt-table tbody tr.selected .action-btn[data-action="delete"] .action-icon {
+	filter:brightness(0) invert(1) contrast(1); opacity:1; transform:scale(1.08);
+}
+
+/* ══════════════════════════════════════════════
+   EDIT MODAL — restore system.css form defaults
+══════════════════════════════════════════════ */
+#pt-edit-modal .server-add-body { padding: 12px 0; }
+#pt-edit-modal .form-section { margin-bottom: 8px; padding: 0 32px; }
+#pt-edit-modal .form-section .section-header { margin-bottom: 10px; padding-bottom: 8px; }
+#pt-edit-modal .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#pt-edit-modal .form-row { display: flex; flex-direction: column; gap: 4px; }
+#pt-edit-modal .form-row label { font-size: 14px; font-weight: 500; color: #34495e; margin: 0; }
+#pt-edit-modal .form-input {
+	width: 100%; box-sizing: border-box;
+	padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px;
+	font-size: 14px; min-height: 44px; background: #fff !important;
+	color: #0f172a; margin: 0;
+	transition: border-color .2s, box-shadow .2s;
+}
+#pt-edit-modal .form-input::placeholder { color: #94a3b8; }
+#pt-edit-modal textarea.form-input { font-family: inherit; }
+#pt-edit-modal .form-input:focus { outline: none; border-color:#e5e7eb; box-shadow:0 0 0 2px rgba(229,231,235,0.5); }
+#pt-edit-modal .required { color: #ef4444; margin-left: 4px; font-weight: 700; }
+
+/* ── Page filter select in toolbar ── */
+#pt-page-filter {
+	min-width: 180px;
+	font-size: 13px;
+}

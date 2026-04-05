@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Flask instance folder (DB, uploads)
+instance/
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Test / debug output
+_*.txt
+_*.log
+*.log
+
+# Uploads
+uploads/
+
+# Byte-compiled
+*.pyc
+
+# Environment variables
+.env
+.flaskenv

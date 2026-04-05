@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/desk.css?v=3.12">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content" data-profile-id="{{ current_user_profile_id or '' }}">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="project.ticket_status"></div>
+                    <h1>티켓 관리</h1>
+                    <p>티켓 기반 업무 흐름을 관리하고, 진행 상태를 한눈에 확인하세요.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (확장 대비) -->
+                <div class="system-tabs" role="tablist" aria-label="작업 관리 탭">
+                    {% set tabs = [
+                        ('workflow_progress', '티켓 현황'),
+                        ('workflow_completed', '완료 티켓')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>티켓 현황 <span class="count-badge" id="wf-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <!-- 티켓 등록: 프로젝트 관리 페이지의 '추가' 버튼 스타일(icon-only header-btn)과 동일하게 적용 -->
+                                <button class="header-btn" id="wf-add-open" title="티켓등록" aria-label="티켓등록" type="button">
+                                    <img src="/static/image/svg/project/free-icon-tickets.svg" alt="티켓등록" class="header-icon">
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 상태 요약 바 -->
+                        <div class="wf-summary-bar" id="wf-summary">
+                            <div class="wf-summary-item" data-status="PENDING">
+                                <span class="wf-summary-dot pending"></span>
+                                <span class="wf-summary-label">접수대기</span>
+                                <span class="wf-summary-value" data-wf-summary="PENDING">0</span>
+                            </div>
+                            <div class="wf-summary-sep"></div>
+                            <div class="wf-summary-item" data-status="ACCEPTED">
+                                <span class="wf-summary-dot accepted"></span>
+                                <span class="wf-summary-label">접수</span>
+                                <span class="wf-summary-value" data-wf-summary="ACCEPTED">0</span>
+                            </div>
+                            <div class="wf-summary-sep"></div>
+                            <div class="wf-summary-item" data-status="INPROGRESS">
+                                <span class="wf-summary-dot inprogress"></span>
+                                <span class="wf-summary-label">처리중</span>
+                                <span class="wf-summary-value" data-wf-summary="INPROGRESS">0</span>
+                            </div>
+                            <div class="wf-summary-sep"></div>
+                            <div class="wf-summary-item" data-status="DONE">
+                                <span class="wf-summary-dot done"></span>
+                                <span class="wf-summary-label">완료</span>
+                                <span class="wf-summary-value" data-wf-summary="DONE">0</span>
+                            </div>
+                        </div>
+
+                        <!-- 2x2 워크플로우 상태 박스 -->
+                        <section class="wf-grid" aria-label="워크플로우 상태">
+                            <div class="wf-box" data-status="PENDING">
+                                <div class="wf-box-header">
+                                    <div class="wf-title">
+                                        <span class="status-dot"></span>
+                                        <span>접수대기</span>
+                                    </div>
+                                </div>
+                                <div class="wf-box-body" id="wf-col-PENDING" data-accept="PENDING" role="list" aria-label="접수대기 목록"></div>
+                            </div>
+                            <div class="wf-box" data-status="ACCEPTED">
+                                <div class="wf-box-header">
+                                    <div class="wf-title">
+                                        <span class="status-dot"></span>
+                                        <span>접수</span>
+                                    </div>
+                                </div>
+                                <div class="wf-box-body" id="wf-col-ACCEPTED" data-accept="ACCEPTED" role="list" aria-label="접수 목록"></div>
+                            </div>
+                            <div class="wf-box" data-status="INPROGRESS">
+                                <div class="wf-box-header">
+                                    <div class="wf-title">
+                                        <span class="status-dot"></span>
+                                        <span>처리중</span>
+                                    </div>
+                                </div>
+                                <div class="wf-box-body" id="wf-col-INPROGRESS" data-accept="INPROGRESS" role="list" aria-label="처리중 목록"></div>
+                            </div>
+                            <div class="wf-box" data-status="DONE">
+                                <div class="wf-box-header">
+                                    <div class="wf-title">
+                                        <span class="status-dot"></span>
+                                        <span>완료</span>
+                                    </div>
+                                    <div class="wf-box-actions">
+                                        <button type="button" class="wf-hdr-btn danger" id="wf-done-clear" title="완료 티켓 비우기">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                            <span>비우기</span>
+                                        </button>
+
+                                    </div>
+                                </div>
+                                <div class="wf-box-body" id="wf-col-DONE" data-accept="DONE" role="list" aria-label="완료 목록"></div>
+                            </div>
+                        </section>
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">등록된 티켓이 없습니다.</h3>
+                                <p id="system-empty-desc">티켓 등록 버튼을 눌러 새 워크플로우를 시작하세요.</p>
+                            </div>
+                        </div>
+
+                        <!-- 하단 티켓 섹션 제거됨 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/8.project/8-3.desk/8-3-1.workflow/1.workflow_progress.js?v=4.7"></script>
+
+        <!-- 티켓 등록 모달 -->
+        <div id="wf-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>티켓 등록</h3>
+                        <p class="server-add-subtitle">필수 정보를 입력하세요.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="wf-add-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="wf-add-form">
+                        <div class="form-section">
+                            <div class="section-header"><h4>티켓 정보</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row form-row-wide">
+                                    <label>제목<span class="required">*</span></label>
+                                    <input name="title" class="form-input" required maxlength="100" placeholder="티켓 제목">
+                                </div>
+                                <div class="form-row">
+                                    <label>유형</label>
+                                    <select name="kind" id="wf-kind" class="form-input search-select" data-placeholder="유형 선택">
+                                        <option value="">선택</option>
+                                        <option value="장애">장애</option>
+                                        <option value="요청">요청</option>
+                                        <option value="변경">변경</option>
+                                        <option value="유지보수">유지보수</option>
+                                        <option value="감사">감사</option>
+                                        <option value="문제">문제</option>
+                                        <option value="작업">작업</option>
+                                        <option value="점검">점검</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>분류</label>
+                                    <select name="task" id="wf-task" class="form-input search-select"
+                                            data-placeholder="분류 선택" data-empty-message="유형을 먼저 선택해 주세요.">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>우선순위<span class="required">*</span></label>
+                                    <select name="priority" class="form-input search-select" data-placeholder="우선순위 선택" required>
+                                        <option value="">선택</option>
+                                        <option value="긴급">긴급</option>
+                                        <option value="일반">일반</option>
+                                        <option value="낮음">낮음</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label>기한<span class="required">*</span></label>
+                                    <input type="text" name="due" class="form-input date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off">
+                                </div>
+                                <div class="form-row">
+                                    <label>담당자<span class="required">*</span></label>
+                                    <div class="wf-select-toggle" id="wf-assignee-picker">
+                                        <div class="wf-select-wrap">
+                                            <input type="text" class="form-input" id="wf-assignee-input" placeholder="담당자 검색" autocomplete="off">
+                                            <div class="wf-select-dropdown" id="wf-assignee-dropdown" hidden></div>
+                                        </div>
+                                        <div class="wf-select-chips" id="wf-assignee-tags"></div>
+                                    </div>
+                                    <input type="hidden" name="assignee" id="wf-assignee-hidden">
+                                </div>
+                                <div class="form-row">
+                                    <label>대상</label>
+                                    <div class="wf-select-toggle" id="wf-target-picker">
+                                        <div class="wf-select-wrap">
+                                            <input type="text" class="form-input" id="wf-target-input" placeholder="업무명 또는 시스템명 검색" autocomplete="off">
+                                            <div class="wf-select-dropdown" id="wf-target-dropdown" hidden></div>
+                                        </div>
+                                        <div class="wf-select-chips" id="wf-target-tags"></div>
+                                    </div>
+                                    <input type="hidden" name="target" id="wf-target-hidden">
+                                </div>
+                                <div class="form-row form-row-wide">
+                                    <label>세부내용</label>
+                                    <textarea name="detail" class="form-input textarea-large" rows="6" placeholder="세부내용"></textarea>
+                                </div>
+                                <div class="form-row form-row-wide">
+                                    <label for="wf-attachments">첨부파일</label>
+                                    <div class="attachment-field">
+                                        <input type="file" id="wf-attachments" name="attachments" class="visually-hidden" multiple>
+                                        <label for="wf-attachments" class="attachment-drop" id="wf-attachment-drop">
+                                            <div class="attachment-icon" aria-hidden="true">
+                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                    <polyline points="7 10 12 5 17 10" />
+                                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                                </svg>
+                                            </div>
+                                            <div class="attachment-copy">
+                                                <strong>파일을 업로드하려면 클릭하거나 끌어다 놓으세요</strong>
+                                                <span>최대 10개, 20MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</span>
+                                            </div>
+                                        </label>
+                                        <div class="attachment-actions">
+                                            <button type="button" class="attachment-clear" id="wf-attachment-clear" hidden>전체 삭제</button>
+                                        </div>
+                                        <ul class="attachment-list" id="wf-attachment-list" hidden></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="wf-add-save">등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <!-- Context menu for ticket cards -->
+            <div id="wf-context-menu" class="wf-context-menu" role="menu" aria-hidden="true"></div>
+
+            <!-- Detail modal (read-only) -->
+            <div id="wf-detail-modal" class="server-edit-modal modal-overlay-full" aria-hidden="true">
+                <div class="server-edit-content" role="dialog" aria-modal="true" aria-labelledby="wf-detail-title">
+                    <div class="server-edit-header">
+                        <div class="server-edit-title"><h3 id="wf-detail-title">티켓 상세정보</h3></div>
+                        <p class="server-edit-subtitle">선택한 티켓의 정보를 확인하세요.</p>
+                        <button id="wf-detail-close" class="close-btn" type="button" aria-label="닫기">×</button>
+                    </div>
+                    <div class="server-edit-body">
+                        <div class="wf-detail-illustration" aria-hidden="true">
+                            <img src="/static/image/svg/project/free-sticker-planning.svg" alt="" />
+                        </div>
+                        <div class="form-section" style="padding: 0 32px;">
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label class="form-label">제목</label>
+                                    <div class="form-value" id="wf-d-title">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">분류</label>
+                                    <div class="form-value" id="wf-d-task">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">요청자</label>
+                                    <div class="form-value" id="wf-d-requester">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">우선순위</label>
+                                    <div class="form-value" id="wf-d-priority">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">상태</label>
+                                    <div class="form-value" id="wf-d-status">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">기한</label>
+                                    <div class="form-value" id="wf-d-due">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">담당자</label>
+                                    <div class="form-value" id="wf-d-assignee">-</div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="form-label">대상</label>
+                                    <div class="form-value" id="wf-d-target">-</div>
+                                </div>
+                            </div>
+                            <div class="form-field" id="wf-d-detail-row" style="grid-column: 1 / -1; margin-top: 8px;">
+                                <label class="form-label">내용</label>
+                                <div class="form-value" id="wf-d-detail" style="white-space:pre-wrap;">-</div>
+                            </div>
+                            <div class="form-field" id="wf-d-files-row" style="grid-column: 1 / -1;">
+                                <label class="form-label">첨부파일</label>
+                                <div class="form-value" id="wf-d-files">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="server-edit-actions align-right">
+                        <div class="action-buttons">
+                            <button class="btn-primary" id="wf-detail-edit-btn" type="button" style="display:none;">수정</button>
+                            <button class="btn-secondary" id="wf-detail-close2" type="button">닫기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 티켓 수정 모달 (등록 모달과 동일한 스타일) -->
+            <div id="wf-edit-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+                <div class="server-add-content">
+                    <div class="server-add-header">
+                        <div class="server-add-title">
+                            <h3>티켓 수정</h3>
+                            <p class="server-add-subtitle">수정할 정보를 입력하세요.</p>
+                        </div>
+                        <button class="close-btn" type="button" id="wf-edit-close" title="닫기">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="server-add-body">
+                        <form id="wf-edit-form">
+                            <div class="form-section">
+                                <div class="section-header"><h4>티켓 정보</h4></div>
+                                <div class="form-grid">
+                                    <div class="form-row form-row-wide">
+                                        <label>제목<span class="required">*</span></label>
+                                        <input name="title" id="wf-e-title" class="form-input" required maxlength="100" placeholder="티켓 제목">
+                                    </div>
+                                    <div class="form-row">
+                                        <label>유형</label>
+                                        <select name="kind" id="wf-e-kind" class="form-input search-select" data-placeholder="유형 선택">
+                                            <option value="">선택</option>
+                                            <option value="장애">장애</option>
+                                            <option value="요청">요청</option>
+                                            <option value="변경">변경</option>
+                                            <option value="유지보수">유지보수</option>
+                                            <option value="감사">감사</option>
+                                            <option value="문제">문제</option>
+                                            <option value="작업">작업</option>
+                                            <option value="점검">점검</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-row">
+                                        <label>분류</label>
+                                        <select name="task" id="wf-e-task" class="form-input search-select"
+                                                data-placeholder="분류 선택" data-empty-message="유형을 먼저 선택해 주세요.">
+                                            <option value="">선택</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-row">
+                                        <label>우선순위<span class="required">*</span></label>
+                                        <select name="priority" id="wf-e-priority" class="form-input search-select" data-placeholder="우선순위 선택" required>
+                                            <option value="">선택</option>
+                                            <option value="긴급">긴급</option>
+                                            <option value="일반">일반</option>
+                                            <option value="낮음">낮음</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-row">
+                                        <label>기한<span class="required">*</span></label>
+                                        <input type="text" name="due" id="wf-e-due" class="form-input date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off">
+                                    </div>
+                                    <div class="form-row">
+                                        <label>담당자<span class="required">*</span></label>
+                                        <div class="wf-select-toggle" id="wf-edit-assignee-picker">
+                                            <div class="wf-select-wrap">
+                                                <input type="text" class="form-input" id="wf-edit-assignee-input" placeholder="담당자 검색" autocomplete="off">
+                                                <div class="wf-select-dropdown" id="wf-edit-assignee-dropdown" hidden></div>
+                                            </div>
+                                            <div class="wf-select-chips" id="wf-edit-assignee-tags"></div>
+                                        </div>
+                                        <input type="hidden" name="assignee" id="wf-edit-assignee-hidden">
+                                    </div>
+                                    <div class="form-row">
+                                        <label>대상</label>
+                                        <div class="wf-select-toggle" id="wf-edit-target-picker">
+                                            <div class="wf-select-wrap">
+                                                <input type="text" class="form-input" id="wf-edit-target-input" placeholder="장비/시스템 검색" autocomplete="off">
+                                                <div class="wf-select-dropdown" id="wf-edit-target-dropdown" hidden></div>
+                                            </div>
+                                            <div class="wf-select-chips" id="wf-edit-target-tags"></div>
+                                        </div>
+                                        <input type="hidden" name="target" id="wf-edit-target-hidden">
+                                    </div>
+                                    <div class="form-row form-row-wide">
+                                        <label>세부내용</label>
+                                        <textarea name="detail" id="wf-e-detail" class="form-input textarea-large" rows="6" placeholder="세부내용"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="server-add-actions align-right">
+                        <div class="action-buttons right">
+                            <button type="button" class="btn-primary" id="wf-edit-save">저장</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- 비우기 확인 모달 -->
+        <div id="wf-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>비우기</h3>
+                        <p class="server-add-subtitle" id="wf-delete-subtitle">완료 티켓 0건을 모두 비우시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="wf-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>비우기는 완료 티켓을 칸반 보드에서 숨기는 기능입니다.</p>
+                            <p>데이터는 삭제되지 않으며, '완료 티켓' 탭에서 계속 확인할 수 있습니다.</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="wf-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 알림 모달 (onpremise 스타일) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+

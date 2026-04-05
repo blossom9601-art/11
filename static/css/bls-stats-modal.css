@@ -1,0 +1,1057 @@
+/*
+ * bls-stats-modal.css — 통계 모달 통합 디자인 시스템 v2.0
+ * ========================================================
+ * 모든 *list.html 통계 모달에 공통 적용.
+ * 모달 루트에 .bls-stats 클래스 추가(JS normalizeModal 자동).
+ *
+ * 카드 240px 고정 / 상대 비율 bar / 단일 accent 색상.
+ * 로드 순서: blossom.css → bls-stats-modal.css
+ * v2.0  2026-03-28
+ */
+
+/* =========================================================================
+   0. 디자인 토큰
+   ========================================================================= */
+:root {
+  --bls-stats-max-width: 920px;
+  --bls-stats-max-height: 88vh;
+  --bls-stats-radius: 16px;
+  --bls-stats-shadow: 0 12px 32px rgba(15,23,42,0.12), 0 2px 8px rgba(15,23,42,0.04);
+
+  /* 헤더 */
+  --bls-stats-hdr-bg: linear-gradient(180deg, #f8f9fb 0%, #f1f3f6 100%);
+  --bls-stats-hdr-border: #e3e6eb;
+  --bls-stats-hdr-pad: 22px 32px 18px;
+  --bls-stats-title-size: 20px;
+  --bls-stats-title-color: #1e293b;
+  --bls-stats-subtitle-size: 13px;
+  --bls-stats-subtitle-color: #64748b;
+
+  /* 본문 */
+  --bls-stats-body-bg: #ffffff;
+  --bls-stats-body-pad: 20px 0 28px;
+
+  /* 풋터 */
+  --bls-stats-ftr-bg: #f5f6f8;
+  --bls-stats-ftr-border: #e3e6eb;
+  --bls-stats-ftr-pad: 16px 32px;
+
+  /* 섹션 */
+  --bls-stats-section-pad: 0 32px;
+  --bls-stats-section-gap: 32px;
+  --bls-stats-section-divider: 1px solid #e5e7eb;
+  --bls-stats-section-title-size: 16px;
+  --bls-stats-section-title-color: #334155;
+  --bls-stats-section-title-weight: 700;
+  --bls-stats-section-accent: var(--accent, #6366f1);
+
+  /* 카드 그리드 */
+  --bls-stats-grid-cols: repeat(auto-fill, 240px);
+  --bls-stats-grid-gap: 16px;
+
+  /* 카드 */
+  --bls-stats-card-bg: #ffffff;
+  --bls-stats-card-border: #e5e7eb;
+  --bls-stats-card-radius: 12px;
+  --bls-stats-card-pad: 16px;
+  --bls-stats-card-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --bls-stats-card-title-size: 13px;
+  --bls-stats-card-title-color: #6b7280;
+  --bls-stats-card-title-weight: 500;
+
+  /* 항목 */
+  --bls-stats-item-gap: 8px;
+  --bls-stats-item-font: 14px;
+  --bls-stats-item-label-color: #475569;
+  --bls-stats-item-value-color: #111827;
+  --bls-stats-item-value-size: 16px;
+  --bls-stats-item-value-weight: 700;
+  --bls-stats-bar-height: 8px;
+  --bls-stats-bar-bg: #f1f5f9;
+  --bls-stats-bar-fill: var(--accent, #6366f1);
+  --bls-stats-bar-radius: 6px;
+}
+
+
+/* =========================================================================
+   1. 모달 프레임 (Header / Scrollable Body / Footer)
+   ========================================================================= */
+
+/* 1-1. 컨테이너 */
+.bls-stats .server-add-content,
+#system-stats-modal .server-add-content,
+#system-analytics-modal .server-add-content,
+#hw-analytics-modal .server-add-content,
+#sw-analytics-modal .server-add-content,
+#t91-analytics-modal .server-add-content,
+#t95-analytics-modal .server-add-content,
+#prj-stats-modal .server-add-content,
+#eva-stats-modal .server-add-content,
+#cm-stats-modal .server-add-content {
+  max-width: var(--bls-stats-max-width);
+  max-height: var(--bls-stats-max-height);
+  border-radius: var(--bls-stats-radius);
+  box-shadow: var(--bls-stats-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 1-2. 헤더 (고정) */
+.bls-stats .server-add-header,
+#system-stats-modal .server-add-header,
+#system-analytics-modal .server-add-header,
+#hw-analytics-modal .server-add-header,
+#sw-analytics-modal .server-add-header,
+#t91-analytics-modal .server-add-header,
+#t95-analytics-modal .server-add-header,
+#prj-stats-modal .server-add-header,
+#eva-stats-modal .server-add-header,
+#cm-stats-modal .server-add-header {
+  flex: 0 0 auto;
+  background: var(--bls-stats-hdr-bg);
+  padding: var(--bls-stats-hdr-pad);
+  border-bottom: 1px solid var(--bls-stats-hdr-border);
+  position: relative;
+  z-index: 2;
+}
+
+.bls-stats .server-add-header .server-add-title h3 {
+  margin: 0;
+  font-size: var(--bls-stats-title-size);
+  font-weight: 700;
+  color: var(--bls-stats-title-color);
+  line-height: 1.35;
+}
+
+.bls-stats .server-add-header .server-add-subtitle {
+  margin: 4px 0 0;
+  font-size: var(--bls-stats-subtitle-size);
+  color: var(--bls-stats-subtitle-color);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* 서브타이틀 없어도 헤더 높이 안정적 유지 */
+.bls-stats .server-add-header .server-add-title {
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 1-3. 닫기 버튼 — 원형, 우상단 */
+.bls-stats .server-add-header .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  padding: 0;
+}
+.bls-stats .server-add-header .close-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: scale(1.06);
+}
+.bls-stats .server-add-header .close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 1-4. 본문 (스크롤 영역) */
+.bls-stats .server-add-body,
+#system-stats-modal .server-add-body,
+#system-analytics-modal .server-add-body,
+#hw-analytics-modal .server-add-body,
+#sw-analytics-modal .server-add-body,
+#t91-analytics-modal .server-add-body,
+#t95-analytics-modal .server-add-body,
+#prj-stats-modal .server-add-body,
+#eva-stats-modal .server-add-body,
+#cm-stats-modal .server-add-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bls-stats-body-bg);
+  padding: var(--bls-stats-body-pad);
+}
+
+/* 스크롤바 스타일 */
+.bls-stats .server-add-body::-webkit-scrollbar {
+  width: 8px;
+}
+.bls-stats .server-add-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.bls-stats .server-add-body::-webkit-scrollbar-thumb {
+  background: rgba(156,163,175,0.25);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.bls-stats .server-add-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(156,163,175,0.4);
+  background-clip: padding-box;
+}
+.bls-stats .server-add-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156,163,175,0.25) transparent;
+}
+
+/* 1-5. 풋터 (고정, 하단) */
+.bls-stats .server-add-actions,
+#system-stats-modal .server-add-actions,
+#system-analytics-modal .server-add-actions,
+#hw-analytics-modal .server-add-actions,
+#sw-analytics-modal .server-add-actions,
+#t91-analytics-modal .server-add-actions,
+#t95-analytics-modal .server-add-actions,
+#prj-stats-modal .server-add-actions,
+#eva-stats-modal .server-add-actions,
+#cm-stats-modal .server-add-actions {
+  flex: 0 0 auto;
+  background: var(--bls-stats-ftr-bg);
+  border-top: 1px solid var(--bls-stats-ftr-border);
+  padding: var(--bls-stats-ftr-pad);
+  z-index: 2;
+}
+.bls-stats .server-add-actions .action-buttons.right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.bls-stats .server-add-actions .btn-primary {
+  min-width: 88px;
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  background: var(--accent, #6366f1);
+  color: #fff;
+}
+.bls-stats .server-add-actions .btn-primary:hover {
+  filter: brightness(1.06);
+}
+.bls-stats .server-add-actions .btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* 1-6. 헤더 일러스트 (선택적) */
+.bls-stats .server-add-header .stats-illustration {
+  position: absolute;
+  right: 68px;
+  top: 8px;
+  opacity: 0.88;
+  pointer-events: none;
+}
+.bls-stats .server-add-header .stats-illustration img {
+  width: 110px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
+}
+
+
+/* =========================================================================
+   2. 섹션 (Section)
+   ========================================================================= */
+
+.bls-stats .form-section,
+.bls-stats .bls-stats-section {
+  padding: var(--bls-stats-section-pad);
+}
+
+.bls-stats .form-section + .form-section,
+.bls-stats .bls-stats-section + .bls-stats-section {
+  border-top: var(--bls-stats-section-divider);
+  padding-top: var(--bls-stats-section-gap);
+  margin-top: var(--bls-stats-section-gap);
+}
+
+/* 섹션 제목 — 좌측 강조선 + 일정한 타이포 */
+.bls-stats .section-header,
+.bls-stats .bls-stats-section-header {
+  margin-bottom: 16px;
+}
+
+.bls-stats .section-header h4,
+.bls-stats .bls-stats-section-header h4 {
+  margin: 0;
+  font-size: var(--bls-stats-section-title-size);
+  font-weight: var(--bls-stats-section-title-weight);
+  color: var(--bls-stats-section-title-color);
+  position: relative;
+  padding-left: 12px;
+}
+.bls-stats .section-header h4::before,
+.bls-stats .bls-stats-section-header h4::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 16px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--bls-stats-section-accent);
+}
+
+
+/* =========================================================================
+   3. 카드 그리드 (Card Grid)
+   ========================================================================= */
+
+.bls-stats .stats-grid {
+  display: grid;
+  grid-template-columns: var(--bls-stats-grid-cols);
+  gap: var(--bls-stats-grid-gap);
+  align-items: stretch;
+  padding: 2px 0;
+}
+
+@media (max-width: 600px) {
+  .bls-stats .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================================================
+   4. 통계 카드 (Stat Card)
+   ========================================================================= */
+
+.bls-stats .stat-card {
+  background: var(--bls-stats-card-bg);
+  border: 1px solid var(--bls-stats-card-border);
+  border-radius: var(--bls-stats-card-radius);
+  padding: var(--bls-stats-card-pad);
+  box-shadow: var(--bls-stats-card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  transition: box-shadow 0.15s;
+}
+.bls-stats .stat-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.bls-stats .stat-card .stat-title {
+  font-size: var(--bls-stats-card-title-size);
+  font-weight: var(--bls-stats-card-title-weight);
+  color: var(--bls-stats-card-title-color);
+  line-height: 1.4;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+  margin: 0;
+}
+
+.bls-stats .stat-card .stat-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bls-stats-item-gap);
+  flex: 1;
+}
+
+/* 일러스트 카드 (비워진 그리드 셀 대신 장식용) */
+.bls-stats .stat-card.stat-illustration-card {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.bls-stats .stat-card.stat-illustration-card:hover {
+  box-shadow: none;
+}
+.bls-stats .stat-card.stat-illustration-card img {
+  width: 78%;
+  max-width: 200px;
+  height: auto;
+  display: block;
+  margin: 4px auto;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
+  opacity: 0.92;
+}
+
+
+/* =========================================================================
+   5. 항목 행 (Stat Item)
+   ========================================================================= */
+
+.bls-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--bls-stats-item-font);
+  color: var(--bls-stats-item-label-color);
+  min-height: 26px;
+}
+
+/* 라벨 */
+.bls-stats .stat-item .label {
+  flex: 0 0 auto;
+  min-width: 56px;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 막대 */
+.bls-stats .stat-item .bar {
+  flex: 1 1 0%;
+  min-width: 60px;
+  height: var(--bls-stats-bar-height);
+  background: var(--bls-stats-bar-bg);
+  border-radius: var(--bls-stats-bar-radius);
+  overflow: hidden;
+}
+.bls-stats .stat-item .bar > span {
+  display: block;
+  height: 100%;
+  background: var(--bls-stats-bar-fill);
+  border-radius: var(--bls-stats-bar-radius);
+  transition: width 0.3s ease;
+}
+
+/* 값 */
+.bls-stats .stat-item .value {
+  flex: 0 0 auto;
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--bls-stats-item-value-size);
+  font-weight: var(--bls-stats-item-value-weight);
+  color: var(--bls-stats-item-value-color);
+}
+
+/* 0건 숨김 메모 */
+.bls-stats .stat-muted-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+
+/* =========================================================================
+   6. O/X 배지 & 상태 점 (공통)
+   ========================================================================= */
+
+.bls-stats .stat-item .label.with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bls-stats .ox-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  background: #fff;
+}
+.bls-stats .ox-badge.on {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+.bls-stats .ox-badge.off {
+  background: #eef2f7;
+  color: #6b7280;
+}
+
+.bls-stats .status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.05) inset;
+}
+.bls-stats .status-dot.ws-run  { background: var(--accent, #6366f1); }
+.bls-stats .status-dot.ws-idle { background: #0ea5e9; }
+.bls-stats .status-dot.ws-wait { background: #94a3b8; }
+
+
+/* =========================================================================
+   7. 빈 상태 (Empty State)
+   ========================================================================= */
+
+.bls-stats .bls-stats-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 32px;
+  text-align: center;
+}
+.bls-stats .bls-stats-empty img {
+  width: 160px;
+  height: auto;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+.bls-stats .bls-stats-empty .empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #334155;
+  margin: 0 0 6px;
+}
+.bls-stats .bls-stats-empty .empty-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+
+/* =========================================================================
+   8. 차트 컨테이너 (Chart.js / SVG 영역)
+   ========================================================================= */
+
+.bls-stats .bls-stats-chart-area {
+  padding: 0 32px;
+  position: relative;
+}
+.bls-stats .bls-stats-chart-area canvas {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+
+/* =========================================================================
+   9. 벤더 분석 모달 (donut/stacked 탭) — 기존 클래스 호환
+   ========================================================================= */
+
+.bls-stats .vendor-analytics-body {
+  padding: 0;
+}
+
+/* 탭 스트립 */
+.bls-stats .va-tab-strip {
+  display: flex;
+  gap: 6px;
+  padding: 12px 24px 0;
+  flex-wrap: wrap;
+}
+.bls-stats .va-tab {
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.bls-stats .va-tab.active {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+.bls-stats .va-tab:hover:not(.active) {
+  background: #f8fafc;
+}
+.bls-stats .va-tab-count {
+  font-weight: 700;
+  margin-left: 4px;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+/* 탭 콘텐츠 */
+.bls-stats .va-tab-content {
+  padding: 16px 24px 20px;
+}
+
+
+/* =========================================================================
+   10. 도넛 차트 (SVG 기반)
+   ========================================================================= */
+
+.bls-stats .va-donut-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 16px 0;
+  min-height: 280px;
+}
+
+.bls-stats .va-donut-chart {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  flex-shrink: 0;
+}
+.bls-stats .va-donut-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.bls-stats .va-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+.bls-stats .va-donut-total {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.bls-stats .va-donut-label {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 도넛 범례 */
+.bls-stats .va-donut-legend {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.bls-stats .va-donut-legend::-webkit-scrollbar { width: 6px; }
+.bls-stats .va-donut-legend::-webkit-scrollbar-track { background: transparent; }
+.bls-stats .va-donut-legend::-webkit-scrollbar-thumb {
+  background: rgba(156,163,175,0.3);
+  border-radius: 3px;
+}
+}
+.bls-stats .va-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: #475569;
+}
+.bls-stats .va-donut-ldot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bls-stats .va-donut-lname {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bls-stats .va-donut-lval {
+  min-width: 36px;
+  text-align: right;
+  font-weight: 600;
+}
+.bls-stats .va-donut-lpct {
+  min-width: 48px;
+  text-align: right;
+  color: #94a3b8;
+}
+
+/* 도넛 세그먼트 hover */
+.bls-stats .va-donut-seg {
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+.bls-stats .va-donut-seg:hover {
+  opacity: 0.8;
+}
+
+
+/* =========================================================================
+   11. 스택 바 차트
+   ========================================================================= */
+
+.bls-stats .va-type-section {
+  margin-bottom: 18px;
+}
+.bls-stats .va-type-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.bls-stats .va-type-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.bls-stats .va-type-count {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.bls-stats .va-sb-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #e2e8f0;
+  margin-bottom: 8px;
+}
+.bls-stats .va-sb-seg {
+  height: 100%;
+  transition: opacity 0.15s;
+  cursor: default;
+}
+.bls-stats .va-sb-seg:hover {
+  opacity: 0.8;
+}
+.bls-stats .va-sb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bls-stats .va-sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #475569;
+}
+.bls-stats .va-sb-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 플로팅 툴팁 */
+.va-sb-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.va-sb-tip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.va-sb-tip-name {
+  font-weight: 600;
+  color: #334155;
+}
+.va-sb-tip-val {
+  color: #64748b;
+}
+
+
+/* =========================================================================
+   12. EVA 비용 통계 (KPI + 바 + 도넛)
+   ========================================================================= */
+
+.bls-stats .eva-summary {
+  padding: 0 24px 12px;
+}
+.bls-stats .eva-sum-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.bls-stats .eva-sum-card {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bls-stats .eva-sum-lbl {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+.bls-stats .eva-sum-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 프로그레스 바 */
+.bls-stats .eva-sum-progress {
+  margin-bottom: 14px;
+}
+.bls-stats .eva-sum-prog-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.bls-stats .eva-sum-prog-title { color: #64748b; font-weight: 600; }
+.bls-stats .eva-sum-prog-pct   { color: #111827; font-weight: 700; }
+.bls-stats .eva-sum-prog-track {
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bls-stats .eva-sum-prog-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #6366f1);
+  transition: width 0.4s ease;
+}
+
+
+/* =========================================================================
+   13. 의사소통 통계 (SVG 막대+추세)
+   ========================================================================= */
+
+.bls-stats .cm-stats-body {
+  padding: 16px 24px 12px;
+}
+.bls-stats .cm-stats-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+.bls-stats .cm-stats-legend .lg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+.bls-stats .cm-stats-legend .lg-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.bls-stats .cm-stats-chart {
+  position: relative;
+  min-height: 260px;
+}
+.bls-stats .cm-stats-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+
+/* =========================================================================
+   14. Chart.js 프로젝트 통계 (chart toggle + year bar)
+   ========================================================================= */
+
+.bls-stats .prj-stats-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 28px 14px;
+  flex-wrap: wrap;
+}
+.bls-stats .prj-stats-year-bar {
+  display: flex;
+  gap: 4px;
+}
+.bls-stats .prj-stats-year-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.bls-stats .prj-stats-year-btn.active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+.bls-stats .prj-stats-chart-toggle {
+  display: flex;
+  gap: 4px;
+}
+.bls-stats .prj-chart-type-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.bls-stats .prj-chart-type-btn.active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+.bls-stats .prj-stats-chart-wrap {
+  padding: 0 28px;
+  position: relative;
+  min-height: 280px;
+}
+.bls-stats .prj-stats-chart-wrap canvas {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+
+/* =========================================================================
+   15. 제어 위젯 (segmented, date picker) — 센터 타임라인 등에서 사용
+   ========================================================================= */
+
+.bls-stats .stats-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 32px 12px;
+}
+.bls-stats .segmented {
+  display: inline-flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.bls-stats .segmented-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  line-height: 1.2;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+.bls-stats .segmented-btn + .segmented-btn {
+  border-left: 1px solid #e5e7eb;
+}
+.bls-stats .segmented-btn.active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+}
+.bls-stats .segmented-btn:hover:not(.active) {
+  background: #f8fafc;
+}
+
+
+/* =========================================================================
+   16. 반응형
+   ========================================================================= */
+
+@media (max-width: 680px) {
+  .bls-stats .server-add-content {
+    max-width: 98vw;
+    border-radius: 12px;
+  }
+  .bls-stats .server-add-header {
+    padding: 16px 20px 14px;
+  }
+  .bls-stats .server-add-header .close-btn {
+    top: 12px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+  }
+  .bls-stats .form-section,
+  .bls-stats .bls-stats-section {
+    padding: 0 20px;
+  }
+  .bls-stats .server-add-actions {
+    padding: 14px 20px;
+  }
+  .bls-stats .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .bls-stats .va-donut-wrap {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .bls-stats .va-donut-chart {
+    width: 200px;
+    height: 200px;
+  }
+  .bls-stats .prj-stats-toolbar {
+    padding: 0 16px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .bls-stats .prj-stats-chart-wrap {
+    padding: 0 16px;
+  }
+  .bls-stats .eva-sum-row {
+    grid-template-columns: 1fr;
+  }
+  .bls-stats .server-add-header .stats-illustration {
+    right: 52px;
+    top: 10px;
+  }
+  .bls-stats .server-add-header .stats-illustration img {
+    width: 90px;
+  }
+}

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <link rel="stylesheet" href="/static/css/unused.css">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="governance.disposal_asset"></div>
+                    <h1>불용자산 관리</h1>
+                    <p>불용자산을 관리 합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (동적 라우팅) -->                {% set tabs = [
+                    ('gov_unused_server', '서버'),
+                    ('gov_unused_storage', '스토리지'),
+                    ('gov_unused_san', 'SAN'),
+                    ('gov_unused_network', '네트워크'),
+                    ('gov_unused_security', '보안장비')
+                ] %}
+                <div class="system-tabs" role="tablist" aria-label="시스템 관리 탭">
+                    {% for key, label in tabs %}
+                        <a class="system-tab-btn {% if current_key == key %}active{% endif %}"
+                           role="tab"
+                           aria-selected="{{ 'true' if current_key == key else 'false' }}"
+                           href="/p/{{ key }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>Software <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="소프트웨어 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: HPE%가상). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <!-- 자산편입 / 삭제처리 / 일괄변경 버튼 -->
+                                <button class="header-btn" id="system-dispose-btn" title="자산편입" aria-label="선택 행 자산편입">
+                                    <img src="/static/image/svg/list/free-icon-move.svg" alt="자산편입" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+                                    <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-bulk-btn" title="일괄변경" aria-label="선택 행 일괄변경">
+                                    <img src="/static/image/svg/list/free-icon-bulk-edit.svg" alt="일괄변경" class="header-icon">
+                                </button>
+                                <!-- 제거된 기능: 통계 / 행 복제 / 업로드 -->
+                                <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
+                                <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <!-- 제거된 기능: 추가 -->
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th data-col="work_status">업무 상태</th>
+                                        <th data-col="work_group">업무 그룹</th>
+                                        <th data-col="sw_type">소프트웨어 구분</th>
+                                        <th data-col="sw_class">소프트웨어 분류</th>
+                                        <th data-col="sw_vendor">소프트웨어 제조사</th>
+                                        <th data-col="sw_name">소프트웨어 이름</th>
+                                        <th data-col="sw_version">소프트웨어 버전</th>
+                                        <th data-col="sw_dept" class="col-hidden">소프트웨어 담당부서</th>
+                                        <th data-col="sw_owner">소프트웨어 담당자</th>
+                                        <th data-col="service_dept" class="col-hidden">서비스 담당부서</th>
+                                        <th data-col="service_owner" class="col-hidden">서비스 담당자</th>
+                                        <th data-col="erp_no">ERP번호</th>
+                                        <th data-col="acq_date">취득일</th>
+                                        <th data-col="acq_cost">취득비용</th>
+                                        <th data-col="residual_value">잔존가치</th>
+                                        <th data-col="remark" class="col-hidden">비고</th>
+                                        <th data-col="actions">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State (테이블 헤더 아래, 페이지네이션 위) -->
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">소프트웨어 내역이 없습니다.</h3>
+                                <p id="system-empty-desc">등록된 소프트웨어가 없습니다.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <div class="page-numbers" id="system-page-numbers"></div>
+                                <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/4.governance/4-6.unused_assets/4-6-2.software/1.unused_software_list.js"></script>
+
+
+        <!-- 소프트웨어 수정 모달 -->
+        <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-edit-content">
+                <div class="server-edit-header">
+                    <div class="server-edit-title"><h3>소프트웨어 수정</h3><p class="server-edit-subtitle">선택한 소프트웨어 정보를 수정합니다.</p></div>
+                    <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <div class="server-edit-body">
+                    <form id="system-edit-form"><!-- 동적 채움 --></form>
+                </div>
+                <div class="server-edit-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컬럼 선택 모달 (전용회선 페이지 스타일 적용) -->
+        <div id="system-column-modal" class="server-add-modal system-column-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>컬럼 선택</h3>
+                        <p class="server-add-subtitle">표시할 컬럼을 선택하세요 (기본 열은 체크됨)</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-column-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-column-body">
+                    <form id="system-column-form"><!-- JS로 컬럼 체크박스 렌더링 --></form>
+                </div>
+                <div class="server-add-actions system-column-actions">
+                    <div class="action-buttons left">
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-reset">초기화</button>
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-selectall-btn">전체 선택</button>
+                    </div>
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-column-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 불용처리 확인 모달 -->
+        <div id="system-dispose-modal" class="server-add-modal system-dispose-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>자산편입</h3>
+                        <p class="server-add-subtitle" id="dispose-subtitle">선택된 0개의 소프트웨어를 자산으로 편입하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-dispose-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>선택한 소프트웨어를 일반 자산으로 다시 편입합니다.</p>
+                            <p>편입된 항목은 불용자산 목록에서 제거되고 자산 현황에 반영됩니다.</p>
+                            <p>(필요 시 다시 불용 처리할 수 있습니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-process.svg" alt="Process Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-dispose-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제처리 확인 모달 -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 소프트웨어를 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 자산을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- CSV 다운로드 확인 모달 -->
+        {% include 'layouts/_download_modal_range.html' %}
+
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <!-- 일괄변경 모달 -->
+        <div id="system-bulk-modal" class="server-add-modal system-bulk-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>일괄변경</h3>
+                        <p class="server-add-subtitle" id="bulk-subtitle">선택된 0개의 소프트웨어에서 지정한 필드를 일괄 변경합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-bulk-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-bulk-body">
+                    <form id="system-bulk-form"><!-- JS로 필드 렌더링 --></form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-bulk-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+

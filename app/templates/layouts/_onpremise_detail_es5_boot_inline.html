@@ -1,0 +1,354 @@
+{#
+  ES5-safe fallback bootstrap for On-premise detail tabs.
+  Purpose: even if the main onpremise detail bundle cannot be parsed on older runtimes,
+  this inline script still populates the page header and (when present) the basic-info grid.
+#}
+<script>
+(function(){
+  // Security: remove selection identifiers from the address bar (best-effort).
+  try{
+    var __opStripKeys = function(keys){
+      try{
+        if(!keys || !keys.length) return;
+        if(!window.history || !window.history.replaceState) return;
+        var params = null;
+        try{ params = new URLSearchParams(window.location.search || ''); }catch(_eP){ params = null; }
+        if(!params) return;
+        var changed = false;
+        for(var i=0;i<keys.length;i++){
+          var k = String(keys[i] || '');
+          if(k && params.has(k)){
+            try{ params.delete(k); }catch(_eD){}
+            changed = true;
+          }
+        }
+        if(!changed) return;
+        var qs = params.toString();
+        var next = window.location.pathname + (qs ? ('?' + qs) : '') + (window.location.hash || '');
+        window.history.replaceState(null, document.title, next);
+      }catch(_e){ }
+    };
+    __opStripKeys(['asset_id','assetId','id','asset_scope']);
+  }catch(_eStrip){ }
+
+  // Some Chrome extensions inject runtime messaging that occasionally triggers an
+  // unhandled promise rejection in the page context:
+  // "A listener indicated an asynchronous response by returning true, but the message channel closed..."
+  // This is not an app error. Filter it to keep the console clean on this page.
+  try{
+    var __opHandleRejection = function(ev){
+      try{
+        if(!ev) return;
+        var reason = ev.reason;
+        var msg = '';
+        if(typeof reason === 'string') msg = reason;
+        else if(reason && typeof reason.message === 'string') msg = reason.message;
+        else msg = String(reason || '');
+
+        if(
+          msg &&
+          msg.indexOf('A listener indicated an asynchronous response by returning true') > -1 &&
+          msg.indexOf('message channel closed') > -1
+        ){
+          try{ ev.preventDefault(); }catch(_eP){}
+        }
+      }catch(_eH){ }
+    };
+
+    // Use capture to catch early; older browsers ignore the options object.
+    try{ window.addEventListener('unhandledrejection', __opHandleRejection, { capture: true }); }
+    catch(_eOpt){ window.addEventListener('unhandledrejection', __opHandleRejection, true); }
+  }catch(_eUR){ }
+
+  function qs(sel){ try{ return document.querySelector(sel); }catch(_e){ return null; } }
+  function qsa(sel){ try{ return document.querySelectorAll(sel); }catch(_e){ return []; } }
+
+  function getParam(name){
+    try{
+      var sp = new URLSearchParams(window.location.search || '');
+      return sp.get(name);
+    }catch(_e){
+      var q = (window.location.search || '').replace(/^\?/, '');
+      var parts = q.split('&');
+      for(var i=0;i<parts.length;i++){
+        var kv = parts[i].split('=');
+        if(decodeURIComponent(kv[0] || '') === name) return decodeURIComponent(kv[1] || '');
+      }
+      return null;
+    }
+  }
+
+  function toText(v){
+    if(v === 0) return '0';
+    if(v == null) return '';
+    return String(v).replace(/^\s+|\s+$/g, '');
+  }
+
+  function firstNonEmpty(){
+    for(var i=0;i<arguments.length;i++){
+      var v = toText(arguments[i]);
+      if(v) return v;
+    }
+    return '';
+  }
+
+  function safeJsonParse(raw){
+    try{ return raw ? JSON.parse(raw) : null; }catch(_e){ return null; }
+  }
+
+  function getAssetIdFromStorage(){
+    var raw = null;
+    try{ raw = sessionStorage.getItem('onpremise:selected:row'); }catch(_e0){ raw = null; }
+    if(!raw){ try{ raw = localStorage.getItem('onpremise:selected:row'); }catch(_e1){ raw = null; } }
+    var row = safeJsonParse(raw);
+    if(!row || typeof row !== 'object') return null;
+    var cand = row.id != null ? row.id : (row.asset_id != null ? row.asset_id : (row.assetId != null ? row.assetId : null));
+    var id = parseInt(toText(cand), 10);
+    return (id && id > 0) ? id : null;
+  }
+
+  function getSelectedRowFromStorage(){
+    var raw = null;
+    try{ raw = sessionStorage.getItem('onpremise:selected:row'); }catch(_e0){ raw = null; }
+    if(!raw){ try{ raw = localStorage.getItem('onpremise:selected:row'); }catch(_e1){ raw = null; } }
+    var row = safeJsonParse(raw);
+    if(row && typeof row === 'object') return row;
+    return null;
+  }
+
+  function setByLabel(label, value){
+    var rows = qsa('.basic-info-grid .info-row');
+    for(var i=0;i<rows.length;i++){
+      var row = rows[i];
+      var lab = row ? row.querySelector('label') : null;
+      if(!lab) continue;
+      var lt = toText(lab.textContent);
+      if(lt !== label) continue;
+
+      if(label === '업무 상태'){
+        var statusText = row.querySelector('.status-pill .status-text');
+        if(statusText) statusText.textContent = value || '-';
+        var dot = row.querySelector('.status-pill .status-dot');
+        if(dot){
+          try{ dot.classList.remove('ws-run','ws-idle','ws-wait'); }catch(_e0){}
+          var v = (value || '').trim();
+          try{ dot.classList.add(v === '가동' ? 'ws-run' : (v === '유휴' ? 'ws-idle' : 'ws-wait')); }catch(_e1){}
+        }
+        return;
+      }
+
+      if(label === '기밀성' || label === '무결성' || label === '가용성' || label === '보안 점수'){
+        var badge = row.querySelector('.num-badge');
+        if(badge){
+          var vNumRaw = toText(value);
+          badge.textContent = vNumRaw || '-';
+          try{ badge.classList.remove('tone-1','tone-2','tone-3'); }catch(_e2){}
+          var n = parseInt(vNumRaw, 10);
+          if(!isNaN(n)){
+            var tone = 'tone-1';
+            if(label === '보안 점수'){
+              tone = (n >= 8) ? 'tone-3' : (n >= 6 ? 'tone-2' : 'tone-1');
+            } else {
+              tone = (n >= 3) ? 'tone-3' : (n === 2 ? 'tone-2' : 'tone-1');
+            }
+            try{ badge.classList.add(tone); }catch(_e3){}
+          } else {
+            try{ badge.classList.add('tone-1'); }catch(_e4){}
+          }
+        }
+        return;
+      }
+
+      if(label === 'DR 구축여부' || label === '서비스 이중화'){
+        var ox = row.querySelector('.ox-badge');
+        if(ox){
+          var vv = toText(value);
+          var upper = vv.toUpperCase();
+          if(upper === 'TRUE') vv = 'O';
+          if(upper === 'FALSE') vv = 'X';
+          if(vv === '—' || vv === '-') vv = '';
+          var mark = '';
+          if(vv) mark = (vv === 'X') ? 'X' : 'O';
+          try{ ox.classList.remove('on','off'); }catch(_e5){}
+          if(!mark){
+            ox.textContent = '-';
+            try{ ox.setAttribute('aria-label', ''); }catch(_e6){}
+          } else {
+            ox.textContent = mark;
+            try{ ox.setAttribute('aria-label', mark); }catch(_e7){}
+            try{ ox.classList.add(mark === 'O' ? 'on' : 'off'); }catch(_e8){}
+          }
+        }
+        return;
+      }
+
+      var target = row.querySelector('.info-value') || row.querySelector('.toggle-badge');
+      if(!target){
+        var spans = row.querySelectorAll('span');
+        if(spans && spans.length) target = spans[spans.length-1];
+      }
+      if(target) target.textContent = value || '-';
+      return;
+    }
+  }
+
+  function alreadyPopulated(){
+    // Check if key basic-info fields are populated (not just the page header).
+    // The header (h1/p) may be pre-set by Flask session without basic-info data,
+    // so we must verify actual info-row content before skipping population.
+    var any = ['업무 이름','시스템 이름','시스템 제조사','시스템 모델명','관리 IP'];
+    var gridRows = qsa('.basic-info-grid .info-row');
+    if(!gridRows || !gridRows.length){
+      // Tabs without a basic-info-grid: fall back to header check.
+      var h1 = qs('.page-header h1') || qs('#page-title');
+      var p = qs('.page-header p') || qs('#page-subtitle');
+      var h1v = h1 ? toText(h1.textContent) : '';
+      var pv = p ? toText(p.textContent) : '';
+      if((h1v && h1v !== '-') || (pv && pv !== '-')) return true;
+      return false;
+    }
+    for(var i=0;i<any.length;i++){
+      var label = any[i];
+      for(var j=0;j<gridRows.length;j++){
+        var lab = gridRows[j].querySelector('label');
+        if(!lab || toText(lab.textContent) !== label) continue;
+        var target = gridRows[j].querySelector('.info-value') || gridRows[j].querySelector('.toggle-badge');
+        var val = target ? toText(target.textContent) : '';
+        if(val && val !== '-') return true;
+      }
+    }
+
+    return false;
+  }
+
+  function xhrGetJson(url, cb){
+    try{
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      try{ xhr.setRequestHeader('Accept', 'application/json'); }catch(_e0){}
+      xhr.onreadystatechange = function(){
+        if(xhr.readyState !== 4) return;
+        var ok = (xhr.status >= 200 && xhr.status < 300);
+        var data = null;
+        try{ data = JSON.parse(xhr.responseText || 'null'); }catch(_e){ data = null; }
+        cb(ok, xhr.status, data);
+      };
+      xhr.send(null);
+    }catch(_e){
+      cb(false, 0, null);
+    }
+  }
+
+  function applyItem(item){
+    if(!item) return;
+
+    var workName = firstNonEmpty(item.work_name, item.workName);
+    var systemName = firstNonEmpty(item.system_name, item.systemName);
+
+    var h1 = qs('.page-header h1');
+    var p = qs('.page-header p');
+    if(h1 && workName) h1.textContent = workName;
+    if(p && systemName) p.textContent = systemName;
+
+    setByLabel('업무 상태', firstNonEmpty(item.work_status_name, item.work_status, item.work_status_code));
+    setByLabel('업무 분류', firstNonEmpty(item.work_type_name, item.work_type, item.work_type_code));
+    setByLabel('업무 구분', firstNonEmpty(item.work_category_name, item.work_category, item.work_category_code));
+    setByLabel('업무 운영', firstNonEmpty(item.work_operation_name, item.work_operation, item.work_operation_code));
+    setByLabel('업무 그룹', firstNonEmpty(item.work_group_name, item.work_group, item.work_group_code));
+    setByLabel('업무 이름', workName);
+    setByLabel('시스템 이름', systemName);
+    setByLabel('시스템 IP', firstNonEmpty(item.system_ip, item.systemIp));
+    setByLabel('관리 IP', firstNonEmpty(item.mgmt_ip, item.manage_ip, item.manageIp));
+
+    setByLabel('시스템 제조사', firstNonEmpty(item.manufacturer_name, item.vendor, item.manufacturer_code));
+    setByLabel('시스템 모델명', firstNonEmpty(item.server_model_name, item.model, item.server_code));
+    setByLabel('시스템 일련번호', firstNonEmpty(item.serial_number, item.serial));
+    setByLabel('시스템 가상화', firstNonEmpty(item.virtualization_type, item.virtualization));
+
+    setByLabel('시스템 장소', firstNonEmpty(item.center_name, item.location_place, item.center_code));
+    setByLabel('시스템 위치', firstNonEmpty(item.rack_name, item.location_pos, item.rack_code));
+    setByLabel('시스템 슬롯', firstNonEmpty(item.system_slot, item.slot));
+    setByLabel('시스템 크기', firstNonEmpty(item.system_size, item.u_size));
+
+    setByLabel('시스템 담당부서', firstNonEmpty(item.system_dept_name, item.sys_dept, item.system_department, item.system_dept_code));
+    setByLabel('시스템 담당자', firstNonEmpty(item.system_owner_display, item.system_owner_name, item.sys_owner, item.system_owner));
+    setByLabel('서비스 담당부서', firstNonEmpty(item.service_dept_name, item.svc_dept, item.service_department, item.service_dept_code));
+    setByLabel('서비스 담당자', firstNonEmpty(item.service_owner_display, item.service_owner_name, item.svc_owner, item.service_owner));
+
+    setByLabel('기밀성', firstNonEmpty(item.cia_confidentiality, item.confidentiality));
+    setByLabel('무결성', firstNonEmpty(item.cia_integrity, item.integrity));
+    setByLabel('가용성', firstNonEmpty(item.cia_availability, item.availability));
+    setByLabel('보안 점수', firstNonEmpty(item.security_score));
+    setByLabel('시스템 등급', firstNonEmpty(item.system_grade));
+
+    var core = (item.is_core_system != null) ? (item.is_core_system ? '핵심' : '일반') : firstNonEmpty(item.core_flag);
+    setByLabel('핵심/일반', core);
+
+    var dr = (item.has_dr_site != null) ? (item.has_dr_site ? 'O' : 'X') : firstNonEmpty(item.dr_built);
+    setByLabel('DR 구축여부', dr);
+
+    var ha = (item.has_service_ha != null) ? (item.has_service_ha ? 'O' : 'X') : firstNonEmpty(item.svc_redundancy);
+    setByLabel('서비스 이중화', ha);
+
+    try{ sessionStorage.setItem('onpremise:selected:row', JSON.stringify(item)); }catch(_e1){}
+    try{ localStorage.setItem('onpremise:selected:row', JSON.stringify(item)); }catch(_e2){}
+  }
+
+  function getCurrentValueByLabel(label){
+    var rows = qsa('.basic-info-grid .info-row');
+    for(var i=0;i<rows.length;i++){
+      var row = rows[i];
+      var lab = row ? row.querySelector('label') : null;
+      if(!lab) continue;
+      if(toText(lab.textContent) !== label) continue;
+
+      var target = row.querySelector('.num-badge') || row.querySelector('.ox-badge') || row.querySelector('.info-value') || row.querySelector('.toggle-badge');
+      if(!target){
+        var spans = row.querySelectorAll('span');
+        if(spans && spans.length) target = spans[spans.length-1];
+      }
+      return target ? toText(target.textContent) : '';
+    }
+    return '';
+  }
+
+  function decorateExistingBadges(){
+    var labels = ['기밀성','무결성','가용성','보안 점수','DR 구축여부','서비스 이중화'];
+    for(var i=0;i<labels.length;i++){
+      var label = labels[i];
+      // Re-apply the exact same rendering rules (tone/on/off classes) using the current text.
+      // This is needed when the server already rendered values and boot() would otherwise exit early.
+      setByLabel(label, getCurrentValueByLabel(label));
+    }
+  }
+
+  function boot(){
+    // Always decorate existing values (badge tones / OX state) even when data is already present.
+    // Previously, alreadyPopulated() caused an early return and skipped styling until a save/rehydrate.
+    try{ decorateExistingBadges(); }catch(_eDecorate){}
+
+    if(alreadyPopulated()) return;
+
+    // Quick paint from cached row (best effort). This helps even when network is slow.
+    var cached = getSelectedRowFromStorage();
+    if(cached){
+      try{ applyItem(cached); }catch(_e0){}
+      // If that was enough, do not hit the API.
+      if(alreadyPopulated()) return;
+    }
+
+    var raw = getParam('asset_id') || getParam('assetId') || getParam('id');
+    var id = parseInt(toText(raw), 10);
+    if(!id || id <= 0) id = getAssetIdFromStorage();
+    if(!id || id <= 0) return;
+
+    xhrGetJson('/api/hardware/onpremise/assets/' + encodeURIComponent(String(id)), function(ok, _status, data){
+      if(!ok || !data || data.success !== true) return;
+      applyItem(data.item);
+    });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/work.css?v=2.1.5">
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="project.work_status"></div>
+                    <h1>작업 관리</h1>
+                    <p>작업을 관리 합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (확장 대비) -->
+                <div class="system-tabs" role="tablist" aria-label="작업 관리 탭">
+                    {% set tabs = [
+                        ('task_status', '담당 작업'),
+                        ('task_participating', '참여 작업'),
+                        ('task_overview', '작업 현황'),
+                        ('task_completed', '완료 작업')
+                    ] %}
+                    {% for key, label in tabs %}
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>작업 현황 <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <button class="header-btn" id="task-add-report-btn" title="작업보고서 추가" aria-label="작업보고서 추가" type="button">
+                                    <img src="/static/image/svg/free-icon-font-tools.svg" alt="작업추가" class="header-icon">
+                                </button>
+                            </div>
+                        </div>
+                        <div class="status-group-container" id="status-groups"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 비우기 확인 모달 -->
+        <div id="task-clear-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>비우기</h3>
+                        <p class="server-add-subtitle" id="task-clear-subtitle">완료된 0개 항목을 목록에서 비우시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="task-clear-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>비우기는 완료된 작업보고서를 현재 목록에서 숨기는 기능입니다.</p>
+                            <p>비운 항목은 완료 작업 탭에서 계속 확인할 수 있습니다.</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="task-clear-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 액션 확인 모달 (승인/회수 등) -->
+        <div id="task-action-confirm-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3 id="task-action-confirm-title">확인</h3>
+                        <p class="server-add-subtitle" id="task-action-confirm-subtitle"></p>
+                    </div>
+                    <button class="close-btn" type="button" id="task-action-confirm-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p id="task-action-confirm-body"></p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-secondary" id="task-action-confirm-cancel">취소</button>
+                        <button type="button" class="btn-primary" id="task-action-confirm-ok">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <script>
+            window.TASK_PAGE_MODE = 'my';
+            window.CURRENT_USER = window.CURRENT_USER || '홍길동';
+        </script>
+        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/ui/searchable_select.js?v=1.2.0"></script>
+        <script src="/static/js/8.project/8-2.task/8-2-1.my_task/1.my_task.js?v=2.16.1"></script>
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+

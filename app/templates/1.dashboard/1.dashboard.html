@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=2.0.3">
+</head>
+<body>
+        <!-- Header (공통) -->
+        {% include 'layouts/_header.html' %}
+
+        {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                
+                <!-- 대시보드 본문 -->
+                <section class="dashboard-sections">
+                    <!-- 상단 바: 날짜(좌) + 기간 선택(우) -->
+                    <div class="dash-topbar">
+                        <h1 id="today-date" class="page-date" aria-label="오늘 날짜"></h1>
+                        <div class="range-wrap">
+                            <label for="range-select" class="visually-hidden">기간 선택</label>
+                            <select id="range-select" class="range-select page-size-select" aria-label="기간 선택">
+                                <option value="1m" selected>1개월</option>
+                                <option value="3m">3개월</option>
+                                <option value="1y">1년</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Top KPIs: left (하드웨어/소프트웨어/작업), right (유지보수 금액 카드형) -->
+                    <div class="kpi-top-grid">
+                        <!-- Left combined KPI card -->
+                        <div class="kpi-card kpi-core-card" id="kpi-core">
+                            <div class="mini-kpi-list">
+                                <div class="mini-kpi" id="kpi-hw">
+                                    <div class="kpi-title">하드웨어</div>
+                                    <div class="kpi-value">—</div>
+                                    <div class="kpi-delta" aria-live="polite">—</div>
+                                </div>
+                                <div class="mini-kpi" id="kpi-sw">
+                                    <div class="kpi-title">소프트웨어</div>
+                                    <div class="kpi-value">—</div>
+                                    <div class="kpi-delta" aria-live="polite">—</div>
+                                </div>
+                                <div class="mini-kpi" id="kpi-task">
+                                    <div class="kpi-title">작업</div>
+                                    <div class="kpi-value">—</div>
+                                    <div class="kpi-delta" aria-live="polite">—</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right maintenance KPI card (styled like sample) -->
+                        <div class="kpi-card kpi-maint-card" id="kpi-mtce-card">
+                            <div class="maint-top">
+                                <img src="/static/image/logo/bccard_logo.jpg" alt="MAINT" class="maint-logo" />
+                            </div>
+                            <div class="maint-mask" aria-label="계약 식별자">**** **** **** 1241</div>
+                            <div class="maint-meta">
+                                <div class="meta-col">
+                                    <div class="meta-title" style="white-space:nowrap">유지보수 비용</div>
+                                    <div class="meta-value" id="kpi-mtce">
+                                        <span class="kpi-value">—</span>
+                                        <span class="kpi-delta" aria-live="polite">—</span>
+                                    </div>
+                                </div>
+                                <div class="meta-col">
+                                    <div class="meta-title">기준</div>
+                                    <div class="meta-value">12/35</div>
+                                </div>
+                                <div class="meta-col">
+                                    <div class="meta-title">건수</div>
+                                    <div class="meta-value">456</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts row: Donuts (3 fixed columns) -->
+                    <div class="dash-grid charts-grid fixed-3">
+                        <div class="dash-card chart-card" id="card-hw">
+                            <div class="dash-card-header"><h3>하드웨어 구성</h3></div>
+                            <div class="chart-body">
+                                <div class="chart donut" id="chart-hw" role="img" aria-label="하드웨어 구성"></div>
+                                <div class="chart-legend" id="legend-hw"></div>
+                            </div>
+                        </div>
+                        <div class="dash-card chart-card" id="card-sw">
+                            <div class="dash-card-header"><h3>소프트웨어 구성</h3></div>
+                            <div class="chart-body">
+                                <div class="chart donut" id="chart-sw" role="img" aria-label="소프트웨어 구성"></div>
+                                <div class="chart-legend" id="legend-sw"></div>
+                            </div>
+                        </div>
+                        <div class="dash-card chart-card" id="card-prj">
+                            <div class="dash-card-header"><h3>프로젝트 구성</h3></div>
+                            <div class="chart-body">
+                                <div class="chart donut" id="chart-prj" role="img" aria-label="프로젝트 구성"></div>
+                                <div class="chart-legend" id="legend-prj"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Charts row: Maintenance & Task (2 fixed columns) -->
+                    <div class="dash-grid charts-grid fixed-2">
+                        <div class="dash-card chart-card" id="card-mtce">
+                            <div class="dash-card-header"><h3>유지보수 </h3></div>
+                            <div class="chart-body">
+                                <div class="chart" id="chart-mtce" role="img" aria-label="유지보수 신규/변경/삭제 시계열"></div>
+                                <div class="chart-legend" id="legend-mtce"></div>
+                            </div>
+                        </div>
+                        <div class="dash-card chart-card" id="card-task">
+                            <div class="dash-card-header"><h3>작업 </h3></div>
+                            <div class="chart-body">
+                                <div class="chart" id="chart-task" role="img" aria-label="작업 유형별 구성 (누적 막대)"></div>
+                                <div class="chart-legend" id="legend-task"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+        <!-- Chart tooltip container -->
+        <div id="chart-tooltip" class="chart-tooltip" role="status" aria-live="polite"></div>
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/1.dashboard/1.dashboard.js?v=2.2.6"></script>
+
+    </body>
+</html>
+

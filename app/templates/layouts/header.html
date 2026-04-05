@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=20260321b">
+</head>
+<body>
+    <header class="main-header">
+            <div class="header-left">
+        <img src="/static/image/logo/blossom_logo.png" alt="Blossom 로고" class="header-logo">
+        <h1 class="system-title">blossom</h1>
+    </div>
+        <div class="header-right">
+            <button class="header-btn" id="btn-sidebar" title="메뉴">
+                <img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
+            </button>
+            <button class="header-btn" id="btn-work-timeline" title="작업 타임라인" type="button" data-href="{{ url_for('main.addon_work_timeline') }}">
+                <img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
+            </button>
+            <a class="header-btn" id="btn-notifications" title="알림" href="{{ url_for('main.addon_notifications') }}">
+                <img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
+            </a>
+            <a class="header-btn" id="btn-chat" title="채팅" href="{{ url_for('main.addon_chat') }}">
+                <img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
+            </a>
+            <a class="header-btn" id="btn-calendar" title="달력" href="{{ url_for('main.addon_calendar') }}">
+                <img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
+            </a>
+            <button class="header-btn" id="btn-account" title="계정" type="button" data-emp-no="{{ current_user_emp_no or '' }}">
+                <img src="/static/image/center/avatar-default.svg" alt="계정" class="header-avatar-icon">
+            </button>
+        </div>
+    </header>
+
+    <div class="page-padding">
+        <h1>Blossom Header</h1>
+        <p>기본 점검</p>
+    </div>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/_shared/bls-stats-modal.js?v=20260321a" defer></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+</body>
+</html>

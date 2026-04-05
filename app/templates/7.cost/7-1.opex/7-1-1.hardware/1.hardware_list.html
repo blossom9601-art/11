@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+    <link rel="stylesheet" href="/static/css/contract.css?v=1.0.8">
+    <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.show', key='cost_opex_hardware_detail') }}";</script>
+</head>
+<body>
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content" data-opex-type="HW" data-detail-url="{{ url_for('pages.show', key='cost_opex_hardware_detail') }}">
+            <div class="content-wrapper">
+                <div class="page-header">
+                    <div class="page-utility-right" data-info-key="cost.opex"></div>
+                    <h1>OPEX 관리</h1>
+                    <p>OPEX(Operating Expenditure) 중 <strong>하드웨어</strong>를 관리합니다.</p>
+                </div>
+                <!-- 시스템 탭 네비게이션 (확장 대비) -->
+                <div class="system-tabs" role="tablist" aria-label="비용관리 OPEX 탭">
+                    {% set tabs = [
+                        ('cost_opex_dashboard','대시보드'),
+                        ('cost_opex_hardware','하드웨어'),
+                        ('cost_opex_software','소프트웨어'),
+                        ('cost_opex_etc','기타 사용료'),
+                    ] %}
+                    {% for key,label in tabs %}
+                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="tab-content single-pane">
+                    <div class="tab-pane active" id="system-list-pane">
+                        <div class="tab-header">
+                            <div class="tab-header-left">
+                                <h2>계약 목록 <span class="count-badge" id="system-count">0</span></h2>
+                            </div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper" id="system-search-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="계약 검색" autocomplete="off">
+                                        <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
+                                            <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+                                        </button>
+                                        <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
+                                    </div>
+                                    <span id="system-search-hint" class="visually-hidden" hidden aria-hidden="true">입력 즉시 필터링 됩니다. 여러 조건은 % 로 구분 (예: 삼성SDS%진행). 슬래시 키(/) 포커스, ESC 초기화.</span>
+                                </div>
+                                <div class="page-size-selector compact" id="page-size-wrapper">
+                                    <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option>
+                                        <option value="20">20 개</option>
+                                        <option value="50">50 개</option>
+                                        <option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <button class="header-btn" id="system-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+                                    <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-bulk-btn" title="일괄변경" aria-label="선택 행 일괄변경">
+                                    <img src="/static/image/svg/list/free-icon-bulk-edit.svg" alt="일괄변경" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-stats-btn" title="통계" aria-label="현재 결과 통계 보기">
+                                    <img src="/static/image/svg/list/free-icon-chart.svg" alt="통계" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-duplicate-btn" title="행 복제" aria-label="선택 행 복제">
+                                    <img src="/static/image/svg/list/free-icon-globe.svg" alt="행 복제" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-upload-btn" title="업로드" aria-label="엑셀 업로드">
+                                    <img src="/static/image/svg/list/free-icon-upload.svg" alt="업로드" class="header-icon">
+                                </button>
+                                <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
+                                <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" id="system-table">
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th data-col="contract_status">계약상태</th>
+                                        <th data-col="contract_name">계약명</th>
+                                        <th data-col="manage_no">관리번호</th>
+                                        <th data-col="maint_vendor"><span>유지보수</span><br><span>사업자</span></th>
+                                        <th data-col="maint_qty_total"><span>유지보수</span><br><span>전체수량</span></th>
+                                        <th data-col="maint_qty_active"><span>유지보수</span><br><span>활성수량</span></th>
+                                        <th data-col="maint_start"><span>유지보수</span><br><span>시작일</span></th>
+                                        <th data-col="maint_end"><span>유지보수</span><br><span>종료일</span></th>
+                                        <th data-col="maint_amount"><span>유지보수</span><br><span>금액</span></th>
+                                        <th data-col="inspection_target"><span>유지보수</span><br><span>점검대상</span></th>
+                                        <th data-col="maint_manager"><span>유지보수</span><br><span>담당자</span></th>
+                                        <th data-col="memo">비고</th>
+                                        <th data-col="actions">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State (테이블 헤더 아래, 페이지네이션 위) -->
+                        <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 id="system-empty-title">유지보수 계약이 없습니다.</h3>
+                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 계약을 등록하세요.</p>
+                            </div>
+                        </div>
+                        <div class="modern-pagination" id="system-pagination">
+                            <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+                                <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+                                <div class="page-numbers" id="system-page-numbers"></div>
+                                <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+                                <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 유지보수 계약 추가 모달 -->
+        <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title"><h3>유지보수 계약 등록</h3><p class="server-add-subtitle">계약 정보를 입력하세요.</p></div>
+                    <button class="close-btn" type="button" id="system-add-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="system-add-form">
+                        <!-- 계약 기본 정보 -->
+                        <div class="form-section">
+                            <div class="section-header"><h4>계약</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row"><label>계약상태<span class="required">*</span></label>
+                                    <select name="contract_status" class="form-input search-select" data-searchable="true" data-placeholder="선택">
+                                        <option value="">선택</option>
+                                        <option value="진행">진행</option>
+                                        <option value="해지">해지</option>
+                                        <option value="만료">만료</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>계약명<span class="required">*</span></label><input name="contract_name" class="form-input" placeholder="계약명"></div>
+                                <div class="form-row"><label>관리번호<span class="required">*</span></label><input name="manage_no" class="form-input" placeholder="관리번호"></div>
+                                <div class="form-row"><label>유지보수 사업자<span class="required">*</span></label>
+                                    <select name="vendor_id" class="form-input search-select" data-vendor-select="add">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 유지보수 정보 -->
+                        <div class="form-section">
+                            <div class="section-header"><h4>유지보수</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row" hidden><label>유지보수 전체수량</label><input name="maint_qty_total" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                                <div class="form-row" hidden><label>유지보수 활성수량</label><input name="maint_qty_active" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                                <div class="form-row"><label>유지보수 시작일<span class="required">*</span></label><input name="maint_start" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                                <div class="form-row"><label>유지보수 종료일<span class="required">*</span></label><input name="maint_end" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                                <div class="form-row" hidden><label>유지보수 금액<span class="required">*</span></label><input name="maint_amount" type="text" inputmode="decimal" class="form-input" placeholder="0"></div>
+                                <div class="form-row"><label>유지보수 점검대상</label>
+                                    <select name="inspection_target" class="form-input search-select" data-searchable="true" data-placeholder="선택">
+                                        <option value="">선택</option>
+                                        <option value="O">O</option>
+                                        <option value="X">X</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>유지보수 담당자</label>
+                                    <select name="maint_manager" class="form-input search-select" data-searchable="true" data-placeholder="선택" data-manager-select="add">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                                <div class="form-row form-row-wide"><label>비고</label><textarea name="memo" class="form-input textarea-large" rows="6"></textarea></div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-add-save">등록</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 유지보수 계약 수정 모달 (추가 모달과 동일 구조/스타일) -->
+        <div id="system-edit-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title"><h3>유지보수 계약 수정</h3><p class="server-add-subtitle">선택한 계약 정보를 수정합니다.</p></div>
+                    <button class="close-btn" type="button" id="system-edit-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <form id="system-edit-form">
+                        <!-- 계약 기본 정보 -->
+                        <div class="form-section">
+                            <div class="section-header"><h4>계약</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row"><label>계약상태<span class="required">*</span></label>
+                                    <select name="contract_status" class="form-input search-select" data-searchable="true" data-placeholder="선택">
+                                        <option value="">선택</option>
+                                        <option value="진행">진행</option>
+                                        <option value="해지">해지</option>
+                                        <option value="만료">만료</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>계약명<span class="required">*</span></label><input name="contract_name" class="form-input" placeholder="계약명"></div>
+                                <div class="form-row"><label>관리번호<span class="required">*</span></label><input name="manage_no" class="form-input" placeholder="관리번호"></div>
+                                <div class="form-row"><label>유지보수 사업자<span class="required">*</span></label>
+                                    <select name="vendor_id" class="form-input search-select" data-vendor-select="edit">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 유지보수 정보 -->
+                        <div class="form-section">
+                            <div class="section-header"><h4>유지보수</h4></div>
+                            <div class="form-grid">
+                                <div class="form-row" hidden><label>유지보수 전체수량</label><input name="maint_qty_total" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                                <div class="form-row" hidden><label>유지보수 활성수량</label><input name="maint_qty_active" type="number" min="0" step="1" class="form-input" placeholder="0"></div>
+                                <div class="form-row"><label>유지보수 시작일<span class="required">*</span></label><input name="maint_start" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                                <div class="form-row"><label>유지보수 종료일<span class="required">*</span></label><input name="maint_end" type="date" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
+                                <div class="form-row" hidden><label>유지보수 금액<span class="required">*</span></label><input name="maint_amount" type="text" inputmode="decimal" class="form-input locked-field" placeholder="0" readonly></div>
+                                <div class="form-row"><label>유지보수 점검대상</label>
+                                    <select name="inspection_target" class="form-input search-select" data-searchable="true" data-placeholder="선택">
+                                        <option value="">선택</option>
+                                        <option value="O">O</option>
+                                        <option value="X">X</option>
+                                    </select>
+                                </div>
+                                <div class="form-row"><label>유지보수 담당자</label>
+                                    <select name="maint_manager" class="form-input search-select" data-searchable="true" data-placeholder="선택" data-manager-select="edit">
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
+                                <div class="form-row form-row-wide"><label>비고</label><textarea name="memo" class="form-input textarea-large" rows="6"></textarea></div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 컬럼 선택 모달 (전용회선 페이지 스타일 적용) -->
+        <div id="system-column-modal" class="server-add-modal system-column-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>컬럼 선택</h3>
+                        <p class="server-add-subtitle">표시할 컬럼을 선택하세요 (기본 열은 체크됨)</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-column-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-column-body">
+                    <form id="system-column-form"><!-- JS로 컬럼 체크박스 렌더링 --></form>
+                </div>
+                <div class="server-add-actions system-column-actions">
+                    <div class="action-buttons left">
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-reset">초기화</button>
+                        <button type="button" class="btn-secondary column-bulk-btn" id="system-column-selectall-btn">전체 선택</button>
+                    </div>
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-column-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제처리 확인 모달 -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 계약을 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 자산을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 행 복제 확인 모달 -->
+        <div id="system-duplicate-modal" class="server-add-modal system-duplicate-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>행 복제</h3>
+                        <p class="server-add-subtitle" id="duplicate-subtitle">선택된 0개의 계약 행을 복제합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-duplicate-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>선택된 행의 복제본을 생성합니다.</p>
+                            <p>복제 후 <strong>관리번호</strong> 끝에 _COPY가 붙습니다.</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-programming.svg" alt="Programming Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-duplicate-confirm">복제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CSV 다운로드 확인 모달 -->
+        {% include 'layouts/_download_modal_range.html' %}
+
+
+        <!-- 메시지 모달 (alert 대체) -->
+        {% include 'layouts/_message_modal.html' %}
+
+
+        <!-- 일괄변경 모달 -->
+        <div id="system-bulk-modal" class="server-add-modal system-bulk-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>일괄변경</h3>
+                        <p class="server-add-subtitle" id="bulk-subtitle">선택된 0개의 계약에서 지정한 필드를 일괄 변경합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-bulk-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-bulk-body">
+                    <form id="system-bulk-form"><!-- JS로 필드 렌더링 --></form>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-bulk-apply">적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% include 'layouts/_stats_modal.html' %}
+
+        <!-- 업로드 모달 -->
+        <div id="system-upload-modal" class="server-add-modal system-upload-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title">
+                        <h3>엑셀 업로드</h3>
+                        <p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 계약을 등록합니다.</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-upload-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body system-upload-body">
+                    <div class="upload-dropzone" id="upload-dropzone" role="button" tabindex="0" aria-label="파일을 드래그하거나 클릭하여 선택">
+                        <div class="upload-illu"><div id="upload-anim" class="lottie-anim" aria-hidden="true"></div></div>
+                        <div class="upload-text center">
+                            <strong>파일을 끌어서 업로드 하거나, 클릭하여 파일을 선택하세요.</strong>
+                        </div>
+                        <input type="file" id="upload-input" class="visually-hidden" accept=".xls,.xlsx" aria-hidden="true" />
+                    </div>
+                    <div class="upload-subinfo" aria-hidden="true">
+                        <span class="sub-left">지원 가능한 확장자: XLS, XLSX</span>
+                        <span class="sub-right">최대 파일 사이즈: 10 MB</span>
+                    </div>
+                    <div class="upload-meta" id="upload-meta" hidden>
+                        <div class="file-chip" id="upload-file-chip" aria-live="polite"></div>
+                    </div>
+                    <div class="upload-help">
+                        <p class="upload-warning">엑셀업로드는 반드시 제공한 양식을 사용해야 합니다.<br>아래 양식을 다운로드한 뒤 작성하여 업로드 해주세요.</p>
+                        <div class="template-card">
+                            <div class="template-label"><img src="/static/image/svg/list/free-icon-excel.svg" alt="엑셀" class="template-icon">엑셀 업로드 양식</div>
+                            <button type="button" class="btn-primary template-download-btn" id="upload-template-download" aria-label="양식 다운로드">
+                                <img src="/static/image/svg/list/free-icon-download.svg" alt="" class="template-icon" aria-hidden="true">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-upload-confirm" disabled>등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/7.cost/7-1.opex/opex_contracts.js?v=20260401-1"></script>
+        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+</body>
+</html>
+
