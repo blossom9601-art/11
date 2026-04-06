@@ -355,7 +355,9 @@
             return [];
         }
         try{
-            const data = await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             const rawItems = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             let items = rawItems;
             if(sourceKey === 'SERVER_MODEL' && SERVER_MODEL_FORM_FACTOR_FILTER){
@@ -2686,7 +2688,7 @@
                             try{ sessionStorage.setItem('hw_security_vpn:selected:asset_id', String(assetId)); }catch(_e8){}
                             try{ localStorage.setItem('hw_security_vpn:selected:asset_id', String(assetId)); }catch(_e9){}
                         }
-                        window.location.href = buildDetailUrl(assetId);
+                        blsSpaNavigate(buildDetailUrl(assetId));
                         return;
                     }
                 }catch(_e){}
@@ -3039,7 +3041,7 @@
                 const data = await res.json();
                 if(!data.success){ showMessage(data.message || '불용처리 실패', '오류'); return; }
                 closeModal(DISPOSE_MODAL_ID);
-                window.location.href = '/p/gov_unused_security';
+                blsSpaNavigate('/p/gov_unused_security');
             } catch(err){
                 showMessage('불용처리 중 오류가 발생했습니다.', '오류');
             } finally {

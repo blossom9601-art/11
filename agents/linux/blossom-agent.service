@@ -1,0 +1,16 @@
+[Unit]
+Description=Lumina 자산 자동 탐색 에이전트
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/lumina/agents/linux/agent.py --conf /etc/lumina/lumina.conf
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

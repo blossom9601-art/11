@@ -59,7 +59,7 @@
       }
 
       // No context available: go back to list (server detail style).
-      try{ window.location.href = '/p/hw_storage_san'; }catch(_e5){}
+      try{ blsSpaNavigate('/p/hw_storage_san'); }catch(_e5){}
     })();
 
     // Initialize page header from list selection (query or storage)

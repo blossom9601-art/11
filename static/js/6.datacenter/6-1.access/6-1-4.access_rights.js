@@ -90,7 +90,7 @@
 		const r = state.filtered[index]; if(!r) return;
 		const q = [r.place, r.location, r.zone, r.task_name, r.vendor, r.auth].filter(Boolean).join(' ');
 		const url = `/app/templates/6.datacenter/6-1.access/6-1-5.access_system.html?q=${encodeURIComponent(q)}`;
-		window.location.href = url;
+		blsSpaNavigate(url);
 	};
 
 	document.addEventListener('DOMContentLoaded', function(){

@@ -733,6 +733,9 @@ def logout():
 # 계정: 프로필 보기
 @auth_bp.route('/account/profile')
 def account_profile():
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='account_profile', menu_code=None)
     uid = session.get('user_id')
     emp = session.get('emp_no')
     if not uid and not emp:
@@ -838,6 +841,10 @@ def _settings_current_user_merged():
 
 @auth_bp.route('/settings/profile')
 def settings_profile():
+    # SPA: 직접 방문 → 셸 반환
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='settings_profile', menu_code=None)
     merged = _settings_current_user_merged()
     if not merged:
         flash('로그인이 필요합니다.', 'error')
@@ -874,6 +881,9 @@ def settings_profile():
 
 @auth_bp.route('/settings/member')
 def settings_member():
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='settings_member', menu_code=None)
     merged = _settings_current_user_merged()
     if not merged:
         flash('로그인이 필요합니다.', 'error')
@@ -917,6 +927,9 @@ def settings_member():
 
 @auth_bp.route('/settings/memo')
 def settings_memo():
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='settings_memo', menu_code=None)
     merged = _settings_current_user_merged()
     if not merged:
         flash('로그인이 필요합니다.', 'error')
@@ -926,6 +939,10 @@ def settings_memo():
 
 @auth_bp.route('/settings/password', methods=['GET', 'POST'])
 def settings_password():
+    if request.method == 'GET':
+        _xhr = request.headers.get('X-Requested-With', '')
+        if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+            return render_template('layouts/spa_shell.html', current_key='settings_password', menu_code=None)
     if request.method == 'POST':
         uid = session.get('user_id')
         emp = session.get('emp_no')
@@ -1292,6 +1309,9 @@ def admin_locked_users():
         # 항상 명시적으로 200 OK JSON
         return jsonify({'users': user_rows})
 
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_locked', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-1.user/1.user_list.html', users=user_rows)
 
 
@@ -1794,6 +1814,9 @@ def admin_groups():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
     # 빈 검색 자동완성 상태 고급 스타일(illustration) 활성 플래그 전달
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_groups', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-2.role/1.role_list.html', enable_suggest_empty=True)
 
 @auth_bp.route('/admin/auth/groups/data', methods=['GET'])
@@ -2154,6 +2177,9 @@ def admin_settings():
     if 'role' not in session or session.get('role') not in ('admin','ADMIN','관리자'):
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_settings', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/1.setting.html')
 
 
@@ -2163,6 +2189,9 @@ def admin_security_settings():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_security', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/3.security.html')
 
 
@@ -2386,6 +2415,9 @@ def admin_sessions_page():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_sessions', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/8.sessions.html')
 
 
@@ -2558,6 +2590,9 @@ def admin_mail_settings():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_mail', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/2.mail.html')
 
 
@@ -2567,6 +2602,9 @@ def admin_quality_type():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_quality_type', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/4.quality_type.html')
 
 
@@ -2576,6 +2614,9 @@ def admin_change_log():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_change_log', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/5.change_log.html')
 
 
@@ -2585,6 +2626,9 @@ def admin_info_message():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_info_message', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/6.info_message.html')
 
 
@@ -2594,6 +2638,9 @@ def admin_version():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_version', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/7.version.html')
 
 
@@ -2603,6 +2650,9 @@ def admin_page_tab():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_page_tab', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/9.page_tab.html')
 
 
@@ -2612,6 +2662,9 @@ def admin_brand_settings():
     if not _ensure_admin_session():
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_brand', menu_code=None)
     resp = make_response(render_template('authentication/11-3.admin/11-3-3.setting/10.brand.html'))
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'

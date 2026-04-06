@@ -729,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	if (ctxViewEl) {
 		ctxViewEl.addEventListener('click', () => {
 			if (!ctxTargetPostId) return;
-			window.location.href = buildDetailUrl(ctxTargetPostId);
+			blsSpaNavigate(buildDetailUrl(ctxTargetPostId));
 		});
 	}
 

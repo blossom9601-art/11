@@ -44,7 +44,7 @@
                 body: JSON.stringify({name:'제목 없는 워크플로우', description:''})
             }).then(function(r){ return r.json(); }).then(function(d){
                 if(!d.success){ alert(d.error||'생성 실패'); btn.disabled=false; btn.style.opacity='1'; return; }
-                window.location.href = '/p/wf_designer_editor?id=' + d.item.id;
+                blsSpaNavigate('/p/wf_designer_editor?id=' + d.item.id);
             }).catch(function(){ alert('네트워크 오류'); btn.disabled=false; btn.style.opacity='1'; });
         });
         // hover 효과
@@ -804,7 +804,7 @@
     backBtn.title = '목록으로';
     backBtn.innerHTML = '<span class="wf-tool-icon"><img src="/static/image/svg/workflow/free-icon-font-layout-fluid.svg" alt="목록" draggable="false"></span>'
         + '<span class="wf-tool-tip">목록으로</span>';
-    backBtn.addEventListener('click', function(){ window.location.href = '/p/wf_designer_manage'; });
+    backBtn.addEventListener('click', function(){ blsSpaNavigate('/p/wf_designer_manage'); });
     toolbar.appendChild(backBtn);
 
     // ── 도형 카테고리 패널 (툴바 외부, editor-body 안) ──

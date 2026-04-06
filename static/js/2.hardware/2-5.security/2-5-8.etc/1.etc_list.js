@@ -344,7 +344,9 @@
             return [];
         }
         try{
-            const data = await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             const rawItems = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             let items = rawItems;
             if(sourceKey === 'SERVER_MODEL' && SERVER_MODEL_FORM_FACTOR_FILTER){
@@ -2666,7 +2668,7 @@
                         try{ localStorage.setItem('security-etc:selected:row', JSON.stringify(row)); }catch(_e){}
                         e.preventDefault();
                         // Do not put asset_id in URL; persist via storage instead
-                        window.location.href = DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id));
+                        blsSpaNavigate(DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id)));
                         return;
                     }
                 }catch(_e){}
@@ -3019,7 +3021,7 @@
                 const data = await res.json();
                 if(!data.success){ showMessage(data.message || '불용처리 실패', '오류'); return; }
                 closeModal(DISPOSE_MODAL_ID);
-                window.location.href = '/p/gov_unused_security';
+                blsSpaNavigate('/p/gov_unused_security');
             } catch(err){
                 showMessage('불용처리 중 오류가 발생했습니다.', '오류');
             } finally {

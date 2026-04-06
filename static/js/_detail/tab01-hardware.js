@@ -8,12 +8,8 @@
 
 	// Utilities
 	if(typeof window === 'undefined') return;
-	if(window.BlossomTab01Hardware) {
-		// SPA re-entry: re-run init on the new DOM
-		if(document.readyState !== 'loading') window.BlossomTab01Hardware.init();
-		else document.addEventListener('DOMContentLoaded', function(){ window.BlossomTab01Hardware.init(); });
-		return;
-	}
+	// SPA re-entry: 이전 sentinel 제거 → IIFE 전체 재정의
+	if(window.BlossomTab01Hardware) delete window.BlossomTab01Hardware;
 
 	function hwTrim(v){ return String(v == null ? '' : v).trim(); }
 	function hwEscapeHtml(s){

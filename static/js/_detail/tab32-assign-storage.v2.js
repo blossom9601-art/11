@@ -549,7 +549,7 @@
     function saveGroup(){
       if(!assetId){
         toast('선택된 스토리지가 없습니다. 목록에서 스토리지를 선택하세요.', 'warning');
-        try{ window.location.href = ctx.listPath; }catch(_e){}
+        try{ blsSpaNavigate(ctx.listPath); }catch(_e){}
         return Promise.reject(new Error('no assetId'));
       }
 
@@ -2303,7 +2303,7 @@
       btnAdd.addEventListener('click', function(){
         if(!assetId){
           toast('선택된 스토리지가 없습니다. 목록에서 스토리지를 선택하세요.', 'warning');
-          try{ window.location.href = ctx.listPath; }catch(_e){}
+          try{ blsSpaNavigate(ctx.listPath); }catch(_e){}
           return;
         }
         openGroup(null);

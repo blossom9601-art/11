@@ -38,6 +38,7 @@ def test_data_delete_register_crud_flow(client, app):
     with client.session_transaction() as sess:
         sess['emp_no'] = profiles['creator_emp_no']
         sess['user_id'] = profiles['creator_id']
+        sess['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
     create_resp = client.post(
         '/api/datacenter/data-deletion',
         json=_build_payload(profiles['worker_id'], profiles['requester_id'], 1),

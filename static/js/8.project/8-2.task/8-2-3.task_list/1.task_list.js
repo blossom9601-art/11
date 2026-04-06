@@ -1016,7 +1016,7 @@
                             }, 700);
                         }
                     }catch(_e){
-                        window.location.href = link.getAttribute('href');
+                        blsSpaNavigate(link.getAttribute('href'));
                     }
                 }
                 return;
@@ -1163,7 +1163,7 @@
 				}
             }catch(_e){
                 // fallback: same-tab navigation
-                window.location.href = '2.task_detail.html';
+                blsSpaNavigate('2.task_detail.html');
             }
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));

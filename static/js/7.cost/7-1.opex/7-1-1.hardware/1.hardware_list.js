@@ -37,7 +37,7 @@
       });
     } catch (_e) {}
 
-    window.location.href = href;
+    blsSpaNavigate(href);
   }
   function render(){
     state.filtered = applyFilter(state.data);

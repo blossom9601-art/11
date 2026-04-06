@@ -384,7 +384,7 @@
 			saveStoredAssetId(ctx, assetId);
 			return;
 		}
-		try{ window.location.href = ctx.listPath; }catch(_e3){}
+		try{ blsSpaNavigate(ctx.listPath); }catch(_e3){}
 	}
 	function applyHeaderFromSelection(ctx){
 		try{

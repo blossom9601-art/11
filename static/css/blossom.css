@@ -171,7 +171,9 @@ html.dl-header-pending #page-header-subtitle{
     from { opacity: 0; }
     to   { opacity: 1; }
 }
-main.main-content.spa-fade-in {
+main.main-content.spa-fade-in,
+.server-detail-content.spa-fade-in,
+.tab-content.spa-fade-in {
     animation: spaFadeIn .15s ease-out both;
 }
 

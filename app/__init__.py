@@ -87,6 +87,7 @@ from app.services.access_entry_register_service import init_access_entry_registe
 from app.services.data_delete_register_service import init_data_delete_register_table
 from app.services.data_delete_system_service import init_data_delete_system_table
 from app.services.hw_interface_service import init_hw_interface_table
+from app.services.hw_interface_detail_service import init_hw_interface_detail_table
 from app.services.tab32_assign_group_service import init_tab32_assign_group_tables
 from app.services.hw_maintenance_contract_service import init_hw_maintenance_contract_table
 from app.services.hw_activate_service import init_hw_activate_table
@@ -516,6 +517,15 @@ def create_app(config_name='default'):
     except Exception as iface_init_err:
         try:
             print('[hw-interface] table init failed:', iface_init_err, flush=True)
+        except Exception:
+            pass
+
+    try:
+        with app.app_context():
+            init_hw_interface_detail_table(app)
+    except Exception as iface_detail_init_err:
+        try:
+            print('[hw-interface-detail] table init failed:', iface_detail_init_err, flush=True)
         except Exception:
             pass
     try:
@@ -1512,6 +1522,7 @@ def create_app(config_name='default'):
     from app.routes.rack_detail_api import rack_detail_api_bp
     from app.routes.auth import auth_bp
     from app.routes.hw_interface_api import hw_interface_api_bp
+    from app.routes.hw_interface_detail_api import hw_interface_detail_api_bp
     from app.routes.hw_maintenance_contract_api import hw_maintenance_contract_api_bp
     from app.routes.hw_activate_api import hw_activate_api_bp
     from app.routes.hw_firewalld_api import hw_firewalld_api_bp
@@ -1523,12 +1534,15 @@ def create_app(config_name='default'):
     from app.routes.tab32_assign_group_api import tab32_assign_group_api_bp
     from app.routes.notification_api import notification_api_bp
     from app.routes.sse_api import sse_bp
+    from app.routes.agent_api import agent_api_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(agent_api_bp)
     app.register_blueprint(rack_detail_api_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(hw_interface_api_bp)
+    app.register_blueprint(hw_interface_detail_api_bp)
     app.register_blueprint(hw_maintenance_contract_api_bp)
     app.register_blueprint(hw_activate_api_bp)
     app.register_blueprint(hw_firewalld_api_bp)

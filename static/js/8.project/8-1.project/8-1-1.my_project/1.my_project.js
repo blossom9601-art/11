@@ -221,7 +221,7 @@
       };
       try { sessionStorage.setItem('project_selected_row', JSON.stringify(payload)); } catch(_e){}
       const base = (window.__PROJ_COMPLETED_DETAIL_URL || '/p/proj_completed_detail');
-      window.location.href = base;
+      blsSpaNavigate(base);
     });
   }
 

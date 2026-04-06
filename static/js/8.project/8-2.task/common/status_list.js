@@ -224,7 +224,7 @@
           }, 700);
         }
       }catch(_e){
-        window.location.href = `/p/2.task_detail.html?id=${encodeURIComponent(rid)}`;
+        blsSpaNavigate(`/p/2.task_detail.html?id=${encodeURIComponent(rid)}`);
       }
     });
       });

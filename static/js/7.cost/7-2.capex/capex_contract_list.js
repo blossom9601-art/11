@@ -816,10 +816,10 @@
           method: 'POST',
           body: JSON.stringify({ key: detailKey, manage_no: manageNo })
         }).then(()=>{
-          window.location.href = `/p/${detailKey}`;
+          blsSpaNavigate(`/p/${detailKey}`);
         }).catch((err)=>{
           console.error(err);
-          window.location.href = fallbackHref;
+          blsSpaNavigate(fallbackHref);
         });
         return;
       }

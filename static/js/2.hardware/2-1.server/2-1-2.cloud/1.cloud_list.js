@@ -340,7 +340,9 @@
             return [];
         }
         try{
-            const data = await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             let items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             if(sourceKey === 'SERVER_MODEL' && SERVER_MODEL_FORM_FACTOR_FILTER){
                 const target = String(SERVER_MODEL_FORM_FACTOR_FILTER).trim();
@@ -2639,7 +2641,7 @@
                             }
                         }catch(_e2){}
                         e.preventDefault();
-                        window.location.href = DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id));
+                        blsSpaNavigate(DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id)));
                         return;
                     }
                 }catch(_e){}
@@ -2804,7 +2806,7 @@
                 var _virtTabMap = {'물리서버':'/p/hw_server_onpremise','가상서버':'/p/hw_server_workstation','클라우드':'/p/hw_server_cloud'};
                 if(virtVal && _virtTabMap[virtVal] && _virtTabMap[virtVal] !== '/p/hw_server_cloud'){
                     showMessage('자산이 수정되었습니다. 해당 탭으로 이동합니다.', '수정 완료');
-                    setTimeout(function(){ window.location.href = _virtTabMap[virtVal]; }, 800);
+                    setTimeout(function(){ blsSpaNavigate(_virtTabMap[virtVal]); }, 800);
                     return;
                 }
                 await loadAssetsFromServer({ preservePage: true });
@@ -2999,7 +3001,7 @@
                 const data = await res.json();
                 if(!data.success){ showMessage(data.message || '불용처리 실패', '오류'); return; }
                 closeModal(DISPOSE_MODAL_ID);
-                window.location.href = '/p/gov_unused_server';
+                blsSpaNavigate('/p/gov_unused_server');
             } catch(err){
                 showMessage('불용처리 중 오류가 발생했습니다.', '오류');
             } finally {

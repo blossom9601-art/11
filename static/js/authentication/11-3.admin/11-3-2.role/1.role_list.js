@@ -779,7 +779,7 @@
                     if(hasDirtyChanges()){
                         e.preventDefault();
                         var href = tab.getAttribute('href');
-                        showConfirm('저장하지 않은 변경사항이 있습니다.\n페이지를 이동하시겠습니까?', function(){ window.location.href = href; });
+                        showConfirm('저장하지 않은 변경사항이 있습니다.\n페이지를 이동하시겠습니까?', function(){ blsSpaNavigate(href); });
                     }
                 });
             })(tabs[i]);

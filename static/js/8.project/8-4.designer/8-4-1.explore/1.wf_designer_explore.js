@@ -227,7 +227,7 @@
                         }
                     })
                     .catch(function(){});
-                    window.location.href = '/p/wf_designer_editor?id='+id;
+                    blsSpaNavigate('/p/wf_designer_editor?id='+id);
                 });
             }
 
@@ -279,7 +279,7 @@
         .then(function(r){ return r.json(); })
         .then(function(data){
             if(!data.success){ alert(data.error||'생성 실패'); return; }
-            window.location.href = '/p/wf_designer_editor?id='+data.item.id;
+            blsSpaNavigate('/p/wf_designer_editor?id='+data.item.id);
         })
         .catch(function(e){ alert('네트워크 오류'); console.error(e); });
     }

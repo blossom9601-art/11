@@ -1,7 +1,15 @@
-from flask import Blueprint, render_template, session, redirect, url_for, flash, current_app, send_file
+from flask import Blueprint, render_template, session, redirect, url_for, flash, current_app, send_file, request
 from app.models import AuthUser, UserProfile
 import os
 import time
+
+
+def _is_spa_fetch():
+    """blossom.js SPA fetch 요청인지 판별"""
+    xhr = request.headers.get('X-Requested-With', '')
+    return xhr in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest')
+
+
 def _static_asset_stamp(relative_path: str, default: str = 'dev') -> str:
     try:
         project_root = os.path.dirname(current_app.root_path)
@@ -49,6 +57,10 @@ def dashboard():
         session['pending_terms_user_id'] = user.id
         return redirect(url_for('auth.terms'))
 
+    # SPA: 직접 방문 → 셸 반환, JS fetch → 풀 템플릿
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='dashboard', menu_code='dashboard')
+
     user_info = {
         'emp_no': session.get('emp_no'),
         'role': session.get('role')
@@ -66,6 +78,8 @@ def hardware_server():
     """
     # if 'user_id' not in session:
     #     return redirect(url_for('auth.login'))
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='hw_server', menu_code=None)
     return render_template('2.hardware/2-1.hardware/2-1-1.server.html')
 
 
@@ -76,28 +90,38 @@ def project_task_calendar():
     """
     # if 'user_id' not in session:
     #     return redirect(url_for('auth.login'))
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='project_task_calendar', menu_code=None)
     return render_template('8.project/8-2.task/8-2-5.calendar.html')
 
 
 @main_bp.route('/construction')
 def construction_zone():
     """Temporary route to display the construction page."""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='construction', menu_code=None)
     return render_template('error/construction-zone.html')
 
 # ===== Add-on / header icon linked pages (stub pages for now) =====
 @main_bp.route('/addon/work-timeline')
 def addon_work_timeline():
     """작업 타임라인 (임시 스텁)"""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='addon_work_timeline', menu_code=None)
     return render_template('addon_application/1.work_timeline.html')
 
 @main_bp.route('/addon/notifications')
 def addon_notifications():
     """알림 (임시 스텁)"""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='addon_notifications', menu_code=None)
     return render_template('addon_application/2.alarm.html')
 
 @main_bp.route('/addon/chat')
 def addon_chat():
     """채팅 (임시 스텁)"""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='addon_chat', menu_code=None)
     try:
         chat_rooms_url = url_for('api.list_chat_rooms')
     except Exception:
@@ -126,6 +150,8 @@ def addon_chat():
 @main_bp.route('/addon/calendar')
 def addon_calendar():
     """캘린더 (임시 스텁)"""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='addon_calendar', menu_code=None)
     # 기존 프로젝트 작업 캘린더 라우트와 중복될 수 있으나 구분 (addon prefix)
     try:
         calendar_api_base = url_for('api.list_calendar_schedules')
@@ -154,6 +180,8 @@ def addon_calendar():
 
 @main_bp.route('/p/compose-email')
 def compose_email():
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='compose_email', menu_code=None)
     return render_template('8.project/8-2.task/8-2-3.task_list/3.compose_email.html')
 
 

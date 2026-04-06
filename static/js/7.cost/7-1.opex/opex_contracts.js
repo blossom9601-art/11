@@ -251,13 +251,13 @@
             const key = keyFromDetailUrl(cleanHref);
             if (key) {
               setCostDetailContext(key, token, manageNo)
-                .then(() => { window.location.href = cleanHref; })
-                .catch(() => { window.location.href = fallbackHref; });
+                .then(() => { blsSpaNavigate(cleanHref); })
+                .catch(() => { blsSpaNavigate(fallbackHref); });
               return;
             }
 
             // If key extraction fails, fall back to href that includes ?id=...
-            window.location.href = fallbackHref;
+            blsSpaNavigate(fallbackHref);
             return;
           }
 

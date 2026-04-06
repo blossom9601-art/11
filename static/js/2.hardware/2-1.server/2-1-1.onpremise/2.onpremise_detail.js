@@ -533,6 +533,8 @@
         has_service_ha: svcHaFlag,
         service_ha_type: item.service_ha_type != null ? item.service_ha_type : prevRow.service_ha_type,
 
+        agent_synced: !!item.agent_synced,
+
         _record: item
       };
       return row;
@@ -690,6 +692,18 @@
                   setText('.page-header p', viewRow.system_name || '-');
                 }
                 applyRowToBasicInfo(viewRow);
+                // Lumina 에이전트 연동 아이콘 갱신
+                try{
+                  if(window.BlossomHardwareDetail && window.BlossomHardwareDetail.updateAgentIcon){
+                    window.BlossomHardwareDetail.updateAgentIcon(!!viewRow.agent_synced);
+                  }
+                }catch(_eAgent){}
+                // 연동 버튼 삽입
+                try{
+                  if(window.BlossomHardwareDetail && window.BlossomHardwareDetail.initLinkButton){
+                    window.BlossomHardwareDetail.initLinkButton(assetId);
+                  }
+                }catch(_eLB){}
               }catch(_e5){}
             });
           }

@@ -12257,6 +12257,12 @@ def _hardware_asset_get_response(asset_id: int, asset_type: Union[str, Sequence[
         )
         if not record:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        # 에이전트(Lumina) 연동 상태 추가
+        try:
+            from app.services.agent_service import is_agent_synced
+            record['agent_synced'] = is_agent_synced(asset_id)
+        except Exception:
+            record['agent_synced'] = False
         return jsonify({'success': True, 'item': record})
     except Exception:
         logger.exception('Failed to fetch %s hardware asset', log_label)

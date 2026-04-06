@@ -8,7 +8,8 @@
 
 	
 
-	if(window.BlossomTab21Frontbay) return;
+	// SPA re-entry: 이전 sentinel 제거 → IIFE 전체 재정의
+	if(window.BlossomTab21Frontbay) delete window.BlossomTab21Frontbay;
 
 	
 	try {

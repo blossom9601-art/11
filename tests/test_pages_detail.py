@@ -21,17 +21,17 @@ def test_frame_detail_route_renders(client):
 
 
 def test_frame_detail_redirect_to_spa(client):
-    """Without ?legacy=1, /p/ routes redirect to SPA."""
+    """Without ?legacy=1, /p/ routes return SPA shell."""
     resp = client.get('/p/hw_server_frame_detail')
-    assert resp.status_code == 302
-    assert '/spa/hardware/frame' in resp.headers['Location']
+    assert resp.status_code == 200
+    assert 'data-spa-boot' in resp.data.decode('utf-8')
 
 
 def test_list_redirect_to_spa(client):
-    """List pages redirect to corresponding SPA route."""
+    """List pages return SPA shell for direct visits."""
     resp = client.get('/p/hw_server_onpremise')
-    assert resp.status_code == 302
-    assert '/spa/hardware/onpremise' in resp.headers['Location']
+    assert resp.status_code == 200
+    assert 'data-spa-boot' in resp.data.decode('utf-8')
 
 
 def test_legacy_bypass(client):
@@ -64,7 +64,7 @@ def test_gov_ad_detail_routes_render(client):
 
 
 def test_gov_ad_detail_redirect_to_spa(client):
-    """Gov AD detail pages redirect to SPA without ?legacy=1."""
+    """Gov AD detail pages return SPA shell without ?legacy=1."""
     resp = client.get('/p/gov_ad_policy')
-    assert resp.status_code == 302
-    assert '/spa/governance/ad' in resp.headers['Location']
+    assert resp.status_code == 200
+    assert 'data-spa-boot' in resp.data.decode('utf-8')

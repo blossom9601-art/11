@@ -238,7 +238,7 @@
                         }, 700);
                     }
                 }catch(_e){
-                    window.location.href = `/p/2.task_detail.html?id=${encodeURIComponent(rid)}`;
+                    blsSpaNavigate(`/p/2.task_detail.html?id=${encodeURIComponent(rid)}`);
                 }
             }
 
@@ -513,7 +513,7 @@
                         }, 700);
                     }
                 }catch(_e){
-                    window.location.href = '/p/2.task_detail.html';
+                    blsSpaNavigate('/p/2.task_detail.html');
                 }
             }
             function initAddReportBtn(){

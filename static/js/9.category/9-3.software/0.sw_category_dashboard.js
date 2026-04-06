@@ -366,7 +366,7 @@
       var btn = document.getElementById(id);
       if (btn) btn.addEventListener('click', function (e) {
         e.preventDefault();
-        window.location.href = '/p/cat_sw_os';
+        blsSpaNavigate('/p/cat_sw_os');
       });
     });
   }

@@ -1259,7 +1259,7 @@
                         if(v == null) return;
                         params.set(k, v);
                     });
-                    window.location.href = `${base}?${params.toString()}`;
+                    blsSpaNavigate(`${base}?${params.toString()}`);
                 }
                 return; // 링크 클릭 시 다른 처리 중단
             }

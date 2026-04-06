@@ -550,9 +550,9 @@
                         body: JSON.stringify({ key: 'cat_customer_client1_detail', id: row.id, title: row.member_name || row.customer_name || '', subtitle: row.address || '' }),
                         credentials: 'same-origin'
                     }).then(function(res){
-                        window.location.href = href;
+                        blsSpaNavigate(href);
                     }).catch(function(){
-                        window.location.href = href;
+                        blsSpaNavigate(href);
                     });
                 });
             }

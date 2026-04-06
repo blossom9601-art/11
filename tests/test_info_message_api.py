@@ -38,6 +38,7 @@ def admin_client(app, _init_info):
     with c.session_transaction() as sess:
         sess['emp_no'] = 'ADMIN_TEST'
         sess['user_id'] = uid
+        sess['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
         sess['role'] = 'ADMIN'
     return c
 
@@ -58,6 +59,7 @@ def normal_client(app, _init_info):
     with c.session_transaction() as sess:
         sess['emp_no'] = 'USER_TEST'
         sess['user_id'] = uid
+        sess['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
         sess['role'] = 'user'
     return c
 

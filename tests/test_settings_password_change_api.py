@@ -15,6 +15,7 @@ def _seed_auth_user(app, *, emp_no: str, password: str) -> int:
 def _login_session(client, *, user_id: int, emp_no: str) -> None:
     with client.session_transaction() as sess:
         sess["user_id"] = user_id
+        sess['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
         sess["emp_no"] = emp_no
 
 

@@ -257,7 +257,7 @@
             description: row.description || ''
           };
           try { sessionStorage.setItem('project_selected_row', JSON.stringify(payload)); } catch(_e){}
-          window.location.href = DETAIL_URL;
+          blsSpaNavigate(DETAIL_URL);
         }
         return;
       }

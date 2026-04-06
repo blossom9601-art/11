@@ -596,10 +596,10 @@
                         body: JSON.stringify({ key: 'cat_vendor_maintenance_detail', vendor_id: row.id }),
                         credentials: 'same-origin'
                     }).then(function(res){
-                        if(res.ok){ window.location.href = href; }
-                        else { window.location.href = href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id); }
+                        if(res.ok){ blsSpaNavigate(href); }
+                        else { blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id)); }
                     }).catch(function(){
-                        window.location.href = href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id);
+                        blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id));
                     });
                 });
             }

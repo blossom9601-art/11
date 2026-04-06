@@ -8,7 +8,8 @@
 
 	
 
-	if(window.BlossomTab04Interface) return;
+	// SPA re-entry: 이전 sentinel 제거 → IIFE 전체 재정의
+	if(window.BlossomTab04Interface) delete window.BlossomTab04Interface;
 
 	function ifTrim(v){ return String(v == null ? '' : v).trim(); }
 
@@ -697,25 +698,305 @@
 			return '';
 		}
 
+		/* ── 확장 서브테이블 (IP 상세) ── */
+		var IF_CATEGORIES = ['Primary','Secondary','VIP'];
+		var IF_VIP_TYPES = ['LB','HA','Floating','DR','Service'];
+		var IF_VIP_LABELS = { LB:'LB(Load Balancer)', HA:'HA(Active-Standby)', Floating:'Floating', DR:'DR', Service:'Service' };
+		var IF_PROTOCOLS = ['TCP','UDP','ICMP','SCTP'];
+		var IF_STATUSES = ['LISTEN','CLOSED','RESTRICTED','FILTERED','UNKNOWN'];
+		var IF_ACCESS_CONTROLS = ['ANY','INTERNAL','PRIVATE','VPN','MGMT','DENY'];
+
+		function ifDetSelectHtml(name, options, selected, labelMap, disabled){
+			var html = '<select class="if-det-select search-select" data-det-col="'+escAttr(name)+'" data-searchable-scope="page" data-placeholder="선택" data-allow-clear="true"'+(disabled?' disabled':'')+' >';
+			html += '<option value="">선택</option>';
+			for(var i=0;i<options.length;i++){
+				var v = options[i];
+				var lab = (labelMap && labelMap[v]) ? labelMap[v] : v;
+				html += '<option value="'+escAttr(v)+'"'+(v===selected?' selected':'')+'>'+escHtml(lab)+'</option>';
+			}
+			html += '</select>';
+			return html;
+		}
+
+		function ifDetGuessCategory(assignValue){
+			var a = ifTrim(assignValue).toLowerCase();
+			if(!a || a==='-') return 'Primary';
+			// VIP 패턴 감지
+			if(a.indexOf('vip')>=0 || a.indexOf('가상')>=0 || a.indexOf('virtual')>=0) return 'VIP';
+			// Secondary 패턴 감지
+			if(a.indexOf('secondary')>=0 || a.indexOf('보조')>=0 || a.indexOf('sub')>=0 || a.indexOf('backup')>=0) return 'Secondary';
+			return 'Primary';
+		}
+
+		async function ifDetApiList(interfaceId){
+			var r = await fetch('/api/hw-interface-details?interface_id='+encodeURIComponent(String(interfaceId)), { method:'GET', headers:{'Accept':'application/json'} });
+			var j = await r.json().catch(function(){ return null; });
+			if(!r.ok) throw new Error((j&&j.error)?j.error:('HTTP '+r.status));
+			return j;
+		}
+		async function ifDetApiCreate(payload){
+			var r = await fetch('/api/hw-interface-details', { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(payload||{}) });
+			var j = await r.json().catch(function(){ return null; });
+			if(!r.ok) throw new Error((j&&j.error)?j.error:('HTTP '+r.status));
+			return j;
+		}
+		async function ifDetApiUpdate(id, payload){
+			var r = await fetch('/api/hw-interface-details/'+encodeURIComponent(String(id)), { method:'PUT', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(payload||{}) });
+			var j = await r.json().catch(function(){ return null; });
+			if(!r.ok) throw new Error((j&&j.error)?j.error:('HTTP '+r.status));
+			return j;
+		}
+		async function ifDetApiDelete(id){
+			var r = await fetch('/api/hw-interface-details/'+encodeURIComponent(String(id)), { method:'DELETE', headers:{'Accept':'application/json'} });
+			var j = await r.json().catch(function(){ return null; });
+			if(!r.ok) throw new Error((j&&j.error)?j.error:('HTTP '+r.status));
+			return j;
+		}
+
+		function ifDetBuildSubRowHtml(d, isEdit){
+			var cat = d.category || 'Primary';
+			var isExcluded = d.is_excluded ? true : false;
+			var excludedClass = isExcluded ? ' if-det-excluded' : '';
+			if(isEdit){
+				return '<tr data-det-id="'+(d.id||'')+'"'+(isExcluded?' data-excluded="1"':'')+' class="'+excludedClass+'">' 
+					+'<td>'+ifDetSelectHtml('category', IF_CATEGORIES, cat)+'</td>'
+					+'<td>'+escHtml(d.ip_address||'-')+'</td>'
+					+'<td>'+escHtml(d.protocol||'-')+'</td>'
+					+'<td>'+escHtml(d.port||'-')+'</td>'
+					+'<td>'+escHtml(d.pid||'-')+'</td>'
+					+'<td>'+escHtml(d.process||'-')+'</td>'
+					+'<td>'+escHtml(d.status||'-')+'</td>'
+					+'<td><input type="text" class="if-det-input" data-det-col="service_name" value="'+escAttr(d.service_name||'')+'" placeholder="서비스명"></td>'
+					+'<td><input type="text" class="if-det-input" data-det-col="description" value="'+escAttr(d.description||'')+'" placeholder="설명"></td>'
+					+'<td class="table-actions">'
+						+'<button class="action-btn js-if-det-save" type="button" title="저장"><img src="/static/image/svg/save.svg" alt="저장" class="action-icon"></button>'
+						+'<button class="action-btn js-if-det-exclude" type="button" title="'+(isExcluded?'예외 해제':'예외 처리')+'"><img src="/static/image/svg/interface/free-icon-font-loading.svg" alt="예외" class="action-icon"></button>'
+					+'</td></tr>';
+			}
+			return '<tr data-det-id="'+(d.id||'')+'"'+(isExcluded?' data-excluded="1"':'')+' class="'+excludedClass+'">' 
+				+'<td>'+escHtml(cat||'-')+'</td>'
+				+'<td>'+escHtml(d.ip_address||'-')+'</td>'
+				+'<td>'+escHtml(d.protocol||'-')+'</td>'
+				+'<td>'+escHtml(d.port||'-')+'</td>'
+				+'<td>'+escHtml(d.pid||'-')+'</td>'
+				+'<td>'+escHtml(d.process||'-')+'</td>'
+				+'<td>'+escHtml(d.status||'-')+'</td>'
+				+'<td>'+escHtml(d.service_name||'-')+'</td>'
+				+'<td>'+escHtml(d.description||'-')+'</td>'
+				+'<td class="table-actions">'
+					+'<button class="action-btn js-if-det-edit" type="button" title="편집"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon"></button>'
+					+'<button class="action-btn js-if-det-exclude" type="button" title="'+(isExcluded?'예외 해제':'예외 처리')+'"><img src="/static/image/svg/interface/free-icon-font-loading.svg" alt="예외" class="action-icon"></button>'
+				+'</td></tr>';
+		}
+
+		function ifDetBuildExpandHtml(items, interfaceId, assignValue){
+			var html = '<div class="if-expand-detail">';
+			html += '<div class="if-expand-header">';
+			html += '<button class="action-btn if-det-refresh-btn" type="button" title="새로고침" data-iface-id="'+escAttr(String(interfaceId))+'"><img src="/static/image/svg/interface/free-icon-font-refresh.svg" alt="새로고침" class="action-icon"></button>';
+			html += '</div>';
+			html += '<table class="if-det-table">';
+			html += '<colgroup>';
+			html += '<col style="width:7%">';   /* 구분 */
+			html += '<col style="width:7%">';   /* IP주소 */
+			html += '<col style="width:7%">';   /* 프로토콜 */
+			html += '<col style="width:7%">';   /* 포트 */
+			html += '<col style="width:7%">';   /* PID */
+			html += '<col style="width:13%">';  /* 프로세스 */
+			html += '<col style="width:7%">';   /* 상태 */
+			html += '<col style="width:13%">';  /* 서비스명 */
+			html += '<col style="width:25%">';  /* 설명 */
+			html += '<col style="width:7%">';   /* 관리 */
+			html += '</colgroup>';
+			html += '<thead><tr>';
+			html += '<th>구분</th><th>IP주소</th><th>프로토콜</th><th>포트</th>';
+			html += '<th>PID</th><th>프로세스</th><th>상태</th><th>서비스명</th><th>설명</th><th>관리</th>';
+			html += '</tr></thead><tbody>';
+			for(var i=0; i<(items||[]).length; i++){
+				html += ifDetBuildSubRowHtml(items[i], false);
+			}
+			html += '</tbody></table>';
+			if(!(items && items.length)){
+				html += '<div class="if-det-empty">에이전트 수집 데이터가 없습니다.</div>';
+			}
+			html += '</div>';
+			return html;
+		}
+
+		function ifDetReadRowPayload(detTr){
+			var payload = {};
+			var selects = detTr.querySelectorAll('.if-det-select');
+			for(var i=0;i<selects.length;i++){
+				var col = selects[i].getAttribute('data-det-col');
+				if(col) payload[col] = ifTrim(selects[i].value);
+			}
+			var inputs = detTr.querySelectorAll('.if-det-input');
+			for(var j=0;j<inputs.length;j++){
+				var col2 = inputs[j].getAttribute('data-det-col');
+				if(col2) payload[col2] = ifTrim(inputs[j].value);
+			}
+			return payload;
+		}
+
+		function ifDetSyncVipType(detTr){
+			var catSel = detTr.querySelector('[data-det-col="category"]');
+			var vipSel = detTr.querySelector('[data-det-col="vip_type"]');
+			if(!catSel || !vipSel) return;
+			var isVip = catSel.value === 'VIP';
+			vipSel.disabled = !isVip;
+			if(!isVip) vipSel.value = '';
+			// 검색 가능 셀렉트 래퍼 동기화 (disabled 상태 반영)
+			try{ if(window.BlossomSearchableSelect){ window.BlossomSearchableSelect.enhance(vipSel); } }catch(_){}
+		}
+
+		function ifDetEnhanceSearchSelects(root){
+			try{
+				if(!window.BlossomSearchableSelect) return;
+				var selects = root.querySelectorAll ? root.querySelectorAll('.search-select') : [];
+				for(var i=0;i<selects.length;i++){
+					try{ window.BlossomSearchableSelect.enhance(selects[i]); }catch(_){}
+				}
+			}catch(_){}
+		}
+
+		function ifDetLoadExpand(tr, forceRefresh){
+			var expRow = tr._expandRow;
+			if(!expRow) return;
+			var cell = expRow.querySelector('.if-expand-cell');
+			if(!cell) return;
+			// 이미 로드된 상태면 재렌더하지 않음 (강제 새로고침 제외)
+			if(!forceRefresh && cell.querySelector('.if-expand-detail')) return;
+			var interfaceId = getRowId(tr);
+			if(!interfaceId){
+				cell.innerHTML = ifDetBuildExpandHtml([], '', '');
+				ifDetBindEvents(cell, tr);
+				return;
+			}
+			// API에서 에이전트 수집 데이터 로드
+			cell.innerHTML = '<div class="if-det-loading">데이터를 불러오는 중...</div>';
+			ifDetApiList(interfaceId).then(function(res){
+				var items = (res && res.items) ? res.items : [];
+				cell.innerHTML = ifDetBuildExpandHtml(items, interfaceId, '');
+				ifDetBindEvents(cell, tr);
+			}).catch(function(err){
+				cell.innerHTML = ifDetBuildExpandHtml([], interfaceId, '');
+				ifDetBindEvents(cell, tr);
+				try{ console.error('[if-det] load failed', err); }catch(_){}
+			});
+		}
+
+		function ifDetBindEvents(cell, parentTr){
+			// 클릭 이벤트 위임
+			cell.addEventListener('click', function(ev){
+				var btn = ev.target.closest('.js-if-det-save, .js-if-det-edit, .js-if-det-exclude, .if-det-refresh-btn');
+				if(!btn) return;
+				var detTr = btn.closest('tr');
+
+				// 새로고침 버튼
+				if(btn.classList.contains('if-det-refresh-btn')){
+					ifDetLoadExpand(parentTr, true);
+					return;
+				}
+
+				// 저장 (서비스명, 설명, 구분만 편집 가능)
+				if(btn.classList.contains('js-if-det-save') && detTr){
+					var payload = ifDetReadRowPayload(detTr);
+					var detId = detTr.getAttribute('data-det-id');
+					(async function(){
+						try{
+							btn.disabled = true;
+							if(detId){
+								var saved = await ifDetApiUpdate(parseInt(detId,10), payload);
+								if(saved && saved.id){
+									detTr.outerHTML = ifDetBuildSubRowHtml(saved, false);
+								}
+							}
+						}catch(err){
+							try{ console.error('[if-det] save failed', err); }catch(_){}
+						}finally{
+							try{ btn.disabled = false; }catch(_){}
+						}
+					})();
+					return;
+				}
+
+				// 편집 (구분, 서비스명, 설명만 입력 가능으로 전환)
+				if(btn.classList.contains('js-if-det-edit') && detTr){
+					var dId = detTr.getAttribute('data-det-id');
+					var tds = detTr.querySelectorAll('td');
+					var d = {
+						id: dId,
+						category: ifTrim(tds[0] ? tds[0].textContent : ''),
+						ip_address: ifTrim(tds[1] ? tds[1].textContent : ''),
+						protocol: ifTrim(tds[2] ? tds[2].textContent : ''),
+						port: ifTrim(tds[3] ? tds[3].textContent : ''),
+						pid: ifTrim(tds[4] ? tds[4].textContent : ''),
+						process: ifTrim(tds[5] ? tds[5].textContent : ''),
+						status: ifTrim(tds[6] ? tds[6].textContent : ''),
+						service_name: ifTrim(tds[7] ? tds[7].textContent : ''),
+						description: ifTrim(tds[8] ? tds[8].textContent : ''),
+						is_excluded: detTr.hasAttribute('data-excluded') ? 1 : 0
+					};
+					for(var dk in d){ if(d[dk]==='-') d[dk]=''; }
+					detTr.outerHTML = ifDetBuildSubRowHtml(d, true);
+					var newDetTr = cell.querySelector('tr[data-det-id="'+escAttr(dId||'')+'"]');
+					if(newDetTr) ifDetEnhanceSearchSelects(newDetTr);
+					return;
+				}
+
+				// 예외 토글
+				if(btn.classList.contains('js-if-det-exclude') && detTr){
+					var excId = detTr.getAttribute('data-det-id');
+					if(!excId) return;
+					var isCurrentlyExcluded = detTr.hasAttribute('data-excluded');
+					var newExcluded = isCurrentlyExcluded ? 0 : 1;
+					(async function(){
+						try{
+							btn.disabled = true;
+							var saved = await ifDetApiUpdate(parseInt(excId,10), { is_excluded: newExcluded });
+							if(saved && saved.id){
+								detTr.outerHTML = ifDetBuildSubRowHtml(saved, false);
+							}
+						}catch(err){
+							try{ console.error('[if-det] exclude toggle failed', err); }catch(_){}
+						}finally{
+							try{ btn.disabled = false; }catch(_){}
+						}
+					})();
+					return;
+				}
+			});
+		}
+
 		function renderSavedRow(item){
 			var tr = document.createElement('tr');
 			if(item && item.id != null) setRowId(tr, item.id);
 			var peerHtml = (item && item.peer) ? ifPeerCellHtmlFromWorkName(item.peer) : '-';
+			var expandBtn = '<button class="action-btn js-if-expand" type="button" title="확장" aria-label="확장"><img src="/static/image/svg/free-icon-font-apps-add.svg" alt="확장" class="action-icon"></button> ';
 			tr.innerHTML = [
 				'<td><input type="checkbox" class="if-row-check" aria-label="행 선택"></td>',
 				'<td data-col="slot">'+escHtml(item && item.slot ? item.slot : '-')+'</td>',
 				'<td data-col="port">'+escHtml(item && item.port ? item.port : '-')+'</td>',
 				'<td data-col="iface">'+escHtml(item && item.iface ? item.iface : '-')+'</td>',
 				'<td data-col="serial">'+escHtml(item && item.serial ? item.serial : '-')+'</td>',
-				'<td data-col="assign">'+escHtml(item && item.assign ? item.assign : '-')+'</td>',
 				'<td data-col="peer">'+peerHtml+'</td>',
 				'<td data-col="peer_port">'+escHtml(item && item.peer_port ? item.peer_port : '-')+'</td>',
 				'<td data-col="remark">'+escHtml(item && item.remark ? item.remark : '-')+'</td>',
 				'<td class="system-actions table-actions">'
+					+expandBtn
 					+'<button class="action-btn js-if-toggle" data-action="edit" type="button" title="편집" aria-label="편집"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon"></button>'
-					+'<button class="action-btn danger js-if-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button>'
 				+'</td>'
 			].join('');
+			// 확장 행 생성
+			var colCount = 9; // checkbox + 7 cols + actions
+			var expTr = document.createElement('tr');
+			expTr.className = 'if-expand-row';
+			expTr.style.display = 'none';
+			var expTd = document.createElement('td');
+			expTd.setAttribute('colspan', String(colCount));
+			expTd.className = 'if-expand-cell';
+			expTr.appendChild(expTd);
+			tr._expandRow = expTr;
+			tr._expandAttached = false;
 			return tr;
 		}
 
@@ -755,7 +1036,15 @@
 				var tbody = table.querySelector('tbody');
 				if(!tbody) return;
 				tbody.innerHTML = '';
-				items.forEach(function(it){ tbody.appendChild(renderSavedRow(it)); });
+				items.forEach(function(it){
+					var tr = renderSavedRow(it);
+					tbody.appendChild(tr);
+					// 확장 행 부착
+					if(tr._expandRow && !tr._expandAttached){
+						tbody.appendChild(tr._expandRow);
+						tr._expandAttached = true;
+					}
+				});
 				updateEmptyState();
 				// SAN/네트워크: 연결된 상대 시스템에서 serial/assign 자동 동기화
 				await ifSyncAllPeerFields();
@@ -792,7 +1081,6 @@
 				port: readCell(tr, 'port'),
 				iface: readCell(tr, 'iface'),
 				serial: readCell(tr, 'serial'),
-				assign: readCell(tr, 'assign'),
 				peer: peerWorkName,
 				peer_port: readCell(tr, 'peer_port'),
 				remark: readCell(tr, 'remark')
@@ -828,13 +1116,13 @@
 			var tbody=table.querySelector('tbody');
 			if(!tbody) return [];
 			return Array.from(tbody.querySelectorAll('tr')).filter(function(tr){
-				return !(tr.hasAttribute('data-hidden') || tr.style.display==='none');
+				return !tr.classList.contains('if-expand-row') && !(tr.hasAttribute('data-hidden') || tr.style.display==='none');
 			});
 		}
 		function ifSavedVisibleRows(){ return ifVisibleRows().filter(ifRowSaved); }
 		function ifExportCSV(onlySelected){
 			var tbody = table.querySelector('tbody'); if(!tbody) return;
-			var headers = ['슬롯','포트','인터페이스','UUID','할당값','연결 시스템','연결 포트','비고'];
+			var headers = ['슬롯','포트','인터페이스','UUID','연결 시스템','연결 포트','비고'];
 			var trs = ifSavedVisibleRows();
 			if(onlySelected){
 				trs = trs.filter(function(tr){ var cb = tr.querySelector('.if-row-check'); return cb && cb.checked; });
@@ -852,7 +1140,7 @@
 			}
 			var rows = trs.map(function(tr){
 				function t(col){ var td = tr.querySelector('[data-col="'+col+'"]'); if(!td) return ''; return readText(td.cloneNode(true)); }
-				return ['slot','port','iface','serial','assign','peer','peer_port','remark'].map(t);
+				return ['slot','port','iface','serial','peer','peer_port','remark'].map(t);
 			});
 			var lines = [headers].concat(rows).map(function(arr){ return arr.map(ifEscapeCSV).join(','); });
 			var csv = '\uFEFF' + lines.join('\r\n');
@@ -908,7 +1196,7 @@ pageSize:10 };
 		var btnNext = document.getElementById('if-next');
 		var btnLast = document.getElementById('if-last');
 
-		function ifRows(){ var tbody = table.querySelector('tbody'); return tbody? Array.from(tbody.querySelectorAll('tr')) : []; }
+		function ifRows(){ var tbody = table.querySelector('tbody'); return tbody? Array.from(tbody.querySelectorAll('tr')).filter(function(tr){ return !tr.classList.contains('if-expand-row'); }) : []; }
 		function ifTotal(){ return ifRows().length; }
 		function ifPages(){ var total=ifTotal(); return Math.max(1, Math.ceil(total / ifState.pageSize)); }
 		function ifClampPage(){ var pages=ifPages(); if(ifState.page>pages) ifState.page=pages; if(ifState.page<1) ifState.page=1; }
@@ -953,11 +1241,18 @@ pageSize:10 };
 				if(visible){ tr.removeAttribute('data-hidden'); } else { tr.setAttribute('data-hidden','1'); }
 				var cb = tr.querySelector('.if-row-check');
 				if(cb){ tr.classList.toggle('selected', !!cb.checked && visible); }
+				// 확장 행도 부모 행 가시성에 따라 토글
+				if(tr._expandRow){
+					if(!visible){
+						tr._expandRow.style.display = 'none';
+					}
+					// visible이면 확장 행의 이전 열림 상태 유지 (이미 열려있으면 보이게)
+				}
 			});
 			ifUpdatePaginationUI();
 			var sa=document.getElementById('if-select-all');
 			if(sa){
-				var visChecks = table.querySelectorAll('tbody tr:not([data-hidden]) .if-row-check');
+				var visChecks = table.querySelectorAll('tbody tr:not([data-hidden]):not(.if-expand-row) .if-row-check');
 				if(visChecks.length){ sa.checked = Array.prototype.every.call(visChecks, function(c){ return c.checked; }); }
 				else { sa.checked=false; }
 			}
@@ -974,14 +1269,14 @@ pageSize:10 };
 
 		function updateEmptyState(){
 			try{
-				var hasRows = table.querySelector('tbody tr') != null;
+				var hasRows = table.querySelector('tbody tr:not(.if-expand-row)') != null;
 				if(empty){ empty.hidden = !!hasRows; empty.style.display = hasRows ? 'none' : ''; }
 			}catch(_){
 				if(empty){ empty.hidden = false; empty.style.display = ''; }
 			}
 			var csvBtn = document.getElementById('if-download-btn');
 			if(csvBtn){
-				var has = !!table.querySelector('tbody tr');
+				var has = !!table.querySelector('tbody tr:not(.if-expand-row)');
 				csvBtn.disabled = !has;
 				csvBtn.setAttribute('aria-disabled', (!has).toString());
 				csvBtn.title = has? 'CSV 다운로드' : 'CSV 내보낼 항목이 없습니다.';
@@ -1090,54 +1385,155 @@ pageSize:10 };
 		})();
 
 		
-		var addBtn = document.getElementById('if-row-add');
-		if(addBtn){
-			addBtn.addEventListener('click', function(){
-				var tbody = table.querySelector('tbody'); if(!tbody) return;
-				var tr = document.createElement('tr');
-				tr.innerHTML = [
-					'<td><input type="checkbox" class="if-row-check" aria-label="행 선택"></td>',
-					'<td data-col="slot"><input type="text" placeholder="슬롯"></td>',
-					'<td data-col="port"><input type="text" placeholder="포트"></td>',
-					'<td data-col="iface"><input type="text" placeholder="인터페이스"></td>',
-					'<td data-col="serial"><input type="text" placeholder="UUID"></td>',
-					'<td data-col="assign"><input type="text" placeholder="할당값"></td>',
-					'<td data-col="peer">'
-						+'<select class="search-select" data-searchable-scope="page" data-placeholder="연결 시스템 선택" data-allow-clear="true">'
-							+'<option value="" selected>선택</option>'
-						+'</select>'
-					+'</td>',
-					'<td data-col="peer_port">'
-						+'<select class="search-select" data-searchable-scope="page" data-placeholder="연결 포트 선택" data-allow-clear="true">'
-							+'<option value="" selected>선택</option>'
-						+'</select>'
-					+'</td>',
-					'<td data-col="remark"><input type="text" placeholder="비고"></td>',
-					'<td class="system-actions table-actions">'
-						+'<button class="action-btn js-if-toggle" data-action="save" type="button" title="저장" aria-label="저장"><img src="/static/image/svg/save.svg" alt="저장" class="action-icon"></button>'
-						+'<button class="action-btn danger js-if-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button>'
-					+'</td>'
-				].join('');
-				// SAN/네트워크: serial, assign 비활성화 (iface는 직접 입력)
-				if(ifIsPeerLinkedScope(scopeKey)){
-					['serial','assign'].forEach(function(col){
-						var inp = tr.querySelector('td[data-col="'+col+'"] input');
-						if(inp){ inp.disabled = true; inp.placeholder = '자동 연동'; inp.title = '연결 시스템에서 자동으로 가져옵니다'; }
-					});
-				}
-				tbody.appendChild(tr);
-
-				ifEnsureSearchableSoon(tr);
-				ifEnsurePeerCache().then(function(){
-					var peerSel = tr.querySelector('td[data-col="peer"] select');
-					ifPopulatePeerSelect(peerSel, ifPeerCache.items, '');
-					ifUpdatePeerPortSelectForRow(tr);
-					ifEnsureSearchableSoon(tr);
-				}).catch(function(){});
-
-				try{ ifGoLast(); }catch(_){ }
-				updateEmptyState();
+		/* ── 새로고침 버튼: 현재 페이지 데이터 다시 로드 ── */
+		var refreshBtn = document.getElementById('if-refresh-btn');
+		if(refreshBtn){
+			refreshBtn.addEventListener('click', function(){
+				ifLoadPage(ifState.page);
 			});
+		}
+
+		/* ── 즐겨찾기 필터: 확장 행이 열린(관심) 행만 표시 ── */
+		var _ifFavoriteActive = false;
+		var favoriteBtn = document.getElementById('if-favorite-btn');
+		if(favoriteBtn){
+			favoriteBtn.addEventListener('click', function(){
+				_ifFavoriteActive = !_ifFavoriteActive;
+				favoriteBtn.classList.toggle('active', _ifFavoriteActive);
+				var tbody = table.querySelector('tbody');
+				if(!tbody) return;
+				var trs = Array.from(tbody.querySelectorAll('tr:not(.if-expand-row)'));
+				trs.forEach(function(tr){
+					if(!_ifFavoriteActive){
+						tr.style.display = '';
+						if(tr._expandRow) tr._expandRow.style.display = 'none';
+						return;
+					}
+					var hasExpand = tr._expandRow && tr._expandRow.style.display !== 'none';
+					tr.style.display = hasExpand ? '' : 'none';
+					if(tr._expandRow && !hasExpand) tr._expandRow.style.display = 'none';
+				});
+			});
+		}
+
+		/* ── 예외 리스트 모달 ── */
+		(function initExceptionListModal(){
+			var modalId = 'if-exception-modal';
+			// 모달 HTML 동적 생성
+			if(!document.getElementById(modalId)){
+				var mHtml = '<div class="modal-overlay" id="'+modalId+'" role="dialog" aria-modal="true" aria-hidden="true">'
+					+'<div class="modal-box" style="max-width:800px;width:90%;">'
+						+'<div class="modal-header"><h3>예외 리스트</h3>'
+							+'<button class="modal-close js-exc-close" type="button" aria-label="닫기">&times;</button>'
+						+'</div>'
+						+'<div class="modal-body">'
+							+'<table class="hw-table" id="if-exc-table">'
+								+'<thead><tr><th>구분</th><th>IP주소</th><th>프로토콜</th><th>포트</th><th>PID</th><th>프로세스</th><th>상태</th><th>서비스명</th><th>설명</th><th>관리</th></tr></thead>'
+								+'<tbody></tbody>'
+							+'</table>'
+							+'<div id="if-exc-empty" class="if-det-empty">예외 항목이 없습니다.</div>'
+						+'</div>'
+					+'</div>'
+				+'</div>';
+				document.body.insertAdjacentHTML('beforeend', mHtml);
+			}
+			var excListBtn = document.getElementById('if-exception-list-btn');
+			if(excListBtn){
+				excListBtn.addEventListener('click', function(){
+					ifLoadExceptionList();
+					var m = document.getElementById(modalId);
+					if(m){ document.body.classList.add('modal-open'); m.classList.add('show'); m.setAttribute('aria-hidden','false'); }
+				});
+			}
+			// close handlers
+			document.addEventListener('click', function(ev){
+				if(ev.target.classList && ev.target.classList.contains('js-exc-close')){
+					var m = document.getElementById(modalId);
+					if(m){ document.body.classList.remove('modal-open'); m.classList.remove('show'); m.setAttribute('aria-hidden','true'); }
+				}
+				if(ev.target && ev.target.id === modalId){
+					document.body.classList.remove('modal-open'); ev.target.classList.remove('show'); ev.target.setAttribute('aria-hidden','true');
+				}
+				// 복원 버튼
+				var restoreBtn = ev.target.closest('.js-if-exc-restore');
+				if(restoreBtn){
+					var excDetId = restoreBtn.getAttribute('data-det-id');
+					if(!excDetId) return;
+					(async function(){
+						try{
+							restoreBtn.disabled = true;
+							var saved = await ifDetApiUpdate(parseInt(excDetId,10), { is_excluded: 0 });
+							if(saved){
+								var row = restoreBtn.closest('tr');
+								if(row && row.parentNode) row.parentNode.removeChild(row);
+								var excTbody = document.querySelector('#if-exc-table tbody');
+								var excEmpty = document.getElementById('if-exc-empty');
+								if(excTbody && !excTbody.querySelector('tr') && excEmpty) excEmpty.style.display = '';
+							}
+						}catch(err){
+							try{ console.error('[if-exc] restore failed', err); }catch(_){}
+						}finally{
+							try{ restoreBtn.disabled = false; }catch(_){}
+						}
+					})();
+				}
+			});
+			document.addEventListener('keydown', function(e){
+				if(e.key==='Escape'){
+					var m = document.getElementById(modalId);
+					if(m && m.classList.contains('show')){ document.body.classList.remove('modal-open'); m.classList.remove('show'); m.setAttribute('aria-hidden','true'); }
+				}
+			});
+		})();
+
+		async function ifLoadExceptionList(){
+			var excTbody = document.querySelector('#if-exc-table tbody');
+			var excEmpty = document.getElementById('if-exc-empty');
+			if(!excTbody) return;
+			excTbody.innerHTML = '';
+			if(excEmpty) excEmpty.style.display = 'none';
+			try{
+				var assetId = getAssetId(storagePrefix);
+				if(!assetId || !scopeKey) return;
+				// 메인 테이블의 모든 interface id에서 예외 항목 가져오기
+				var mainRows = ifVisibleRows();
+				var allExcluded = [];
+				for(var i=0; i<mainRows.length; i++){
+					var ifId = getRowId(mainRows[i]);
+					if(!ifId) continue;
+					try{
+						var res = await ifDetApiList(ifId);
+						var items = (res && res.items) ? res.items : [];
+						for(var j=0; j<items.length; j++){
+							if(items[j].is_excluded) allExcluded.push(items[j]);
+						}
+					}catch(_){}
+				}
+				if(allExcluded.length === 0){
+					if(excEmpty) excEmpty.style.display = '';
+					return;
+				}
+				var html = '';
+				for(var k=0; k<allExcluded.length; k++){
+					var d = allExcluded[k];
+					html += '<tr>'
+						+'<td>'+escHtml(d.category||'-')+'</td>'
+						+'<td>'+escHtml(d.ip_address||'-')+'</td>'
+						+'<td>'+escHtml(d.protocol||'-')+'</td>'
+						+'<td>'+escHtml(d.port||'-')+'</td>'
+						+'<td>'+escHtml(d.pid||'-')+'</td>'
+						+'<td>'+escHtml(d.process||'-')+'</td>'
+						+'<td>'+escHtml(d.status||'-')+'</td>'
+						+'<td>'+escHtml(d.service_name||'-')+'</td>'
+						+'<td>'+escHtml(d.description||'-')+'</td>'
+						+'<td><button class="action-btn js-if-exc-restore" data-det-id="'+d.id+'" type="button" title="복원"><img src="/static/image/svg/interface/free-icon-font-refresh.svg" alt="복원" class="action-icon"></button></td>'
+					+'</tr>';
+				}
+				excTbody.innerHTML = html;
+			}catch(err){
+				try{ console.error('[if-exc] load list failed', err); }catch(_){}
+				if(excEmpty) excEmpty.style.display = '';
+			}
 		}
 
 		
@@ -1178,6 +1574,20 @@ pageSize:10 };
 
 		
 		table.addEventListener('click', function(ev){
+			// 확장 버튼 처리
+			var expandBtn = ev.target.closest('.js-if-expand');
+			if(expandBtn){
+				var expTr = expandBtn.closest('tr');
+				if(!expTr) return;
+				var expRow = expTr._expandRow;
+				if(!expRow) return;
+				var isOpen = expRow.style.display !== 'none';
+				expRow.style.display = isOpen ? 'none' : '';
+				expandBtn.classList.toggle('if-expanded', !isOpen);
+				if(!isOpen) ifDetLoadExpand(expTr);
+				return;
+			}
+
 			var target = ev.target.closest('.js-if-del, .js-if-edit, .js-if-commit, .js-if-toggle');
 			if(!target) return;
 			var tr = ev.target.closest('tr');
@@ -1196,6 +1606,8 @@ pageSize:10 };
 					var id = getRowId(delTr);
 					if(id){
 						apiDelete(id).then(function(){
+							// 확장 행도 제거
+							if(delTr._expandRow && delTr._expandRow.parentNode){ delTr._expandRow.parentNode.removeChild(delTr._expandRow); }
 							if(delTr && delTr.parentNode){ delTr.parentNode.removeChild(delTr); }
 							updateEmptyState();
 							// 양방향 연결 해제
@@ -1211,6 +1623,7 @@ pageSize:10 };
 						});
 						return;
 					}
+					if(delTr._expandRow && delTr._expandRow.parentNode){ delTr._expandRow.parentNode.removeChild(delTr._expandRow); }
 					if(delTr && delTr.parentNode){ delTr.parentNode.removeChild(delTr); }
 					updateEmptyState();
 				});
@@ -1238,10 +1651,9 @@ pageSize:10 };
 				toInput('port', '포트');
 				toInput('iface', '인터페이스');
 				toInput('serial', 'UUID');
-				toInput('assign', '할당값');
-				// SAN/네트워크: serial, assign 비활성화 (iface는 직접 입력)
+				// SAN/네트워크: serial 비활성화 (iface는 직접 입력)
 				if(ifIsPeerLinkedScope(scopeKey)){
-					['serial','assign'].forEach(function(col){
+					['serial'].forEach(function(col){
 						var inp = tr.querySelector('td[data-col="'+col+'"] input');
 						if(inp){ inp.disabled = true; inp.placeholder = '자동 연동'; inp.title = '연결 시스템에서 자동으로 가져옵니다'; }
 					});
@@ -1335,12 +1747,32 @@ pageSize:10 };
 							toggleBtn2.setAttribute('data-action','edit');
 							toggleBtn2.title='편집'; toggleBtn2.setAttribute('aria-label','편집');
 							toggleBtn2.innerHTML='<img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon">';
+							// 확장 버튼 추가 (아직 없으면)
+							if(!tr.querySelector('.js-if-expand')){
+								var actTd = toggleBtn2.closest('.table-actions');
+								if(actTd) actTd.insertAdjacentHTML('afterbegin', '<button class="action-btn js-if-expand" type="button" title="확장" aria-label="확장"><img src="/static/image/svg/free-icon-font-apps-add.svg" alt="확장" class="action-icon"></button> ');
+							}
 						}else{
 							var actions2 = tr.querySelector('.table-actions');
 							if(actions2){
 								actions2.classList.add('system-actions');
-								actions2.innerHTML = '<button class="action-btn js-if-toggle" data-action="edit" type="button" title="편집" aria-label="편집"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon"></button> <button class="action-btn danger js-if-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button>';
+								actions2.innerHTML = '<button class="action-btn js-if-expand" type="button" title="확장" aria-label="확장"><img src="/static/image/svg/free-icon-font-apps-add.svg" alt="확장" class="action-icon"></button> <button class="action-btn js-if-toggle" data-action="edit" type="button" title="편집" aria-label="편집"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon"></button> <button class="action-btn danger js-if-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button>';
 							}
+						}
+						// 확장 행 생성 (아직 없으면)
+						if(!tr._expandRow){
+							var colCount2 = 10;
+							var expTr2 = document.createElement('tr');
+							expTr2.className = 'if-expand-row';
+							expTr2.style.display = 'none';
+							var expTd2 = document.createElement('td');
+							expTd2.setAttribute('colspan', String(colCount2));
+							expTd2.className = 'if-expand-cell';
+							expTr2.appendChild(expTd2);
+							tr._expandRow = expTr2;
+							// 부모 행 아래에 삽입
+							if(tr.nextSibling) tr.parentNode.insertBefore(expTr2, tr.nextSibling);
+							else tr.parentNode.appendChild(expTr2);
 						}
 						updateEmptyState();
 						// 양방향 연결 동기화: 상대방 시스템 인터페이스 자동 매핑

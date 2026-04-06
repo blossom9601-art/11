@@ -346,7 +346,7 @@
           var msg = String((err && err.message) ? err.message : err || '');
           if(msg.indexOf('찾을 수 없습니다') !== -1 || msg.indexOf('HTTP 404') !== -1){
             clearDirectorSelection();
-            try{ window.location.href = '/p/hw_san_director'; }catch(_e3){ }
+            try{ blsSpaNavigate('/p/hw_san_director'); }catch(_e3){ }
           }
         }catch(_e4){ }
       }

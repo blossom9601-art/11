@@ -38,6 +38,86 @@
 /* Reveal page: all DOM content is parsed before this script, so show immediately */
 try { document.body.classList.add('bls-ready'); } catch(_e){}
 
+/* §0 ── FK Session Cache ───────────────────────────────────── */
+/**
+ * 하드웨어 list/detail 페이지들이 공유하는 FK 데이터 sessionStorage 캐시.
+ * 각 페이지의 loadFkSource()에서 window.__blsFkCache.get(url) 로 조회,
+ * 캐시 히트 시 네트워크 호출 없이 즉시 반환.
+ */
+(function(){
+    var FK_CACHE_PREFIX = 'blsFk:';
+    var FK_TTL_MS = 10 * 60 * 1000; // 10분
+
+    function _sGet(key){
+        try { return sessionStorage.getItem(key); } catch(_e){ return null; }
+    }
+    function _sSet(key, val){
+        try { sessionStorage.setItem(key, val); } catch(_e){}
+    }
+    function _sRemove(key){
+        try { sessionStorage.removeItem(key); } catch(_e){}
+    }
+
+    /** 캐시에서 FK 데이터 조회. 만료 시 null 반환. */
+    function get(url){
+        var raw = _sGet(FK_CACHE_PREFIX + url);
+        if(!raw) return null;
+        try {
+            var entry = JSON.parse(raw);
+            if(Date.now() - entry.ts > FK_TTL_MS){
+                _sRemove(FK_CACHE_PREFIX + url);
+                return null;
+            }
+            return entry.data;
+        } catch(_e){
+            _sRemove(FK_CACHE_PREFIX + url);
+            return null;
+        }
+    }
+
+    /** FK API 응답 데이터를 캐시에 저장. */
+    function set(url, data){
+        try {
+            _sSet(FK_CACHE_PREFIX + url, JSON.stringify({ ts: Date.now(), data: data }));
+        } catch(_e){
+            // sessionStorage 용량 초과 시 오래된 FK 캐시 정리 후 재시도
+            _purgeOldest();
+            try { _sSet(FK_CACHE_PREFIX + url, JSON.stringify({ ts: Date.now(), data: data })); } catch(_e2){}
+        }
+    }
+
+    /** 모든 FK 캐시 제거 (관리자 데이터 변경 시 호출). */
+    function clear(){
+        try {
+            var keys = [];
+            for(var i = 0; i < sessionStorage.length; i++){
+                var k = sessionStorage.key(i);
+                if(k && k.indexOf(FK_CACHE_PREFIX) === 0) keys.push(k);
+            }
+            keys.forEach(function(k){ sessionStorage.removeItem(k); });
+        } catch(_e){}
+    }
+
+    function _purgeOldest(){
+        try {
+            var oldest = null, oldestKey = null;
+            for(var i = 0; i < sessionStorage.length; i++){
+                var k = sessionStorage.key(i);
+                if(!k || k.indexOf(FK_CACHE_PREFIX) !== 0) continue;
+                var raw = sessionStorage.getItem(k);
+                if(!raw) continue;
+                try {
+                    var entry = JSON.parse(raw);
+                    if(!oldest || entry.ts < oldest){ oldest = entry.ts; oldestKey = k; }
+                } catch(_e){}
+            }
+            if(oldestKey) sessionStorage.removeItem(oldestKey);
+        } catch(_e){}
+    }
+
+    window.__blsFkCache = { get: get, set: set, clear: clear };
+})();
+
 /* §1 ── MFA / Security ─────────────────────────────────────── */
 
 const BLOSSOM_SECURITY_KEY = 'blossom.security.settings';
@@ -2704,34 +2784,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('btn-search');
     if (searchBtn) {
         searchBtn.addEventListener('click', (e) => {
-            // 앵커인 경우 기본 동작(이동) 유지, 버튼인 경우 수동 이동
-            const targetHref = '/app/templates/authentication/11-2.basic/search.html';
-            if (searchBtn.tagName !== 'A') {
-                window.location.href = targetHref;
-            }
-            // preventDefault 호출 없음: 앵커는 자연스럽게 이동
+            // 검색 기능은 아직 SPA 전용 라우트가 없으므로 현재 동작 유지
+            e.preventDefault();
         });
     }
 
-    // 알림 버튼: 모달/토스트 없이 알림 페이지로 이동
+    // 알림 버튼: 알림 페이지로 SPA 이동
     const notificationsBtn = document.getElementById('btn-notifications');
     if (notificationsBtn) {
         notificationsBtn.addEventListener('click', (e) => {
-            // 앵커인 경우 기본 이동, 버튼이면 수동 이동
-            const targetHref = '/app/templates/authentication/11-2.basic/alarm.html';
-            if (notificationsBtn.tagName !== 'A') {
-                window.location.href = targetHref;
+            e.preventDefault();
+            if (typeof window.blsSpaNavigate === 'function') {
+                window.blsSpaNavigate('/addon/notifications');
+            } else {
+                window.location.href = '/addon/notifications';
             }
         });
     }
 
-    // 채팅 버튼: 채팅 페이지로 이동
+    // 채팅 버튼: 채팅 페이지로 SPA 이동
     const chatBtn = document.getElementById('btn-chat');
     if (chatBtn) {
         chatBtn.addEventListener('click', (e) => {
-            const targetHref = '/app/templates/8.project/8-3.etc/8-3-2.chat.html';
-            if (chatBtn.tagName !== 'A') {
-                window.location.href = targetHref;
+            e.preventDefault();
+            if (typeof window.blsSpaNavigate === 'function') {
+                window.blsSpaNavigate('/addon/chat');
+            } else {
+                window.location.href = '/addon/chat';
             }
         });
     }
@@ -2740,8 +2819,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('btn-settings');
     if (settingsBtn) {
         settingsBtn.addEventListener('click', (e) => {
-            const targetHref = '/settings';
-            if (settingsBtn.tagName !== 'A') {
+            const targetHref = '/settings/profile';
+            e.preventDefault();
+            if (typeof window.blsSpaNavigate === 'function') {
+                window.blsSpaNavigate(targetHref);
+            } else {
                 window.location.href = targetHref;
             }
         });
@@ -2794,8 +2876,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (!action) return;
                 if (action === 'profile') {
-                    // 설정(프로필) UI로 이동 (템플릿 파일 경로 직접 접근 방지)
-                    window.location.href = '/settings/profile';
+                    // 설정(프로필) UI로 SPA 이동
+                    if (typeof window.blsSpaNavigate === 'function') {
+                        window.blsSpaNavigate('/settings/profile');
+                    } else {
+                        window.location.href = '/settings/profile';
+                    }
                 } else if (action === 'logout') {
                     window.location.href = '/logout';
                 }
@@ -3352,13 +3438,24 @@ document.addEventListener('DOMContentLoaded', () => {
     var __spaNavPrefetch = {};        // href -> Promise  (hover prefetch)
     var SPA_CACHE_TTL = 5 * 60 * 1000; // 5분
 
+    // SPA 인터셉트 가능한 경로 목록
+    var __spaRoutePrefixes = ['/p/', '/addon/', '/dashboard', '/settings/', '/account/', '/admin/auth/', '/hardware/', '/project/', '/construction'];
+
     function __spaCanIntercept(href) {
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
         if (/^https?:/i.test(href) && !href.startsWith(location.origin)) return false;
         if (/\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|json|pdf|xlsx?|zip)(\?|$)/i.test(href)) return false;
+        // 인증 관련 경로는 SPA 대상에서 제외 (풀 리로드 필요)
+        if (/^\/(login|logout|signup|register|reset-password|terms)(\?|$)/i.test(href)) return false;
         try {
             var url = new URL(href, location.origin);
-            if (!url.pathname.startsWith('/p/')) return false;
+            var ok = false;
+            for (var pi = 0; pi < __spaRoutePrefixes.length; pi++) {
+                if (url.pathname.startsWith(__spaRoutePrefixes[pi]) || url.pathname === __spaRoutePrefixes[pi].replace(/\/$/, '')) {
+                    ok = true; break;
+                }
+            }
+            if (!ok) return false;
         } catch (_e) { return false; }
         return true;
     }
@@ -3828,7 +3925,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---- Detail Tab SPA Navigation (.server-detail-tab-btn) ----
     // 상세 페이지(하드웨어/네트워크/보안/카테고리/거버넌스/비용 등)의 탭 전환 시
-    // 전체 <main> 콘텐츠를 교체하여 헤더/사이드바를 유지한 채 탭 전환.
+    // .server-detail-content 영역만 교체하여 뒤로가기·제목·탭바를 유지 — 부드러운 전환.
     // 프로젝트 탭(tab81-90)은 자체 SPA(setupProjectSPA)가 있으므로 제외.
     function __spaDetailTabNavigate(href, clickedTab) {
         // 1. 즉시 active 탭 전환 (시각 피드백)
@@ -3844,19 +3941,132 @@ document.addEventListener('DOMContentLoaded', () => {
                 clickedTab.setAttribute('aria-selected', 'true');
             }
         }
-        // 2. 프로그래스 바
+
+        // 2. 현재 콘텐츠 영역에 skeleton 즉시 표시 (시각 피드백)
+        var curContent = document.querySelector('.server-detail-content');
+        if (curContent) {
+            curContent.setAttribute('aria-busy', 'true');
+            curContent.innerHTML = '<div class="spa-skeleton">'
+                + '<div class="spa-skeleton-bar" style="width:60%"></div>'
+                + '<div class="spa-skeleton-bar" style="width:90%"></div>'
+                + '<div class="spa-skeleton-bar" style="width:75%"></div>'
+                + '<div class="spa-skeleton-bar" style="width:85%"></div>'
+                + '<div class="spa-skeleton-bar short" style="width:40%"></div>'
+                + '</div>';
+        }
+
+        // 3. 프로그래스 바
         document.documentElement.classList.add('spa-loading');
 
-        // 3. 페이지 fetch (캐시 활용)
+        // 4. 페이지 fetch (캐시 활용)
         __spaFetchPage(href).then(function (html) {
             window.__blossomLoadedScripts = new Set();
-            var result = __spaSwapMain(html, href);
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
 
-            // 4. History push
+            // 5. .server-detail-content만 교체 (뒤로가기·제목·탭바 유지)
+            var newContent = doc.querySelector('.server-detail-content');
+            var currentContent = document.querySelector('.server-detail-content');
+            if (newContent && currentContent) {
+                currentContent.replaceWith(newContent);
+                newContent.classList.add('spa-fade-in');
+                newContent.addEventListener('animationend', function () {
+                    newContent.classList.remove('spa-fade-in');
+                }, { once: true });
+            } else {
+                // fallback: .server-detail-content가 없으면 전체 main 교체
+                __spaSwapMain(html, href);
+            }
+
+            // 5-a. <main> 클래스 + data-* 속성 동기화 (tab15-file-root 등 탭별 CSS 스코프 클래스)
+            try {
+                var newMain = doc.querySelector('main.main-content');
+                var curMain = document.querySelector('main.main-content');
+                if (newMain && curMain) {
+                    var newCls = Array.from(newMain.classList);
+                    var curCls = Array.from(curMain.classList);
+                    // 현재 main에만 있는 탭 스코프 클래스 제거
+                    curCls.forEach(function (c) {
+                        if (c !== 'main-content' && c !== 'sidebar-collapsed' && c !== 'sidebar-hidden' && c !== 'spa-fade-in' && newCls.indexOf(c) < 0) {
+                            curMain.classList.remove(c);
+                        }
+                    });
+                    // 새 main에 있는 클래스 추가
+                    newCls.forEach(function (c) { curMain.classList.add(c); });
+                    // data-* 속성 동기화 — 새 main에 없는 속성 제거 + 새 속성 추가
+                    var newDataKeys = new Set();
+                    var nm = newMain.attributes;
+                    for (var di = 0; di < nm.length; di++) {
+                        if (/^data-/.test(nm[di].name)) {
+                            curMain.setAttribute(nm[di].name, nm[di].value);
+                            newDataKeys.add(nm[di].name);
+                        }
+                    }
+                    // 이전 탭의 stale data-* 속성 제거
+                    var staleAttrs = [];
+                    for (var si = 0; si < curMain.attributes.length; si++) {
+                        var an = curMain.attributes[si].name;
+                        if (/^data-/.test(an) && an !== 'data-tab15-init' && !newDataKeys.has(an)) {
+                            staleAttrs.push(an);
+                        }
+                    }
+                    staleAttrs.forEach(function (a) { curMain.removeAttribute(a); });
+                }
+            } catch (_e) {}
+
+            // 5-b. 모달 교체 (탭별 추가/편집 모달)
+            try {
+                var modalSel = 'body > .modal-overlay-full, body > .modal-overlay, body > .server-edit-modal, body > .server-add-modal, body > .system-edit-modal';
+                Array.from(document.querySelectorAll(modalSel)).forEach(function (el) { try { el.remove(); } catch (_e) {} });
+                Array.from(doc.querySelectorAll(modalSel)).forEach(function (el) { try { document.body.appendChild(el); } catch (_e) {} });
+                if (!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
+            } catch (_e) {}
+
+            // 5-c. CSS 동기화 — 새 탭 전용 CSS 추가 + 이전 탭 전용 CSS 제거
+            try {
+                var _coreCssPat = /blossom\.css|detail\.css|sidebar|header/;
+                var wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
+                var wantHrefs = new Set(wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+                var haveHrefs = new Set(haveLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                // 이전 탭 전용 CSS 제거 (공통 CSS는 유지)
+                haveLinks.forEach(function (el) {
+                    var h = el.getAttribute('href') || '';
+                    if (!h || wantHrefs.has(h) || _coreCssPat.test(h)) return;
+                    // tab/detail 전용 CSS만 제거 (공통은 보존)
+                    if (/tab\d|file\.css|bay\.css|zone\.css|opex|capex|assign|basic-storage|log\.css|task\.css|package\.css/.test(h)) {
+                        el.remove();
+                    }
+                });
+                // 새 탭 전용 CSS 추가
+                wantLinks.forEach(function (wl) {
+                    var wh = wl.getAttribute('href') || '';
+                    if (!wh || haveHrefs.has(wh) || wh.indexOf('blossom.css') >= 0) return;
+                    // 동일 base path의 다른 버전이 이미 있으면 제거
+                    var wBase = wh.split('?')[0];
+                    haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+                    haveLinks.forEach(function (el) {
+                        var eh = (el.getAttribute('href') || '').split('?')[0];
+                        if (eh === wBase) el.remove();
+                    });
+                    var nl = document.createElement('link');
+                    nl.rel = 'stylesheet';
+                    nl.href = wh;
+                    document.head.appendChild(nl);
+                });
+            } catch (_e) {}
+
+            // 5-d. 제목 갱신
+            try {
+                var newTitle = doc.querySelector('title');
+                if (newTitle) document.title = newTitle.textContent.trim();
+            } catch (_e) {}
+
+            // 6. History push
             history.pushState({ spa: true, href: href, detailTab: true }, '', href);
 
-            // 5. 스크립트 로드 (DCL 인터셉트 포함)
-            return __spaLoadScripts(result.doc).then(function () {
+            // 7. 스크립트 로드 (DCL 인터셉트 포함)
+            return __spaLoadScripts(doc).then(function () {
                 try {
                     document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
                         detail: { href: href, title: document.title, timestamp: Date.now() }
@@ -3949,6 +4159,95 @@ document.addEventListener('DOMContentLoaded', () => {
             __spaNavigate(href);
         }
     });
+
+    // ---- Global SPA Link Interception ----
+    // 사이드바/탭 이외의 모든 <a href="/p/..."> 클릭을 SPA로 처리하여
+    // 전체 리로드를 제거한다. (목록 돌아가기, 거버넌스 카드, 푸터 등)
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented) return; // 이미 처리된 이벤트
+        var link = e.target ? (e.target.closest ? e.target.closest('a[href]') : null) : null;
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!__spaCanIntercept(href)) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        // 이미 SPA 처리되는 요소는 제외 (capture:true 핸들러에서 처리)
+        if (link.closest('#sidebar')) return;
+        if (link.classList.contains('system-tab-btn')) return;
+        if (link.classList.contains('server-detail-tab-btn')) return;
+        // 같은 페이지면 무시
+        try {
+            var tu = new URL(href, location.origin);
+            if (tu.pathname === location.pathname && tu.search === location.search) return;
+        } catch (_e) {}
+        e.preventDefault();
+        e.stopPropagation();
+        __spaNavigate(href);
+    }, { capture: false });
+
+    // 글로벌 <a href="/p/..."> 호버 프리페치
+    document.addEventListener('mouseenter', function (e) {
+        if (!e.target || !e.target.closest) return;
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        // 사이드바/탭은 이미 자체 프리페치 존재
+        if (link.closest('#sidebar')) return;
+        if (link.classList.contains('system-tab-btn')) return;
+        if (link.classList.contains('server-detail-tab-btn')) return;
+        var href = link.getAttribute('href');
+        if (href) __spaPrefetch(href);
+    }, { capture: true, passive: true });
+
+    // ---- Public SPA Navigation API ----
+    // JS 파일에서 window.location.href 대신 사용:
+    //   blsSpaNavigate('/p/some_page?id=123')
+    // SPA 가능하면 SPA, 아니면 일반 이동.
+    window.blsSpaNavigate = function (href) {
+        if (__spaCanIntercept(href)) {
+            __spaNavigate(href);
+        } else {
+            window.location.href = href;
+        }
+    };
+
+    // ---- SPA Boot: 셸 초기 로딩 ----
+    // 서버가 SPA 셸(data-spa-boot)을 반환한 경우
+    // 현재 URL의 콘텐츠를 비동기 fetch → main 교체로 페이지를 채운다.
+    (function __spaBootFromShell() {
+        var bootMain = document.querySelector('main.main-content[data-spa-boot]');
+        if (!bootMain) return;
+        var href = location.pathname + location.search + location.hash;
+        document.documentElement.classList.add('spa-loading');
+        __spaFetchPage(href).then(function (html) {
+            window.__blossomLoadedScripts = new Set();
+            var result = __spaSwapMain(html, href);
+            // replaceState (pushState가 아님 — URL은 이미 올바름)
+            history.replaceState({ spa: true, href: href }, '', href);
+            return __spaLoadScripts(result.doc).then(function () {
+                try {
+                    document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
+                        detail: { href: href, title: document.title, timestamp: Date.now() }
+                    }));
+                } catch (_e) {}
+                try { if (typeof applyActiveMenuHighlight === 'function') applyActiveMenuHighlight(); } catch (_e) {}
+                try { if (typeof updateAllCountBadges === 'function') updateAllCountBadges(); } catch (_e) {}
+                try { if (typeof initializeToggleBadges === 'function') initializeToggleBadges(); } catch (_e) {}
+                try { if (typeof normalizeBookSticker === 'function') normalizeBookSticker(); } catch (_e) {}
+                try { if (typeof runStickerGuard === 'function') runStickerGuard(); } catch (_e) {}
+                try { if (typeof scheduleInfoDedup === 'function') scheduleInfoDedup(); } catch (_e) {}
+                document.documentElement.classList.remove('spa-loading');
+            });
+        }).catch(function (err) {
+            document.documentElement.classList.remove('spa-loading');
+            if (err && err.name === 'AbortError') return;
+            console.warn('[spa-boot] failed, full reload', err);
+            // 부트 실패 시 풀 리로드 방지 (무한 루프 위험)
+            // 대신 에러 메시지 표시
+            bootMain.innerHTML = '<div style="padding:32px;text-align:center;color:#6b7280;">'
+                + '<p>페이지를 불러오는 중 오류가 발생했습니다.</p>'
+                + '<button onclick="location.reload()" style="margin-top:12px;padding:8px 16px;cursor:pointer;">새로고침</button>'
+                + '</div>';
+        });
+    })();
 
         // ---- Fullscreen SPA Navigation (experimental) ----
         // 브라우저는 페이지 전체 이동 시 전체화면을 자동 유지하지 않음.
@@ -5105,7 +5404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         opts = opts || {};
         const url = parseUrl(href);
         if (!url || !isSameOrigin(url) || !isPRoute(url)) {
-            window.location.href = href;
+            if (typeof window.blsSpaNavigate === 'function') { window.blsSpaNavigate(href); } else { window.location.href = href; }
             return;
         }
 
@@ -5113,7 +5412,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const toKey = keyFromUrl(url);
         // Only cost / vendor pages (avoid affecting other modules)
         if (!isSpaTabKey(fromKey) && !isSpaTabKey(toKey)) {
-            window.location.href = href;
+            if (typeof window.blsSpaNavigate === 'function') { window.blsSpaNavigate(href); } else { window.location.href = href; }
             return;
         }
 
@@ -6734,11 +7033,15 @@ document.addEventListener('DOMContentLoaded', function(){
     tabButtons.forEach(btn => {
         btn.addEventListener('click', function(e){
             const href = btn.getAttribute('href');
-            // External page route: force full navigation
+            // External page route: SPA navigation
             if (href && href.startsWith('/p/')) {
                 e.preventDefault();
                 // List tabs should navigate without carrying selected-row context.
-                window.location.href = href;
+                if (typeof window.blsSpaNavigate === 'function') {
+                    window.blsSpaNavigate(href);
+                } else {
+                    window.location.href = href;
+                }
                 return;
             }
             // Internal pane toggle (future use if data-tab exists)
@@ -6760,7 +7063,11 @@ document.addEventListener('DOMContentLoaded', function(){
         const next = withAssetContext(href);
         if(next === href) return;
         e.preventDefault();
-        window.location.href = next;
+        if (typeof window.blsSpaNavigate === 'function') {
+            window.blsSpaNavigate(next);
+        } else {
+            window.location.href = next;
+        }
     }, true);
 });
 

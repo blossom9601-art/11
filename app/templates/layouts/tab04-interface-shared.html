@@ -10,8 +10,8 @@
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
-    <link rel="stylesheet" href="/static/css/tab04-interface.css?v=1.1">
-    <script src="/static/js/_detail/tab04-interface.js?v=1.3&cb=20260326"></script>
+    <link rel="stylesheet" href="/static/css/tab04-interface.css?v=1.8">
+    <script src="/static/js/_detail/tab04-interface.js?v=2.1&cb=20260406"></script>
 </head>
 <body class="page-server-interface-tab">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -53,9 +53,17 @@
                     <button class="add-btn-icon" id="if-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
                         <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
                     </button>
-                    <!-- 행 추가 버튼 -->
-                    <button class="add-btn-icon" id="if-row-add" title="행 추가" type="button" aria-label="행 추가">
-                        <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                    <!-- 새로고침 버튼 -->
+                    <button class="add-btn-icon" id="if-refresh-btn" title="새로고침" type="button" aria-label="새로고침">
+                        <img src="/static/image/svg/interface/free-icon-font-refresh.svg" alt="새로고침">
+                    </button>
+                    <!-- 즐겨찾기 필터 버튼 -->
+                    <button class="add-btn-icon" id="if-favorite-btn" title="즐겨찾기" type="button" aria-label="즐겨찾기">
+                        <img src="/static/image/svg/interface/free-icon-font-filter.svg" alt="즐겨찾기">
+                    </button>
+                    <!-- 예외 리스트 버튼 -->
+                    <button class="add-btn-icon" id="if-exception-list-btn" title="예외 리스트" type="button" aria-label="예외 리스트">
+                        <img src="/static/image/svg/interface/free-icon-font-list.svg" alt="예외 리스트">
                     </button>
 
                     <div class="detail-section">
@@ -83,7 +91,6 @@
                                     <col class="equal-col">
                                     <col class="equal-col">
                                     <col class="equal-col">
-                                    <col class="equal-col">
                                     <col class="actions-col">
                                 </colgroup>
                                 <thead>
@@ -93,7 +100,6 @@
                                         <th>포트</th>
                                         <th>인터페이스</th>
                                         <th>UUID</th>
-                                        <th>할당값</th>
                                         <th>연결 시스템</th>
                                         <th>연결 포트</th>
                                         <th>비고</th>

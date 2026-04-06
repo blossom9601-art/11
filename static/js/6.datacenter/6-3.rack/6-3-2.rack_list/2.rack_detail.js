@@ -173,9 +173,9 @@
       if(workName) qp.set('work', workName);
       if(systemName) qp.set('system', systemName);
       const url = '/p/' + encodeURIComponent(target.key) + (qp.toString() ? ('?' + qp.toString()) : '');
-      window.location.href = url;
+      blsSpaNavigate(url);
     }).catch(function(){
-      window.location.href = '/p/hw_server_onpremise_detail';
+      blsSpaNavigate('/p/hw_server_onpremise_detail');
     });
   }
 

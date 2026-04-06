@@ -76,7 +76,7 @@
       }
       // No valid context -> clear any stale selection and go back to list.
       clearStoredSelection();
-      try{ window.location.href = '/p/hw_storage_backup'; }catch(_e5){}
+      try{ blsSpaNavigate('/p/hw_storage_backup'); }catch(_e5){}
     })();
 
     // ----- Storage Backup asset: server-backed READ/UPDATE (basic info + edit modal) -----
@@ -460,7 +460,7 @@
               try{ localStorage.removeItem('storage_backup:selected:asset_id'); }catch(_e2){}
               try{ sessionStorage.removeItem('storage_backup:selected:row'); }catch(_e3){}
               try{ localStorage.removeItem('storage_backup:selected:row'); }catch(_e4){}
-              try{ window.location.href = '/p/hw_storage_backup'; }catch(_e5){}
+              try{ blsSpaNavigate('/p/hw_storage_backup'); }catch(_e5){}
             }
           }catch(_e6){}
         });

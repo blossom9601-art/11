@@ -1362,7 +1362,7 @@
                     // Send model/vendor for server-side session title/subtitle
                     if(payload.wc_name) params.set('model', payload.wc_name);
                     if(payload.group_code) params.set('vendor', payload.group_code);
-                    window.location.href = `${base}?${params.toString()}`;
+                    blsSpaNavigate(`${base}?${params.toString()}`);
                 }
                 return; // 링크 클릭 시 다른 처리 중단
             }

@@ -6,6 +6,7 @@ from app.models import db, OrgDepartment, UserProfile
 def _login_as_profile(client, profile_id: int, emp_no: str = "TEST"):
     with client.session_transaction() as session_tx:
         session_tx["user_id"] = profile_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
         session_tx["emp_no"] = emp_no
 
 

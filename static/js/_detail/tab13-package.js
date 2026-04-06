@@ -426,11 +426,7 @@
 				+ '<td data-col="identifier">' + pkText(item.identifier) + '</td>'
 				+ '<td data-col="manufacturer">' + pkText(manufacturer) + '</td>'
 				+ '<td data-col="license">' + pkText(item.license) + '</td>'
-				+ '<td data-col="vulnerability" data-full=""></td>'
-				+ '<td class="system-actions table-actions">'
-				+ '<button class="action-btn js-pk-toggle" data-action="edit" type="button" title="편집" aria-label="편집"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="편집" class="action-icon"></button>'
-				+ '<button class="action-btn danger js-pk-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button>'
-				+ '</td>';
+				+ '<td data-col="vulnerability" data-full=""></td>';
 			try {
 				var vulnTd = tr.querySelector('td[data-col="vulnerability"]');
 				pkSetVulnCell(vulnTd, vulnFull);
@@ -776,8 +772,13 @@
 			}
 			if (numWrap) {
 				var pages = pkPages();
+				var maxVisible = 5;
+				var half = Math.floor(maxVisible / 2);
+				var startP = Math.max(1, pkState.page - half);
+				var endP = Math.min(pages, startP + maxVisible - 1);
+				if (endP - startP + 1 < maxVisible) startP = Math.max(1, endP - maxVisible + 1);
 				numWrap.innerHTML = '';
-				for (var p = 1; p <= pages && p <= 50; p++) {
+				for (var p = startP; p <= endP; p++) {
 					var b = document.createElement('button');
 					b.className = 'page-btn' + (p === pkState.page ? ' active' : '');
 					b.textContent = String(p);

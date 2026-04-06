@@ -750,19 +750,16 @@ from .spa_redirect import resolve_spa_redirect
 @pages_bp.route('/p/<key>')
 @pages_bp.route('/p/<key>/<token>')
 def show(key: str, token: str | None = None):
-    # ── SPA 리다이렉트 비활성화 (MPA 원본 유지) ──
-    # resolve_spa_redirect 호출을 제거하여 모든 요청이 MPA 템플릿을 직접 렌더링
-    # 복원 시 아래 주석 해제:
-    # _want_legacy = request.args.get('legacy')
-    # if _want_legacy:
-    #     session['_mpa_one_shot'] = True
-    #     session.modified = True
-    # elif session.pop('_mpa_one_shot', None):
-    #     _want_legacy = True
-    # if not _want_legacy:
-    #     spa_path = resolve_spa_redirect(key, token, decode_fn=decode_manage_no)
-    #     if spa_path is not None:
-    #         return redirect(f'/spa{spa_path}', code=302)
+    # ── SPA 모드: 직접 브라우저 방문 → SPA 셸 반환 ──
+    # blossom.js SPA fetch 요청(X-Requested-With 헤더)이 아닌 경우
+    # 최소 셸(header+sidebar+skeleton)을 반환하고, JS가 콘텐츠를 비동기 로드한다.
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template(
+            'layouts/spa_shell.html',
+            current_key=key,
+            menu_code=_resolve_menu_code(key),
+        )
 
     template = _resolve_template(TEMPLATE_MAP.get(key))
     try:

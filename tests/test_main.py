@@ -17,10 +17,11 @@ def test_api_dashboard_stats(client):
     assert response.status_code == 200
     
     data = response.get_json()
-    assert 'total_companies' in data
-    assert 'total_servers' in data
-    assert 'total_employees' in data
-    assert 'total_projects' in data
+    assert data['success'] is True
+    assert 'kpi' in data
+    assert 'charts' in data
+    assert 'range' in data
+    assert 'period' in data
 
 def test_api_companies_empty(client):
     """회사 목록 API가 빈 상태에서 정상적으로 작동하는지 테스트합니다."""
@@ -76,7 +77,7 @@ def test_404_page(client):
 
 def test_construction_page(client):
     """공사중 페이지가 정상적으로 로드되는지 테스트합니다."""
-    response = client.get('/construction')
+    response = client.get('/construction', headers={'X-Requested-With': 'blossom-spa'})
     assert response.status_code == 200
     html = response.data.decode('utf-8')
     assert '공사중' in html

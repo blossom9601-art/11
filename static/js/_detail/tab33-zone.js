@@ -5,7 +5,8 @@
  */
 (function(){
     'use strict';
-    if(window.BlossomTab33Zone) return;
+// SPA re-entry: 이전 sentinel 제거 → IIFE 전체 재정의
+	if(window.BlossomTab33Zone) delete window.BlossomTab33Zone;
 
     /* ── 유틸리티 ─────────────────────────────── */
     function trim(v){ return v == null ? '' : String(v).replace(/^\s+|\s+$/g, ''); }

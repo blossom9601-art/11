@@ -200,7 +200,7 @@
             body:JSON.stringify({name:'제목 없는 워크플로우', description:''})
         }).then(function(r){return r.json();}).then(function(d){
             if(!d.success){alert(d.error||'실패');return;}
-            window.location.href='/p/wf_designer_editor?id='+d.item.id;
+            blsSpaNavigate('/p/wf_designer_editor?id='+d.item.id);
         }).catch(function(e){alert('네트워크 오류');});
     }
 

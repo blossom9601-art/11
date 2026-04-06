@@ -6320,7 +6320,7 @@
 
         function switchTab(targetUrl, clickedLink){
           var targetKey = routeKey(targetUrl);
-          if(!targetKey){ window.location.href = targetUrl; return; }
+          if(!targetKey){ blsSpaNavigate(targetUrl); return; }
           if(targetKey === currentKey) return;
 
           // 1. Detach current pane from DOM (keep in cache)
@@ -6429,7 +6429,7 @@
                 }
               }catch(err){
                 console.warn('[SPA] fetch failed, falling back', err);
-                window.location.href = targetUrl;
+                blsSpaNavigate(targetUrl);
               }
             })();
           }

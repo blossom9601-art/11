@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
+</head>
+<body{% if menu_code %} data-menu-code="{{ menu_code }}"{% endif %}>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content" data-spa-boot="true">
+        <div class="spa-skeleton" style="padding:32px;">
+            <div class="spa-skeleton-bar" style="width:60%"></div>
+            <div class="spa-skeleton-bar" style="width:90%"></div>
+            <div class="spa-skeleton-bar" style="width:75%"></div>
+            <div class="spa-skeleton-bar" style="width:85%"></div>
+            <div class="spa-skeleton-bar short" style="width:40%"></div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+</body>
+</html>

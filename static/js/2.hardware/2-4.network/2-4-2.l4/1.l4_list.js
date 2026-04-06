@@ -349,7 +349,9 @@
             return [];
         }
         try{
-            const data = await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
+            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             fkSourceCache.set(sourceKey, items);
             if(sourceKey === 'ORG_DEPT'){
@@ -2671,7 +2673,7 @@
                             try{ sessionStorage.setItem('l4:selected:asset_id', String(assetId)); }catch(_e0){}
                             try{ localStorage.setItem('l4:selected:asset_id', String(assetId)); }catch(_e1){}
                         }
-                        window.location.href = DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id));
+                        blsSpaNavigate(DETAIL_URL + '?asset_id=' + encodeURIComponent(String(row.id != null ? row.id : row.asset_id)));
                         return;
                     }
                 }catch(_e){}
@@ -3024,7 +3026,7 @@
                 const data = await res.json();
                 if(!data.success){ showMessage(data.message || '불용처리 실패', '오류'); return; }
                 closeModal(DISPOSE_MODAL_ID);
-                window.location.href = '/p/gov_unused_network';
+                blsSpaNavigate('/p/gov_unused_network');
             } catch(err){
                 showMessage('불용처리 중 오류가 발생했습니다.', '오류');
             } finally {

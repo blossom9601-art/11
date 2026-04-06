@@ -189,7 +189,209 @@
 }
 
 /* ═══════════════════════════════════
-   6. 반응형 (Responsive)
+   6. 확장 버튼 & 확장 행 (IP 상세)
+   ═══════════════════════════════════ */
+.tab04-interface-root .js-if-expand .action-icon {
+    transition: transform .2s ease, filter .2s ease;
+}
+.tab04-interface-root .js-if-expand.if-expanded .action-icon {
+    transform: rotate(45deg);
+}
+.tab04-interface-root .js-if-expand:hover {
+    background: var(--if-accent) !important;
+    border-color: var(--if-accent) !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,.28);
+}
+.tab04-interface-root .js-if-expand:hover .action-icon {
+    filter: brightness(0) invert(1) contrast(1);
+    opacity: 1;
+}
+
+.tab04-interface-root #if-spec-table tbody tr.if-expand-row {
+    background: #f8f9fb;
+    border-top: none;
+}
+.tab04-interface-root #if-spec-table tbody tr.if-expand-row > td {
+    border-top: none;
+    padding: 10px 16px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+.tab04-interface-root #if-spec-table tbody tr.if-expand-row:hover {
+    background: #f4f6f8;
+}
+
+.tab04-interface-root .if-expand-cell {
+    padding: 0;
+}
+
+.tab04-interface-root .if-expand-loading,
+.tab04-interface-root .if-det-empty {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+    padding: 12px;
+}
+
+/* 확장 헤더 */
+.tab04-interface-root .if-expand-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 6px 4px 4px;
+}
+.tab04-interface-root .if-det-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tab04-interface-root .if-det-add-btn .action-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* 서브 테이블 */
+.tab04-interface-root .if-det-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    margin-bottom: 6px;
+}
+.tab04-interface-root .if-det-table th,
+.tab04-interface-root .if-det-table td {
+    font-size: 13.5px !important;
+    line-height: normal !important;
+    padding: 8px 8px !important;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tab04-interface-root .if-det-table th {
+    font-size: 13px !important;
+    font-weight: 700;
+    color: #475569;
+    letter-spacing: .02em;
+    background: #f1f5f9;
+    border-bottom: 2px solid #d0d5dd;
+    border-right: 1px solid #e2e8f0;
+}
+.tab04-interface-root .if-det-table th:last-child {
+    border-right: none;
+}
+.tab04-interface-root .if-det-table td {
+    color: #1e293b;
+    border-bottom: 1px solid #e8ecf1;
+    border-right: 1px solid #f1f3f6;
+}
+.tab04-interface-root .if-det-table td:last-child {
+    border-right: none;
+}
+.tab04-interface-root .if-det-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* 서브 테이블 입력/셀렉트 */
+.tab04-interface-root .if-det-input {
+    width: 100%;
+    min-width: 60px;
+    padding: 5px 8px;
+    border: 1px solid #d0d5dd;
+    border-radius: 5px;
+    font-size: 13px;
+    background: #fafaff;
+    outline: none;
+    transition: border-color .15s;
+    box-sizing: border-box;
+    height: 32px;
+}
+.tab04-interface-root .if-det-input:focus {
+    border-color: var(--if-accent);
+    box-shadow: 0 0 0 2px rgba(99,102,241,.10);
+}
+.tab04-interface-root .if-det-select {
+    width: 100%;
+    min-width: 60px;
+    padding: 5px 8px;
+    border: 1px solid #d0d5dd;
+    border-radius: 5px;
+    font-size: 13px;
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    height: 32px;
+}
+.tab04-interface-root .if-det-select:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+.tab04-interface-root .if-det-select:focus {
+    border-color: var(--if-accent);
+}
+/* 검색 가능 셀렉트 래퍼 서브테이블 내 */
+.tab04-interface-root .if-det-table .fk-searchable-control {
+    width: 100%;
+    min-width: 60px;
+}
+.tab04-interface-root .if-det-table .fk-searchable-control .fk-searchable-display {
+    font-size: 13px;
+    padding: 5px 8px;
+    min-height: auto;
+    height: 32px;
+    box-sizing: border-box;
+}
+.tab04-interface-root .if-det-table .fk-search-native-hidden {
+    display: none;
+}
+
+/* 서브 테이블 액션 버튼 */
+.tab04-interface-root .if-det-table .table-actions {
+    white-space: nowrap;
+}
+.tab04-interface-root .if-det-table .action-btn {
+    padding: 4px;
+}
+.tab04-interface-root .if-det-table .action-icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* 메인 테이블 관리 컬럼 (하드웨어 탭과 동일) */
+.tab04-interface-root #if-spec-table td.system-actions.table-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+.tab04-interface-root #if-spec-table td.system-actions.table-actions .action-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab04-interface-root #if-spec-table td.system-actions.table-actions .action-btn .action-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ═══════════════════════════════════
+   7. 반응형 (Responsive)
    ═══════════════════════════════════ */
 @media (max-width: 680px) {
     .tab04-interface-root #if-delete-modal .dispose-content {
@@ -201,4 +403,76 @@
         width: 160px;
         max-width: 70vw;
     }
+    .tab04-interface-root .if-det-table th,
+    .tab04-interface-root .if-det-table td {
+        font-size: 11px !important;
+        padding: 5px 6px !important;
+    }
+}
+
+/* ═══════════════════════════════════
+   8. 예외 행 스타일
+   ═══════════════════════════════════ */
+.tab04-interface-root .if-det-excluded {
+    opacity: 0.45;
+    text-decoration: line-through;
+    background: #fef2f2 !important;
+}
+.tab04-interface-root .if-det-excluded td {
+    color: #9ca3af !important;
+}
+
+/* 예외 토글 버튼 활성 상태 */
+.tab04-interface-root .if-det-excluded .js-if-det-exclude .action-icon {
+    filter: hue-rotate(180deg) brightness(0.6);
+}
+
+/* 로딩 상태 */
+.tab04-interface-root .if-det-loading {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+    padding: 18px 12px;
+}
+
+/* 새로고침 버튼 (서브 테이블 헤더) */
+.tab04-interface-root .if-det-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tab04-interface-root .if-det-refresh-btn .action-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* 즐겨찾기 버튼 활성 상태 */
+.tab04-interface-root .add-btn-icon.active {
+    background: var(--if-accent-light, #e0e7ff);
+    box-shadow: inset 0 0 0 2px var(--if-accent, #6366f1);
+    border-radius: var(--if-radius-btn, 10px);
+}
+
+/* 예외 리스트 모달 테이블 */
+#if-exception-modal .hw-table {
+    width: 100%;
+    font-size: 13px;
+}
+#if-exception-modal .hw-table th,
+#if-exception-modal .hw-table td {
+    padding: 8px 6px;
+    text-align: left;
+    font-size: 13px;
+}
+#if-exception-modal .action-btn {
+    padding: 4px;
+}
+#if-exception-modal .action-icon {
+    width: 16px;
+    height: 16px;
 }

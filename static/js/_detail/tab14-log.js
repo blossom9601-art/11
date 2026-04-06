@@ -16,7 +16,8 @@
 	/* ═══════════════════════════════════
 	 *  중복 초기화 방지
 	 * ═══════════════════════════════════ */
-	if (window.BlossomTab14Log) return;
+	// SPA re-entry: 이전 sentinel 제거 → IIFE 전체 재정의
+	if (window.BlossomTab14Log) delete window.BlossomTab14Log;
 
 	/* ═══════════════════════════════════
 	 *  유틸리티
@@ -690,9 +691,7 @@
 		}
 	});
 
-	// SPA 부분 네비게이션 지원
-	document.addEventListener('blossom:pageLoaded', function () {
-		try { initFromPage(); } catch (_) {}
-	});
+	// SPA: sentinel 제거 패턴으로 전환 — blossom:pageLoaded 리스너 불필요
+	// (DCL 인터셉트가 initFromPage 호출을 보장)
 })();
 

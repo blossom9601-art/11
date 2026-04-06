@@ -48,6 +48,7 @@ def test_calendar_schedule_visibility_department_and_select(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = owner_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
 
     dept_payload = {
         'title': '부서 공유 일정',
@@ -81,6 +82,7 @@ def test_calendar_schedule_visibility_department_and_select(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = same_dept_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
     resp = client.get('/api/calendar/schedules?start=2025-12-01&end=2025-12-31')
     assert resp.status_code == 200
     items = resp.get_json()['items']
@@ -97,6 +99,7 @@ def test_calendar_schedule_visibility_department_and_select(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = other_dept_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
     resp = client.get('/api/calendar/schedules?start=2025-12-01&end=2025-12-31')
     assert resp.status_code == 200
     items = resp.get_json()['items']
@@ -115,6 +118,7 @@ def test_calendar_schedule_full_crud_flow(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = owner_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
 
     create_payload = {
         'title': '주간 미팅',
@@ -196,6 +200,7 @@ def test_calendar_schedule_attachments_upload_persist_download(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = owner_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
 
     create_payload = {
         'title': '첨부 일정',
@@ -255,6 +260,7 @@ def test_calendar_schedule_attachments_delete(app, client):
 
     with client.session_transaction() as session_tx:
         session_tx['user_id'] = owner_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
 
     # Create schedule
     resp = client.post(
