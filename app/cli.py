@@ -384,6 +384,40 @@ def reset_admin_password_command(emp_no, password, generate, changed_by):
     click.echo(f'관리자 비밀번호가 초기화되었습니다: emp_no={target.emp_no}')
     click.echo(f'NEW_PASSWORD={password}')
 
+
+# ── PKI / 에이전트 토큰 명령어 ─────────────────────────
+@click.command('init-pki')
+@click.option('--force', is_flag=True, help='기존 PKI를 덮어쓰고 재생성')
+@with_appcontext
+def init_pki_command(force):
+    """PKI 초기화 — CA + 서버 인증서를 생성합니다."""
+    from app.services.pki_service import init_pki
+    result = init_pki(force=force)
+    if result["created"]:
+        click.echo('PKI 초기화 완료:')
+        click.echo(f'  CA 인증서 : {result["ca_cert"]}')
+        click.echo(f'  CA 키     : {result["ca_key"]}')
+        click.echo(f'  서버 인증서: {result["server_cert"]}')
+        click.echo(f'  서버 키   : {result["server_key"]}')
+    else:
+        click.echo(f'PKI가 이미 존재합니다: {result["ca_cert"]}')
+        click.echo('강제 재생성: flask init-pki --force')
+
+
+@click.command('create-agent-token')
+@click.option('--hours', default=24, help='토큰 유효 시간 (기본: 24)')
+@click.option('--max-uses', default=0, help='최대 사용 횟수 (0=무제한)')
+@with_appcontext
+def create_agent_token_command(hours, max_uses):
+    """에이전트 등록 토큰을 생성합니다."""
+    from app.services.pki_service import generate_token
+    result = generate_token(hours=hours, max_uses=max_uses)
+    click.echo('에이전트 등록 토큰 생성 완료:')
+    click.echo(f'  토큰     : {result["token"]}')
+    click.echo(f'  만료     : {result["expires_at"]}')
+    click.echo(f'  최대 사용: {"무제한" if max_uses == 0 else max_uses}')
+
+
 def register_commands(app):
     """CLI 명령어들을 앱에 등록합니다."""
     app.cli.add_command(init_db_command)
@@ -393,3 +427,5 @@ def register_commands(app):
     app.cli.add_command(create_user_command)
     app.cli.add_command(init_auth_command)
     app.cli.add_command(reset_admin_password_command)
+    app.cli.add_command(init_pki_command)
+    app.cli.add_command(create_agent_token_command)

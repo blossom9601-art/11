@@ -779,7 +779,8 @@ body.modal-open .sidebar.collapsed {
 }
 
 /* Account Management(tab05): align "보기 개수" selector next to the right-side icons (like the red box example) */
-body.page-account-manager .detail-section h3 .page-size-selector{ right: 128px; }
+body.page-account-manager .detail-section h3 .page-size-selector{ right: 113px; }
+body.page-account-tab .detail-section h3 .page-size-selector{ right: 153px; }
 
 /* Account Management(tab05): searchable dropdown (검색+드롭박스) */
 body.page-account-manager .fk-searchable-control{
@@ -917,7 +918,7 @@ body.page-account-manager .fk-search-panel__empty{
 
 /* Server HW tab (tab01-hardware): match Software tab control positions */
 body.page-server-hardware-tab .server-detail-pane#basic #hw-download-btn.add-btn-icon{ right: 74px !important; }
-body.page-server-hardware-tab .detail-section h3 .page-size-selector{ right: 128px; }
+body.page-server-hardware-tab .detail-section h3 .page-size-selector{ right: 113px; }
 
 /* Tab32 할당정보 스타일 (A): tab32-assign-storage.css 로 이동됨 */
 
@@ -1898,7 +1899,7 @@ body.page-server-hardware-tab #hw-spec-table tr[data-system="1"][data-editing="1
 }
 
 /* Interface tabs: match hardware tab header control positions (page size left of two icon buttons) */
-body.page-server-interface-tab .detail-section h3 .page-size-selector{ right: 128px; }
+body.page-server-interface-tab .detail-section h3 .page-size-selector{ right: 113px; }
 
 /* Interface tab: widen '연결 시스템' column a bit */
 body.page-server-interface-tab #if-spec-table colgroup col:nth-child(7){
@@ -3202,6 +3203,9 @@ body.page-storage-assign-group .fk-search-panel__close:hover{
 /* Backup tab (tab03-backup): CSV button rightmost, page-size selector next to it */
 .server-detail-pane#basic #bk-download-btn.add-btn-icon { right: 20px !important; }
 #bk-page-size-wrap.page-size-selector{ right: 74px !important; }
+/* Package tab (tab13-package): same pattern — CSV rightmost, page-size next to it */
+.server-detail-pane#basic #pk-download-btn.add-btn-icon { right: 20px !important; }
+#pk-page-size-wrap.page-size-selector{ right: 74px !important; }
 
 /* DNS 레코드(tab55): header action buttons (CSV + 행추가) */
 .server-detail-pane#basic #dns-record-row-add-btn.add-btn-icon{ right: 20px !important; }
@@ -3708,8 +3712,7 @@ body.page-dns-record .fk-search-panel__list{ max-height:180px; }
 
 /* Log tab: only CSV button (no add button) */
 #lg-download-btn.add-btn-icon { right: 20px !important; }
-.server-detail-pane#basic #pk-upload-btn.add-btn-icon { right: 128px !important; }
-.server-detail-pane#basic #pk-download-btn.add-btn-icon { right: 74px !important; }
+.server-detail-pane#basic #pk-download-btn.add-btn-icon { right: 20px !important; }
 .server-detail-pane#basic #vl-summary-btn.add-btn-icon { right: 20px !important; }
 .server-detail-pane#basic #vl-download-btn.add-btn-icon { right: 74px !important; }
 /* Task tab download button alignment */

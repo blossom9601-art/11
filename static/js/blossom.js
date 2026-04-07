@@ -4067,9 +4067,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 7. 스크립트 로드 (DCL 인터셉트 포함)
             return __spaLoadScripts(doc).then(function () {
+                // 7-a. 탭 모듈 재초기화 — SPA에서 스크립트가 로드되었으나
+                //      readyState 검사로 init()가 즉시 호출되지 않는 경우를 보완.
+                try {
+                    var _tabModules = [
+                        'BlossomTab01Hardware', 'BlossomTab02Software', 'BlossomTab03Backup',
+                        'BlossomTab04Interface', 'BlossomTab05Account', 'BlossomTab06Authority',
+                        'BlossomTab07Activate', 'BlossomTab08Firewalld',
+                        'BlossomTab12Vulnerability', 'BlossomTab13Package'
+                    ];
+                    _tabModules.forEach(function (name) {
+                        try {
+                            var mod = window[name];
+                            if (mod && typeof mod.init === 'function') mod.init();
+                        } catch (_eTab) {}
+                    });
+                    // 함수형 init 패턴 (tab10, tab11)
+                    try { if (typeof window.__blsInitTab10Storage === 'function') window.__blsInitTab10Storage(); } catch (_e) {}
+                    try { if (typeof window.__blsInitTab11Task === 'function') window.__blsInitTab11Task(); } catch (_e) {}
+                    // initFromPage 패턴 (tab14, tab15)
+                    try { var t14 = window.BlossomTab14Log; if (t14 && typeof t14.initFromPage === 'function') t14.initFromPage(); } catch (_e) {}
+                    try { var t15 = window.BlossomTab15File; if (t15 && typeof t15.initFromPage === 'function') t15.initFromPage(); } catch (_e) {}
+                } catch (_eInit) {}
+
                 try {
                     document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
                         detail: { href: href, title: document.title, timestamp: Date.now() }
+                    }));
+                } catch (_e) {}
+                try {
+                    document.dispatchEvent(new CustomEvent('blossom:detailTabLoaded', {
+                        detail: { href: href }
                     }));
                 } catch (_e) {}
                 try { if (typeof applyActiveMenuHighlight === 'function') applyActiveMenuHighlight(); } catch (_e) {}
@@ -4223,6 +4251,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // replaceState (pushState가 아님 — URL은 이미 올바름)
             history.replaceState({ spa: true, href: href }, '', href);
             return __spaLoadScripts(result.doc).then(function () {
+                // 탭 모듈 재초기화 안전망
+                try {
+                    var _tabModules = [
+                        'BlossomTab01Hardware', 'BlossomTab02Software', 'BlossomTab03Backup',
+                        'BlossomTab04Interface', 'BlossomTab05Account', 'BlossomTab06Authority',
+                        'BlossomTab07Activate', 'BlossomTab08Firewalld',
+                        'BlossomTab12Vulnerability', 'BlossomTab13Package'
+                    ];
+                    _tabModules.forEach(function (name) {
+                        try {
+                            var mod = window[name];
+                            if (mod && typeof mod.init === 'function') mod.init();
+                        } catch (_eTab) {}
+                    });
+                    try { if (typeof window.__blsInitTab10Storage === 'function') window.__blsInitTab10Storage(); } catch (_e) {}
+                    try { if (typeof window.__blsInitTab11Task === 'function') window.__blsInitTab11Task(); } catch (_e) {}
+                    try { var t14 = window.BlossomTab14Log; if (t14 && typeof t14.initFromPage === 'function') t14.initFromPage(); } catch (_e) {}
+                    try { var t15 = window.BlossomTab15File; if (t15 && typeof t15.initFromPage === 'function') t15.initFromPage(); } catch (_e) {}
+                } catch (_eInit) {}
                 try {
                     document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
                         detail: { href: href, title: document.title, timestamp: Date.now() }

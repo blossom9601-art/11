@@ -10,9 +10,11 @@ import json
 import logging
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
+_KST = timezone(timedelta(hours=9))
 
 from flask import current_app
 
@@ -20,9 +22,102 @@ logger = logging.getLogger(__name__)
 
 ACTOR = "agent"
 
+# ── SPDX 라이선스 정규화 ──────────────────────────────────
+_spdx_id_map: Optional[Dict[str, str]] = None   # lower(name|id) → licenseId
+
+
+def _load_spdx_map() -> Dict[str, str]:
+    """static/licenses.json 로드하여 {lower_key: licenseId} 매핑 생성"""
+    global _spdx_id_map
+    if _spdx_id_map is not None:
+        return _spdx_id_map
+    _spdx_id_map = {}
+    try:
+        json_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), os.pardir, "static", "licenses.json"
+        )
+        with open(json_path, encoding="utf-8") as f:
+            data = json.load(f)
+        for lic in data.get("licenses", []):
+            lid = lic.get("licenseId", "")
+            name = lic.get("name", "")
+            if lid:
+                _spdx_id_map[lid.lower()] = lid
+            if name:
+                _spdx_id_map[name.lower()] = lid
+    except Exception:
+        pass
+    return _spdx_id_map
+
+
+def _normalize_license(raw: str) -> str:
+    """에이전트에서 수집한 라이선스 문자열을 SPDX ID로 정규화.
+
+    매칭 순서: exact licenseId → exact name → 부분 매칭.
+    매칭 실패 시 원본 문자열 반환.
+    """
+    s = raw.strip()
+    if not s or s.upper() == "UNKNOWN":
+        return ""
+    smap = _load_spdx_map()
+    if not smap:
+        return s
+    low = s.lower()
+    # 1) exact match (licenseId or name)
+    if low in smap:
+        return smap[low]
+    # 2) common short aliases
+    _aliases = {
+        "bsd": "BSD-2-Clause",
+        "bsd license": "BSD-2-Clause",
+        "bsd-2": "BSD-2-Clause",
+        "bsd-3": "BSD-3-Clause",
+        "mit license": "MIT",
+        "apache 2.0": "Apache-2.0",
+        "apache license 2.0": "Apache-2.0",
+        "apache license, version 2.0": "Apache-2.0",
+        "apache software license": "Apache-2.0",
+        "gpl": "GPL-2.0-only",
+        "gplv2": "GPL-2.0-only",
+        "gplv3": "GPL-3.0-only",
+        "gpl-2.0": "GPL-2.0-only",
+        "gpl-3.0": "GPL-3.0-only",
+        "lgpl": "LGPL-2.1-only",
+        "lgplv2": "LGPL-2.1-only",
+        "lgplv3": "LGPL-3.0-only",
+        "mpl 2.0": "MPL-2.0",
+        "mpl-2.0": "MPL-2.0",
+        "mozilla public license 2.0": "MPL-2.0",
+        "public domain": "Unlicense",
+        "isc license": "ISC",
+        "isc": "ISC",
+        "psf": "PSF-2.0",
+        "python software foundation license": "PSF-2.0",
+    }
+    if low in _aliases:
+        return _aliases[low]
+    # 3) 긴 라이선스 전문 텍스트 → 키워드 기반 추론
+    if len(s) > 200:
+        lt = low
+        if "bsd" in lt and "3" in lt or "neither the name" in lt:
+            return "BSD-3-Clause"
+        if "bsd" in lt:
+            return "BSD-2-Clause"
+        if "mit " in lt or "permission is hereby granted" in lt:
+            return "MIT"
+        if "apache" in lt and "2.0" in lt:
+            return "Apache-2.0"
+        if "gnu general public" in lt:
+            if "version 3" in lt:
+                return "GPL-3.0-only"
+            return "GPL-2.0-only"
+        if "mozilla public" in lt:
+            return "MPL-2.0"
+    return s
+
 
 def _now() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(_KST).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _project_root(app) -> str:
@@ -127,6 +222,7 @@ def _ensure_tables(conn: sqlite3.Connection) -> None:
             os_version TEXT,
             payload TEXT NOT NULL,
             received_at TEXT NOT NULL,
+            last_heartbeat TEXT,
             is_linked INTEGER NOT NULL DEFAULT 0,
             linked_asset_id INTEGER,
             linked_at TEXT
@@ -504,9 +600,15 @@ def _upsert_packages(
     now = _now()
     stats = {"inserted": 0, "updated": 0}
 
+    def _strip_quotes(v: str) -> str:
+        s = v.strip()
+        if len(s) >= 2 and s[0] == '"' and s[-1] == '"':
+            s = s[1:-1].strip()
+        return s
+
     for item in items:
         pkg_name = item.get("package_name", "")
-        version = item.get("version", "")
+        version = _strip_quotes(item.get("version", ""))
         if not pkg_name:
             continue
 
@@ -533,9 +635,9 @@ def _upsert_packages(
                     version,
                     pkg_type,
                     identifier,
-                    item.get("vendor", ""),
+                    _strip_quotes(item.get("vendor", "")),
                     item.get("installed", ""),
-                    item.get("license", ""),
+                    _normalize_license(item.get("license", "")),
                     now,
                     existing["id"],
                 ),
@@ -558,9 +660,9 @@ def _upsert_packages(
                     version,
                     pkg_type,
                     identifier,
-                    item.get("vendor", ""),
+                    _strip_quotes(item.get("vendor", "")),
                     item.get("installed", ""),
-                    item.get("license", ""),
+                    _normalize_license(item.get("license", "")),
                     "",
                     now,
                 ),
@@ -596,6 +698,15 @@ def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any
 
     with _get_connection(app) as conn:
         _ensure_tables(conn)
+        _ensure_heartbeat_column(conn)
+
+        # 업로드 자체가 heartbeat 역할 — 항상 갱신
+        now_hb = _now()
+        conn.execute(
+            "UPDATE agent_pending SET last_heartbeat = ? WHERE hostname = ?",
+            (now_hb, hostname),
+        )
+
         asset = _find_asset_by_hostname(conn, hostname)
         if not asset:
             # 미매칭 → agent_pending 에 upsert (같은 hostname은 최신으로 갱신)
@@ -621,16 +732,16 @@ def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any
             if existing:
                 conn.execute(
                     """UPDATE agent_pending
-                       SET ip_address=?, os_type=?, os_version=?, payload=?, received_at=?
+                       SET ip_address=?, os_type=?, os_version=?, payload=?, received_at=?, last_heartbeat=?
                        WHERE id=?""",
-                    (ip_addr, os_type, os_version, payload_json, now, existing["id"]),
+                    (ip_addr, os_type, os_version, payload_json, now, now, existing["id"]),
                 )
             else:
                 conn.execute(
                     """INSERT INTO agent_pending
-                       (hostname, ip_address, os_type, os_version, payload, received_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (hostname, ip_addr, os_type, os_version, payload_json, now),
+                       (hostname, ip_address, os_type, os_version, payload, received_at, last_heartbeat)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (hostname, ip_addr, os_type, os_version, payload_json, now, now),
                 )
             conn.commit()
             return {
@@ -676,43 +787,95 @@ def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any
 # ── 에이전트 연동 상태 조회 ───────────────────────────────
 
 def is_agent_synced(asset_id: int, *, app=None) -> bool:
-    """해당 자산에 에이전트가 업로드한 레코드가 존재하면 True"""
+    """자산에 연동된 에이전트가 존재하고, 수신시각이 1시간 이내이면 True"""
     app = app or current_app
     try:
         with _get_connection(app) as conn:
-            for table in ("hw_interface", "asset_account", "asset_package"):
+            _ensure_tables(conn)
+            row = conn.execute(
+                """SELECT received_at FROM agent_pending
+                   WHERE linked_asset_id = ? AND is_linked = 1
+                   ORDER BY linked_at DESC LIMIT 1""",
+                (asset_id,),
+            ).fetchone()
+            if not row:
+                return False
+            received = row["received_at"] or ""
+            try:
+                recv_dt = datetime.strptime(received, "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
                 try:
-                    col_name = "created_by" if table == "hw_interface" else "created_at"
-                    # hw_interface uses created_by='agent', others check by asset_id existence
-                    if table == "hw_interface":
-                        row = conn.execute(
-                            "SELECT 1 FROM hw_interface WHERE asset_id = ? AND created_by = ? LIMIT 1",
-                            (asset_id, ACTOR),
-                        ).fetchone()
-                    else:
-                        scope_col = "asset_scope" if table != "hw_interface" else "scope_key"
-                        row = conn.execute(
-                            f"SELECT 1 FROM {table} WHERE asset_id = ? AND is_deleted = 0 LIMIT 1",
-                            (asset_id,),
-                        ).fetchone()
-                    if row:
-                        return True
-                except Exception:
-                    continue
+                    recv_dt = datetime.strptime(received[:19], "%Y-%m-%dT%H:%M:%S")
+                except (ValueError, TypeError):
+                    return False
+            return (datetime.now(_KST).replace(tzinfo=None) - recv_dt).total_seconds() <= 3600
     except Exception:
         pass
     return False
 
 
+# ── 에이전트 heartbeat ────────────────────────────────────
+
+# heartbeat 유효 시간 (초): 이 시간 안에 heartbeat가 없으면 offline
+_HEARTBEAT_TIMEOUT = 120  # 2분
+
+
+def _ensure_heartbeat_column(conn):
+    """last_heartbeat 컬럼이 없으면 추가 (기존 DB 마이그레이션)"""
+    try:
+        conn.execute("SELECT last_heartbeat FROM agent_pending LIMIT 0")
+    except sqlite3.OperationalError:
+        try:
+            conn.execute("ALTER TABLE agent_pending ADD COLUMN last_heartbeat TEXT")
+        except Exception:
+            pass
+
+
+def update_agent_heartbeat(hostname: str, *, app=None) -> bool:
+    """에이전트 heartbeat를 갱신한다. 해당 hostname 레코드 존재 시 True."""
+    app = app or current_app
+    now = _now()
+    try:
+        with _get_connection(app) as conn:
+            _ensure_tables(conn)
+            _ensure_heartbeat_column(conn)
+            cur = conn.execute(
+                "UPDATE agent_pending SET last_heartbeat = ? WHERE hostname = ?",
+                (now, hostname),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception:
+        logger.exception("update_agent_heartbeat 오류")
+        return False
+
+
+def _agent_status(last_hb: str) -> str:
+    """last_heartbeat 문자열 → 'online' | 'offline'"""
+    if not last_hb:
+        return "offline"
+    try:
+        dt = datetime.strptime(last_hb, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        try:
+            dt = datetime.strptime(last_hb[:19], "%Y-%m-%dT%H:%M:%S")
+        except (ValueError, TypeError):
+            return "offline"
+    elapsed = (datetime.now(_KST).replace(tzinfo=None) - dt).total_seconds()
+    return "online" if elapsed <= _HEARTBEAT_TIMEOUT else "offline"
+
+
 # ── 대기중 에이전트 목록 / 연동 ────────────────────────────
 
 def get_pending_agents(*, app=None) -> List[Dict[str, Any]]:
-    """아직 연동되지 않은 에이전트 대기 목록 반환"""
+    """아직 연동되지 않은 에이전트 대기 목록 반환 (hostname 중복 제거, 상태 포함)"""
     app = app or current_app
     rows = []
     try:
         with _get_connection(app) as conn:
             _ensure_tables(conn)
+            _ensure_heartbeat_column(conn)
+
             # os_version 컬럼이 없는 기존 DB 대응
             has_os_ver = False
             try:
@@ -723,19 +886,35 @@ def get_pending_agents(*, app=None) -> List[Dict[str, Any]]:
 
             if has_os_ver:
                 cur = conn.execute(
-                    """SELECT id, hostname, ip_address, os_type, os_version, received_at
-                       FROM agent_pending
-                       WHERE is_linked = 0
-                       ORDER BY received_at DESC"""
+                    """SELECT p.id, p.hostname, p.ip_address, p.os_type,
+                              p.os_version, p.received_at, p.last_heartbeat
+                       FROM agent_pending p
+                       INNER JOIN (
+                           SELECT hostname, MAX(id) AS max_id
+                           FROM agent_pending
+                           WHERE is_linked = 0
+                           GROUP BY hostname
+                       ) latest ON p.id = latest.max_id
+                       WHERE p.is_linked = 0
+                       ORDER BY p.last_heartbeat DESC, p.received_at DESC""",
                 )
             else:
                 cur = conn.execute(
-                    """SELECT id, hostname, ip_address, os_type, received_at
-                       FROM agent_pending
-                       WHERE is_linked = 0
-                       ORDER BY received_at DESC"""
+                    """SELECT p.id, p.hostname, p.ip_address, p.os_type,
+                              p.received_at, p.last_heartbeat
+                       FROM agent_pending p
+                       INNER JOIN (
+                           SELECT hostname, MAX(id) AS max_id
+                           FROM agent_pending
+                           WHERE is_linked = 0
+                           GROUP BY hostname
+                       ) latest ON p.id = latest.max_id
+                       WHERE p.is_linked = 0
+                       ORDER BY p.last_heartbeat DESC, p.received_at DESC""",
                 )
             for r in cur.fetchall():
+                hb = r["last_heartbeat"] if "last_heartbeat" in r.keys() else None
+                status = _agent_status(hb)
                 rows.append({
                     "id": r["id"],
                     "hostname": r["hostname"],
@@ -743,6 +922,8 @@ def get_pending_agents(*, app=None) -> List[Dict[str, Any]]:
                     "os_type": r["os_type"] or "",
                     "os_version": (r["os_version"] if has_os_ver else "") or "",
                     "received_at": r["received_at"],
+                    "last_heartbeat": hb or "",
+                    "status": status,
                 })
     except Exception:
         logger.exception("get_pending_agents 오류")
@@ -856,6 +1037,15 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
 
             if not row:
                 return None
+            received = row["received_at"] or ""
+            try:
+                recv_dt = datetime.strptime(received, "%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                try:
+                    recv_dt = datetime.strptime(received[:19], "%Y-%m-%dT%H:%M:%S")
+                except (ValueError, TypeError):
+                    recv_dt = None
+            is_active = recv_dt is not None and (datetime.now(_KST).replace(tzinfo=None) - recv_dt).total_seconds() <= 3600
             return {
                 "id": row["id"],
                 "hostname": row["hostname"],
@@ -864,6 +1054,7 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
                 "os_version": (row["os_version"] if has_os_ver else "") or "",
                 "received_at": row["received_at"],
                 "linked_at": row["linked_at"],
+                "active": is_active,
             }
     except Exception:
         logger.exception("get_linked_agent 오류")

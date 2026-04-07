@@ -85,6 +85,7 @@ class AccountCollector(BaseCollector):
             raw = subprocess.check_output(
                 ["net", "user", username],
                 text=True, timeout=10, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             groups = []
             in_group = False
@@ -111,6 +112,7 @@ class AccountCollector(BaseCollector):
             raw = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command", script],
                 text=True, timeout=30, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             data = json.loads(raw)
             if isinstance(data, dict):

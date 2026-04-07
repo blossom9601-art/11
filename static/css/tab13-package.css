@@ -13,9 +13,16 @@
    1. 버튼 위치 (3개: 업로드 · 다운로드 · 행추가)
       행추가(#pk-row-add)는 기본 right:20px 사용.
    ═══════════════════════════════════ */
-.server-detail-pane#basic #pk-download-btn.add-btn-icon { right: 74px !important; }
-.server-detail-pane#basic #pk-upload-btn.add-btn-icon   { right: 128px !important; }
-.tab13-package-root .detail-section h3 .page-size-selector { right: 182px; }
+/* download/upload/page-size 위치는 detail.css에서 ID 셀렉터로 제어 */
+
+/* ═══════════════════════════════════
+   1-b. 식별자 컬럼 숨김 (5번째 컬럼)
+   ═══════════════════════════════════ */
+.tab13-package-root #pk-spec-table col:nth-child(5),
+.tab13-package-root #pk-spec-table th:nth-child(5),
+.tab13-package-root #pk-spec-table td:nth-child(5) {
+    display: none;
+}
 
 /* ═══════════════════════════════════
    2. 인라인 편집 — detail.css 기본(#e5e7eb 테두리)를 그대로 사용.

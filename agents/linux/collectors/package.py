@@ -12,6 +12,11 @@ import subprocess
 import sys
 from typing import Any, Dict, List
 
+try:
+    from importlib.metadata import distributions as _distributions
+except ImportError:
+    _distributions = None
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from common.collector import BaseCollector
 
@@ -124,7 +129,17 @@ class PackageCollector(BaseCollector):
         return items
 
     # ── pip ───────────────────────────────────────────────
-    def _collect_pip(self) -> List[Dict[str, Any]]:
+    def _collect_pip(self) -> List[Dict[str, Any]]:        # importlib.metadata 로 라이선스 정보 수집
+        license_map: Dict[str, str] = {}
+        if _distributions is not None:
+            try:
+                for dist in _distributions():
+                    name = dist.metadata.get("Name", "")
+                    lic = dist.metadata.get("License", "") or ""
+                    if name and lic and lic.upper() != "UNKNOWN":
+                        license_map[name.lower()] = lic.strip()
+            except Exception:
+                pass
         items: List[Dict[str, Any]] = []
         pip_cmd = shutil.which("pip3") or shutil.which("pip")
         if not pip_cmd:
@@ -140,13 +155,14 @@ class PackageCollector(BaseCollector):
         for line in raw.strip().splitlines()[2:]:  # 헤더 2줄 건너뛰기
             parts = line.split()
             if len(parts) >= 2:
+                pkg_name = parts[0]
                 items.append({
-                    "package_name": parts[0],
+                    "package_name": pkg_name,
                     "version": parts[1],
                     "package_type": "PIP",
                     "vendor": "",
                     "installed": "",
-                    "license": "",
+                    "license": license_map.get(pkg_name.lower(), ""),
                 })
         return items
 

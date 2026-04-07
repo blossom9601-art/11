@@ -31,6 +31,11 @@ a = Analysis(
         'windows.collectors.interface',
         'windows.collectors.account',
         'windows.collectors.package',
+        'servicemanager',
+        'win32event',
+        'win32service',
+        'win32serviceutil',
+        'win32timezone',
     ],
     hookspath=[],
     hooksconfig={},
@@ -54,7 +59,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     icon=ICON_FILE,
 )
 

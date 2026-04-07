@@ -1,3 +1,8 @@
+<!-- FOUC 방지: 외부 CSS/JS 로드 전에 main-content 숨김 → DOMContentLoaded 시 fade-in -->
+<style>.main-content{opacity:0;transition:opacity .18s ease}</style>
+<script>(function(){function r(){var m=document.querySelector('.main-content');if(m)m.style.opacity='1'}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',r)}else{r()}setTimeout(r,3000)})()</script>
+<noscript><style>.main-content{opacity:1!important}</style></noscript>
+
 <!-- 공통 디자인 토큰 & 컴포넌트 -->
 <link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
 <link rel="stylesheet" href="/static/css/components.css?v=20260315">

@@ -17,11 +17,44 @@ from app.services.agent_service import (
     link_agent_to_asset,
     get_linked_agent,
     unlink_agent,
+    update_agent_heartbeat,
+)
+from app.services.pki_service import (
+    sign_agent_csr,
+    generate_token,
+    list_tokens,
+    revoke_token,
+    list_agent_certs,
+    revoke_agent_cert,
 )
 
 logger = logging.getLogger(__name__)
 
 agent_api_bp = Blueprint("agent_api", __name__)
+
+
+@agent_api_bp.route("/api/agent/ping", methods=["GET"])
+def agent_ping():
+    """에이전트 연결 테스트용 헬스체크"""
+    return jsonify({"success": True, "message": "pong"})
+
+
+@agent_api_bp.route("/api/agent/heartbeat", methods=["POST"])
+def agent_heartbeat():
+    """에이전트 heartbeat 갱신
+
+    body: { "hostname": "..." }
+    """
+    data = request.get_json(silent=True) or {}
+    hostname = (data.get("hostname") or "").strip()
+    if not hostname:
+        return jsonify({"success": False, "error": "hostname이 필요합니다."}), 400
+    try:
+        found = update_agent_heartbeat(hostname)
+        return jsonify({"success": True, "found": found})
+    except Exception:
+        logger.exception("heartbeat 처리 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
 
 
 @agent_api_bp.route("/api/agent/upload", methods=["POST"])
@@ -138,3 +171,100 @@ def agent_unlink():
 
     status_code = 200 if result.get("success") else 400
     return jsonify(result), status_code
+
+
+# ── PKI: 에이전트 등록 (인증서 발급) ─────────────────────
+@agent_api_bp.route("/api/agent/register", methods=["POST"])
+def agent_register():
+    """에이전트 등록 — CSR + 토큰으로 클라이언트 인증서를 발급한다.
+
+    Request JSON: {"csr": "PEM string", "token": "hex string", "hostname": "name"}
+    Response: {"success": true, "client_cert": "PEM", "ca_cert": "PEM"}
+    """
+    data = request.get_json(silent=True) or {}
+    csr_pem = data.get("csr", "").strip()
+    token_str = data.get("token", "").strip()  # 선택 — 없으면 자동 승인
+    hostname = data.get("hostname", "").strip()
+
+    if not csr_pem or not hostname:
+        return jsonify({
+            "success": False,
+            "error": "csr, hostname이 필요합니다.",
+        }), 400
+
+    try:
+        success, result = sign_agent_csr(
+            csr_pem.encode("utf-8"), hostname, token_str
+        )
+    except Exception:
+        logger.exception("에이전트 등록 중 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+    if not success:
+        return jsonify({"success": False, "error": result.get("error", "")}), 403
+
+    return jsonify({
+        "success": True,
+        "client_cert": result["client_cert"],
+        "ca_cert": result["ca_cert"],
+    })
+
+
+# ── PKI: 토큰 관리 API (관리자용) ───────────────────────
+@agent_api_bp.route("/api/agent/tokens", methods=["GET"])
+def agent_token_list():
+    """등록 토큰 목록"""
+    try:
+        rows = list_tokens()
+        return jsonify({"success": True, "rows": rows, "total": len(rows)})
+    except Exception:
+        logger.exception("토큰 목록 조회 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/tokens", methods=["POST"])
+def agent_token_create():
+    """등록 토큰 생성"""
+    data = request.get_json(silent=True) or {}
+    hours = data.get("hours", 24)
+    max_uses = data.get("max_uses", 0)
+    try:
+        result = generate_token(hours=int(hours), max_uses=int(max_uses))
+        return jsonify({"success": True, "item": result})
+    except Exception:
+        logger.exception("토큰 생성 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/tokens/<int:token_id>/revoke", methods=["POST"])
+def agent_token_revoke(token_id):
+    """등록 토큰 폐기"""
+    try:
+        revoke_token(token_id)
+        return jsonify({"success": True})
+    except Exception:
+        logger.exception("토큰 폐기 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+# ── PKI: 에이전트 인증서 관리 ────────────────────────────
+@agent_api_bp.route("/api/agent/certs", methods=["GET"])
+def agent_cert_list():
+    """발급된 에이전트 인증서 목록"""
+    try:
+        rows = list_agent_certs()
+        return jsonify({"success": True, "rows": rows, "total": len(rows)})
+    except Exception:
+        logger.exception("인증서 목록 조회 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/certs/<int:cert_id>/revoke", methods=["POST"])
+def agent_cert_revoke(cert_id):
+    """에이전트 인증서 폐기"""
+    try:
+        revoke_agent_cert(cert_id)
+        return jsonify({"success": True})
+    except Exception:
+        logger.exception("인증서 폐기 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500

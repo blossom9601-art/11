@@ -26,8 +26,8 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile=
-WizardImageFile=
-WizardSmallImageFile=
+WizardImageFile=wizard_image.bmp
+WizardSmallImageFile=wizard_small.bmp
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
@@ -35,15 +35,15 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "바탕화면에 바로가기 만들기"; GroupDescription: "바로가기 옵션:"; Flags: checkedonce
-Name: "startupicon"; Description: "Windows 시작 시 자동 실행"; GroupDescription: "자동 실행:"; Flags: unchecked
 
 [Files]
 ; PyInstaller dist\Lumina\ 폴더 전체
 Source: "dist\Lumina\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 아이콘 파일
 Source: "lumina.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "lumina_ico.png"; DestDir: "{app}"; Flags: ignoreversion
 ; 기본 설정 파일 (없을 때만)
-Source: "lumina.conf.default"; DestDir: "{commonappdata}\Lumina"; DestName: "lumina.conf"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "lumina.conf.default"; DestDir: "{commonappdata}\Lumina"; DestName: "lumina.conf"; Flags: onlyifdoesntexist
 
 [Icons]
 ; 시작 메뉴
@@ -52,20 +52,23 @@ Name: "{group}\{#MyAppName} 제거"; Filename: "{uninstallexe}"; IconFilename: "
 ; 바탕화면 (선택)
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\lumina.ico"; Tasks: desktopicon; Comment: "{#MyAppDescription}"
 
-[Registry]
-; 자동 시작 등록 (선택)
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Lumina"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startupicon
-
 [Dirs]
 Name: "{commonappdata}\Lumina"; Permissions: everyone-full
 Name: "{commonappdata}\Lumina\logs"; Permissions: everyone-full
 
 [Run]
-; 설치 후 실행 (선택)
+; 서비스 자동 등록 (설치 시)
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--install-service"; Flags: runhidden waituntilterminated; StatusMsg: "서비스 등록 중..."
+; 설치 후 GUI 실행 (선택)
 Filename: "{app}\{#MyAppExeName}"; Description: "Lumina 에이전트 실행"; Flags: nowait postinstall skipifsilent unchecked
 
+[UninstallRun]
+; 서비스 중지 및 제거
+Filename: "sc.exe"; Parameters: "stop Lumina"; Flags: runhidden waituntilterminated
+Filename: "sc.exe"; Parameters: "delete Lumina"; Flags: runhidden waituntilterminated
+
 [UninstallDelete]
-Type: filesandordirs; Name: "{commonappdata}\Lumina\logs"
+Type: filesandordirs; Name: "{commonappdata}\Lumina"
 
 [Code]
 // 설치 완료 시 안내 메시지
@@ -73,6 +76,18 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    // 필요 시 추가 동작
+    // 서비스는 [Run] 섹션에서 --install-service 로 자동 등록
+  end;
+end;
+
+// 언인스톨 전 서비스 정리
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    Exec('sc.exe', 'stop Lumina', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'delete Lumina', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

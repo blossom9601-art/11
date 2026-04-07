@@ -8,9 +8,9 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.3">
-    <link rel="stylesheet" href="/static/css/detail.css?v=4.34">
-    <link rel="stylesheet" href="/static/css/tab13-package.css?v=1.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.36">
+    <link rel="stylesheet" href="/static/css/tab13-package.css?v=1.6">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -54,7 +54,7 @@
                     <div class="detail-section">
                         <h3>
                             패키지 정보
-                            <div class="page-size-selector" aria-label="보기 개수">
+                            <div class="page-size-selector" id="pk-page-size-wrap" aria-label="보기 개수">
                                 <label for="pk-page-size" class="visually-hidden">보기 개수</label>
                                 <select id="pk-page-size" class="page-size-select" title="보기 개수">
                                     <option value="10">10개</option>
@@ -67,14 +67,14 @@
                         <div class="table-wrap">
                             <table class="hw-table" id="pk-spec-table" data-scope="{{ tab13_scope or '' }}">
                                 <colgroup>
-                                    <col><!-- checkbox -->
-                                    <col style="width: 160px"><!-- 패키지 이름 -->
-                                    <col style="width: 140px"><!-- 버전 -->
-                                    <col style="width: 140px"><!-- 유형 -->
-                                    <col><!-- 식별자 (나머지 영역 자동) -->
-                                    <col style="width: 140px"><!-- 제조사 -->
-                                    <col style="width: 140px"><!-- 라이선스 -->
-                                    <col style="width: 140px"><!-- 취약점(버튼) -->
+                                    <col style="width: 40px"><!-- checkbox -->
+                                    <col><!-- 패키지 이름 (auto) -->
+                                    <col style="width: 110px"><!-- 버전 -->
+                                    <col style="width: 70px"><!-- 유형 -->
+                                    <col><!-- 식별자 (CSS hidden) -->
+                                    <col style="width: 240px"><!-- 제조사 -->
+                                    <col style="width: 110px"><!-- 라이선스 -->
+                                    <col style="width: 90px"><!-- 취약점(버튼) -->
                                 </colgroup>
                                 <thead>
                                     <tr>
@@ -128,11 +128,11 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260315_dis"></script>
+    <script src="/static/js/blossom.js?v=20260406_tab"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
-    <script src="/static/js/_detail/_hardware_detail.js?v=1.1.0"></script>
+    <script src="/static/js/_detail/_hardware_detail.js?v=1.2.0"></script>
     <script>
     /* 페이지 타이틀/서브타이틀 복원 — sessionStorage 기반 */
     (function resolvePackagePageHeader(){

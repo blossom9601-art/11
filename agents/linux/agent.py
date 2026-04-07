@@ -106,6 +106,30 @@ def run_once(config: AgentConfig):
         logger.info("수집 완료 → 서버 전송 성공")
 
 
+def _send_heartbeat(config: AgentConfig):
+    """서버에 heartbeat 전송"""
+    if not config.server_host:
+        return
+    import ssl as _ssl
+    import socket as _sock
+    try:
+        url = f"{config.server_protocol}://{config.server_host}:{config.server_port}/api/agent/heartbeat"
+        body = json.dumps({"hostname": config.hostname or _sock.gethostname()}).encode("utf-8")
+        ctx = _ssl.create_default_context()
+        if not config.verify_ssl:
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5, context=ctx):
+            pass
+    except Exception:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(description="Lumina 자산 자동 탐색 에이전트 (Linux)")
     parser.add_argument("--once", action="store_true", help="1회 수집 후 종료")
@@ -151,14 +175,21 @@ def main():
     while _running:
         try:
             run_once(config)
+            _send_heartbeat(config)
         except Exception:
             logger.exception("수집 사이클 중 예기치 않은 오류")
 
-        # interval 동안 1초 간격으로 _running 체크 (graceful shutdown)
+        # interval 동안 60초 간격으로 heartbeat 전송
         elapsed = 0
+        hb_interval = min(60, config.interval)
         while _running and elapsed < config.interval:
-            time.sleep(1)
-            elapsed += 1
+            time.sleep(hb_interval)
+            elapsed += hb_interval
+            if _running and elapsed < config.interval:
+                try:
+                    _send_heartbeat(config)
+                except Exception:
+                    pass
 
     logger.info("에이전트 종료")
 

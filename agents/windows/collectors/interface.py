@@ -74,10 +74,13 @@ class InterfaceCollector(BaseCollector):
 
     def _run_ps(self, script: str) -> List[Dict[str, Any]]:
         try:
+            # Force UTF-8 output to avoid CP949 encoding issues with Korean names
+            utf8_prefix = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
             raw = subprocess.check_output(
-                ["powershell", "-NoProfile", "-Command", script],
-                text=True, timeout=30, stderr=subprocess.DEVNULL,
-            )
+                ["powershell", "-NoProfile", "-Command", utf8_prefix + script],
+                timeout=30, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            ).decode("utf-8")
             data = json.loads(raw)
             if isinstance(data, dict):
                 return [data]

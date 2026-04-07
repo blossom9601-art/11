@@ -168,13 +168,13 @@ html.dl-header-pending #page-header-subtitle{
 
 /* SPA tab swap: lightweight fade for tab content transitions */
 @keyframes spaFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 main.main-content.spa-fade-in,
 .server-detail-content.spa-fade-in,
 .tab-content.spa-fade-in {
-    animation: spaFadeIn .15s ease-out both;
+    animation: spaFadeIn .25s ease-out both;
 }
 
 /* SPA skeleton placeholder */

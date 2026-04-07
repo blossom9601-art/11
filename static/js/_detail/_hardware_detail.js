@@ -140,9 +140,10 @@
 						|| getStored((storagePrefix || 'detail') + ':selected:row', 'local');
 			if(_rawRow){
 				var _row = JSON.parse(_rawRow);
-				if(_row && _row.agent_synced != null){
-					updateAgentIcon(!!_row.agent_synced);
-				}
+				// agent_synced가 없으면 미연동(false)으로 표시
+				updateAgentIcon(!!(_row && _row.agent_synced));
+			} else {
+				updateAgentIcon(false);
 			}
 		}catch(_eAI){}
 	}
@@ -271,12 +272,18 @@
 				span.style.cssText = 'display:inline-flex;align-items:center;margin-left:8px;vertical-align:middle;';
 				h1.appendChild(span);
 			}
-			var color = synced ? '#6366F1' : '#cbd5e1';
 			span.title = synced ? 'Lumina 에이전트 연동됨' : 'Lumina 에이전트 미연동';
-			span.innerHTML =
-				'<svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
-					'<path fill="' + color + '" d="m2.953 18.591c-1.481-1.869-2.12-3.722-1.915-5.628.246-2.296 1.664-4.667 4.46-7.464s5.169-4.215 7.464-4.461c2.198-.239 4.331.647 6.497 2.664-.218 1.153-1.435 5.367-7.758 7.344-5.814 1.817-7.961 5.371-8.748 7.545zm18.094-13.182c-.787 2.174-2.934 5.728-8.748 7.545-6.329 1.978-7.542 6.199-7.758 7.346 1.935 1.803 3.842 2.699 5.795 2.699 2.846-.088 5.051-1.464 8.167-4.499 2.797-2.797 4.214-5.168 4.46-7.464.205-1.906-.434-3.759-1.915-5.628z"/>' +
-				'</svg>';
+			if(synced){
+				span.innerHTML =
+					'<svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+						'<path fill="#6366F1" d="m2.953 18.591c-1.481-1.869-2.12-3.722-1.915-5.628.246-2.296 1.664-4.667 4.46-7.464s5.169-4.215 7.464-4.461c2.198-.239 4.331.647 6.497 2.664-.218 1.153-1.435 5.367-7.758 7.344-5.814 1.817-7.961 5.371-8.748 7.545zm18.094-13.182c-.787 2.174-2.934 5.728-8.748 7.545-6.329 1.978-7.542 6.199-7.758 7.346 1.935 1.803 3.842 2.699 5.795 2.699 2.846-.088 5.051-1.464 8.167-4.499 2.797-2.797 4.214-5.168 4.46-7.464.205-1.906-.434-3.759-1.915-5.628z"/>' +
+					'</svg>';
+			} else {
+				span.innerHTML =
+					'<img src="/static/image/svg/agent/free-icon-font-coffee-bean-w.svg" ' +
+						'width="22" height="22" alt="미연동" ' +
+						'style="opacity:.35;filter:grayscale(1);">';
+			}
 		}catch(_e){}
 	}
 
@@ -286,6 +293,7 @@
 	var PAGE_SIZE = 10;
 	var _allPending = [];
 	var _currentPage = 1;
+	var _pendingPollTimer = null;
 
 	function _showConfirmModal(opts){
 		var id = 'lumina-confirm-modal';
@@ -384,15 +392,18 @@
 				_currentPage = 1;
 				_showPendingView();
 				_loadPendingList();
+				_startPendingPoll();
 			}
 		}).catch(function(){
 			_currentPage = 1;
 			_showPendingView();
 			_loadPendingList();
+			_startPendingPoll();
 		});
 	}
 
 	function closeLinkModal(){
+		_stopPendingPoll();
 		var modal = document.getElementById(LINK_MODAL_ID);
 		if(!modal) return;
 		modal.classList.remove('show');
@@ -408,14 +419,21 @@
 		if(subtitleEl) subtitleEl.textContent = '현재 자산에 연동된 에이전트 정보입니다.';
 		if(footer) footer.style.display = 'flex';
 
+		var isActive = !!agent.active;
 		var osLabel = agent.os_version || agent.os_type || '-';
 		var recvTs = (agent.received_at || '').replace('T',' ').substring(0, 16);
 		var linkTs = (agent.linked_at || '').replace('T',' ').substring(0, 16);
+		var statusColor = isActive ? '#6366F1' : '#94a3b8';
+		var statusText = isActive ? '연동됨' : '수신 없음 (1시간 초과)';
+		var iconBg = isActive ? '#6366F1' : '#94a3b8';
+
+		// 아이콘도 active 상태에 맞게 갱신
+		updateAgentIcon(isActive);
 
 		var html =
 			'<div style="padding:32px 40px;">' +
 				'<div style="display:flex;align-items:center;gap:12px;margin-bottom:28px;">' +
-					'<div style="width:48px;height:48px;background:#6366F1;border-radius:12px;display:flex;align-items:center;justify-content:center;">' +
+					'<div style="width:48px;height:48px;background:' + iconBg + ';border-radius:12px;display:flex;align-items:center;justify-content:center;">' +
 						'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
 							'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
 							'<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -423,7 +441,7 @@
 					'</div>' +
 					'<div>' +
 						'<div style="font-size:18px;font-weight:700;color:#1e293b;">' + _esc(agent.hostname) + '</div>' +
-						'<div style="font-size:13px;color:#6366F1;font-weight:500;">연동됨</div>' +
+						'<div style="font-size:13px;color:' + statusColor + ';font-weight:500;">' + statusText + '</div>' +
 					'</div>' +
 				'</div>' +
 				'<table style="width:100%;border-collapse:collapse;font-size:14px;">' +
@@ -516,6 +534,7 @@
 			body.innerHTML =
 				'<table id="lumina-link-table" style="width:100%;border-collapse:collapse;font-size:13px;">' +
 					'<thead><tr style="border-bottom:2px solid #e3e6eb;background:#f8f9fb;">' +
+						'<th style="text-align:center;padding:11px 12px;color:#475569;font-weight:600;font-size:13px;width:52px;">상태</th>' +
 						'<th style="text-align:left;padding:11px 24px;color:#475569;font-weight:600;font-size:13px;">Hostname</th>' +
 						'<th style="text-align:left;padding:11px 24px;color:#475569;font-weight:600;font-size:13px;">IP</th>' +
 						'<th style="text-align:left;padding:11px 24px;color:#475569;font-weight:600;font-size:13px;">OS</th>' +
@@ -529,7 +548,7 @@
 
 	function _loadPendingList(){
 		var tbody = document.getElementById('lumina-link-tbody');
-		if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:28px 24px;color:#94a3b8;">불러오는 중...</td></tr>';
+		if(tbody && !_allPending.length) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px 24px;color:#94a3b8;">불러오는 중...</td></tr>';
 
 		fetchJSON('/api/agent/pending').then(function(data){
 			_allPending = (data && data.rows) || [];
@@ -538,6 +557,28 @@
 			_allPending = [];
 			_renderPage();
 		});
+	}
+
+	function _startPendingPoll(){
+		_stopPendingPoll();
+		_pendingPollTimer = setInterval(function(){
+			var modal = document.getElementById(LINK_MODAL_ID);
+			if(!modal || !modal.classList.contains('show')){
+				_stopPendingPoll();
+				return;
+			}
+			fetchJSON('/api/agent/pending').then(function(data){
+				_allPending = (data && data.rows) || [];
+				_renderPage();
+			}).catch(function(){});
+		}, 5000);
+	}
+
+	function _stopPendingPoll(){
+		if(_pendingPollTimer){
+			clearInterval(_pendingPollTimer);
+			_pendingPollTimer = null;
+		}
 	}
 
 	function _renderPage(){
@@ -554,17 +595,23 @@
 
 		var html = '';
 		if(!pageRows.length){
-			html = '<tr><td colspan="5" style="text-align:center;padding:28px 24px;color:#94a3b8;">연동 대기중인 에이전트가 없습니다.</td></tr>';
+			html = '<tr><td colspan="6" style="text-align:center;padding:28px 24px;color:#94a3b8;">연동 대기중인 에이전트가 없습니다.</td></tr>';
 			// 빈 행으로 높이 유지
 			for(var e = 0; e < PAGE_SIZE - 1; e++){
-				html += '<tr><td colspan="5" style="padding:11px 24px;">&nbsp;</td></tr>';
+				html += '<tr><td colspan="6" style="padding:11px 24px;">&nbsp;</td></tr>';
 			}
 		} else {
 			for(var i = 0; i < pageRows.length; i++){
 				var r = pageRows[i];
 				var ts = (r.received_at || '').replace('T',' ').substring(0, 16);
 				var osLabel = r.os_version || r.os_type || '-';
+				var isOnline = r.status === 'online';
+				var dotColor = isOnline ? '#16a34a' : '#94a3b8';
+				var dotTitle = isOnline ? '온라인' : '오프라인';
 				html += '<tr data-pending-id="' + r.id + '" style="border-bottom:1px solid #f1f5f9;">' +
+					'<td style="padding:11px 12px;text-align:center;" title="' + dotTitle + '">' +
+						'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + dotColor + ';"></span>' +
+					'</td>' +
 					'<td style="padding:11px 24px;color:#1e293b;">' + _esc(r.hostname) + '</td>' +
 					'<td style="padding:11px 24px;color:#475569;">' + _esc(r.ip_address || '-') + '</td>' +
 					'<td style="padding:11px 24px;color:#475569;font-size:12px;">' + _esc(osLabel) + '</td>' +
@@ -582,7 +629,7 @@
 			}
 			// 빈 행으로 높이 유지
 			for(var j = pageRows.length; j < PAGE_SIZE; j++){
-				html += '<tr><td colspan="5" style="padding:11px 24px;">&nbsp;</td></tr>';
+				html += '<tr><td colspan="6" style="padding:11px 24px;">&nbsp;</td></tr>';
 			}
 		}
 		tbody.innerHTML = html;

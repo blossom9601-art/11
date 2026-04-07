@@ -11,6 +11,11 @@ import subprocess
 import sys
 from typing import Any, Dict, List
 
+try:
+    from importlib.metadata import distributions as _distributions
+except ImportError:
+    _distributions = None
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from common.collector import BaseCollector
 
@@ -78,22 +83,36 @@ $items | Sort-Object Name -Unique | ConvertTo-Json -Compress
 
     def _collect_pip(self) -> List[Dict[str, Any]]:
         """pip list 로 Python 패키지 수집"""
+        # importlib.metadata 로 라이선스 정보 수집
+        license_map: Dict[str, str] = {}
+        if _distributions is not None:
+            try:
+                for dist in _distributions():
+                    name = dist.metadata.get("Name", "")
+                    lic = dist.metadata.get("License", "") or ""
+                    if name and lic and lic.upper() != "UNKNOWN":
+                        license_map[name.lower()] = lic.strip()
+            except Exception:
+                pass
+
         items: List[Dict[str, Any]] = []
         for pip_cmd in ["pip3", "pip"]:
             try:
                 raw = subprocess.check_output(
                     [pip_cmd, "list", "--format=json"],
                     text=True, timeout=60, stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 data = json.loads(raw)
                 for pkg in data:
+                    pkg_name = pkg.get("name", "")
                     items.append({
-                        "package_name": pkg.get("name", ""),
+                        "package_name": pkg_name,
                         "version": pkg.get("version", ""),
                         "package_type": "PIP",
                         "vendor": "",
                         "installed": "",
-                        "license": "",
+                        "license": license_map.get(pkg_name.lower(), ""),
                     })
                 break  # pip3 성공하면 pip 건너뛰기
             except (FileNotFoundError, subprocess.SubprocessError, json.JSONDecodeError):
@@ -105,6 +124,7 @@ $items | Sort-Object Name -Unique | ConvertTo-Json -Compress
             raw = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command", script],
                 text=True, timeout=60, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             data = json.loads(raw)
             if isinstance(data, dict):

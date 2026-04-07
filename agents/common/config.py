@@ -43,6 +43,11 @@ class AgentConfig:
         self.server_protocol = DEFAULT_PROTOCOL
         self.verify_ssl = False
 
+        # TLS / mTLS 인증서 경로
+        self.ca_cert = ""       # CA 인증서 (서버 검증용)
+        self.client_cert = ""   # 클라이언트 인증서 (mTLS)
+        self.client_key = ""    # 클라이언트 개인키 (mTLS)
+
         self._load()
 
     @property
@@ -86,6 +91,9 @@ class AgentConfig:
                 self.server_port = self._cp.getint("server", "port", fallback=DEFAULT_PORT)
                 self.server_protocol = self._cp.get("server", "protocol", fallback=DEFAULT_PROTOCOL).strip()
                 self.verify_ssl = self._cp.getboolean("server", "verify_ssl", fallback=False)
+                self.ca_cert = self._cp.get("server", "ca_cert", fallback="").strip()
+                self.client_cert = self._cp.get("server", "client_cert", fallback="").strip()
+                self.client_key = self._cp.get("server", "client_key", fallback="").strip()
 
             # [agent] 섹션
             if self._cp.has_section("agent"):
@@ -111,6 +119,9 @@ class AgentConfig:
         cp.set("server", "port", str(self.server_port))
         cp.set("server", "protocol", self.server_protocol)
         cp.set("server", "verify_ssl", str(self.verify_ssl).lower())
+        cp.set("server", "ca_cert", self.ca_cert)
+        cp.set("server", "client_cert", self.client_cert)
+        cp.set("server", "client_key", self.client_key)
 
         cp.add_section("agent")
         cp.set("agent", "interval", str(self.interval))
