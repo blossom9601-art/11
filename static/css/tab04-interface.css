@@ -458,21 +458,178 @@
     border-radius: var(--if-radius-btn, 10px);
 }
 
-/* 예외 리스트 모달 테이블 */
+/* ═══════════════════════════════════
+   9. 예외 리스트 모달
+   ═══════════════════════════════════ */
+
+/* 모달 박스 */
+#if-exception-modal .modal-box {
+    background: #fafbfc;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
+    max-width: 960px;
+    width: 92%;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin: 48px auto 32px;
+}
+
+/* 모달 헤더 */
+#if-exception-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px 16px;
+    background: linear-gradient(180deg, #f8f9fb 0%, #f1f3f6 100%);
+    border-bottom: 1px solid #e3e6eb;
+    flex-shrink: 0;
+}
+#if-exception-modal .modal-header h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: #1e293b;
+    letter-spacing: -0.01em;
+}
+
+/* 닫기 버튼 */
+#if-exception-modal .modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1;
+    padding: 0;
+}
+#if-exception-modal .modal-close:hover {
+    background: #f1f5f9;
+    border-color: #d1d5db;
+    color: #1e293b;
+}
+
+/* 모달 바디 */
+#if-exception-modal .modal-body {
+    padding: 20px 28px 24px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    background: #fff;
+}
+
+/* 예외 건수 뱃지 */
+#if-exception-modal .if-exc-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 6px 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #dc2626;
+    font-weight: 500;
+}
+
+/* 테이블 */
 #if-exception-modal .hw-table {
     width: 100%;
     font-size: 13px;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
 }
-#if-exception-modal .hw-table th,
+#if-exception-modal .hw-table thead {
+    background: #f8fafc;
+}
+#if-exception-modal .hw-table th {
+    padding: 10px 10px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: none;
+    letter-spacing: 0;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
 #if-exception-modal .hw-table td {
-    padding: 8px 6px;
+    padding: 9px 10px;
     text-align: left;
     font-size: 13px;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    word-break: break-all;
 }
+#if-exception-modal .hw-table tbody tr:last-child td {
+    border-bottom: none;
+}
+#if-exception-modal .hw-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* 인터페이스명 컬럼 강조 */
+#if-exception-modal .hw-table td.if-exc-iface {
+    font-weight: 500;
+    color: #6366f1;
+}
+
+/* 복원 버튼 */
 #if-exception-modal .action-btn {
-    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+#if-exception-modal .action-btn:hover {
+    background: #eef2ff;
+    border-color: #a5b4fc;
 }
 #if-exception-modal .action-icon {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
+}
+
+/* 빈 상태 */
+#if-exception-modal .if-det-empty {
+    text-align: center;
+    padding: 36px 16px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    #if-exception-modal .modal-box {
+        width: 98%;
+        max-height: 90vh;
+        margin: 16px auto;
+        border-radius: 10px;
+    }
+    #if-exception-modal .modal-header {
+        padding: 16px 18px 12px;
+    }
+    #if-exception-modal .modal-body {
+        padding: 14px 12px 18px;
+    }
+    #if-exception-modal .hw-table th,
+    #if-exception-modal .hw-table td {
+        font-size: 11px;
+        padding: 6px 5px;
+    }
 }

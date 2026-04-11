@@ -1,0 +1,3 @@
+#!/bin/bash
+# Lumina Agent CLI wrapper
+exec /usr/bin/python3 /opt/lumina/linux/agent.py --conf /etc/lumina/lumina.conf "$@"

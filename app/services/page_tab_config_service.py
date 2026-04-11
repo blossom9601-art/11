@@ -82,7 +82,7 @@ def init_page_tab_config_table(app):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS page_tab_config (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id              INTEGER PRIMARY KEY AUTO_INCREMENT,
                     page_code       VARCHAR(64)  NOT NULL,
                     tab_code        VARCHAR(64)  NOT NULL,
                     tab_name        VARCHAR(128) NOT NULL,
@@ -95,7 +95,7 @@ def init_page_tab_config_table(app):
                     permission_code VARCHAR(64),
                     route_key       VARCHAR(128),
                     extra_options   TEXT,
-                    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at      TEXT,
                     is_deleted      INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(page_code, tab_code)

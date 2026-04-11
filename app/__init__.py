@@ -114,7 +114,7 @@ def _ensure_org_user_view(app: Flask) -> None:
             nickname,
             company,
             department,
-            location,
+            NULL AS location,
             ext_phone,
             mobile_phone,
             email,
@@ -139,9 +139,14 @@ def _ensure_org_user_view(app: Flask) -> None:
     try:
         with app.app_context():
             engine = db.get_engine()
+            is_mysql = 'mysql' in str(engine.url) or 'mariadb' in str(engine.url)
             with engine.begin() as conn:
-                conn.execute(text('DROP VIEW IF EXISTS "user"'))
-                conn.execute(ddl_create)
+                if is_mysql:
+                    conn.execute(text('DROP VIEW IF EXISTS `user`'))
+                    conn.execute(text(ddl_create.text.replace('"user"', '`user`')))
+                else:
+                    conn.execute(text('DROP VIEW IF EXISTS "user"'))
+                    conn.execute(ddl_create)
     except Exception as exc:
         try:
             print('[org-user-view] ensure failed:', exc, flush=True)
@@ -277,7 +282,7 @@ def create_app(config_name='default'):
                     # menu 테이블
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS menu (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             menu_code VARCHAR(64) UNIQUE NOT NULL,
                             menu_name VARCHAR(128) NOT NULL,
                             parent_menu_id INTEGER REFERENCES menu(id),
@@ -288,7 +293,7 @@ def create_app(config_name='default'):
                     # role_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS role_menu_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -298,7 +303,7 @@ def create_app(config_name='default'):
                     # department_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS department_menu_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             dept_id INTEGER NOT NULL REFERENCES org_department(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -308,7 +313,7 @@ def create_app(config_name='default'):
                     # user_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS user_menu_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -318,7 +323,7 @@ def create_app(config_name='default'):
                     # permission_audit_log (확장)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS permission_audit_log (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             target_type VARCHAR(20) NOT NULL DEFAULT 'role',
                             target_id INTEGER NOT NULL DEFAULT 0,
                             menu_code VARCHAR(64) NOT NULL,
@@ -372,7 +377,7 @@ def create_app(config_name='default'):
                     cur = conn.cursor()
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS detail_page (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             page_code VARCHAR(64) UNIQUE NOT NULL,
                             page_name VARCHAR(128) NOT NULL,
                             parent_page_id INTEGER REFERENCES detail_page(id),
@@ -382,7 +387,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS role_detail_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -391,7 +396,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS department_detail_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             dept_id INTEGER NOT NULL REFERENCES org_department(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -400,7 +405,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS user_detail_permission (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
                             user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -424,737 +429,649 @@ def create_app(config_name='default'):
             print('[detail_perm_migration] error:', e, flush=True)
     _ensure_detail_perm_tables(app)
 
-    # ── 출입 권한 구역 테이블 자동 생성 + 시드 ──
-    try:
-        with app.app_context():
+    # ── 테이블 초기화 (단일 app_context 블록으로 통합) ──
+    with app.app_context():
+        # ── 출입 권한 구역 테이블 자동 생성 + 시드 ──
+        try:
             from app.routes.api import _ensure_access_zone_tables
             _ensure_access_zone_tables()
-    except Exception as zone_init_err:
-        try:
-            print('[access-zone] table init failed:', zone_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as zone_init_err:
+            try:
+                print('[access-zone] table init failed:', zone_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 권한 변경 기록 테이블 자동 생성 ──
-    try:
-        with app.app_context():
+        # ── 권한 변경 기록 테이블 자동 생성 ──
+        try:
             from app.routes.api import _ensure_authority_record_table
             _ensure_authority_record_table()
-    except Exception as auth_rec_err:
-        try:
-            print('[authority-record] table init failed:', auth_rec_err, flush=True)
-        except Exception:
-            pass
+        except Exception as auth_rec_err:
+            try:
+                print('[authority-record] table init failed:', auth_rec_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_insight_item_table(app)
-    except Exception as insight_init_err:
+        except Exception as insight_init_err:
+            try:
+                print('[insight-item] table init failed:', insight_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[insight-item] table init failed:', insight_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_work_category_table(app)
-    except Exception as work_init_err:
+        except Exception as work_init_err:
+            try:
+                print('[work-category] table init failed:', work_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[work-category] table init failed:', work_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_work_division_table(app)
-    except Exception as division_init_err:
+        except Exception as division_init_err:
+            try:
+                print('[work-division] table init failed:', division_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[work-division] table init failed:', division_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_work_status_table(app)
-    except Exception as status_init_err:
+        except Exception as status_init_err:
+            try:
+                print('[work-status] table init failed:', status_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[work-status] table init failed:', status_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_tab32_assign_group_tables(app)
-    except Exception as asg32_init_err:
+        except Exception as asg32_init_err:
+            try:
+                print('[tab32-assign-group] table init failed:', asg32_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[tab32-assign-group] table init failed:', asg32_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_work_operation_table(app)
-    except Exception as operation_init_err:
+        except Exception as operation_init_err:
+            try:
+                print('[work-operation] table init failed:', operation_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[work-operation] table init failed:', operation_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_org_department_table(app)
-    except Exception as dept_init_err:
+        except Exception as dept_init_err:
+            try:
+                print('[org-department] table init failed:', dept_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[org-department] table init failed:', dept_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_work_group_table(app)
-    except Exception as group_init_err:
-        try:
-            print('[work-group] table init failed:', group_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as group_init_err:
+            try:
+                print('[work-group] table init failed:', group_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_hw_interface_table(app)
-    except Exception as iface_init_err:
-        try:
-            print('[hw-interface] table init failed:', iface_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as iface_init_err:
+            try:
+                print('[hw-interface] table init failed:', iface_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_hw_interface_detail_table(app)
-    except Exception as iface_detail_init_err:
+        except Exception as iface_detail_init_err:
+            try:
+                print('[hw-interface-detail] table init failed:', iface_detail_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-interface-detail] table init failed:', iface_detail_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_maintenance_contract_table(app)
-    except Exception as maint_init_err:
+        except Exception as maint_init_err:
+            try:
+                print('[hw-maintenance-contract] table init failed:', maint_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-maintenance-contract] table init failed:', maint_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_activate_table(app)
-    except Exception as activate_init_err:
+        except Exception as activate_init_err:
+            try:
+                print('[hw-activate] table init failed:', activate_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-activate] table init failed:', activate_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_firewalld_table(app)
-    except Exception as firewalld_init_err:
+        except Exception as firewalld_init_err:
+            try:
+                print('[hw-firewalld] table init failed:', firewalld_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-firewalld] table init failed:', firewalld_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_frame_frontbay_table(app)
-    except Exception as frontbay_init_err:
+        except Exception as frontbay_init_err:
+            try:
+                print('[hw-frame-frontbay] table init failed:', frontbay_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-frame-frontbay] table init failed:', frontbay_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_quality_type_table(app)
-    except Exception as qt_init_err:
+        except Exception as qt_init_err:
+            try:
+                print('[quality-type] table init failed:', qt_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[quality-type] table init failed:', qt_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_org_center_table(app)
-    except Exception as center_init_err:
+        except Exception as center_init_err:
+            try:
+                print('[org-center] table init failed:', center_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[org-center] table init failed:', center_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_org_rack_table(app)
-    except Exception as rack_init_err:
+        except Exception as rack_init_err:
+            try:
+                print('[org-rack] table init failed:', rack_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[org-rack] table init failed:', rack_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_org_thermometer_table(app)
-    except Exception as thermo_init_err:
+        except Exception as thermo_init_err:
+            try:
+                print('[org-thermometer] table init failed:', thermo_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[org-thermometer] table init failed:', thermo_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_org_cctv_table(app)
-    except Exception as cctv_init_err:
+        except Exception as cctv_init_err:
+            try:
+                print('[org-cctv] table init failed:', cctv_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[org-cctv] table init failed:', cctv_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab1_surface_table(app)
-    except Exception as lab_surface_init_err:
+        except Exception as lab_surface_init_err:
+            try:
+                print('[system-lab1-surface] table init failed:', lab_surface_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab1-surface] table init failed:', lab_surface_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab2_surface_table(app)
-    except Exception as lab_surface_init_err:
+        except Exception as lab_surface_init_err:
+            try:
+                print('[system-lab2-surface] table init failed:', lab_surface_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab2-surface] table init failed:', lab_surface_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab3_surface_table(app)
-    except Exception as lab_surface_init_err:
+        except Exception as lab_surface_init_err:
+            try:
+                print('[system-lab3-surface] table init failed:', lab_surface_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab3-surface] table init failed:', lab_surface_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab4_surface_table(app)
-    except Exception as lab_surface_init_err:
+        except Exception as lab_surface_init_err:
+            try:
+                print('[system-lab4-surface] table init failed:', lab_surface_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab4-surface] table init failed:', lab_surface_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab1_thermometer_table(app)
-    except Exception as lab_thermo_init_err:
+        except Exception as lab_thermo_init_err:
+            try:
+                print('[system-lab1-thermometer] table init failed:', lab_thermo_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab1-thermometer] table init failed:', lab_thermo_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab2_thermometer_table(app)
-    except Exception as lab_thermo_init_err:
+        except Exception as lab_thermo_init_err:
+            try:
+                print('[system-lab2-thermometer] table init failed:', lab_thermo_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab2-thermometer] table init failed:', lab_thermo_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab3_thermometer_table(app)
-    except Exception as lab_thermo_init_err:
+        except Exception as lab_thermo_init_err:
+            try:
+                print('[system-lab3-thermometer] table init failed:', lab_thermo_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab3-thermometer] table init failed:', lab_thermo_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab4_thermometer_table(app)
-    except Exception as lab_thermo_init_err:
+        except Exception as lab_thermo_init_err:
+            try:
+                print('[system-lab4-thermometer] table init failed:', lab_thermo_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab4-thermometer] table init failed:', lab_thermo_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab1_cctv_table(app)
-    except Exception as lab_cctv_init_err:
+        except Exception as lab_cctv_init_err:
+            try:
+                print('[system-lab1-cctv] table init failed:', lab_cctv_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab1-cctv] table init failed:', lab_cctv_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab2_cctv_table(app)
-    except Exception as lab_cctv_init_err:
+        except Exception as lab_cctv_init_err:
+            try:
+                print('[system-lab2-cctv] table init failed:', lab_cctv_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab2-cctv] table init failed:', lab_cctv_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab3_cctv_table(app)
-    except Exception as lab_cctv_init_err:
+        except Exception as lab_cctv_init_err:
+            try:
+                print('[system-lab3-cctv] table init failed:', lab_cctv_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab3-cctv] table init failed:', lab_cctv_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_system_lab4_cctv_table(app)
-    except Exception as lab_cctv_init_err:
+        except Exception as lab_cctv_init_err:
+            try:
+                print('[system-lab4-cctv] table init failed:', lab_cctv_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[system-lab4-cctv] table init failed:', lab_cctv_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_manufacturer_table(app)
-    except Exception as vendor_init_err:
+        except Exception as vendor_init_err:
+            try:
+                print('[vendor-manufacturer] table init failed:', vendor_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-manufacturer] table init failed:', vendor_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_manufacturer_manager_table(app)
-    except Exception as vendor_mgr_init_err:
+        except Exception as vendor_mgr_init_err:
+            try:
+                print('[vendor-manufacturer-manager] table init failed:', vendor_mgr_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-manufacturer-manager] table init failed:', vendor_mgr_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_maintenance_table(app)
-    except Exception as vendor_maint_init_err:
+        except Exception as vendor_maint_init_err:
+            try:
+                print('[vendor-maintenance] table init failed:', vendor_maint_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-maintenance] table init failed:', vendor_maint_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_maintenance_manager_table(app)
-    except Exception as vendor_maint_mgr_init_err:
+        except Exception as vendor_maint_mgr_init_err:
+            try:
+                print('[vendor-maintenance-manager] table init failed:', vendor_maint_mgr_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-maintenance-manager] table init failed:', vendor_maint_mgr_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_manufacturer_software_table(app)
-    except Exception as vendor_sw_init_err:
+        except Exception as vendor_sw_init_err:
+            try:
+                print('[vendor-manufacturer-software] table init failed:', vendor_sw_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-manufacturer-software] table init failed:', vendor_sw_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_maintenance_software_table(app)
-    except Exception as vendor_maint_sw_init_err:
+        except Exception as vendor_maint_sw_init_err:
+            try:
+                print('[vendor-maintenance-software] table init failed:', vendor_maint_sw_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-maintenance-software] table init failed:', vendor_maint_sw_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_maintenance_sla_tables(app)
-    except Exception as sla_init_err:
+        except Exception as sla_init_err:
+            try:
+                print('[vendor-maintenance-sla] table init failed:', sla_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-maintenance-sla] table init failed:', sla_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_maintenance_issue_tables(app)
-    except Exception as issue_init_err:
+        except Exception as issue_init_err:
+            try:
+                print('[vendor-maintenance-issue] table init failed:', issue_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-maintenance-issue] table init failed:', issue_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_component_table(app)
-    except Exception as vendor_component_init_err:
+        except Exception as vendor_component_init_err:
+            try:
+                print('[vendor-component] table init failed:', vendor_component_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-component] table init failed:', vendor_component_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_vendor_hardware_table(app)
-    except Exception as vendor_hw_init_err:
+        except Exception as vendor_hw_init_err:
+            try:
+                print('[vendor-hardware] table init failed:', vendor_hw_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[vendor-hardware] table init failed:', vendor_hw_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_opex_contract_table(app)
-    except Exception as opex_contract_init_err:
+        except Exception as opex_contract_init_err:
+            try:
+                print('[opex-contract] table init failed:', opex_contract_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[opex-contract] table init failed:', opex_contract_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_capex_contract_table(app)
-    except Exception as capex_contract_init_err:
+        except Exception as capex_contract_init_err:
+            try:
+                print('[capex-contract] table init failed:', capex_contract_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[capex-contract] table init failed:', capex_contract_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cost_contract_tab61_table(app)
-    except Exception as tab71_opex_init_err:
+        except Exception as tab71_opex_init_err:
+            try:
+                print('[tab71-opex] table init failed:', tab71_opex_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[tab71-opex] table init failed:', tab71_opex_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cost_capex_contract_tab62_table(app)
-    except Exception as tab62_contract_init_err:
+        except Exception as tab62_contract_init_err:
+            try:
+                print('[tab62-capex-contract] table init failed:', tab62_contract_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[tab62-capex-contract] table init failed:', tab62_contract_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_cpu_type_table(app)
-    except Exception as cmp_cpu_type_init_err:
+        except Exception as cmp_cpu_type_init_err:
+            try:
+                print('[cmp-cpu-type] table init failed:', cmp_cpu_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-cpu-type] table init failed:', cmp_cpu_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_memory_type_table(app)
-    except Exception as cmp_memory_type_init_err:
+        except Exception as cmp_memory_type_init_err:
+            try:
+                print('[cmp-memory-type] table init failed:', cmp_memory_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-memory-type] table init failed:', cmp_memory_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_disk_type_table(app)
-    except Exception as cmp_disk_type_init_err:
+        except Exception as cmp_disk_type_init_err:
+            try:
+                print('[cmp-disk-type] table init failed:', cmp_disk_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-disk-type] table init failed:', cmp_disk_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_gpu_type_table(app)
-    except Exception as cmp_gpu_type_init_err:
+        except Exception as cmp_gpu_type_init_err:
+            try:
+                print('[cmp-gpu-type] table init failed:', cmp_gpu_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-gpu-type] table init failed:', cmp_gpu_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_nic_type_table(app)
-    except Exception as cmp_nic_type_init_err:
+        except Exception as cmp_nic_type_init_err:
+            try:
+                print('[cmp-nic-type] table init failed:', cmp_nic_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-nic-type] table init failed:', cmp_nic_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_hba_type_table(app)
-    except Exception as cmp_hba_type_init_err:
+        except Exception as cmp_hba_type_init_err:
+            try:
+                print('[cmp-hba-type] table init failed:', cmp_hba_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-hba-type] table init failed:', cmp_hba_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_cmp_etc_type_table(app)
-    except Exception as cmp_etc_type_init_err:
+        except Exception as cmp_etc_type_init_err:
+            try:
+                print('[cmp-etc-type] table init failed:', cmp_etc_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cmp-etc-type] table init failed:', cmp_etc_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_server_type_table(app)
-    except Exception as hw_server_type_init_err:
+        except Exception as hw_server_type_init_err:
+            try:
+                print('[hw-server-type] table init failed:', hw_server_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-server-type] table init failed:', hw_server_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_storage_type_table(app)
-    except Exception as hw_storage_type_init_err:
+        except Exception as hw_storage_type_init_err:
+            try:
+                print('[hw-storage-type] table init failed:', hw_storage_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-storage-type] table init failed:', hw_storage_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_san_type_table(app)
-    except Exception as hw_san_type_init_err:
+        except Exception as hw_san_type_init_err:
+            try:
+                print('[hw-san-type] table init failed:', hw_san_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-san-type] table init failed:', hw_san_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_network_type_table(app)
-    except Exception as hw_network_type_init_err:
+        except Exception as hw_network_type_init_err:
+            try:
+                print('[hw-network-type] table init failed:', hw_network_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-network-type] table init failed:', hw_network_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_hw_security_type_table(app)
-    except Exception as hw_security_type_init_err:
+        except Exception as hw_security_type_init_err:
+            try:
+                print('[hw-security-type] table init failed:', hw_security_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[hw-security-type] table init failed:', hw_security_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_os_type_table(app)
-    except Exception as sw_os_type_init_err:
+        except Exception as sw_os_type_init_err:
+            try:
+                print('[sw-os-type] table init failed:', sw_os_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-os-type] table init failed:', sw_os_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_db_type_table(app)
-    except Exception as sw_db_type_init_err:
+        except Exception as sw_db_type_init_err:
+            try:
+                print('[sw-db-type] table init failed:', sw_db_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-db-type] table init failed:', sw_db_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_middleware_type_table(app)
-    except Exception as sw_middleware_type_init_err:
+        except Exception as sw_middleware_type_init_err:
+            try:
+                print('[sw-middleware-type] table init failed:', sw_middleware_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-middleware-type] table init failed:', sw_middleware_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_virtual_type_table(app)
-    except Exception as sw_virtual_type_init_err:
+        except Exception as sw_virtual_type_init_err:
+            try:
+                print('[sw-virtual-type] table init failed:', sw_virtual_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-virtual-type] table init failed:', sw_virtual_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_ha_type_table(app)
-    except Exception as sw_ha_type_init_err:
+        except Exception as sw_ha_type_init_err:
+            try:
+                print('[sw-ha-type] table init failed:', sw_ha_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-ha-type] table init failed:', sw_ha_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_sw_security_type_table(app)
-    except Exception as sw_security_type_init_err:
+        except Exception as sw_security_type_init_err:
+            try:
+                print('[sw-security-type] table init failed:', sw_security_type_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[sw-security-type] table init failed:', sw_security_type_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_chat_tables(app)
-    except Exception as chat_init_err:
+        except Exception as chat_init_err:
+            try:
+                print('[chat] table init failed:', chat_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[chat] table init failed:', chat_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_software_asset_table(app)
-    except Exception as sw_asset_init_err:
+        except Exception as sw_asset_init_err:
+            try:
+                print('[software-asset] table init failed:', sw_asset_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[software-asset] table init failed:', sw_asset_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_dns_policy_table(app)
-    except Exception as network_dns_init_err:
+        except Exception as network_dns_init_err:
+            try:
+                print('[network-dns-policy] table init failed:', network_dns_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-dns-policy] table init failed:', network_dns_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_dns_policy_log_table(app)
-    except Exception as network_dns_log_init_err:
+        except Exception as network_dns_log_init_err:
+            try:
+                print('[network-dns-policy-log] table init failed:', network_dns_log_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-dns-policy-log] table init failed:', network_dns_log_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_dns_record_table(app)
-    except Exception as network_dns_record_init_err:
+        except Exception as network_dns_record_init_err:
+            try:
+                print('[network-dns-record] table init failed:', network_dns_record_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-dns-record] table init failed:', network_dns_record_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_dns_diagram_table(app)
-    except Exception as network_dns_diagram_init_err:
+        except Exception as network_dns_diagram_init_err:
+            try:
+                print('[network-dns-diagram] table init failed:', network_dns_diagram_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-dns-diagram] table init failed:', network_dns_diagram_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ip_policy_table(app)
-    except Exception as network_ip_init_err:
+        except Exception as network_ip_init_err:
+            try:
+                print('[network-ip-policy] table init failed:', network_ip_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-ip-policy] table init failed:', network_ip_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ip_diagram_table(app)
-    except Exception as network_ip_diagram_init_err:
+        except Exception as network_ip_diagram_init_err:
+            try:
+                print('[network-ip-diagram] table init failed:', network_ip_diagram_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-ip-diagram] table init failed:', network_ip_diagram_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_leased_line_log_table(app)
-    except Exception as network_leased_line_log_init_err:
+        except Exception as network_leased_line_log_init_err:
+            try:
+                print('[network-leased-line-log] table init failed:', network_leased_line_log_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-leased-line-log] table init failed:', network_leased_line_log_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ad_table(app)
-    except Exception as network_ad_init_err:
+        except Exception as network_ad_init_err:
+            try:
+                print('[network-ad] table init failed:', network_ad_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-ad] table init failed:', network_ad_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ad_account_tables(app)
-    except Exception as network_ad_acc_init_err:
+        except Exception as network_ad_acc_init_err:
+            try:
+                print('[network-ad] account/log table init failed:', network_ad_acc_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-ad] account/log table init failed:', network_ad_acc_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ad_diagram_table(app)
-    except Exception as network_ad_diagram_init_err:
-        try:
-            print('[network-ad-diagram] table init failed:', network_ad_diagram_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as network_ad_diagram_init_err:
+            try:
+                print('[network-ad-diagram] table init failed:', network_ad_diagram_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_upload_meta_table(app)
-    except Exception as upload_meta_init_err:
-        try:
-            print('[upload-meta] table init failed:', upload_meta_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as upload_meta_init_err:
+            try:
+                print('[upload-meta] table init failed:', upload_meta_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_tab15_file_table(app)
-    except Exception as tab15_init_err:
-        try:
-            print('[tab15-file] table init failed:', tab15_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as tab15_init_err:
+            try:
+                print('[tab15-file] table init failed:', tab15_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_cost_opex_hardware_config_table(app)
-    except Exception as cost_opex_hw_cfg_init_err:
+        except Exception as cost_opex_hw_cfg_init_err:
+            try:
+                print('[cost-opex-hardware-config] table init failed:', cost_opex_hw_cfg_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[cost-opex-hardware-config] table init failed:', cost_opex_hw_cfg_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_network_ad_fqdn_table(app)
-    except Exception as network_ad_fqdn_init_err:
+        except Exception as network_ad_fqdn_init_err:
+            try:
+                print('[network-ad-fqdn] table init failed:', network_ad_fqdn_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[network-ad-fqdn] table init failed:', network_ad_fqdn_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_access_entry_register_table(app)
-    except Exception as access_entry_init_err:
+        except Exception as access_entry_init_err:
+            try:
+                print('[access-entry-register] table init failed:', access_entry_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[access-entry-register] table init failed:', access_entry_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_data_delete_register_table(app)
-    except Exception as data_delete_init_err:
+        except Exception as data_delete_init_err:
+            try:
+                print('[data-delete-register] table init failed:', data_delete_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[data-delete-register] table init failed:', data_delete_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_data_delete_system_table(app)
-    except Exception as data_delete_system_init_err:
+        except Exception as data_delete_system_init_err:
+            try:
+                print('[data-delete-system] table init failed:', data_delete_system_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[data-delete-system] table init failed:', data_delete_system_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_customer_member_table(app)
-    except Exception as customer_member_init_err:
+        except Exception as customer_member_init_err:
+            try:
+                print('[customer-member] table init failed:', customer_member_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[customer-member] table init failed:', customer_member_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_dynamic_tab_record_table(app)
-    except Exception as dtr_init_err:
+        except Exception as dtr_init_err:
+            try:
+                print('[dynamic-tab-record] table init failed:', dtr_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[dynamic-tab-record] table init failed:', dtr_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_customer_associate_table(app)
-    except Exception as customer_associate_init_err:
+        except Exception as customer_associate_init_err:
+            try:
+                print('[customer-associate] table init failed:', customer_associate_init_err, flush=True)
+            except Exception:
+                pass
         try:
-            print('[customer-associate] table init failed:', customer_associate_init_err, flush=True)
-        except Exception:
-            pass
-    try:
-        with app.app_context():
             init_customer_client_table(app)
-    except Exception as customer_client_init_err:
-        try:
-            print('[customer-client] table init failed:', customer_client_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as customer_client_init_err:
+            try:
+                print('[customer-client] table init failed:', customer_client_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_sw_system_allocation_table(app)
-    except Exception as sw_system_alloc_init_err:
-        try:
-            print('[sw-system-allocation] table init failed:', sw_system_alloc_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as sw_system_alloc_init_err:
+            try:
+                print('[sw-system-allocation] table init failed:', sw_system_alloc_init_err, flush=True)
+            except Exception:
+                pass
 
-    # SMTP 설정 테이블 (singleton)
-    try:
-        with app.app_context():
+        # SMTP 설정 테이블 (singleton)
+        try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS smtp_config (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
                     host        TEXT NOT NULL DEFAULT 'smtp.gmail.com',
                     port        INTEGER NOT NULL DEFAULT 587,
                     encryption  TEXT NOT NULL DEFAULT 'STARTTLS',
@@ -1186,18 +1103,17 @@ def create_app(config_name='default'):
                 """))
                 db.session.commit()
                 print('[smtp-config] seeded default row', flush=True)
-    except Exception as smtp_init_err:
-        try:
-            print('[smtp-config] table init failed:', smtp_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as smtp_init_err:
+            try:
+                print('[smtp-config] table init failed:', smtp_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── MFA / SMS / OTP 관련 테이블 생성 ──
-    try:
-        with app.app_context():
+        # ── MFA / SMS / OTP 관련 테이블 생성 ──
+        try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS mfa_config (
-                    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id                   INTEGER PRIMARY KEY AUTO_INCREMENT,
                     enabled              INTEGER NOT NULL DEFAULT 0,
                     default_type         TEXT    NOT NULL DEFAULT 'totp',
                     totp_enabled         INTEGER NOT NULL DEFAULT 1,
@@ -1217,7 +1133,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS sms_config (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id            INTEGER PRIMARY KEY AUTO_INCREMENT,
                     provider      TEXT    NOT NULL DEFAULT 'coolsms',
                     api_key       TEXT    NOT NULL DEFAULT '',
                     api_secret    TEXT    NOT NULL DEFAULT '',
@@ -1228,7 +1144,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS company_otp_config (
-                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id            INTEGER PRIMARY KEY AUTO_INCREMENT,
                     provider      TEXT    NOT NULL DEFAULT 'initech',
                     api_endpoint  TEXT    NOT NULL DEFAULT '',
                     api_key       TEXT    NOT NULL DEFAULT '',
@@ -1241,7 +1157,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS mfa_pending_codes (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id         INTEGER PRIMARY KEY AUTO_INCREMENT,
                     emp_no     TEXT    NOT NULL,
                     mfa_type   TEXT    NOT NULL,
                     code       TEXT    NOT NULL,
@@ -1252,18 +1168,17 @@ def create_app(config_name='default'):
             """))
             db.session.commit()
             print('[mfa-tables] mfa_config / sms_config / company_otp_config / mfa_pending_codes ready', flush=True)
-    except Exception as mfa_init_err:
-        try:
-            print('[mfa-tables] table init failed:', mfa_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as mfa_init_err:
+            try:
+                print('[mfa-tables] table init failed:', mfa_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 보안정책 테이블 (security_policy + security_policy_log + banned_passwords) ──
-    try:
-        with app.app_context():
+        # ── 보안정책 테이블 (security_policy + security_policy_log + banned_passwords) ──
+        try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_policy (
-                    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id                       INTEGER PRIMARY KEY AUTO_INCREMENT,
                     min_length               INTEGER NOT NULL DEFAULT 12,
                     max_length               INTEGER NOT NULL DEFAULT 64,
                     expiry_days              INTEGER NOT NULL DEFAULT 90,
@@ -1298,7 +1213,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_policy_log (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
                     field_name  TEXT NOT NULL,
                     old_value   TEXT,
                     new_value   TEXT,
@@ -1308,8 +1223,8 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS banned_passwords (
-                    id   INTEGER PRIMARY KEY AUTOINCREMENT,
-                    word TEXT NOT NULL UNIQUE
+                    id   INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    word VARCHAR(255) NOT NULL UNIQUE
                 )
             """))
             db.session.commit()
@@ -1323,7 +1238,7 @@ def create_app(config_name='default'):
             if _bw and _bw[0] == 0:
                 for _w in ['password','admin','welcome','qwerty','letmein','123456','abc123','master','root','login']:
                     try:
-                        db.session.execute(db.text("INSERT OR IGNORE INTO banned_passwords (word) VALUES (:w)"), {'w': _w})
+                        db.session.execute(db.text("INSERT IGNORE INTO banned_passwords (word) VALUES (:w)"), {'w': _w})
                     except Exception:
                         pass
                 db.session.commit()
@@ -1343,20 +1258,19 @@ def create_app(config_name='default'):
                 except Exception:
                     db.session.rollback()
             print('[security-policy] security_policy / security_policy_log / banned_passwords ready', flush=True)
-    except Exception as sec_policy_init_err:
-        try:
-            print('[security-policy] table init failed:', sec_policy_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as sec_policy_init_err:
+            try:
+                print('[security-policy] table init failed:', sec_policy_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 활성 세션 테이블 (active_sessions) ──
-    try:
-        with app.app_context():
+        # ── 활성 세션 테이블 (active_sessions) ──
+        try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS active_sessions (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id  TEXT    NOT NULL UNIQUE,
-                    emp_no      TEXT    NOT NULL,
+                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    session_id  VARCHAR(255) NOT NULL UNIQUE,
+                    emp_no      VARCHAR(64)  NOT NULL,
                     user_name   TEXT    NOT NULL DEFAULT '',
                     ip_address  TEXT,
                     user_agent  TEXT,
@@ -1377,15 +1291,14 @@ def create_app(config_name='default'):
                 except Exception:
                     db.session.rollback()
             print('[active-sessions] active_sessions table ready', flush=True)
-    except Exception as _as_err:
-        try:
-            print('[active-sessions] table init failed:', _as_err, flush=True)
-        except Exception:
-            pass
+        except Exception as _as_err:
+            try:
+                print('[active-sessions] table init failed:', _as_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 워크플로우 디자이너 테이블 (wf_design, wf_design_version, wf_design_like) ──
-    try:
-        with app.app_context():
+        # ── 워크플로우 디자이너 테이블 (wf_design, wf_design_version, wf_design_like) ──
+        try:
             from app.models import WfDesign, WfDesignVersion, WfDesignLike, WfDesignView  # noqa: F401
             from sqlalchemy import inspect as sa_inspect
             inspector = sa_inspect(db.engine)
@@ -1441,15 +1354,14 @@ def create_app(config_name='default'):
                         conn.execute(db.text("ALTER TABLE wf_design ADD COLUMN live_definition TEXT"))
                         conn.commit()
                     print('[wf-design] live_definition column added', flush=True)
-    except Exception as wf_init_err:
-        try:
-            print('[wf-design] table init failed:', wf_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as wf_init_err:
+            try:
+                print('[wf-design] table init failed:', wf_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 워크플로우 댓글 테이블 (wf_design_comment) ──
-    try:
-        with app.app_context():
+        # ── 워크플로우 댓글 테이블 (wf_design_comment) ──
+        try:
             from app.models import WfDesignComment  # noqa: F401
             from sqlalchemy import inspect as sa_inspect
             inspector = sa_inspect(db.engine)
@@ -1457,63 +1369,59 @@ def create_app(config_name='default'):
             if 'wf_design_comment' not in existing:
                 WfDesignComment.__table__.create(db.engine, checkfirst=True)
                 print('[wf-design-comment] table created', flush=True)
-    except Exception as wfc_init_err:
-        try:
-            print('[wf-design-comment] table init failed:', wfc_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as wfc_init_err:
+            try:
+                print('[wf-design-comment] table init failed:', wfc_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 변경이력(change_event / change_diff) 테이블 ──
-    try:
-        with app.app_context():
+        # ── 변경이력(change_event / change_diff) 테이블 ──
+        try:
             from app.services.change_event_service import init_change_event_tables
             init_change_event_tables(app)
-    except Exception as ce_init_err:
-        try:
-            print('[change-event] table init failed:', ce_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as ce_init_err:
+            try:
+                print('[change-event] table init failed:', ce_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 알림(sys_notification) 테이블 ──
-    try:
-        with app.app_context():
+        # ── 알림(sys_notification) 테이블 ──
+        try:
             from app.services.notification_service import init_notification_table
             init_notification_table(app)
-    except Exception as noti_init_err:
-        try:
-            print('[notification] table init failed:', noti_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as noti_init_err:
+            try:
+                print('[notification] table init failed:', noti_init_err, flush=True)
+            except Exception:
+                pass
 
-    # ── 인포메이션 문구(sys_info_message) 테이블 + 시드 ──
-    try:
-        with app.app_context():
+        # ── 인포메이션 문구(sys_info_message) 테이블 + 시드 ──
+        try:
             from app.services.info_message_service import init_info_message_table, seed_info_messages
             init_info_message_table(app)
             seed_info_messages(app)
-    except Exception as info_msg_err:
-        try:
-            print('[info-message] table init failed:', info_msg_err, flush=True)
-        except Exception:
-            pass
+        except Exception as info_msg_err:
+            try:
+                print('[info-message] table init failed:', info_msg_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
+        try:
             init_page_tab_config_table(app)
-    except Exception as page_tab_init_err:
-        try:
-            print('[page-tab-config] table init failed:', page_tab_init_err, flush=True)
-        except Exception:
-            pass
+        except Exception as page_tab_init_err:
+            try:
+                print('[page-tab-config] table init failed:', page_tab_init_err, flush=True)
+            except Exception:
+                pass
 
-    try:
-        with app.app_context():
-            init_brand_setting_table(app)
-    except Exception as brand_init_err:
         try:
-            print('[brand-setting] table init failed:', brand_init_err, flush=True)
-        except Exception:
-            pass
+            init_brand_setting_table(app)
+        except Exception as brand_init_err:
+            try:
+                print('[brand-setting] table init failed:', brand_init_err, flush=True)
+            except Exception:
+                pass
+
 
     # 블루프린트 등록
     from app.routes.main import main_bp
@@ -1555,779 +1463,7 @@ def create_app(config_name='default'):
     app.register_blueprint(notification_api_bp)
     app.register_blueprint(sse_bp)
 
-    # Self-heal server component suggest API route in case blueprint attachment failed
-    try:
-        rules_snapshot = list(app.url_map.iter_rules())
-        server_components_suggest = '/api/server-components/suggest'
-        has_server_components_suggest = any(rule.rule == server_components_suggest for rule in rules_snapshot)
-        if not has_server_components_suggest:
-            import flask
-            from app.services.server_component_service import (
-                suggest_server_component_rows as svc_suggest_server_component_rows,
-            )
 
-            def _heal_suggest_server_components():
-                q = (flask.request.args.get('q') or '').strip()
-                limit = flask.request.args.get('limit', default=200, type=int) or 200
-                try:
-                    items = svc_suggest_server_component_rows(q=q, limit=limit)
-                    return flask.jsonify({'success': True, 'total': len(items), 'items': items})
-                except Exception:
-                    try:
-                        flask.current_app.logger.exception('Failed to suggest server components (heal)')
-                    except Exception:
-                        pass
-                    return flask.jsonify({'success': False, 'message': '추천 목록 조회 중 오류가 발생했습니다.'}), 500
-
-            app.add_url_rule(
-                server_components_suggest,
-                endpoint='api.suggest_server_components.heal',
-                view_func=_heal_suggest_server_components,
-                methods=['GET'],
-            )
-            print('[heal] registered server-components suggest route directly on app', flush=True)
-    except Exception as server_components_heal_err:
-        try:
-            print('[heal] server-components suggest self-heal failed:', server_components_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # Self-heal calendar schedule API routes in case blueprint attachment failed
-    try:
-        rules_snapshot = list(app.url_map.iter_rules())
-        calendar_base = '/api/calendar/schedules'
-        calendar_detail = '/api/calendar/schedules/<int:schedule_id>'
-        has_calendar_base = any(rule.rule == calendar_base for rule in rules_snapshot)
-        has_calendar_detail = any(rule.rule == calendar_detail for rule in rules_snapshot)
-        if not has_calendar_base or not has_calendar_detail:
-            from app.routes.api import (
-                list_calendar_schedules,
-                create_calendar_schedule,
-                get_calendar_schedule,
-                update_calendar_schedule,
-                delete_calendar_schedule,
-            )
-            if not has_calendar_base:
-                app.add_url_rule(
-                    calendar_base,
-                    endpoint='api.list_calendar_schedules.heal',
-                    view_func=list_calendar_schedules,
-                    methods=['GET'],
-                )
-                app.add_url_rule(
-                    calendar_base,
-                    endpoint='api.create_calendar_schedule.heal',
-                    view_func=create_calendar_schedule,
-                    methods=['POST'],
-                )
-                print('[heal] registered calendar list/create routes directly on app', flush=True)
-            if not has_calendar_detail:
-                app.add_url_rule(
-                    calendar_detail,
-                    endpoint='api.get_calendar_schedule.heal',
-                    view_func=get_calendar_schedule,
-                    methods=['GET'],
-                )
-                app.add_url_rule(
-                    calendar_detail,
-                    endpoint='api.update_calendar_schedule.heal',
-                    view_func=update_calendar_schedule,
-                    methods=['PUT'],
-                )
-                app.add_url_rule(
-                    calendar_detail,
-                    endpoint='api.delete_calendar_schedule.heal',
-                    view_func=delete_calendar_schedule,
-                    methods=['DELETE'],
-                )
-                print('[heal] registered calendar detail routes directly on app', flush=True)
-    except Exception as _calendar_heal_err:
-        try:
-            print('[heal] calendar schedule route registration failed:', _calendar_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # Self-heal project (prj_project) API routes in case blueprint attachment failed
-    try:
-        rules_snapshot = list(app.url_map.iter_rules())
-        prj_base = '/api/prj/projects'
-        prj_detail = '/api/prj/projects/<int:project_id>'
-        prj_members = '/api/prj/projects/<int:project_id>/members'
-
-        has_prj_base = any(rule.rule == prj_base for rule in rules_snapshot)
-        has_prj_detail = any(rule.rule == prj_detail for rule in rules_snapshot)
-        has_prj_members = any(rule.rule == prj_members for rule in rules_snapshot)
-
-        if not (has_prj_base and has_prj_detail and has_prj_members):
-            from app.routes.api import (  # pylint: disable=import-outside-toplevel
-                list_prj_projects,
-                create_prj_project,
-                get_prj_project,
-                update_prj_project,
-                delete_prj_project,
-                get_prj_project_members,
-                replace_prj_project_members,
-            )
-
-            if not has_prj_base:
-                app.add_url_rule(
-                    prj_base,
-                    endpoint='api.list_prj_projects.heal',
-                    view_func=list_prj_projects,
-                    methods=['GET'],
-                )
-                app.add_url_rule(
-                    prj_base,
-                    endpoint='api.create_prj_project.heal',
-                    view_func=create_prj_project,
-                    methods=['POST'],
-                )
-                print('[heal] registered prj projects list/create routes directly on app', flush=True)
-
-            if not has_prj_detail:
-                app.add_url_rule(
-                    prj_detail,
-                    endpoint='api.get_prj_project.heal',
-                    view_func=get_prj_project,
-                    methods=['GET'],
-                )
-                app.add_url_rule(
-                    prj_detail,
-                    endpoint='api.update_prj_project.heal',
-                    view_func=update_prj_project,
-                    methods=['PUT'],
-                )
-                app.add_url_rule(
-                    prj_detail,
-                    endpoint='api.delete_prj_project.heal',
-                    view_func=delete_prj_project,
-                    methods=['DELETE'],
-                )
-                print('[heal] registered prj projects detail routes directly on app', flush=True)
-
-            if not has_prj_members:
-                app.add_url_rule(
-                    prj_members,
-                    endpoint='api.get_prj_project_members.heal',
-                    view_func=get_prj_project_members,
-                    methods=['GET'],
-                )
-                app.add_url_rule(
-                    prj_members,
-                    endpoint='api.replace_prj_project_members.heal',
-                    view_func=replace_prj_project_members,
-                    methods=['PUT'],
-                )
-                print('[heal] registered prj project members routes directly on app', flush=True)
-    except Exception as _prj_heal_err:
-        try:
-            print('[heal] prj project route registration failed:', _prj_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # Proxy bindings to guarantee calendar schedule APIs even if blueprint registration fails later.
-    try:
-
-        from app.routes import api as _api_routes_calendar  # pylint: disable=import-outside-toplevel
-
-        @app.route('/api/calendar/schedules', methods=['GET'], endpoint='api.list_calendar_schedules.proxy')
-        def _calendar_schedule_proxy_list():
-            return _api_routes_calendar.list_calendar_schedules()
-
-        @app.route('/api/calendar/schedules', methods=['POST'], endpoint='api.create_calendar_schedule.proxy')
-        def _calendar_schedule_proxy_create():
-            return _api_routes_calendar.create_calendar_schedule()
-
-        @app.route('/api/calendar/schedules/<int:schedule_id>', methods=['GET'], endpoint='api.get_calendar_schedule.proxy')
-        def _calendar_schedule_proxy_get(schedule_id: int):
-            return _api_routes_calendar.get_calendar_schedule(schedule_id)
-
-        @app.route('/api/calendar/schedules/<int:schedule_id>', methods=['PUT'], endpoint='api.update_calendar_schedule.proxy')
-        def _calendar_schedule_proxy_update(schedule_id: int):
-            return _api_routes_calendar.update_calendar_schedule(schedule_id)
-
-        @app.route('/api/calendar/schedules/<int:schedule_id>', methods=['DELETE'], endpoint='api.delete_calendar_schedule.proxy')
-        def _calendar_schedule_proxy_delete(schedule_id: int):
-            return _api_routes_calendar.delete_calendar_schedule(schedule_id)
-
-    except Exception as _calendar_proxy_err:
-        try:
-            print('[heal] calendar schedule proxy registration failed:', _calendar_proxy_err, flush=True)
-        except Exception:
-            pass
-
-    # Proxy bindings to guarantee ticket APIs even if blueprint registration fails later.
-    try:
-
-        from app.routes import api as _api_routes_ticket  # pylint: disable=import-outside-toplevel
-
-        @app.route('/api/tickets', methods=['GET'], endpoint='api.list_tickets.proxy')
-        def _tickets_proxy_list():
-            return _api_routes_ticket.list_tickets()
-
-        @app.route('/api/tickets', methods=['POST'], endpoint='api.create_ticket.proxy')
-        def _tickets_proxy_create():
-            return _api_routes_ticket.create_ticket()
-
-        @app.route('/api/tickets/<int:ticket_id>', methods=['GET'], endpoint='api.get_ticket.proxy')
-        def _tickets_proxy_get(ticket_id: int):
-            return _api_routes_ticket.get_ticket(ticket_id)
-
-        @app.route('/api/tickets/<int:ticket_id>', methods=['PUT'], endpoint='api.update_ticket.proxy')
-        def _tickets_proxy_update(ticket_id: int):
-            return _api_routes_ticket.update_ticket(ticket_id)
-
-        @app.route('/api/tickets/<int:ticket_id>', methods=['DELETE'], endpoint='api.delete_ticket.proxy')
-        def _tickets_proxy_delete(ticket_id: int):
-            return _api_routes_ticket.delete_ticket(ticket_id)
-
-        @app.route('/api/tickets/<int:ticket_id>/files', methods=['GET'], endpoint='api.list_ticket_files.proxy')
-        def _ticket_files_proxy_list(ticket_id: int):
-            return _api_routes_ticket.list_ticket_files(ticket_id)
-
-        @app.route('/api/tickets/<int:ticket_id>/files', methods=['POST'], endpoint='api.upload_ticket_files.proxy')
-        def _ticket_files_proxy_upload(ticket_id: int):
-            return _api_routes_ticket.upload_ticket_files(ticket_id)
-
-        @app.route('/api/tickets/<int:ticket_id>/files/<int:file_id>/download', methods=['GET'], endpoint='api.download_ticket_file.proxy')
-        def _ticket_files_proxy_download(ticket_id: int, file_id: int):
-            return _api_routes_ticket.download_ticket_file(ticket_id, file_id)
-
-        @app.route('/api/tickets/<int:ticket_id>/files/<int:file_id>', methods=['DELETE'], endpoint='api.delete_ticket_file.proxy')
-        def _ticket_files_proxy_delete(ticket_id: int, file_id: int):
-            return _api_routes_ticket.delete_ticket_file(ticket_id, file_id)
-
-    except Exception as _ticket_proxy_err:
-        try:
-            print('[heal] ticket proxy registration failed:', _ticket_proxy_err, flush=True)
-        except Exception:
-            pass
-
-    # Ensure core chat API routes exist even if blueprint registration is missing (chat UI depends on them)
-    try:
-        rules_snapshot = list(app.url_map.iter_rules())
-
-        def _has_route(path: str, method: str) -> bool:
-            method_upper = method.upper()
-            for rule in rules_snapshot:
-                if rule.rule == path and method_upper in (rule.methods or {}):
-                    return True
-            return False
-
-        chat_additions: list[str] = []
-        from app.routes import api as _api_routes_chat  # pylint: disable=import-outside-toplevel
-
-        if not _has_route('/api/chat/rooms', 'GET'):
-            app.add_url_rule(
-                '/api/chat/rooms',
-                endpoint='api.list_chat_rooms.heal',
-                view_func=_api_routes_chat.list_chat_rooms,
-                methods=['GET'],
-            )
-            chat_additions.append('GET /api/chat/rooms')
-        if not _has_route('/api/chat/rooms', 'POST'):
-            app.add_url_rule(
-                '/api/chat/rooms',
-                endpoint='api.create_chat_room.heal',
-                view_func=_api_routes_chat.create_chat_room,
-                methods=['POST'],
-            )
-            chat_additions.append('POST /api/chat/rooms')
-        if not _has_route('/api/chat/rooms/<int:room_id>', 'GET'):
-            app.add_url_rule(
-                '/api/chat/rooms/<int:room_id>',
-                endpoint='api.get_chat_room.heal',
-                view_func=_api_routes_chat.get_chat_room,
-                methods=['GET'],
-            )
-            chat_additions.append('GET /api/chat/rooms/<id>')
-        if not _has_route('/api/chat/rooms/<int:room_id>/messages', 'GET'):
-            app.add_url_rule(
-                '/api/chat/rooms/<int:room_id>/messages',
-                endpoint='api.list_chat_messages.heal',
-                view_func=_api_routes_chat.list_chat_messages,
-                methods=['GET'],
-            )
-            chat_additions.append('GET /api/chat/rooms/<id>/messages')
-        if not _has_route('/api/chat/rooms/<int:room_id>/messages', 'POST'):
-            app.add_url_rule(
-                '/api/chat/rooms/<int:room_id>/messages',
-                endpoint='api.create_chat_message.heal',
-                view_func=_api_routes_chat.create_chat_message,
-                methods=['POST'],
-            )
-            chat_additions.append('POST /api/chat/rooms/<id>/messages')
-
-        if chat_additions:
-            print('[chat-heal] registered routes directly on app:', ', '.join(chat_additions), flush=True)
-    except Exception as chat_heal_err:
-        try:
-            print('[chat-heal] route self-heal failed:', chat_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # ---- FORCE REGISTER MISSING ROLE LIST ROUTES (early) ----
-    # Some environments showed persistent absence of /admin/auth/groups/list despite code edits.
-    # We defensively import the view functions and (if absent) bind them directly now, before later self-heal logic.
-    try:
-        from app.routes.auth import admin_groups_list, admin_groups_list_compat  # view funcs
-        existing_early = {str(r) for r in app.url_map.iter_rules()}
-        if '/admin/auth/groups/list' not in existing_early:
-            app.add_url_rule('/admin/auth/groups/list', endpoint='auth.admin_groups_list.force', view_func=admin_groups_list, methods=['GET'])
-            print('[force] registered /admin/auth/groups/list', flush=True)
-        else:
-            print('[force] /admin/auth/groups/list already present (early)', flush=True)
-        if '/admin/auth/groups/list2' not in existing_early:
-            app.add_url_rule('/admin/auth/groups/list2', endpoint='auth.admin_groups_list_compat.force', view_func=admin_groups_list_compat, methods=['GET'])
-            print('[force] registered /admin/auth/groups/list2', flush=True)
-        else:
-            print('[force] /admin/auth/groups/list2 already present (early)', flush=True)
-    except Exception as _force_e:
-        try:
-            print('[force] early role list registration failed:', _force_e, flush=True)
-        except Exception:
-            pass
-
-    # 보강: auth_bp 로드 중 일부 환경에서 최신 auth.py 가 반영되지 않아 검색 라우트가 누락되는 현상 진단됨.
-    # url_map 에 검색 라우트가 없다면 직접 등록하여 404 문제를 회피한다.
-    try:
-        from app.routes.auth import admin_user_search  # 함수 직접 참조
-        existing = {str(r) for r in app.url_map.iter_rules()}
-        forced_rules = ['/admin/auth/users/search', '/admin/auth/user/search', '/admin/auth/user-search']
-        for rule in forced_rules:
-            if rule not in existing:
-                app.add_url_rule(rule, endpoint=f'auth.admin_user_search.{rule}', view_func=admin_user_search, methods=['GET'])
-                try:
-                    print('[patch] registered missing search route', rule, flush=True)
-                except Exception:
-                    pass
-        # ---- 역할 목록(list) 라우트 자가치유 ----
-        # 서버가 오래된 캐시된 auth.py 를 로딩하거나 패치 누락 시 list/list2 404 회피.
-        role_list_primary = '/admin/auth/groups/list'
-        role_list_fallback = '/admin/auth/groups/list2'
-        if role_list_primary not in existing and role_list_fallback not in existing:
-            try:
-                # 내부 import에서 db 재선언하면 create_app 스코프에서 UnboundLocalError 발생하므로 제외
-                from app.models import Role, RoleUser
-                import sqlalchemy as sa
-                def _healed_role_list():
-                    # 관리자 권한 단순 확인 (session 미활용 환경에서 unauthorized 표시)
-                    from flask import session, jsonify
-                    if 'role' not in session or session.get('role') not in ('admin','ADMIN','관리자'):
-                        return jsonify({'error':'unauthorized'}), 403
-                    try:
-                        rows = (
-                            db.session.query(Role, sa.func.count(RoleUser.user_id).label('uc'))
-                            .outerjoin(RoleUser, Role.id == RoleUser.role_id)
-                            .group_by(Role.id)
-                            .order_by(Role.id.asc())
-                            .all()
-                        )
-                    except Exception as e:
-                        return jsonify({'error':'db_query_failed','detail':str(e)}) ,500
-                    roles = []
-                    for r, uc in rows:
-                        roles.append({
-                            'id': r.id,
-                            'name': r.name,
-                            'description': r.description,
-                            'user_count': uc,
-                            'permissions': {
-                                'dashboard': {'read': r.dashboard_read, 'write': r.dashboard_write},
-                                'hardware': {'read': r.hardware_read, 'write': r.hardware_write},
-                                'software': {'read': r.software_read, 'write': r.software_write},
-                                'governance': {'read': r.governance_read, 'write': r.governance_write},
-                                'datacenter': {'read': r.datacenter_read, 'write': r.datacenter_write},
-                                'cost': {'read': r.cost_read, 'write': r.cost_write},
-                                'project': {'read': r.project_read, 'write': r.project_write},
-                                'category': {'read': r.category_read, 'write': r.category_write},
-                            }
-                        })
-                    return jsonify({'roles': roles, 'count': len(roles)})
-                app.add_url_rule(role_list_primary, endpoint='auth.admin_groups_list.healed', view_func=_healed_role_list, methods=['GET'])
-                app.add_url_rule(role_list_fallback, endpoint='auth.admin_groups_list_compat.healed', view_func=_healed_role_list, methods=['GET'])
-                print('[patch] healed missing role list routes registered')
-            except Exception as e:
-                print('[patch] role list self-heal failed:', e)
-    except Exception as e:
-        try:
-            print('[patch] search route self-heal failed:', e, flush=True)
-        except Exception:
-            pass
-
-    # GPU 타입 API 라우트 누락 시 복구 (일부 환경에서 최신 api.py 가 로딩되지 않는 현상 대응)
-    try:
-        from app.routes import api as _api_routes  # pylint: disable=import-outside-toplevel
-
-        def _ensure_cmp_gpu_routes(context: str) -> None:
-            current_endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
-            fallback_specs = [
-                ('/api/cmp-gpu-types', 'api.list_cmp_gpu_types.heal', _api_routes.list_cmp_gpu_types, ['GET']),
-                ('/api/cmp-gpu-types', 'api.create_cmp_gpu_type.heal', _api_routes.create_cmp_gpu_type, ['POST']),
-                ('/api/cmp-gpu-types/<int:gpu_id>', 'api.update_cmp_gpu_type.heal', _api_routes.update_cmp_gpu_type, ['PUT']),
-                ('/api/cmp-gpu-types/bulk-delete', 'api.delete_cmp_gpu_types.heal', _api_routes.delete_cmp_gpu_types, ['POST']),
-            ]
-            registered: list[str] = []
-            for rule, endpoint, view_func, methods in fallback_specs:
-                if endpoint in current_endpoints:
-                    continue
-                app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-                registered.append(endpoint)
-            if registered:
-                try:
-                    print(f"[patch] cmp-gpu fallback routes registered ({context}): {registered}", flush=True)
-                except Exception:
-                    pass
-
-        _ensure_cmp_gpu_routes('initial')
-
-        # Proxy routes (directly bound to app) to guarantee cmp-gpu APIs even if blueprint routes vanish.
-        @app.route('/api/cmp-gpu-types', methods=['GET'], endpoint='api.list_cmp_gpu_types.proxy')
-        def _cmp_gpu_types_proxy_list():
-            return _api_routes.list_cmp_gpu_types()
-
-        @app.route('/api/cmp-gpu-types', methods=['POST'], endpoint='api.create_cmp_gpu_type.proxy')
-        def _cmp_gpu_types_proxy_create():
-            return _api_routes.create_cmp_gpu_type()
-
-        @app.route('/api/cmp-gpu-types/<int:gpu_id>', methods=['PUT'], endpoint='api.update_cmp_gpu_type.proxy')
-        def _cmp_gpu_types_proxy_update(gpu_id: int):
-            return _api_routes.update_cmp_gpu_type(gpu_id)
-
-        @app.route('/api/cmp-gpu-types/bulk-delete', methods=['POST'], endpoint='api.delete_cmp_gpu_types.proxy')
-        def _cmp_gpu_types_proxy_delete():
-            return _api_routes.delete_cmp_gpu_types()
-
-    except Exception as _gpu_route_err:
-        try:
-            print('[patch] cmp-gpu route self-heal failed:', _gpu_route_err, flush=True)
-        except Exception:
-            pass
-    
-    # DNS 정책 API 라우트도 간헐적으로 누락되어 별도 자가치유 절차를 추가한다.
-    try:
-        from app.routes import api as _api_routes_dns  # pylint: disable=import-outside-toplevel
-        existing_dns_endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
-        dns_specs = [
-            ('/api/network/dns-policies', ['GET'], 'api.list_network_dns_policies', 'list_network_dns_policies'),
-            ('/api/network/dns-policies/<int:policy_id>', ['GET'], 'api.get_network_dns_policy', 'get_network_dns_policy'),
-            ('/api/network/dns-policies', ['POST'], 'api.create_network_dns_policy', 'create_network_dns_policy'),
-            ('/api/network/dns-policies/<int:policy_id>', ['PUT'], 'api.update_network_dns_policy', 'update_network_dns_policy'),
-            ('/api/network/dns-policies/<int:policy_id>', ['DELETE'], 'api.delete_network_dns_policy', 'delete_network_dns_policy'),
-            ('/api/network/dns-policies/bulk-delete', ['POST'], 'api.bulk_delete_network_dns_policies', 'bulk_delete_network_dns_policies'),
-            ('/api/network/dns-policies/<int:policy_id>/records', ['GET'], 'api.list_network_dns_policy_records', 'list_network_dns_policy_records'),
-            ('/api/network/dns-policies/<int:policy_id>/records', ['POST'], 'api.create_network_dns_policy_record', 'create_network_dns_policy_record'),
-            ('/api/network/dns-policies/<int:policy_id>/records/<int:record_id>', ['PUT'], 'api.update_network_dns_policy_record', 'update_network_dns_policy_record'),
-            ('/api/network/dns-policies/<int:policy_id>/records/<int:record_id>', ['DELETE'], 'api.delete_network_dns_policy_record', 'delete_network_dns_policy_record'),
-            ('/api/network/dns-policies/<int:policy_id>/records/bulk-delete', ['POST'], 'api.bulk_delete_network_dns_policy_records', 'bulk_delete_network_dns_policy_records'),
-            ('/api/network/dns-policies/<int:policy_id>/logs', ['GET'], 'api.list_network_dns_policy_logs', 'list_network_dns_policy_logs'),
-            ('/api/network/dns-policies/<int:policy_id>/logs/<int:log_id>/reason', ['PUT'], 'api.update_network_dns_policy_log_reason', 'update_network_dns_policy_log_reason'),
-        ]
-        to_register = [spec for spec in dns_specs if spec[2] not in existing_dns_endpoints]
-        for rule, methods, endpoint, attr_name in to_register:
-            view_func = getattr(_api_routes_dns, attr_name, None)
-            if not callable(view_func):
-                print('[dns-heal] missing view func for', attr_name, '-> skip', flush=True)
-                continue
-            app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-            print('[dns-heal] registered fallback route', rule, 'methods=', methods, flush=True)
-
-        # Proxy routes (direct binding) to guarantee DNS API availability even if blueprint registration fails later.
-        @app.route('/api/network/dns-policies', methods=['GET'], endpoint='api.list_network_dns_policies.proxy')
-        def _dns_policies_proxy_list():
-            return _api_routes_dns.list_network_dns_policies()
-
-        @app.route('/api/network/dns-policies/<int:policy_id>', methods=['GET'], endpoint='api.get_network_dns_policy.proxy')
-        def _dns_policies_proxy_get(policy_id: int):
-            return _api_routes_dns.get_network_dns_policy(policy_id)
-
-        @app.route('/api/network/dns-policies', methods=['POST'], endpoint='api.create_network_dns_policy.proxy')
-        def _dns_policies_proxy_create():
-            return _api_routes_dns.create_network_dns_policy()
-
-        @app.route('/api/network/dns-policies/<int:policy_id>', methods=['PUT'], endpoint='api.update_network_dns_policy.proxy')
-        def _dns_policies_proxy_update(policy_id: int):
-            return _api_routes_dns.update_network_dns_policy(policy_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>', methods=['DELETE'], endpoint='api.delete_network_dns_policy.proxy')
-        def _dns_policies_proxy_delete(policy_id: int):
-            return _api_routes_dns.delete_network_dns_policy(policy_id)
-
-        @app.route('/api/network/dns-policies/bulk-delete', methods=['POST'], endpoint='api.bulk_delete_network_dns_policies.proxy')
-        def _dns_policies_proxy_bulk_delete():
-            return _api_routes_dns.bulk_delete_network_dns_policies()
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/records', methods=['GET'], endpoint='api.list_network_dns_policy_records.proxy')
-        def _dns_policy_records_proxy_list(policy_id: int):
-            return _api_routes_dns.list_network_dns_policy_records(policy_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/records', methods=['POST'], endpoint='api.create_network_dns_policy_record.proxy')
-        def _dns_policy_records_proxy_create(policy_id: int):
-            return _api_routes_dns.create_network_dns_policy_record(policy_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/records/<int:record_id>', methods=['PUT'], endpoint='api.update_network_dns_policy_record.proxy')
-        def _dns_policy_records_proxy_update(policy_id: int, record_id: int):
-            return _api_routes_dns.update_network_dns_policy_record(policy_id, record_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/records/<int:record_id>', methods=['DELETE'], endpoint='api.delete_network_dns_policy_record.proxy')
-        def _dns_policy_records_proxy_delete(policy_id: int, record_id: int):
-            return _api_routes_dns.delete_network_dns_policy_record(policy_id, record_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/records/bulk-delete', methods=['POST'], endpoint='api.bulk_delete_network_dns_policy_records.proxy')
-        def _dns_policy_records_proxy_bulk_delete(policy_id: int):
-            return _api_routes_dns.bulk_delete_network_dns_policy_records(policy_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/logs', methods=['GET'], endpoint='api.list_network_dns_policy_logs.proxy')
-        def _dns_policy_logs_proxy_list(policy_id: int):
-            return _api_routes_dns.list_network_dns_policy_logs(policy_id)
-
-        @app.route('/api/network/dns-policies/<int:policy_id>/logs/<int:log_id>/reason', methods=['PUT'], endpoint='api.update_network_dns_policy_log_reason.proxy')
-        def _dns_policy_logs_proxy_update_reason(policy_id: int, log_id: int):
-            return _api_routes_dns.update_network_dns_policy_log_reason(policy_id, log_id)
-    except Exception as _dns_heal_err:
-        try:
-            print('[dns-heal] route self-heal failed:', _dns_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # Datacenter access entry APIs also vanished intermittently in some environments.
-    # Apply the same defensive registration strategy used above.
-    try:
-        from app.routes import api as _api_routes_access  # pylint: disable=import-outside-toplevel
-        existing_access_endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
-        access_specs = [
-            ('/api/datacenter/access/entries', ['GET'], 'api.list_datacenter_access_entries', 'list_datacenter_access_entries'),
-            ('/api/datacenter/access/records', ['GET'], 'api.list_datacenter_access_records', 'list_datacenter_access_records'),
-            ('/api/datacenter/access/entries/<int:entry_id>', ['GET'], 'api.get_datacenter_access_entry', 'get_datacenter_access_entry'),
-            ('/api/datacenter/access/entries', ['POST'], 'api.create_datacenter_access_entry', 'create_datacenter_access_entry'),
-            ('/api/datacenter/access/entries/<int:entry_id>', ['PUT'], 'api.update_datacenter_access_entry', 'update_datacenter_access_entry'),
-            ('/api/datacenter/access/entries/<int:entry_id>', ['DELETE'], 'api.delete_datacenter_access_entry', 'delete_datacenter_access_entry'),
-            ('/api/datacenter/access/entries/bulk-delete', ['POST'], 'api.bulk_delete_datacenter_access_entries', 'bulk_delete_datacenter_access_entries'),
-        ]
-        pending_access_specs = [spec for spec in access_specs if spec[2] not in existing_access_endpoints]
-        for rule, methods, endpoint, attr_name in pending_access_specs:
-            view_func = getattr(_api_routes_access, attr_name, None)
-            if not callable(view_func):
-                try:
-                    print('[access-heal] missing view func for', attr_name, '-> skip', flush=True)
-                except Exception:
-                    pass
-                continue
-            app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-            try:
-                print('[access-heal] registered fallback route', rule, 'methods=', methods, flush=True)
-            except Exception:
-                pass
-
-        @app.route('/api/datacenter/access/entries', methods=['GET'], endpoint='api.list_datacenter_access_entries.proxy')
-        def _access_entries_proxy_list():
-            return _api_routes_access.list_datacenter_access_entries()
-
-        @app.route('/api/datacenter/access/records', methods=['GET'], endpoint='api.list_datacenter_access_records.proxy')
-        def _access_records_proxy_list():
-            return _api_routes_access.list_datacenter_access_records()
-
-        @app.route('/api/datacenter/access/entries/<int:entry_id>', methods=['GET'], endpoint='api.get_datacenter_access_entry.proxy')
-        def _access_entries_proxy_get(entry_id: int):
-            return _api_routes_access.get_datacenter_access_entry(entry_id)
-
-        @app.route('/api/datacenter/access/entries', methods=['POST'], endpoint='api.create_datacenter_access_entry.proxy')
-        def _access_entries_proxy_create():
-            return _api_routes_access.create_datacenter_access_entry()
-
-        @app.route('/api/datacenter/access/entries/<int:entry_id>', methods=['PUT'], endpoint='api.update_datacenter_access_entry.proxy')
-        def _access_entries_proxy_update(entry_id: int):
-            return _api_routes_access.update_datacenter_access_entry(entry_id)
-
-        @app.route('/api/datacenter/access/entries/<int:entry_id>', methods=['DELETE'], endpoint='api.delete_datacenter_access_entry.proxy')
-        def _access_entries_proxy_delete(entry_id: int):
-            return _api_routes_access.delete_datacenter_access_entry(entry_id)
-
-        @app.route('/api/datacenter/access/entries/bulk-delete', methods=['POST'], endpoint='api.bulk_delete_datacenter_access_entries.proxy')
-        def _access_entries_proxy_bulk_delete():
-            return _api_routes_access.bulk_delete_datacenter_access_entries()
-
-        # Access system APIs (dc_access_system) can also be missing if blueprint attachment flakes.
-        # Register direct app rules as a safety net.
-        access_system_specs = [
-            ('/api/datacenter/access/systems', ['GET'], 'api.datacenter_access_systems_list', 'datacenter_access_systems_list'),
-            ('/api/datacenter/access/systems', ['POST'], 'api.datacenter_access_systems_create', 'datacenter_access_systems_create'),
-            ('/api/datacenter/access/systems/<int:system_id>', ['GET'], 'api.datacenter_access_systems_get', 'datacenter_access_systems_get'),
-            ('/api/datacenter/access/systems/<int:system_id>', ['PUT'], 'api.datacenter_access_systems_update', 'datacenter_access_systems_update'),
-            ('/api/datacenter/access/systems/<int:system_id>', ['DELETE'], 'api.datacenter_access_systems_delete', 'datacenter_access_systems_delete'),
-            ('/api/datacenter/access/systems/bulk-delete', ['POST'], 'api.datacenter_access_systems_bulk_delete', 'datacenter_access_systems_bulk_delete'),
-        ]
-        pending_access_system_specs = [spec for spec in access_system_specs if spec[2] not in existing_access_endpoints]
-        for rule, methods, endpoint, attr_name in pending_access_system_specs:
-            view_func = getattr(_api_routes_access, attr_name, None)
-            if not callable(view_func):
-                try:
-                    print('[access-heal] missing view func for', attr_name, '-> skip', flush=True)
-                except Exception:
-                    pass
-                continue
-            app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-            try:
-                print('[access-heal] registered fallback route', rule, 'methods=', methods, flush=True)
-            except Exception:
-                pass
-
-        @app.route('/api/datacenter/access/systems', methods=['GET'], endpoint='api.datacenter_access_systems_list.proxy')
-        def _access_systems_proxy_list():
-            return _api_routes_access.datacenter_access_systems_list()
-
-        @app.route('/api/datacenter/access/systems', methods=['POST'], endpoint='api.datacenter_access_systems_create.proxy')
-        def _access_systems_proxy_create():
-            return _api_routes_access.datacenter_access_systems_create()
-
-        @app.route('/api/datacenter/access/systems/<int:system_id>', methods=['GET'], endpoint='api.datacenter_access_systems_get.proxy')
-        def _access_systems_proxy_get(system_id: int):
-            return _api_routes_access.datacenter_access_systems_get(system_id)
-
-        @app.route('/api/datacenter/access/systems/<int:system_id>', methods=['PUT'], endpoint='api.datacenter_access_systems_update.proxy')
-        def _access_systems_proxy_update(system_id: int):
-            return _api_routes_access.datacenter_access_systems_update(system_id)
-
-        @app.route('/api/datacenter/access/systems/<int:system_id>', methods=['DELETE'], endpoint='api.datacenter_access_systems_delete.proxy')
-        def _access_systems_proxy_delete(system_id: int):
-            return _api_routes_access.datacenter_access_systems_delete(system_id)
-
-        @app.route('/api/datacenter/access/systems/bulk-delete', methods=['POST'], endpoint='api.datacenter_access_systems_bulk_delete.proxy')
-        def _access_systems_proxy_bulk_delete():
-            return _api_routes_access.datacenter_access_systems_bulk_delete()
-
-        # Access permission APIs (access_permission) may also be missing if blueprint attachment flakes.
-        access_permission_specs = [
-            ('/api/datacenter/access/permissions', ['GET'], 'api.datacenter_access_permissions_list', 'datacenter_access_permissions_list'),
-            ('/api/datacenter/access/permissions', ['POST'], 'api.datacenter_access_permissions_create', 'datacenter_access_permissions_create'),
-            ('/api/datacenter/access/permissions/<int:permission_id>', ['GET'], 'api.datacenter_access_permissions_get', 'datacenter_access_permissions_get'),
-            ('/api/datacenter/access/permissions/<int:permission_id>', ['PUT'], 'api.datacenter_access_permissions_update', 'datacenter_access_permissions_update'),
-            ('/api/datacenter/access/permissions/<int:permission_id>', ['DELETE'], 'api.datacenter_access_permissions_delete', 'datacenter_access_permissions_delete'),
-            ('/api/datacenter/access/permissions/bulk-delete', ['POST'], 'api.datacenter_access_permissions_bulk_delete', 'datacenter_access_permissions_bulk_delete'),
-        ]
-        pending_access_permission_specs = [spec for spec in access_permission_specs if spec[2] not in existing_access_endpoints]
-        for rule, methods, endpoint, attr_name in pending_access_permission_specs:
-            view_func = getattr(_api_routes_access, attr_name, None)
-            if not callable(view_func):
-                try:
-                    print('[access-heal] missing view func for', attr_name, '-> skip', flush=True)
-                except Exception:
-                    pass
-                continue
-            app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-            try:
-                print('[access-heal] registered fallback route', rule, 'methods=', methods, flush=True)
-            except Exception:
-                pass
-
-        @app.route('/api/datacenter/access/permissions', methods=['GET'], endpoint='api.datacenter_access_permissions_list.proxy')
-        def _access_permissions_proxy_list():
-            return _api_routes_access.datacenter_access_permissions_list()
-
-        @app.route('/api/datacenter/access/permissions', methods=['POST'], endpoint='api.datacenter_access_permissions_create.proxy')
-        def _access_permissions_proxy_create():
-            return _api_routes_access.datacenter_access_permissions_create()
-
-        @app.route('/api/datacenter/access/permissions/<int:permission_id>', methods=['GET'], endpoint='api.datacenter_access_permissions_get.proxy')
-        def _access_permissions_proxy_get(permission_id: int):
-            return _api_routes_access.datacenter_access_permissions_get(permission_id)
-
-        @app.route('/api/datacenter/access/permissions/<int:permission_id>', methods=['PUT'], endpoint='api.datacenter_access_permissions_update.proxy')
-        def _access_permissions_proxy_update(permission_id: int):
-            return _api_routes_access.datacenter_access_permissions_update(permission_id)
-
-        @app.route('/api/datacenter/access/permissions/<int:permission_id>', methods=['DELETE'], endpoint='api.datacenter_access_permissions_delete.proxy')
-        def _access_permissions_proxy_delete(permission_id: int):
-            return _api_routes_access.datacenter_access_permissions_delete(permission_id)
-
-        @app.route('/api/datacenter/access/permissions/bulk-delete', methods=['POST'], endpoint='api.datacenter_access_permissions_bulk_delete.proxy')
-        def _access_permissions_proxy_bulk_delete():
-            return _api_routes_access.datacenter_access_permissions_bulk_delete()
-
-        try:
-            snapshot = [str(rule) for rule in app.url_map.iter_rules() if 'datacenter/access' in str(rule)]
-            print('[access-heal] datacenter route snapshot:', snapshot, flush=True)
-        except Exception:
-            pass
-    except Exception as _access_heal_err:
-        try:
-            print('[access-heal] route self-heal failed:', _access_heal_err, flush=True)
-        except Exception:
-            pass
-
-    # Datacenter data deletion APIs share the same flakiness issue on some hosts.
-    # Mirror the fallback pattern so the frontend always has functioning endpoints.
-    try:
-        from app.routes import api as _api_routes_data_delete  # pylint: disable=import-outside-toplevel
-        existing_data_delete_endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
-        data_delete_specs = [
-            ('/api/datacenter/data-deletion', ['GET'], 'api.list_data_deletion_entries', 'list_data_deletion_entries'),
-            ('/api/datacenter/data-deletion/registers', ['GET'], 'api.list_data_deletion_registers', 'list_data_deletion_registers'),
-            ('/api/datacenter/data-deletion/records', ['GET'], 'api.list_data_deletion_records', 'list_data_deletion_records'),
-            ('/api/datacenter/data-deletion/<int:entry_id>', ['GET'], 'api.get_data_deletion_entry', 'get_data_deletion_entry'),
-            ('/api/datacenter/data-deletion', ['POST'], 'api.create_data_deletion_entry', 'create_data_deletion_entry'),
-            ('/api/datacenter/data-deletion/<int:entry_id>', ['PUT'], 'api.update_data_deletion_entry', 'update_data_deletion_entry'),
-            ('/api/datacenter/data-deletion/<int:entry_id>', ['DELETE'], 'api.delete_data_deletion_entry', 'delete_data_deletion_entry'),
-            ('/api/datacenter/data-deletion/bulk-delete', ['POST'], 'api.bulk_delete_data_deletion_entries', 'bulk_delete_data_deletion_entries'),
-        ]
-        pending_data_delete_specs = [spec for spec in data_delete_specs if spec[2] not in existing_data_delete_endpoints]
-        for rule, methods, endpoint, attr_name in pending_data_delete_specs:
-            view_func = getattr(_api_routes_data_delete, attr_name, None)
-            if not callable(view_func):
-                try:
-                    print('[data-delete-heal] missing view func for', attr_name, '-> skip', flush=True)
-                except Exception:
-                    pass
-                continue
-            app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=methods)
-            try:
-                print('[data-delete-heal] registered fallback route', rule, 'methods=', methods, flush=True)
-            except Exception:
-                pass
-
-        @app.route('/api/datacenter/data-deletion', methods=['GET'], endpoint='api.list_data_deletion_entries.proxy')
-        def _data_delete_proxy_list():
-            return _api_routes_data_delete.list_data_deletion_entries()
-
-        @app.route('/api/datacenter/data-deletion/registers', methods=['GET'], endpoint='api.list_data_deletion_registers.proxy')
-        def _data_delete_proxy_registers():
-            return _api_routes_data_delete.list_data_deletion_registers()
-
-        @app.route('/api/datacenter/data-deletion/records', methods=['GET'], endpoint='api.list_data_deletion_records.proxy')
-        def _data_delete_proxy_records():
-            return _api_routes_data_delete.list_data_deletion_records()
-
-        @app.route('/api/datacenter/data-deletion/<int:entry_id>', methods=['GET'], endpoint='api.get_data_deletion_entry.proxy')
-        def _data_delete_proxy_get(entry_id: int):
-            return _api_routes_data_delete.get_data_deletion_entry(entry_id)
-
-        @app.route('/api/datacenter/data-deletion', methods=['POST'], endpoint='api.create_data_deletion_entry.proxy')
-        def _data_delete_proxy_create():
-            return _api_routes_data_delete.create_data_deletion_entry()
-
-        @app.route('/api/datacenter/data-deletion/<int:entry_id>', methods=['PUT'], endpoint='api.update_data_deletion_entry.proxy')
-        def _data_delete_proxy_update(entry_id: int):
-            return _api_routes_data_delete.update_data_deletion_entry(entry_id)
-
-        @app.route('/api/datacenter/data-deletion/<int:entry_id>', methods=['DELETE'], endpoint='api.delete_data_deletion_entry.proxy')
-        def _data_delete_proxy_delete(entry_id: int):
-            return _api_routes_data_delete.delete_data_deletion_entry(entry_id)
-
-        @app.route('/api/datacenter/data-deletion/bulk-delete', methods=['POST'], endpoint='api.bulk_delete_data_deletion_entries.proxy')
-        def _data_delete_proxy_bulk_delete():
-            return _api_routes_data_delete.bulk_delete_data_deletion_entries()
-
-        try:
-            snapshot = [str(rule) for rule in app.url_map.iter_rules() if 'datacenter/data-deletion' in str(rule)]
-            print('[data-delete-heal] route snapshot:', snapshot, flush=True)
-        except Exception:
-            pass
-    except Exception as _data_delete_heal_err:
-        try:
-            print('[data-delete-heal] route self-heal failed:', _data_delete_heal_err, flush=True)
-        except Exception:
-            pass
-    
     # CLI 명령어 등록
     from app.cli import register_commands
     register_commands(app)
@@ -2346,6 +1482,27 @@ def create_app(config_name='default'):
             pass
         return render_template('error/pages-404.html'), 404
     
+    # 403 에러 핸들러
+    @app.errorhandler(403)
+    def forbidden(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '접근이 거부되었습니다.'}), 403
+        return render_template('error/pages-404.html'), 403
+
+    # 405 에러 핸들러
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '허용되지 않은 메서드입니다.'}), 405
+        return render_template('error/pages-404.html'), 405
+
+    # 422 에러 핸들러
+    @app.errorhandler(422)
+    def unprocessable_entity(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '요청을 처리할 수 없습니다.'}), 422
+        return render_template('error/pages-404.html'), 422
+
     # 500 에러 핸들러 — 내부 정보 노출 방지
     @app.errorhandler(500)
     def internal_server_error(e):
@@ -2358,10 +1515,17 @@ def create_app(config_name='default'):
         except Exception:
             return '처리 중 오류가 발생했습니다.', 500
     
-    # 간단한 헬스체크 엔드포인트 (서버 살아있음 확인용)
+    # 헬스체크 엔드포인트 (서버 + DB 연결 확인)
     @app.route('/health')
     def health():
-        return {'status': 'ok'}, 200
+        result = {'status': 'ok'}
+        try:
+            db.session.execute(db.text('SELECT 1'))
+        except Exception as exc:
+            result['status'] = 'degraded'
+            result['db'] = str(type(exc).__name__)
+            return result, 503
+        return result, 200
 
     # 요청 진단: /login 접근 시 사전(before_request) 훅으로 실제 실행 여부와 메소드 로깅
     @app.before_request
@@ -2896,7 +2060,7 @@ def create_app(config_name='default'):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS wrk_report_user_clear (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     report_id INTEGER NOT NULL REFERENCES wrk_report(id) ON DELETE CASCADE,
                     user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2908,7 +2072,11 @@ def create_app(config_name='default'):
             db.session.commit()
             print('[wrk-report] wrk_report_user_clear table ready', flush=True)
     except Exception as e:
-        db.session.rollback()
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except Exception:
+            pass
         print('[wrk-report] wrk_report_user_clear migration error:', e, flush=True)
 
     return app

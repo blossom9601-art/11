@@ -306,6 +306,34 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: str) -> None:
     _INITIALIZED_DBS.add(db_path)
 
 
+# Auxiliary SQLite DB files required for LEFT JOIN lookups.
+# (filename, alias) — alias is used as the ATTACH schema name.
+_AUXILIARY_DBS = [
+    ('work_category.db',      'aux_wc'),
+    ('work_division.db',      'aux_wd'),
+    ('work_status.db',        'aux_ws'),
+    ('work_operation.db',     'aux_wo'),
+    ('work_group.db',         'aux_wg'),
+    ('vendor_manufacturer.db','aux_vm'),
+    ('hw_server_type.db',     'aux_hst'),
+    ('org_center.db',         'aux_oc'),
+    ('org_rack.db',           'aux_or'),
+    ('org_department.db',     'aux_od'),
+]
+
+
+def _attach_auxiliary_dbs(conn: sqlite3.Connection, app) -> None:
+    """ATTACH auxiliary SQLite DBs so LEFT JOIN lookups can resolve."""
+    instance_path = app.instance_path
+    for db_file, alias in _AUXILIARY_DBS:
+        db_full = os.path.join(instance_path, db_file)
+        if os.path.exists(db_full):
+            try:
+                conn.execute(f"ATTACH DATABASE ? AS {alias}", (db_full,))
+            except sqlite3.OperationalError:
+                pass  # already attached or limit reached
+
+
 def _get_connection(app=None) -> sqlite3.Connection:
     app = app or current_app
     db_path = _resolve_db_path(app)
@@ -314,6 +342,7 @@ def _get_connection(app=None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     _ensure_schema(conn, db_path)
+    _attach_auxiliary_dbs(conn, app)
     return conn
 
 

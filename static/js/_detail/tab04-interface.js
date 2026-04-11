@@ -1182,9 +1182,11 @@ pageSize:10 };
 						if(!isNaN(v)){
 							ifState.page=1; ifState.pageSize=v;
 							localStorage.setItem(storagePrefix+':if:pageSize', String(v));
+							sel.classList.add('is-chosen');
 							ifRenderPage();
 						}
 					});
+					if(sel.value){ sel.classList.add('is-chosen'); }
 				}
 			}catch(_){ }
 		})();
@@ -1422,13 +1424,14 @@ pageSize:10 };
 			// 모달 HTML 동적 생성
 			if(!document.getElementById(modalId)){
 				var mHtml = '<div class="modal-overlay" id="'+modalId+'" role="dialog" aria-modal="true" aria-hidden="true">'
-					+'<div class="modal-box" style="max-width:800px;width:90%;">'
+					+'<div class="modal-box">'
 						+'<div class="modal-header"><h3>예외 리스트</h3>'
 							+'<button class="modal-close js-exc-close" type="button" aria-label="닫기">&times;</button>'
 						+'</div>'
 						+'<div class="modal-body">'
+							+'<div id="if-exc-count" class="if-exc-count" style="display:none;">예외 <span id="if-exc-count-num">0</span>건</div>'
 							+'<table class="hw-table" id="if-exc-table">'
-								+'<thead><tr><th>구분</th><th>IP주소</th><th>프로토콜</th><th>포트</th><th>PID</th><th>프로세스</th><th>상태</th><th>서비스명</th><th>설명</th><th>관리</th></tr></thead>'
+								+'<thead><tr><th>인터페이스</th><th>구분</th><th>IP주소</th><th>프로토콜</th><th>포트</th><th>PID</th><th>프로세스</th><th>상태</th><th>서비스명</th><th>설명</th><th>관리</th></tr></thead>'
 								+'<tbody></tbody>'
 							+'</table>'
 							+'<div id="if-exc-empty" class="if-det-empty">예외 항목이 없습니다.</div>'
@@ -1489,23 +1492,32 @@ pageSize:10 };
 		async function ifLoadExceptionList(){
 			var excTbody = document.querySelector('#if-exc-table tbody');
 			var excEmpty = document.getElementById('if-exc-empty');
+			var excCountEl = document.getElementById('if-exc-count');
+			var excCountNum = document.getElementById('if-exc-count-num');
 			if(!excTbody) return;
 			excTbody.innerHTML = '';
 			if(excEmpty) excEmpty.style.display = 'none';
+			if(excCountEl) excCountEl.style.display = 'none';
 			try{
 				var assetId = getAssetId(storagePrefix);
 				if(!assetId || !scopeKey) return;
 				// 메인 테이블의 모든 interface id에서 예외 항목 가져오기
+				// 인터페이스명도 함께 매핑
 				var mainRows = ifVisibleRows();
 				var allExcluded = [];
 				for(var i=0; i<mainRows.length; i++){
 					var ifId = getRowId(mainRows[i]);
 					if(!ifId) continue;
+					var ifaceTd = mainRows[i].querySelector('[data-col="iface"]');
+					var ifaceName = ifaceTd ? ifTrim(ifaceTd.textContent) : '-';
 					try{
 						var res = await ifDetApiList(ifId);
 						var items = (res && res.items) ? res.items : [];
 						for(var j=0; j<items.length; j++){
-							if(items[j].is_excluded) allExcluded.push(items[j]);
+							if(items[j].is_excluded){
+								items[j]._iface_name = ifaceName;
+								allExcluded.push(items[j]);
+							}
 						}
 					}catch(_){}
 				}
@@ -1513,10 +1525,14 @@ pageSize:10 };
 					if(excEmpty) excEmpty.style.display = '';
 					return;
 				}
+				// 건수 뱃지 표시
+				if(excCountEl){ excCountEl.style.display = ''; }
+				if(excCountNum){ excCountNum.textContent = String(allExcluded.length); }
 				var html = '';
 				for(var k=0; k<allExcluded.length; k++){
 					var d = allExcluded[k];
 					html += '<tr>'
+						+'<td class="if-exc-iface">'+escHtml(d._iface_name||'-')+'</td>'
 						+'<td>'+escHtml(d.category||'-')+'</td>'
 						+'<td>'+escHtml(d.ip_address||'-')+'</td>'
 						+'<td>'+escHtml(d.protocol||'-')+'</td>'

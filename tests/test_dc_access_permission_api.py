@@ -92,7 +92,8 @@ def test_dc_access_permission_crud_flow(client, app):
     # 2) List
     res = client.get('/api/datacenter/access/permissions')
     assert res.status_code == 200
-    rows = res.get_json()
+    body = res.get_json()
+    rows = body.get('items', body) if isinstance(body, dict) else body
     assert any(r['permission_id'] == permission_id for r in rows)
 
     # 3) Get
@@ -185,5 +186,6 @@ def test_dc_access_permission_bulk_delete(client, app):
     # Ensure they're gone
     res = client.get('/api/datacenter/access/permissions')
     assert res.status_code == 200
-    rows = res.get_json()
+    body = res.get_json()
+    rows = body.get('items', body) if isinstance(body, dict) else body
     assert all(r['permission_id'] not in ids for r in rows)

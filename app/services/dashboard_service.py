@@ -293,8 +293,15 @@ def _get_work_stats(sa_db, cur_start, cur_end, prev_start, prev_end):
         today = date.today()
 
         try:
-            monthly_raw = sa_db.session.execute(text("""
-                SELECT strftime('%Y-%m', r.created_at) AS m,
+            # MySQL / SQLite 호환 월 추출
+            _dialect = sa_db.engine.dialect.name
+            if _dialect == 'sqlite':
+                _month_expr = "strftime('%Y-%m', r.created_at)"
+            else:
+                _month_expr = "DATE_FORMAT(r.created_at, '%Y-%m')"
+
+            monthly_raw = sa_db.session.execute(text(f"""
+                SELECT {_month_expr} AS m,
                        COALESCE(wt.value, '기타')       AS work_type,
                        COUNT(1)                         AS cnt
                 FROM wrk_report r

@@ -5,7 +5,7 @@
 # 대상: Rocky Linux 8.10 / 9.x / 10.x
 ###############################################################################
 
-%define _name       blossom-lumina-web
+%define _name       lumina-web
 %define _version    2.0.0
 %define _release    1%{?dist}
 %define _prefix     /opt/blossom/lumina
@@ -22,7 +22,7 @@ License:        Proprietary
 URL:            https://blossom.local
 Group:          System Environment/Daemons
 BuildArch:      noarch
-Requires:       blossom-lumina-common >= 2.0.0
+Requires:       lumina-common >= 2.0.0
 Requires:       python3 >= 3.6
 Requires:       python3-flask >= 2.0
 Requires:       python3-gunicorn >= 20.0

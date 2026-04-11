@@ -12,8 +12,13 @@
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
     <link rel="stylesheet" href="/static/css/tab05-account.css?v=1.4">
     <!-- 계정관리 컨텍스트: JS가 CRUD API 호출 시 사용 -->
-    <script>{% if hw_asset_id and hw_asset_scope %}window.__TAB05_ACCOUNT_CONTEXT__={asset_scope:{{ hw_asset_scope|tojson }},asset_id:{{ hw_asset_id|int }}};{% endif %}</script>
-    <script src="/static/js/_detail/tab05-account.js?v=1.5"></script>
+    <!-- SPA 재탐색 시 init 가드를 초기화하여 이벤트 핸들러 재등록 보장 -->
+    <script>
+    window.__TAB05_ACCOUNT_DETAIL_INIT__ = false;
+    window.__TAB05_ACCOUNT_API_HANDLED__ = false;
+    {% if hw_asset_id and hw_asset_scope %}window.__TAB05_ACCOUNT_CONTEXT__={asset_scope:{{ hw_asset_scope|tojson }},asset_id:{{ hw_asset_id|int }}};{% else %}window.__TAB05_ACCOUNT_CONTEXT__=null;{% endif %}
+    </script>
+    <script src="/static/js/_detail/tab05-account.js?v=1.7"></script>
 </head>
 <body class="page-account-tab">
     <!-- 공통 헤더 & 사이드바 인클루드 -->

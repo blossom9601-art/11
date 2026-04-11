@@ -43,6 +43,9 @@ class AccountCollector(BaseCollector):
 
             groups = self._get_user_groups(name)
 
+            # 의미없는 그룹(None 등) 필터링
+            groups = [g for g in groups if g.lower() not in ("none", "")]
+
             results.append({
                 "status": "활성" if enabled else "비활성",
                 "account_type": account_type,
@@ -52,7 +55,7 @@ class AccountCollector(BaseCollector):
                 "gid": 0,
                 "login_allowed": enabled,
                 "admin_allowed": is_admin,
-                "purpose": description,
+                "purpose": "",
                 "remark": f"SID={sid}" if sid else "",
             })
 

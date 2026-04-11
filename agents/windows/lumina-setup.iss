@@ -3,7 +3,7 @@
 ;       또는 Inno Setup GUI에서 이 파일 열고 Compile (Ctrl+F9)
 
 #define MyAppName "Lumina"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Blossom IT Asset Management"
 #define MyAppExeName "Lumina.exe"
 #define MyAppDescription "자산 자동 탐색 에이전트"
@@ -17,7 +17,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=no
 OutputDir=installer
-OutputBaseFilename=Lumina-Setup-{#MyAppVersion}
+OutputBaseFilename=lumina-agent-{#MyAppVersion}.win
 SetupIconFile=lumina.ico
 UninstallDisplayIcon={app}\lumina.ico
 Compression=lzma2
@@ -69,8 +69,31 @@ Filename: "sc.exe"; Parameters: "delete Lumina"; Flags: runhidden waituntiltermi
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commonappdata}\Lumina"
+Type: filesandordirs; Name: "{app}"
+
+[Registry]
+; 언인스톨 시 자동 시작 레지스트리 정리
+Root: HKCU; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Lumina"; Flags: uninsdeletevalue
 
 [Code]
+// Lumina 프로세스 강제 종료
+procedure KillLuminaProcess;
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/F /IM Lumina.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+// 설치 초기화 — 기존 프로세스/서비스 정리 후 설치
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  Exec('sc.exe', 'stop Lumina', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  KillLuminaProcess;
+end;
+
 // 설치 완료 시 안내 메시지
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
@@ -80,7 +103,7 @@ begin
   end;
 end;
 
-// 언인스톨 전 서비스 정리
+// 언인스톨 전 프로세스/서비스 정리
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
@@ -88,6 +111,7 @@ begin
   if CurUninstallStep = usUninstall then
   begin
     Exec('sc.exe', 'stop Lumina', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    KillLuminaProcess;
     Exec('sc.exe', 'delete Lumina', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

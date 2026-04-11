@@ -3,8 +3,6 @@
 /etc/passwd, /etc/group 파싱으로 시스템·사용자 계정을 수집한다.
 """
 
-from __future__ import annotations
-
 import grp
 import os
 import pwd
@@ -71,7 +69,7 @@ class AccountCollector(BaseCollector):
                 "gid": gid,
                 "login_allowed": login_allowed,
                 "admin_allowed": admin_allowed,
-                "purpose": pw.pw_gecos or "",
+                "purpose": "",
                 "remark": f"shell={shell}",
             })
 
@@ -93,10 +91,13 @@ class AccountCollector(BaseCollector):
         paths = ["/etc/sudoers"]
         sudoers_d = "/etc/sudoers.d"
         if os.path.isdir(sudoers_d):
-            for name in os.listdir(sudoers_d):
-                fp = os.path.join(sudoers_d, name)
-                if os.path.isfile(fp):
-                    paths.append(fp)
+            try:
+                for name in os.listdir(sudoers_d):
+                    fp = os.path.join(sudoers_d, name)
+                    if os.path.isfile(fp):
+                        paths.append(fp)
+            except (OSError, PermissionError):
+                pass
 
         for path in paths:
             try:

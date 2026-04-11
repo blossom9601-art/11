@@ -1,27 +1,170 @@
+# ============================================================================
+#  Lumina Agent Configuration
+#  Blossom IT Asset Management  —  v1.0.2
 #
-# Lumina Agent Configuration
-# Blossom IT Asset Management — 자산 자동 탐색 에이전트
+#  After editing this file, restart the service to apply changes:
+#    systemctl restart lumina-agent
 #
+#  Or run the interactive setup wizard:
+#    lumina-agent --setup
+# ============================================================================
 
+
+# ----------------------------------------------------------------------------
+#  [server]  Connection to the Blossom management server
+# ----------------------------------------------------------------------------
 [server]
-# 서버 IP 또는 도메인 (첫 실행 시 자동으로 입력 프롬프트가 나타납니다)
+
+# Blossom server hostname or IP address.
+# Examples:  host = 192.168.1.100  /  host = blossom.example.com
 host =
 
-# 서버 포트 (기본값: 8080)
-port = 8080
+# Server port number.  Default: 443
+port = 443
 
-# 통신 프로토콜 (https / http)
+# Communication protocol.  Only HTTPS is allowed.
+# HTTP is disabled for security.  Default: https
 protocol = https
 
-# SSL 인증서 검증 (운영환경에서는 true 권장)
-verify_ssl = false
+# Verify the server's TLS/SSL certificate.
+# Set to "true" in production to prevent man-in-the-middle attacks.
+# Default: true
+verify_ssl = true
 
+# (Optional) CA certificate bundle for server verification.
+# Leave empty to use the system default CA store.
+# Example:  ca_cert = /etc/pki/tls/certs/blossom-ca.pem
+ca_cert =
+
+# (Optional) Client certificate and key for mutual TLS (mTLS).
+# Both must be set to enable mTLS.
+# Example:  client_cert = /etc/lumina/certs/agent.crt
+#           client_key  = /etc/lumina/certs/agent.key
+client_cert =
+client_key =
+
+# Connection timeout in seconds when establishing a TCP connection.
+# Default: 10
+connect_timeout = 10
+
+# Read timeout in seconds for waiting on a server response.
+# Default: 30
+read_timeout = 30
+
+
+# ----------------------------------------------------------------------------
+#  [agent]  Collection behaviour and identity
+# ----------------------------------------------------------------------------
 [agent]
-# 수집 주기 (초). 기본값: 3600 (1시간)
+
+# Data collection interval in seconds.
+# Default: 3600 (1 hour)
+# Examples:  1800 = 30 min  /  3600 = 1 h  /  86400 = 1 day
 interval = 3600
 
-# JSON 저장 디렉터리 (서버 전송 실패 시 fallback 저장 경로)
+# Automatically start the collection loop on service startup.
+# Set to "false" to keep the agent idle until manually triggered.
+# Default: true
+auto_start = true
+
+# Directory for storing collected JSON data (offline fallback).
+# Default: /var/lib/lumina
 output_dir = /var/lib/lumina
 
-# 활성화할 수집기 (쉼표 구분)
+# Comma-separated list of enabled collectors.
+# Available:  interface, account, package
+# Default: interface, account, package
 collectors = interface, account, package
+
+# Unique agent identifier.  "auto" generates one from the hostname.
+# Override to assign a fixed ID across reinstalls.
+# Default: auto
+agent_id = auto
+
+# Site or data-centre label.  Appears in the Blossom dashboard.
+# Example:  site = dc-seoul-01
+site =
+
+# Deployment environment tag.
+# Typical values: prod, staging, dev
+# Default: prod
+env = prod
+
+# Initial retry interval (seconds) after a failed server push.
+# The agent uses exponential back-off up to max_retry_interval.
+# Default: 60
+retry_interval = 60
+
+# Maximum retry interval (seconds).  Default: 3600
+max_retry_interval = 3600
+
+# Maximum offline queue size in megabytes.
+# Older entries are discarded when this limit is exceeded.
+# Default: 100
+max_queue_size_mb = 100
+
+
+# ----------------------------------------------------------------------------
+#  [logging]  Log output settings
+# ----------------------------------------------------------------------------
+[logging]
+
+# Log level.  Allowed values: debug, info, warning, error, critical
+# Default: info
+level = info
+
+# Log file path.  Default: /var/log/lumina/lumina.log
+file = /var/log/lumina/lumina.log
+
+# Maximum size of a single log file in megabytes before rotation.
+# Default: 50
+max_size_mb = 50
+
+# Number of rotated log files to keep.  Default: 5
+backup_count = 5
+
+
+# ----------------------------------------------------------------------------
+#  [security]  Authentication and privilege settings
+# ----------------------------------------------------------------------------
+[security]
+
+# Enrollment token for first-time agent registration.
+# Obtain this from the Blossom admin console → Agent Enrollment.
+# After successful enrollment, the server issues an auth_token
+# and this field can be cleared.
+enrollment_token =
+
+# Bearer token for ongoing API authentication.
+# Automatically populated after enrollment; do NOT edit manually.
+auth_token =
+
+# Mask sensitive values (tokens, keys) in log output.
+# Default: true
+mask_sensitive = true
+
+# System user under which the agent process runs.
+# The RPM pre-install script creates this user automatically.
+# Default: lumina
+run_as = lumina
+
+
+# ----------------------------------------------------------------------------
+#  [network]  Proxy and DNS settings
+# ----------------------------------------------------------------------------
+[network]
+
+# HTTP/HTTPS proxy for outbound connections to the Blossom server.
+# Leave empty for direct connections.
+# Examples:
+#   proxy = http://proxy.corp:3128
+#   proxy = socks5://10.0.0.1:1080
+proxy =
+
+# Comma-separated list of hosts that bypass the proxy.
+# Example:  no_proxy = localhost, 127.0.0.1, 10.0.0.0/8
+no_proxy =
+
+# DNS lookup timeout in seconds (used by the proxy resolver).
+# Default: 5
+dns_timeout = 5

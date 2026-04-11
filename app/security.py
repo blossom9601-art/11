@@ -26,7 +26,7 @@ from functools import wraps
 from threading import Lock
 from typing import Optional, Set, Tuple
 
-from flask import Flask, Request, Response, abort, g, jsonify, request, session
+from flask import Flask, Request, Response, abort, current_app, g, jsonify, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def apply_security_headers(response: Response) -> Response:
     # Content-Security-Policy
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
@@ -99,6 +99,10 @@ def validate_csrf_request() -> Optional[Tuple[str, int]]:
     if request.method in CSRF_SAFE_METHODS:
         return None
 
+    # 테스트 환경에서는 CSRF 검증 생략
+    if current_app.config.get('TESTING'):
+        return None
+
     # 로그인/로그아웃 등 예외 경로
     if request.path in CSRF_EXEMPT_PATHS:
         return None
@@ -124,8 +128,7 @@ def validate_csrf_request() -> Optional[Tuple[str, int]]:
 
     logger.warning('[CSRF] 검증 실패 path=%s method=%s ip=%s',
                    request.path, request.method, request.remote_addr)
-    return None  # 경고만 기록, 점진적 도입을 위해 차단하지 않음
-    # 향후 활성화: return ('CSRF 토큰이 유효하지 않습니다.', 403)
+    return ('CSRF 토큰이 유효하지 않습니다.', 403)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -421,7 +424,7 @@ def _init_audit_log_table(app: Flask):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     event_type VARCHAR(50) NOT NULL,
                     emp_no VARCHAR(30) NOT NULL DEFAULT '',
                     ip_address VARCHAR(45) NOT NULL DEFAULT '',

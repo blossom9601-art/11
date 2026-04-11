@@ -524,7 +524,7 @@ def login():
                     return render_template('authentication/11-2.basic/sign-in.html')
                 # '*' 혼합 사용 시 의미가 모호해지므로 경고 및 차단 (강화 정책)
                 if '*' in norm_tokens and len(norm_tokens) > 1:
-                    current_app.logger.warning(f"[login] IP 차단(혼합 *) emp_no={emp_no} tokens={norm_tokens} remote_ip={remote_ip}")
+                    current_app.logger.warning(f"[login] IP 차단(혼합 *) emp_no={emp_no} remote_ip={remote_ip}")
                     print('[login_debug] BLOCK mixed_wildcard tokens', norm_tokens, flush=True)
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
@@ -534,7 +534,7 @@ def login():
                 # 단순화된 1차 매칭 (정확 일치만) - 실패 시 곧바로 차단 후 반환
                 if remote_ip not in norm_tokens:
                     print('[login_debug] BLOCK_simple remote_ip', remote_ip, 'norm_tokens', norm_tokens, flush=True)
-                    current_app.logger.warning(f"[login] IP 차단(simple) emp_no={emp_no} remote_ip={remote_ip} tokens={norm_tokens}")
+                    current_app.logger.warning(f"[login] IP 차단(simple) emp_no={emp_no} remote_ip={remote_ip}")
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
                     db.session.commit()
@@ -565,11 +565,11 @@ def login():
                     with open(os.path.join(instance_path, 'login_debug.log'), 'a', encoding='utf-8') as f:
                         for cand in remote_ip_candidates:
                             cand_match = next((tok for tok in norm_tokens if token_match(tok, cand)), None)
-                            f.write(f"[login_debug_probe] emp_no={emp_no} candidate={cand} match={cand_match} tokens={norm_tokens}\n")
+                            f.write(f"[login_debug_probe] emp_no={emp_no} candidate={cand} match={cand_match}\n")
                 except Exception:
                     pass
                 if not matched_token:
-                    current_app.logger.warning(f"[login] IP 차단 emp_no={emp_no} remote_ip={remote_ip} allowed_tokens={norm_tokens}")
+                    current_app.logger.warning(f"[login] IP 차단 emp_no={emp_no} remote_ip={remote_ip}")
                     print('[login_debug] BLOCK_v2 remote_ip', remote_ip, 'tokens', norm_tokens, flush=True)
                     # 실패 카운트 증가 (IP 차단도 실패 취급)
                     try:
@@ -582,11 +582,11 @@ def login():
                     db.session.commit()
                     return render_template('authentication/11-2.basic/sign-in.html')
                 else:
-                    current_app.logger.info(f"[login] IP 허용 emp_no={emp_no} remote_ip={remote_ip} matched_token={matched_token} allowed_tokens={norm_tokens}")
+                    current_app.logger.info(f"[login] IP 허용 emp_no={emp_no} remote_ip={remote_ip} matched=yes")
                     print('[login_debug] ALLOW_v2 remote_ip', remote_ip, 'matched_token', matched_token, flush=True)
                     try:
                         with open(os.path.join(instance_path, 'login_debug.log'), 'a', encoding='utf-8') as f:
-                            f.write(f"[login_debug_allow_v2] emp_no={emp_no} remote_ip={remote_ip} matched={matched_token} tokens={norm_tokens}\n")
+                            f.write(f"[login_debug_allow_v2] emp_no={emp_no} remote_ip={remote_ip} matched=yes\n")
                     except Exception:
                         pass
             else:
@@ -3632,7 +3632,8 @@ def _verify_company_otp(otp_cfg, emp_no, code):
 
     current_app.logger.info(f'[mfa] Company OTP verify: provider={provider}, url={verify_url}, emp_no={emp_no}')
 
-    resp = http_requests.post(verify_url, json=payload, headers=headers, timeout=timeout, verify=False)
+    _ca_bundle = current_app.config.get('COMPANY_OTP_CA_BUNDLE', True)
+    resp = http_requests.post(verify_url, json=payload, headers=headers, timeout=timeout, verify=_ca_bundle)
 
     current_app.logger.info(f'[mfa] Company OTP response: status={resp.status_code}, body={resp.text[:500]}')
 

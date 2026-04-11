@@ -339,3 +339,47 @@ def get_pagination_args(
     if size > max_size:
         size = max_size
     return page, size
+
+
+def paginate_query(query, default_size: int = 50, max_size: int = 500):
+    """SQLAlchemy 쿼리에 페이지네이션을 적용하고 표준 메타데이터를 반환한다.
+
+    query params:
+      - page (int, default 1)
+      - size / per_page (int, default ``default_size``)
+      - limit / offset 도 대체 파라미터로 지원
+
+    Returns dict:
+      ``{ 'items': [...], 'page': int, 'size': int, 'total': int, 'pages': int }``
+      items 는 SQLAlchemy 모델 리스트이므로 호출자가 직렬화해야 한다.
+    """
+    # limit/offset 스타일 지원
+    raw_limit = request.args.get('limit')
+    raw_offset = request.args.get('offset')
+    if raw_limit is not None or raw_offset is not None:
+        limit = parse_int(raw_limit, default_size)
+        if limit < 1:
+            limit = default_size
+        if limit > max_size:
+            limit = max_size
+        offset = max(parse_int(raw_offset, 0), 0)
+        total = query.count()
+        items = query.offset(offset).limit(limit).all()
+        return {
+            'items': items,
+            'offset': offset,
+            'limit': limit,
+            'total': total,
+            'has_more': (offset + len(items)) < total,
+        }
+
+    # page/size 스타일
+    page, size = get_pagination_args(default_size=default_size, max_size=max_size)
+    pagination = query.paginate(page=page, per_page=size, error_out=False)
+    return {
+        'items': pagination.items,
+        'page': page,
+        'size': size,
+        'total': pagination.total,
+        'pages': pagination.pages,
+    }

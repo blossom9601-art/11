@@ -116,6 +116,54 @@ def _normalize_license(raw: str) -> str:
     return s
 
 
+# ── 알려진 패키지/벤더 → SPDX 라이선스 매핑 ─────────────────
+_pkg_license_map: Optional[Dict[str, str]] = None   # lower(pkg_name) → SPDX ID
+_vendor_license_list: Optional[List[tuple]] = None   # [(lower_vendor, SPDX ID), …]
+
+
+def _load_pkg_license_map() -> tuple:
+    """sbom/package_licenses.json 로드 → (packages dict, vendors list)"""
+    global _pkg_license_map, _vendor_license_list
+    if _pkg_license_map is not None:
+        return _pkg_license_map, _vendor_license_list
+    _pkg_license_map = {}
+    _vendor_license_list = []
+    try:
+        json_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            os.pardir, "sbom", "package_licenses.json",
+        )
+        with open(json_path, encoding="utf-8") as f:
+            data = json.load(f)
+        for k, v in data.get("packages", {}).items():
+            _pkg_license_map[k.lower()] = v
+        for k, v in data.get("vendors", {}).items():
+            _vendor_license_list.append((k.lower(), v))
+    except Exception:
+        logger.warning("sbom/package_licenses.json 로드 실패, 매핑 없이 진행")
+    return _pkg_license_map, _vendor_license_list
+
+
+def _infer_license(package_name: str, vendor: str) -> str:
+    """패키지명·벤더로부터 라이선스를 추론. 매칭 실패 시 빈 문자열 반환."""
+    pkg_map, vendor_list = _load_pkg_license_map()
+    low_name = package_name.lower().strip()
+    # 1) 패키지명 정확 매칭
+    if low_name in pkg_map:
+        return pkg_map[low_name]
+    # 2) 패키지명 부분 매칭 (버전 접미사 제외)
+    for key, lic in pkg_map.items():
+        if low_name.startswith(key):
+            return lic
+    # 3) 벤더 부분 매칭
+    low_vendor = (vendor or "").lower().strip()
+    if low_vendor:
+        for pattern, lic in vendor_list:
+            if pattern in low_vendor:
+                return lic
+    return ""
+
+
 def _now() -> str:
     return datetime.now(_KST).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -622,6 +670,12 @@ def _upsert_packages(
             (scope, asset_id, pkg_name),
         ).fetchone()
 
+        # 라이선스: 에이전트 수집값 → SPDX 정규화 → 매핑 추론 순서
+        raw_lic = _normalize_license(item.get("license", ""))
+        vendor_str = _strip_quotes(item.get("vendor", ""))
+        if not raw_lic:
+            raw_lic = _infer_license(pkg_name, vendor_str)
+
         if existing:
             conn.execute(
                 """
@@ -635,9 +689,9 @@ def _upsert_packages(
                     version,
                     pkg_type,
                     identifier,
-                    _strip_quotes(item.get("vendor", "")),
+                    vendor_str,
                     item.get("installed", ""),
-                    _normalize_license(item.get("license", "")),
+                    raw_lic,
                     now,
                     existing["id"],
                 ),
@@ -660,9 +714,9 @@ def _upsert_packages(
                     version,
                     pkg_type,
                     identifier,
-                    _strip_quotes(item.get("vendor", "")),
+                    vendor_str,
                     item.get("installed", ""),
-                    _normalize_license(item.get("license", "")),
+                    raw_lic,
                     "",
                     now,
                 ),
@@ -674,7 +728,7 @@ def _upsert_packages(
 
 # ── 메인 처리 함수 ────────────────────────────────────────
 
-def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any]:
+def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=None) -> Dict[str, Any]:
     """에이전트 JSON 페이로드를 처리하여 DB에 upsert
 
     Returns:
@@ -710,7 +764,7 @@ def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any
         asset = _find_asset_by_hostname(conn, hostname)
         if not asset:
             # 미매칭 → agent_pending 에 upsert (같은 hostname은 최신으로 갱신)
-            ip_addr = _extract_ip(payload)
+            ip_addr = remote_ip or _extract_ip(payload)
             os_type = payload.get("os_type") or ""
             os_version = payload.get("os_version") or ""
             payload_json = json.dumps(payload, ensure_ascii=False)
@@ -774,6 +828,13 @@ def process_agent_payload(payload: Dict[str, Any], *, app=None) -> Dict[str, Any
         if packages:
             results["packages"] = _upsert_packages(conn, asset_id, scope, packages)
 
+        # 연동된 에이전트의 received_at도 갱신 (active 판정에 사용)
+        conn.execute(
+            "UPDATE agent_pending SET received_at = ?, last_heartbeat = ? "
+            "WHERE hostname = ? AND is_linked = 1",
+            (now_hb, now_hb, hostname),
+        )
+
         conn.commit()
 
     return {
@@ -831,7 +892,7 @@ def _ensure_heartbeat_column(conn):
             pass
 
 
-def update_agent_heartbeat(hostname: str, *, app=None) -> bool:
+def update_agent_heartbeat(hostname: str, *, remote_ip: str = "", app=None) -> bool:
     """에이전트 heartbeat를 갱신한다. 해당 hostname 레코드 존재 시 True."""
     app = app or current_app
     now = _now()
@@ -839,10 +900,16 @@ def update_agent_heartbeat(hostname: str, *, app=None) -> bool:
         with _get_connection(app) as conn:
             _ensure_tables(conn)
             _ensure_heartbeat_column(conn)
-            cur = conn.execute(
-                "UPDATE agent_pending SET last_heartbeat = ? WHERE hostname = ?",
-                (now, hostname),
-            )
+            if remote_ip:
+                cur = conn.execute(
+                    "UPDATE agent_pending SET last_heartbeat = ?, ip_address = ? WHERE hostname = ?",
+                    (now, remote_ip, hostname),
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE agent_pending SET last_heartbeat = ? WHERE hostname = ?",
+                    (now, hostname),
+                )
             conn.commit()
             return cur.rowcount > 0
     except Exception:
@@ -1019,7 +1086,7 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
             if has_os_ver:
                 row = conn.execute(
                     """SELECT id, hostname, ip_address, os_type, os_version,
-                              received_at, linked_at
+                              received_at, last_heartbeat, linked_at
                        FROM agent_pending
                        WHERE linked_asset_id = ? AND is_linked = 1
                        ORDER BY linked_at DESC LIMIT 1""",
@@ -1028,7 +1095,7 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
             else:
                 row = conn.execute(
                     """SELECT id, hostname, ip_address, os_type,
-                              received_at, linked_at
+                              received_at, last_heartbeat, linked_at
                        FROM agent_pending
                        WHERE linked_asset_id = ? AND is_linked = 1
                        ORDER BY linked_at DESC LIMIT 1""",
@@ -1037,15 +1104,23 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
 
             if not row:
                 return None
-            received = row["received_at"] or ""
-            try:
-                recv_dt = datetime.strptime(received, "%Y-%m-%d %H:%M:%S")
-            except (ValueError, TypeError):
+
+            def _parse_ts(s):
+                if not s:
+                    return None
                 try:
-                    recv_dt = datetime.strptime(received[:19], "%Y-%m-%dT%H:%M:%S")
+                    return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
                 except (ValueError, TypeError):
-                    recv_dt = None
-            is_active = recv_dt is not None and (datetime.now(_KST).replace(tzinfo=None) - recv_dt).total_seconds() <= 3600
+                    try:
+                        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+                    except (ValueError, TypeError):
+                        return None
+
+            recv_dt = _parse_ts(row["received_at"])
+            hb_dt = _parse_ts(row["last_heartbeat"])
+            # received_at과 last_heartbeat 중 최신 값 기준으로 active 판정
+            latest = max(filter(None, [recv_dt, hb_dt]), default=None)
+            is_active = latest is not None and (datetime.now(_KST).replace(tzinfo=None) - latest).total_seconds() <= 3600
             return {
                 "id": row["id"],
                 "hostname": row["hostname"],

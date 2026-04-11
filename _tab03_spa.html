@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.33">
+    <link rel="stylesheet" href="/static/css/tab03-backup.css?v=1.1">
+    <script src="/static/js/_detail/tab03-backup.js?v=1.0&cb=20260131-3"></script>
+</head>
+<body class="page-server-hardware-tab">
+    <!-- 공통 헤더 & 사이드바 인클루드 -->
+    <!-- FOUC 방지: 외부 CSS/JS 로드 전에 main-content 숨김 → DOMContentLoaded 시 fade-in -->
+<style>.main-content{opacity:0;transition:opacity .18s ease}</style>
+<script>(function(){function r(){var m=document.querySelector('.main-content');if(m)m.style.opacity='1'}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',r)}else{r()}setTimeout(r,3000)})()</script>
+<noscript><style>.main-content{opacity:1!important}</style></noscript>
+
+<!-- 공통 디자인 토큰 & 컴포넌트 -->
+<link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
+<link rel="stylesheet" href="/static/css/components.css?v=20260315">
+<link rel="stylesheet" href="/static/css/bls-modal.css?v=20260321d">
+<link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=20260321b">
+
+<!-- Global Footer assets -->
+<link rel="stylesheet" href="/static/css/footer.css?v=1.0.0">
+<script src="/static/js/footer.js?v=1.0.1" defer></script>
+
+<!-- Reusable main header -->
+<header class="main-header">
+	<div class="header-left">
+		<img src="/static/image/logo/blossom_logo.png" alt="Blossom 로고" class="header-logo">
+		<div class="header-brand-text">
+			<h1 class="system-title notranslate" translate="no">blossom</h1>
+			<span class="system-subtitle"></span>
+		</div>
+	</div>
+	<div class="header-right">
+		<button class="header-btn" id="btn-sidebar" title="메뉴">
+			<img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
+		</button>
+		<button class="header-btn" id="btn-work-timeline" title="작업 타임라인" type="button" data-href="/addon/work-timeline">
+			<img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
+		</button>
+		<a class="header-btn" id="btn-notifications" title="알림" href="/addon/notifications">
+			<img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
+			<span class="header-badge" id="noti-badge"></span>
+		</a>
+		<a class="header-btn" id="btn-chat" title="채팅" href="/addon/chat">
+			<img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
+		</a>
+		<a class="header-btn" id="btn-calendar" title="달력" href="/addon/calendar">
+			<img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
+		</a>
+		<button class="header-btn" id="btn-account" title="계정" type="button" data-emp-no="">
+			<img src="/static/image/svg/profil/free-icon-bussiness-man.svg" alt="계정" class="header-avatar-icon" loading="lazy" data-debug-avatar="/static/image/svg/profil/free-icon-bussiness-man.svg">
+		</button>
+	</div>
+</header>
+
+<script src="/static/js/ui/searchable_select.js?v=1.2.0"></script>
+<script src="/static/js/ui/fk_select.js?v=1.1.0"></script>
+<script src="/static/js/2.hardware/ui/hw_inventory_catalog.js?v=1.0.2"></script>
+<script src="/static/js/tab05_account_global_api.js"></script>
+
+<!-- 공통 유틸리티 (순서: constants → dom-utils → api-client → modal-utils → table-utils) -->
+<script src="/static/js/common/constants.js?v=20260315"></script>
+<script src="/static/js/common/dom-utils.js?v=20260315"></script>
+<script src="/static/js/common/api-client.js?v=20260315"></script>
+<script src="/static/js/common/modal-utils.js?v=20260315"></script>
+<script src="/static/js/common/bls-modal-factory.js?v=20260317"></script>
+<script src="/static/js/common/bls-alert.js?v=20260317"></script>
+<script src="/static/js/common/table-utils.js?v=20260315"></script>
+<script src="/static/js/common/brand-loader.js?v=20260315b"></script>
+<script src="/static/js/_shared/bls-stats-modal.js?v=20260321a" defer></script>
+
+<!-- 화면 권한 가드 (blossom.js 로드 후, URL 기반 자동 판별) -->
+<script src="/static/js/blossom-permission-guard.js?v=20260315_dis" defer></script>
+
+<!-- Chat unread badge polling -->
+<script>
+(function(){
+  var POLL_MS = 5000;
+  var btn = document.getElementById('btn-chat');
+  if (!btn) return;
+  function check(){
+    fetch('/api/chat/unread-total', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.total > 0) btn.classList.add('has-unread');
+        else btn.classList.remove('has-unread');
+      })
+      .catch(function(){});
+  }
+  check();
+  setInterval(check, POLL_MS);
+})();
+</script>
+
+<!-- Notification unread badge polling -->
+<script>
+(function(){
+  var POLL_MS = 15000;
+  var badge = document.getElementById('noti-badge');
+  if (!badge) return;
+  function check(){
+    fetch('/api/notifications/unread-count', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.success && d.count > 0){
+          badge.textContent = d.count > 10 ? '10+' : String(d.count);
+          badge.classList.add('show');
+        } else {
+          badge.classList.remove('show');
+          badge.textContent = '';
+        }
+      })
+      .catch(function(){ badge.classList.remove('show'); badge.textContent = ''; });
+  }
+  check();
+  setInterval(check, POLL_MS);
+})();
+</script>
+
+
+<script>
+/* Hardware detail: backup sync — posts title/subtitle to Flask session.
+   Primary mechanism is ?asset_id= query-param redirect (VPN pattern).
+   This fires as fallback for direct-URL access or bookmarked pages. */
+(function(){
+  var _HW_SUFFIXES = ['_detail','_system','_contract','_hw','_sw','_backup',
+    '_if','_account','_authority','_activate','_firewalld',
+    '_storage','_task','_vulnerability','_package','_log','_file','_manager',
+    '_hardware','_software','_component','_ip_range','_communication',
+    '_vpn_policy','_frontbay','_rearbay','_basic','_assign'];
+  var key = 'hw_server_onpremise_backup';
+  var baseKey = key;
+  for(var i=0;i<_HW_SUFFIXES.length;i++){
+    var s = _HW_SUFFIXES[i];
+    if(key.length > s.length && key.substr(key.length - s.length) === s){
+      baseKey = key.substr(0, key.length - s.length);
+      break;
+    }
+  }
+  function doSync(){
+    try{
+      var t = document.getElementById('page-title') || document.querySelector('.page-header h1');
+      var sub = document.getElementById('page-subtitle') || document.querySelector('.page-header p');
+      var title = t ? (t.textContent||'').trim() : '';
+      var subtitle = sub ? (sub.textContent||'').trim() : '';
+      if(!title || title === '-') return false;
+      fetch('/api/_hw_session_sync', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
+        body:JSON.stringify({base_key:baseKey, title:title, subtitle:subtitle||'-'})
+      }).catch(function(){});
+      return true;
+    }catch(e){ return false; }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    /* Try immediately — if server already rendered real title, sync it */
+    if(doSync()) return;
+    /* Otherwise observe DOM for client JS to populate title */
+    var el = document.getElementById('page-title') || document.querySelector('.page-header h1');
+    if(!el) return;
+    var obs = new MutationObserver(function(){
+      if(doSync()){ obs.disconnect(); }
+    });
+    obs.observe(el, {childList:true, characterData:true, subtree:true});
+    setTimeout(function(){ obs.disconnect(); }, 5000);
+  });
+})();
+</script>
+
+
+    <!-- Reusable sidebar navigation -->
+
+
+
+
+<nav class="sidebar" id="sidebar">
+	<div class="sidebar-menu">
+		<ul class="menu-list main-list">
+			
+			<li class="menu-item"><a href="/p/dashboard" class="menu-link" data-match-keys="dashboard"><img src="/static/image/svg/dashboard.svg" class="menu-icon" alt="대시"/><span class="menu-text">대시보드</span></a></li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/build.svg" class="menu-icon" alt="HW"/><span class="menu-text">시스템</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/hw_server_onpremise" class="submenu-link" data-match-keys="hw_server_onpremise,hw_server_onpremise_detail,hw_server_onpremise_hw,hw_server_onpremise_sw,hw_server_onpremise_backup,hw_server_onpremise_if,hw_server_onpremise_account,hw_server_onpremise_authority,hw_server_onpremise_activate,hw_server_onpremise_firewalld,hw_server_onpremise_storage,hw_server_onpremise_task,hw_server_onpremise_vulnerability,hw_server_onpremise_package,hw_server_onpremise_log,hw_server_onpremise_file,hw_server_cloud,hw_server_cloud_detail,hw_server_cloud_hw,hw_server_cloud_sw,hw_server_cloud_backup,hw_server_cloud_if,hw_server_cloud_account,hw_server_cloud_authority,hw_server_cloud_activate,hw_server_cloud_firewalld,hw_server_cloud_storage,hw_server_cloud_task,hw_server_cloud_vulnerability,hw_server_cloud_package,hw_server_cloud_log,hw_server_cloud_file,hw_server_frame,hw_server_frame_detail,hw_server_frame_frontbay,hw_server_frame_rearbay,hw_server_frame_if,hw_server_frame_account,hw_server_frame_task,hw_server_frame_log,hw_server_frame_file,hw_server_workstation,hw_server_workstation_detail,hw_server_workstation_hw,hw_server_workstation_sw,hw_server_workstation_backup,hw_server_workstation_if,hw_server_workstation_account,hw_server_workstation_authority,hw_server_workstation_activate,hw_server_workstation_firewalld,hw_server_workstation_storage,hw_server_workstation_task,hw_server_workstation_vulnerability,hw_server_workstation_package,hw_server_workstation_log,hw_server_workstation_file">서버</a></li>
+					<li><a href="/p/hw_storage_san" class="submenu-link" data-match-keys="hw_storage_san,hw_storage_san_detail,hw_storage_san_basic,hw_storage_san_assign,hw_storage_san_group,hw_storage_san_hw,hw_storage_san_if,hw_storage_san_account,hw_storage_san_task,hw_storage_san_log,hw_storage_san_file,hw_storage_backup,hw_storage_backup_detail,hw_storage_backup_basic,hw_storage_backup_assign,hw_storage_backup_group,hw_storage_backup_hw,hw_storage_backup_if,hw_storage_backup_account,hw_storage_backup_task,hw_storage_backup_log,hw_storage_backup_file">스토리지</a></li>
+					<li><a href="/p/hw_san_director" class="submenu-link" data-match-keys="hw_san_director,hw_san_director_detail,hw_san_director_hw,hw_san_director_if,hw_san_director_account,hw_san_director_task,hw_san_director_log,hw_san_director_file,hw_san_switch,hw_san_switch_detail,hw_san_switch_hw,hw_san_switch_if,hw_san_switch_account,hw_san_switch_task,hw_san_switch_log,hw_san_switch_file">SAN</a></li>
+					<li><a href="/p/hw_network_l2" class="submenu-link" data-match-keys="hw_network_l2,hw_network_l2_detail,hw_network_l2_hw,hw_network_l2_if,hw_network_l2_account,hw_network_l2_task,hw_network_l2_log,hw_network_l2_file,hw_network_l4,hw_network_l4_detail,hw_network_l4_hw,hw_network_l4_if,hw_network_l4_account,hw_network_l4_task,hw_network_l4_log,hw_network_l4_file,hw_network_l7,hw_network_l7_detail,hw_network_l7_hw,hw_network_l7_if,hw_network_l7_account,hw_network_l7_task,hw_network_l7_log,hw_network_l7_file,hw_network_ap,hw_network_ap_detail,hw_network_ap_hw,hw_network_ap_if,hw_network_ap_account,hw_network_ap_task,hw_network_ap_log,hw_network_ap_file,hw_network_dedicateline,hw_network_dedicateline_detail,hw_network_dedicateline_hw,hw_network_dedicateline_if,hw_network_dedicateline_account,hw_network_dedicateline_task,hw_network_dedicateline_log,hw_network_dedicateline_file">네트워크</a></li>
+					<li><a href="/p/hw_security_firewall" class="submenu-link" data-match-keys="hw_security_firewall,hw_security_firewall_detail,hw_security_firewall_hw,hw_security_firewall_if,hw_security_firewall_account,hw_security_firewall_task,hw_security_firewall_log,hw_security_firewall_file,hw_security_vpn,hw_security_vpn_detail,hw_security_vpn_hw,hw_security_vpn_if,hw_security_vpn_account,hw_security_vpn_task,hw_security_vpn_log,hw_security_vpn_file,hw_security_ids,hw_security_ids_detail,hw_security_ids_hw,hw_security_ids_if,hw_security_ids_account,hw_security_ids_task,hw_security_ids_log,hw_security_ids_file,hw_security_ips,hw_security_ips_detail,hw_security_ips_hw,hw_security_ips_if,hw_security_ips_account,hw_security_ips_task,hw_security_ips_log,hw_security_ips_file,hw_security_hsm,hw_security_hsm_detail,hw_security_hsm_hw,hw_security_hsm_if,hw_security_hsm_account,hw_security_hsm_task,hw_security_hsm_log,hw_security_hsm_file,hw_security_kms,hw_security_kms_detail,hw_security_kms_hw,hw_security_kms_if,hw_security_kms_account,hw_security_kms_task,hw_security_kms_log,hw_security_kms_file,hw_security_wips,hw_security_wips_detail,hw_security_wips_hw,hw_security_wips_if,hw_security_wips_account,hw_security_wips_task,hw_security_wips_log,hw_security_wips_file,hw_security_etc,hw_security_etc_detail,hw_security_etc_hw,hw_security_etc_if,hw_security_etc_account,hw_security_etc_task,hw_security_etc_log,hw_security_etc_file">보안장비</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/governance.svg" class="menu-icon" alt="NW"/><span class="menu-text">거버넌스</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<!-- <li><a href="/p/gov_dr_training" class="submenu-link" data-match-keys="gov_dr_training">재해복구 모의훈련</a></li> -->
+					<li><a href="/p/gov_backup_dashboard" class="submenu-link" data-match-keys="gov_backup_dashboard,gov_backup_policy,gov_backup_tape">백업 정책</a></li>
+					<li><a href="/p/gov_package_dashboard" class="submenu-link" data-match-keys="gov_package_dashboard,gov_package_list,gov_package_vulnerability">패키지 관리</a></li>
+					<li><a href="/p/gov_vulnerability_dashboard" class="submenu-link" data-match-keys="gov_vulnerability_dashboard,gov_vulnerability_analysis,gov_vulnerability_guide">취약점 분석</a></li>
+					<li><a href="/p/gov_ip_policy" class="submenu-link" data-match-keys="gov_ip_policy,gov_ip_policy_detail,gov_ip_policy_ip_range,gov_ip_policy_log,gov_ip_policy_file,gov_dns_policy,gov_dns_policy_detail,gov_dns_policy_dns_record,gov_dns_policy_log,gov_dns_policy_file,gov_ad_policy,gov_ad_policy_detail,gov_ad_policy_log,gov_ad_policy_file,gov_ad_policy_account,gov_ad_policy_domain">IP 정책</a></li>
+					<li><a href="/p/gov_vpn_policy" class="submenu-link" data-match-keys="gov_vpn_policy,gov_vpn_policy_detail,gov_vpn_policy_manager,gov_vpn_policy_communication,gov_vpn_policy_vpn_policy,gov_vpn_policy_log,gov_vpn_policy_file,gov_vpn_policy2,gov_vpn_policy2_detail,gov_vpn_policy2_manager,gov_vpn_policy2_communication,gov_vpn_policy2_vpn_policy,gov_vpn_policy2_log,gov_vpn_policy2_file,gov_vpn_policy3,gov_vpn_policy3_detail,gov_vpn_policy3_manager,gov_vpn_policy3_communication,gov_vpn_policy3_vpn_policy,gov_vpn_policy3_log,gov_vpn_policy3_file,gov_vpn_policy4,gov_vpn_policy4_detail,gov_vpn_policy4_manager,gov_vpn_policy4_communication,gov_vpn_policy4_vpn_policy,gov_vpn_policy4_log,gov_vpn_policy4_file,gov_vpn_policy5,gov_vpn_policy5_detail,gov_vpn_policy5_manager,gov_vpn_policy5_communication,gov_vpn_policy5_vpn_policy,gov_vpn_policy5_log,gov_vpn_policy5_file">VPN 정책</a></li>
+					<li><a href="/p/gov_dedicatedline_member" class="submenu-link" data-match-keys="gov_dedicatedline_member,gov_dedicatedline_member_detail,gov_dedicatedline_member_manager,gov_dedicatedline_member_task,gov_dedicatedline_member_log,gov_dedicatedline_member_file,gov_dedicatedline_customer,gov_dedicatedline_customer_detail,gov_dedicatedline_customer_manager,gov_dedicatedline_customer_task,gov_dedicatedline_customer_log,gov_dedicatedline_customer_file,gov_dedicatedline_van,gov_dedicatedline_van_detail,gov_dedicatedline_van_manager,gov_dedicatedline_van_task,gov_dedicatedline_van_log,gov_dedicatedline_van_file,gov_dedicatedline_affiliate,gov_dedicatedline_affiliate_detail,gov_dedicatedline_affiliate_manager,gov_dedicatedline_affiliate_task,gov_dedicatedline_affiliate_log,gov_dedicatedline_affiliate_file,gov_dedicatedline_intranet,gov_dedicatedline_intranet_detail,gov_dedicatedline_intranet_manager,gov_dedicatedline_intranet_task,gov_dedicatedline_intranet_log,gov_dedicatedline_intranet_file">전용회선 정책</a></li>
+					<li><a href="/p/gov_unused_server" class="submenu-link" data-match-keys="gov_unused_hardware,gov_unused_server,gov_unused_storage,gov_unused_san,gov_unused_network,gov_unused_security">불용자산 관리</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/dc_access_control" class="submenu-link" data-match-keys="dc_access_control,dc_access_records,dc_authority_control,dc_authority_records,dc_access_system">출입 관리</a></li>
+					<li><a href="/p/dc_data_deletion" class="submenu-link" data-match-keys="dc_data_deletion,dc_data_deletion_system">데이터 삭제 관리</a></li>
+					<li><a href="/p/dc_rack_lab1" class="submenu-link" data-match-keys="dc_rack_lab1,dc_rack_lab2,dc_rack_lab3,dc_rack_lab4,dc_rack_list">RACK 관리</a></li>
+					<li><a href="/p/dc_thermo_lab1" class="submenu-link" data-match-keys="dc_thermo_lab1,dc_thermo_lab2,dc_thermo_lab3,dc_thermo_lab4,dc_thermometer_list,dc_thermometer_log">온/습도 관리</a></li>
+					<li><a href="/p/dc_cctv_lab1" class="submenu-link" data-match-keys="dc_cctv_lab1,dc_cctv_lab2,dc_cctv_lab3,dc_cctv_lab4,dc_cctv_list">CCTV 관리</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-font-usd-circle.svg" class="menu-icon" alt="비용"/><span class="menu-text">비용관리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/cost_opex_dashboard" class="submenu-link" data-match-keys="cost_opex_dashboard,cost_opex_hardware,cost_opex_hardware_detail,cost_opex_hardware_contract,cost_opex_hardware_log,cost_opex_hardware_file,cost_opex_software,cost_opex_software_detail,cost_opex_software_contract,cost_opex_software_log,cost_opex_software_file,cost_opex_etc,cost_opex_etc_detail,cost_opex_etc_contract,cost_opex_etc_log,cost_opex_etc_file">OPEX</a></li>
+					<li><a href="/p/cost_capex_dashboard" class="submenu-link" data-match-keys="cost_capex_dashboard,cost_capex_contract,cost_capex_hardware,cost_capex_hardware_detail,cost_capex_hardware_contract,cost_capex_hardware_log,cost_capex_hardware_file,cost_capex_software,cost_capex_software_detail,cost_capex_software_contract,cost_capex_software_log,cost_capex_software_file,cost_capex_etc,cost_capex_etc_detail,cost_capex_etc_contract,cost_capex_etc_log,cost_capex_etc_file">CAPEX</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/folder.svg" class="menu-icon" alt="프로젝트"/><span class="menu-text">프로젝트</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/proj_status" class="submenu-link" data-match-keys="proj_status,proj_participating,proj_completed,proj_completed_detail,proj_completed_integrity,proj_completed_scope,proj_completed_schedule,proj_completed_cost,proj_completed_quality,proj_completed_resource,proj_completed_communication,proj_completed_risk,proj_completed_procurement,proj_completed_stakeholder">프로젝트 현황</a></li>
+					<li><a href="/p/task_status" class="submenu-link" data-match-keys="task_status,task_participating,task_completed">작업 현황</a></li>
+					<li><a href="/p/workflow_progress" class="submenu-link" data-match-keys="workflow_progress,workflow_completed">티켓 현황</a></li>
+					<li><a href="/p/wf_designer_explore" class="submenu-link" data-match-keys="wf_designer_explore,wf_designer_manage">워크플로우 제작</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-lightbulb-on.svg" class="menu-icon" alt="인사이트"/><span class="menu-text">인사이트</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/insight_trend" class="submenu-link" data-match-keys="insight_trend,insight_security,insight_report,insight_technical">기술자료</a></li>
+					<li><a href="/p/insight_blog_it" class="submenu-link" data-match-keys="insight_blog_it,insight_blog_it_detail">블로그</a></li>
+				</ul>
+			</li>
+			
+			
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/settings.svg" class="menu-icon" alt="카테고리"/><span class="menu-text">카테고리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="/p/cat_business_dashboard" class="submenu-link" data-match-keys="cat_business_dashboard,cat_business_division,cat_business_group,cat_business_group_detail,cat_business_group_file,cat_business_group_log,cat_business_group_manager,cat_business_group_system,cat_business_group_task,cat_business_operation,cat_business_status,cat_business_work">비즈니스</a></li>
+					<li><a href="/p/cat_hw_dashboard" class="submenu-link" data-match-keys="cat_hw_dashboard,cat_hw_network,cat_hw_network_detail,cat_hw_network_file,cat_hw_network_hardware,cat_hw_network_log,cat_hw_network_task,cat_hw_san,cat_hw_san_detail,cat_hw_san_file,cat_hw_san_hardware,cat_hw_san_log,cat_hw_san_task,cat_hw_security,cat_hw_security_detail,cat_hw_security_file,cat_hw_security_hardware,cat_hw_security_log,cat_hw_security_task,cat_hw_server,cat_hw_server_detail,cat_hw_server_file,cat_hw_server_hardware,cat_hw_server_log,cat_hw_server_task,cat_hw_storage,cat_hw_storage_detail,cat_hw_storage_file,cat_hw_storage_hardware,cat_hw_storage_log,cat_hw_storage_task">하드웨어</a></li>
+					<li><a href="/p/cat_sw_dashboard" class="submenu-link" data-match-keys="cat_sw_dashboard,cat_sw_database,cat_sw_database_detail,cat_sw_database_file,cat_sw_database_log,cat_sw_database_system,cat_sw_database_task,cat_sw_high_availability,cat_sw_high_availability_detail,cat_sw_high_availability_file,cat_sw_high_availability_log,cat_sw_high_availability_system,cat_sw_high_availability_task,cat_sw_middleware,cat_sw_middleware_detail,cat_sw_middleware_file,cat_sw_middleware_log,cat_sw_middleware_system,cat_sw_middleware_task,cat_sw_os,cat_sw_os_detail,cat_sw_os_file,cat_sw_os_log,cat_sw_os_system,cat_sw_os_task,cat_sw_security,cat_sw_security_detail,cat_sw_security_file,cat_sw_security_log,cat_sw_security_system,cat_sw_security_task,cat_sw_virtualization,cat_sw_virtualization_detail,cat_sw_virtualization_file,cat_sw_virtualization_log,cat_sw_virtualization_system,cat_sw_virtualization_task">소프트웨어</a></li>
+					<li><a href="/p/cat_component_cpu" class="submenu-link" data-match-keys="cat_component_cpu,cat_component_cpu_detail,cat_component_cpu_file,cat_component_cpu_log,cat_component_cpu_system,cat_component_cpu_task,cat_component_disk,cat_component_etc,cat_component_gpu,cat_component_gpu_detail,cat_component_gpu_file,cat_component_gpu_log,cat_component_gpu_system,cat_component_gpu_task,cat_component_hba,cat_component_memory,cat_component_memory_detail,cat_component_memory_file,cat_component_memory_log,cat_component_memory_system,cat_component_memory_task,cat_component_nic">컴포넌트</a></li>
+					<li><a href="/p/cat_company_center" class="submenu-link" data-match-keys="cat_company_center,cat_company_department">회사</a></li>
+					<li><a href="/p/cat_customer_client1" class="submenu-link" data-match-keys="cat_customer_client1">고객</a></li>
+					<li><a href="/p/cat_vendor_manufacturer" class="submenu-link" data-match-keys="cat_vendor_maintenance,cat_vendor_maintenance_component,cat_vendor_maintenance_detail,cat_vendor_maintenance_file,cat_vendor_maintenance_hardware,cat_vendor_maintenance_log,cat_vendor_maintenance_manager,cat_vendor_maintenance_software,cat_vendor_maintenance_task,cat_vendor_manufacturer,cat_vendor_manufacturer_component,cat_vendor_manufacturer_detail,cat_vendor_manufacturer_file,cat_vendor_manufacturer_hardware,cat_vendor_manufacturer_log,cat_vendor_manufacturer_manager,cat_vendor_manufacturer_software,cat_vendor_manufacturer_task">벤더</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+		
+		
+		
+	</div>
+</nav>
+
+
+    
+
+    <!-- Main Content -->
+    <main class="main-content tab03-backup-root">
+        <div class="content-wrapper">
+            <!-- 뒤로가기 버튼 -->
+            
+            <a href="/p/hw_server_onpremise" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+            
+
+            <!-- 페이지 타이틀 / 서브타이틀 -->
+            <div class="page-header">
+                <h1 id="page-title">-</h1>
+                <p id="page-subtitle">-</p>
+            </div>
+
+            <!-- 상세 탭 네비게이션 -->
+            
+            <div class="server-detail-tabs">
+                
+                <a href="/p/hw_server_onpremise_detail"
+                   class="server-detail-tab-btn ">기본정보</a>
+                
+                <a href="/p/hw_server_onpremise_hw"
+                   class="server-detail-tab-btn ">하드웨어</a>
+                
+                <a href="/p/hw_server_onpremise_sw"
+                   class="server-detail-tab-btn ">소프트웨어</a>
+                
+                <a href="/p/hw_server_onpremise_backup"
+                   class="server-detail-tab-btn active">백업정책</a>
+                
+                <a href="/p/hw_server_onpremise_if"
+                   class="server-detail-tab-btn ">인터페이스</a>
+                
+                <a href="/p/hw_server_onpremise_account"
+                   class="server-detail-tab-btn ">계정관리</a>
+                
+                <a href="/p/hw_server_onpremise_authority"
+                   class="server-detail-tab-btn ">권한관리</a>
+                
+                <a href="/p/hw_server_onpremise_activate"
+                   class="server-detail-tab-btn ">기동절차</a>
+                
+                <a href="/p/hw_server_onpremise_firewalld"
+                   class="server-detail-tab-btn ">방화벽</a>
+                
+                <a href="/p/hw_server_onpremise_storage"
+                   class="server-detail-tab-btn ">스토리지</a>
+                
+                <a href="/p/hw_server_onpremise_task"
+                   class="server-detail-tab-btn ">작업이력</a>
+                
+                <a href="/p/hw_server_onpremise_vulnerability"
+                   class="server-detail-tab-btn ">취약점</a>
+                
+                <a href="/p/hw_server_onpremise_package"
+                   class="server-detail-tab-btn ">패키지</a>
+                
+                <a href="/p/hw_server_onpremise_log"
+                   class="server-detail-tab-btn ">변경이력</a>
+                
+                <a href="/p/hw_server_onpremise_file"
+                   class="server-detail-tab-btn ">구성/파일</a>
+                
+            </div>
+            
+
+            <!-- 백업정책 컨텐츠 영역 -->
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="basic">
+                    <button class="add-btn-icon" id="bk-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                        <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                    </button>
+                    <div class="detail-section">
+                        <h3>
+                            백업 정책
+                            <div class="page-size-selector" id="bk-page-size-wrap" aria-label="보기 개수">
+                                <label for="bk-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="bk-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="table-wrap">
+                            <table class="hw-table cols-13" id="bk-spec-table">
+                                <colgroup>
+                                    <col><!-- checkbox -->
+                                    <col class="equal-col"><!-- 백업 구분 -->
+                                    <col class="equal-col"><!-- 백업 정책 -->
+                                    <col class="equal-col"><!-- 백업 디렉터리 -->
+                                    <col class="equal-col"><!-- 데이터 유형 -->
+                                    <col class="equal-col"><!-- 백업 등급 -->
+                                    <col class="equal-col"><!-- 보관 기간 -->
+                                    <col class="equal-col"><!-- 스토리지 풀 -->
+                                    <col class="equal-col"><!-- 소산여부 -->
+                                    <col class="equal-col"><!-- 미디어 구분 -->
+                                    <col class="equal-col"><!-- 주기 -->
+                                    <col class="equal-col"><!-- 요일 -->
+                                    <col class="equal-col"><!-- 일자 -->
+                                    <col class="equal-col"><!-- 시작시간 -->
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th><input type="checkbox" id="bk-select-all" aria-label="전체 선택"></th>
+                                        <th>백업 구분</th>
+                                        <th>백업 정책</th>
+                                        <th>백업 디렉터리</th>
+                                        <th>데이터 유형</th>
+                                        <th>백업 등급</th>
+                                        <th>보관 기간</th>
+                                        <th>스토리지 풀</th>
+                                        <th>소산여부</th>
+                                        <th>미디어 구분</th>
+                                        <th>주기</th>
+                                        <th>요일</th>
+                                        <th>일자</th>
+                                        <th>시작시간</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- 초기 데이터 없음; JS로 조회/표시 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State -->
+                        <div id="bk-empty" class="system-empty" role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">백업 정책 내역이 없습니다.</h3>
+                                <p class="empty-desc">거버넌스 백업 정책에 등록된 내역이 없습니다.</p>
+                            </div>
+                        </div>
+                        <!-- Pagination -->
+                        <div class="modern-pagination" id="bk-pagination">
+                            <div class="pagination-info"><span id="bk-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="bk-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/>
+                                </button>
+                                <button class="pagination-btn" id="bk-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/>
+                                </button>
+                                <div class="page-numbers" id="bk-page-numbers"></div>
+                                <button class="pagination-btn" id="bk-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/>
+                                </button>
+                                <button class="pagination-btn" id="bk-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260406_tab"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/_detail/_hardware_detail.js?v=1.2.0"></script>
+    <script>
+    /* 페이지 타이틀/서브타이틀 복원 — sessionStorage에 저장된 선택 행 정보로 설정 */
+    (function resolveBkPageHeader(){
+        'use strict';
+        var titleEl = document.getElementById('page-title');
+        var subEl   = document.getElementById('page-subtitle');
+        if(!titleEl && !subEl) return;
+
+        function norm(v){ var s=String(v==null?'':v).trim(); return (!s||s==='-')?'':s; }
+        if(norm(titleEl?titleEl.textContent:'') && norm(subEl?subEl.textContent:'')) return;
+
+        var serverPrefix = 'onpremise'.trim();
+        if(serverPrefix){
+            var stores = [];
+            try{ if(window.sessionStorage) stores.push(window.sessionStorage); }catch(_){}
+            try{ if(window.localStorage)  stores.push(window.localStorage); }catch(_){}
+
+            function read(kind){
+                var keys = [
+                    serverPrefix + ':selected:' + kind,
+                    serverPrefix + ':selected:' + kind + '_name'
+                ];
+                for(var si=0;si<stores.length;si++){
+                    for(var ki=0;ki<keys.length;ki++){
+                        var v = norm(stores[si].getItem(keys[ki]));
+                        if(v) return v;
+                    }
+                }
+                var rowKey = serverPrefix + ':selected:row';
+                for(var si2=0;si2<stores.length;si2++){
+                    try{
+                        var raw = stores[si2].getItem(rowKey);
+                        if(!raw) continue;
+                        var row = JSON.parse(raw);
+                        if(!row||typeof row!=='object') continue;
+                        return (kind==='work')
+                            ? norm(row.work_name||row.workName||row.work||row.title||row.name)
+                            : norm(row.system_name||row.systemName||row.system||row.subTitle||row.subtitle);
+                    }catch(_){}
+                }
+                return '';
+            }
+            var w = read('work'),  s = read('system');
+            if(w && titleEl) titleEl.textContent = w;
+            if(s && subEl)   subEl.textContent   = s;
+            return;
+        }
+
+        if(window.BlossomHardwareDetail){
+            var pm = window.location.pathname.match(/\/p\/([^\/]+)/);
+            var pageKey = pm ? pm[1] : '';
+            var baseKey = pageKey.replace(/_backup$/, '');
+            var parts = baseKey.split('_').filter(function(p){ return !!p; });
+
+            var candidates = [];
+            for(var len = parts.length; len >= 1; len--){
+                for(var start = parts.length - len; start >= 0; start--){
+                    var seg = parts.slice(start, start + len).join('_');
+                    candidates.push(seg);
+                    candidates.push(seg.toUpperCase());
+                }
+            }
+
+            BlossomHardwareDetail.initHeader({
+                storagePrefix: parts[parts.length-1] || 'detail',
+                headerKeyPrefix: parts[parts.length-1] || 'detail',
+                compatHeaderKeyPrefixes: candidates
+            });
+        }
+    })();
+    </script>
+
+    <!-- 시스템 수정 모달 -->
+    <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-edit-content">
+            <div class="server-edit-header">
+                <div class="server-edit-title"><h3>시스템 수정</h3><p class="server-edit-subtitle">선택한 시스템 정보를 수정합니다.</p></div>
+                <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+            <div class="server-edit-body">
+                <form id="system-edit-form"><!-- 동적 채움 --></form>
+            </div>
+            <div class="server-edit-actions align-right">
+                <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV 다운로드 확인 모달 -->
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div id="bk-download-modal" class="server-add-modal system-download-modal modal-overlay-full bls-download-modal bls-download-modal--range" aria-hidden="true">
+    <div class="server-add-content" role="dialog" aria-modal="true" aria-labelledby="bk-download-modal-title">
+        <div class="server-add-header bls-download-modal__header">
+            <div class="server-add-title dispose-title bls-download-modal__header-copy">
+                <h3 id="bk-download-modal-title" class="bls-download-modal__title">CSV 다운로드</h3>
+                <p class="server-add-subtitle bls-download-modal__subtitle" id="bk-download-subtitle">현재 결과를 CSV로 내보냅니다.</p>
+            </div>
+            <button class="close-btn bls-download-modal__close" type="button" id="bk-download-close" title="닫기" aria-label="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="server-add-body bls-download-modal__body">
+            <div class="dispose-content bls-download-modal__layout">
+                <div class="dispose-text bls-download-modal__copy">
+                    <p class="bls-download-modal__primary">내보낼 범위를 선택하세요.</p>
+                    
+                    <div class="form-radio-group bls-download-modal__options">
+                        <label id="bk-csv-range-row-all" class="bls-download-modal__option">
+                            <input type="radio" name="bk-csv-range" id="bk-csv-range-all" value="all" checked>
+                            <span>전체 결과</span>
+                        </label>
+                        <label id="bk-csv-range-row-selected" class="bls-download-modal__option">
+                            <input type="radio" name="bk-csv-range" id="bk-csv-range-selected" value="selected">
+                            <span>선택된 행만</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="dispose-illust bls-download-modal__illust">
+                    <img src="/static/image/svg/list/free-sticker-research.svg" alt="Research Illustration" loading="lazy" />
+                </div>
+            </div>
+        </div>
+        <div class="server-add-actions align-right bls-download-modal__footer">
+            <div class="action-buttons right bls-download-modal__actions">
+                <button type="button" class="btn-primary bls-download-modal__button bls-download-modal__button--primary" id="bk-download-confirm">다운로드</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

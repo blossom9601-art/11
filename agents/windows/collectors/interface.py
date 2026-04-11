@@ -1,6 +1,6 @@
 """Windows 네트워크 인터페이스 수집기 (tab04-interface)
 
-PowerShell / WMI 기반으로 NIC, IP, MAC 정보를 수집한다.
+PowerShell / WMI 기반으로 NIC, IP, MAC, HBA WWN 정보를 수집한다.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ class InterfaceCollector(BaseCollector):
     def collect(self) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
 
+        # ── 1) 이더넷 네트워크 어댑터 수집 ──
         adapters = self._get_adapters()
         ip_config = self._get_ip_addresses()
 
@@ -30,7 +31,8 @@ class InterfaceCollector(BaseCollector):
 
             mac = adapter.get("MacAddress", "")
             status = adapter.get("Status", "")
-            slot = adapter.get("PciSlot", "")
+            desc = adapter.get("InterfaceDescription", "")
+            guid = adapter.get("InterfaceGuid", "")
 
             # 해당 어댑터의 IP 주소 수집
             ip_addresses = []
@@ -45,12 +47,24 @@ class InterfaceCollector(BaseCollector):
                     })
 
             results.append({
-                "slot": slot,
+                "slot": "",
                 "port": str(if_index) if if_index else "",
                 "iface": iface_name,
-                "serial": mac,
+                "serial": guid,
                 "ip_addresses": ip_addresses,
-                "remark": f"Status={status}",
+                "remark": f"Status={status}" + (f", {desc}" if desc else ""),
+            })
+
+        # ── 2) FC HBA (Fibre Channel) 포트 수집 ──
+        hba_ports = self._get_fc_hba_ports()
+        for hba in hba_ports:
+            results.append({
+                "slot": "",
+                "port": hba.get("port", ""),
+                "iface": hba.get("iface", ""),
+                "serial": hba.get("wwn", ""),
+                "ip_addresses": [],
+                "remark": "HBA FC Port",
             })
 
         return results
@@ -59,7 +73,7 @@ class InterfaceCollector(BaseCollector):
         """Get-NetAdapter 로 NIC 목록 수집"""
         ps_script = (
             "Get-NetAdapter | Select-Object Name, InterfaceIndex, MacAddress, Status, "
-            "InterfaceDescription | ConvertTo-Json -Compress"
+            "InterfaceDescription, InterfaceGuid | ConvertTo-Json -Compress"
         )
         return self._run_ps(ps_script)
 
@@ -71,6 +85,27 @@ class InterfaceCollector(BaseCollector):
             "ConvertTo-Json -Compress"
         )
         return self._run_ps(ps_script)
+
+    def _get_fc_hba_ports(self) -> List[Dict[str, Any]]:
+        """Get-InitiatorPort 로 FC HBA WWN 수집"""
+        ps_script = (
+            "Get-InitiatorPort -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.ConnectionType -eq 'Fibre Channel' } | "
+            "Select-Object NodeAddress, PortAddress, InstanceName | "
+            "ConvertTo-Json -Compress"
+        )
+        raw = self._run_ps(ps_script)
+        results: List[Dict[str, Any]] = []
+        for item in raw:
+            port_addr = item.get("PortAddress", "")
+            instance = item.get("InstanceName", "")
+            if port_addr:
+                results.append({
+                    "port": instance,
+                    "iface": instance.split("\\")[-1] if "\\" in instance else instance,
+                    "wwn": port_addr,
+                })
+        return results
 
     def _run_ps(self, script: str) -> List[Dict[str, Any]]:
         try:

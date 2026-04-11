@@ -22,10 +22,10 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_room (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    room_type TEXT NOT NULL,
-                    room_name TEXT,
-                    direct_key TEXT UNIQUE,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    room_type VARCHAR(64) NOT NULL,
+                    room_name VARCHAR(255),
+                    direct_key VARCHAR(255) UNIQUE,
                     last_message_preview TEXT,
                     last_message_at TEXT,
                     created_by_user_id INTEGER NOT NULL,
@@ -42,10 +42,10 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_message (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     room_id INTEGER NOT NULL,
                     sender_user_id INTEGER NOT NULL,
-                    content_type TEXT NOT NULL DEFAULT 'TEXT',
+                    content_type VARCHAR(64) NOT NULL DEFAULT 'TEXT',
                     content_text TEXT,
                     file_id INTEGER,
                     reply_to_message_id INTEGER,
@@ -64,10 +64,10 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_room_member (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     room_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    member_role TEXT NOT NULL DEFAULT 'MEMBER',
+                    member_role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
                     is_favorite INTEGER NOT NULL DEFAULT 0,
                     is_muted INTEGER NOT NULL DEFAULT 0,
                     last_read_message_id INTEGER,
@@ -86,12 +86,12 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_file (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     message_id INTEGER NOT NULL,
                     file_path TEXT NOT NULL,
                     original_name TEXT NOT NULL,
                     file_size INTEGER,
-                    content_type TEXT,
+                    content_type VARCHAR(128),
                     uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     uploaded_by_user_id INTEGER NOT NULL,
                     FOREIGN KEY (message_id) REFERENCES msg_message(id),

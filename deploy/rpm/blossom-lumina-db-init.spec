@@ -5,7 +5,7 @@
 # 대상: Rocky Linux 8.10 / 9.x / 10.x
 ###############################################################################
 
-%define _name       blossom-lumina-db-init
+%define _name       lumina-db
 %define _version    2.0.0
 %define _release    1%{?dist}
 %define _prefix     /opt/blossom/lumina

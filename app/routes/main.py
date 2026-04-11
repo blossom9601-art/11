@@ -105,9 +105,7 @@ def construction_zone():
 # ===== Add-on / header icon linked pages (stub pages for now) =====
 @main_bp.route('/addon/work-timeline')
 def addon_work_timeline():
-    """작업 타임라인 (임시 스텁)"""
-    if not _is_spa_fetch():
-        return render_template('layouts/spa_shell.html', current_key='addon_work_timeline', menu_code=None)
+    """작업 타임라인 (팝업 전용 — 독립 HTML 페이지)"""
     return render_template('addon_application/1.work_timeline.html')
 
 @main_bp.route('/addon/notifications')

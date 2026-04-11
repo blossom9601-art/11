@@ -1576,7 +1576,7 @@ pageSize: 10 };
 					td.innerHTML = '<input type="text" class="form-input am-control" value="' + current.replace(/"/g, '&quot;') + '"' + (ph ? (' placeholder="' + ph + '"') : '') + '>';
 				}
 
-				['status', 'type', 'account', 'group', 'user', 'login', 'admin', 'purpose'].forEach(toInput);
+				['status', 'type', 'user', 'login', 'admin', 'purpose'].forEach(toInput);
 				try { enhanceSearchSelects(tr); } catch (_) { }
 				try { syncSearchSelects(tr); } catch (_) { }
 				try { applyControlClasses(tr); } catch (_) { }

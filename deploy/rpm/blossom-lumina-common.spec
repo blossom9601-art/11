@@ -4,7 +4,7 @@
 # 대상: Rocky Linux 8.10 / 9.x / 10.x
 ###############################################################################
 
-%define _name       blossom-lumina-common
+%define _name       lumina-common
 %define _version    2.0.0
 %define _release    1%{?dist}
 %define _prefix     /opt/blossom/lumina
@@ -23,7 +23,10 @@ Group:          System Environment/Base
 BuildArch:      noarch
 Requires:       openssl >= 1.1.1
 Requires:       python3 >= 3.6
+Requires:       python3-requests
+Requires:       python3-click
 Requires:       ca-certificates
+Requires:       bash-completion
 
 %description
 Blossom 플랫폼의 Lumina 서비스 공통 패키지.
@@ -45,11 +48,32 @@ install -m 0644 %{_sourcedir}/common/collector.py  %{buildroot}%{_prefix}/common
 install -m 0644 %{_sourcedir}/common/crypto.py     %{buildroot}%{_prefix}/common/
 install -m 0644 %{_sourcedir}/common/masking.py    %{buildroot}%{_prefix}/common/
 
+# ── CLI 도구 (lumina) ────────────────────────────────────
+install -d -m 0755 %{buildroot}%{_prefix}/cli/lumina_cli
+install -d -m 0755 %{buildroot}%{_prefix}/cli/lumina_cli/commands
+install -m 0644 %{_sourcedir}/cli/lumina_cli/__init__.py       %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/__main__.py       %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/main.py           %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/config.py         %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/api_client.py     %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/output.py         %{buildroot}%{_prefix}/cli/lumina_cli/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/commands/__init__.py  %{buildroot}%{_prefix}/cli/lumina_cli/commands/
+install -m 0644 %{_sourcedir}/cli/lumina_cli/commands/agent.py     %{buildroot}%{_prefix}/cli/lumina_cli/commands/
+
 # ── 관리 스크립트 ────────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_prefix}/bin
 install -m 0755 %{_sourcedir}/bin/lumina-healthcheck   %{buildroot}%{_prefix}/bin/
 install -m 0755 %{_sourcedir}/bin/lumina-rotate-token   %{buildroot}%{_prefix}/bin/
 install -m 0755 %{_sourcedir}/bin/lumina-cert-renew     %{buildroot}%{_prefix}/bin/
+install -m 0755 %{_sourcedir}/bin/lumina                %{buildroot}%{_prefix}/bin/
+
+# ── /usr/local/bin 심볼릭 링크 (lumina CLI 명령어) ────────
+install -d -m 0755 %{buildroot}/usr/local/bin
+ln -sf %{_prefix}/bin/lumina %{buildroot}/usr/local/bin/lumina
+
+# ── Bash 자동완성 ────────────────────────────────────────
+install -d -m 0755 %{buildroot}%{_sysconfdir}/bash_completion.d
+install -m 0644 %{_sourcedir}/cli/lumina-completion.bash %{buildroot}%{_sysconfdir}/bash_completion.d/lumina
 
 # ── 설정 디렉터리 ────────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_confdir}
@@ -125,6 +149,24 @@ LREOF
 %{_prefix}/bin/lumina-healthcheck
 %{_prefix}/bin/lumina-rotate-token
 %{_prefix}/bin/lumina-cert-renew
+%{_prefix}/bin/lumina
+/usr/local/bin/lumina
+
+# CLI 도구
+%dir %{_prefix}/cli
+%dir %{_prefix}/cli/lumina_cli
+%dir %{_prefix}/cli/lumina_cli/commands
+%{_prefix}/cli/lumina_cli/__init__.py
+%{_prefix}/cli/lumina_cli/__main__.py
+%{_prefix}/cli/lumina_cli/main.py
+%{_prefix}/cli/lumina_cli/config.py
+%{_prefix}/cli/lumina_cli/api_client.py
+%{_prefix}/cli/lumina_cli/output.py
+%{_prefix}/cli/lumina_cli/commands/__init__.py
+%{_prefix}/cli/lumina_cli/commands/agent.py
+
+# Bash 자동완성
+%{_sysconfdir}/bash_completion.d/lumina
 
 # 설정 파일
 %dir %{_confdir}
@@ -196,7 +238,11 @@ fi
 # changelog
 ###############################################################################
 %changelog
-* Sun Apr 06 2026 Blossom Admin <admin@blossom.local> - 2.0.0-1
+* Tue Apr 08 2026 Blossom Admin <admin@blossom.local> - 2.0.0-1
+- lumina CLI 도구 추가 (에이전트 관리)
+- Bash 자동완성 지원
+- RBAC 기반 접근제어 적용
+- 감사 로그 기록 추가
 - 보안 중심 3티어 아키텍처 재설계
 - 공통 암호화/마스킹 유틸리티 추가
 - 디렉터리 구조 표준화 (/opt/blossom/lumina/, /etc/blossom/lumina/)

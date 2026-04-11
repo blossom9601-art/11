@@ -162,8 +162,8 @@ def _register_agent(host: str, port: int, protocol: str,
     with open(ca_path, "w", encoding="utf-8") as f:
         f.write(result["ca_cert"])
 
-    logger.info("에이전트 등록 완료 — 인증서 저장: %s", cert_path)
-    return True, f"등록 완료 (cert={cert_path})"
+    logger.info("에이전트 등록 완료 — 인증서 저장 성공")
+    return True, "등록 완료"
 
 
 def _is_registered() -> bool:
@@ -200,7 +200,6 @@ def _build_ssl_context(config: AgentConfig):
     if config.client_cert and os.path.isfile(config.client_cert):
         key_file = config.client_key if (config.client_key and os.path.isfile(config.client_key)) else None
         ctx.load_cert_chain(certfile=config.client_cert, keyfile=key_file)
-        logger.info("mTLS 클라이언트 인증서 로드: %s", config.client_cert)
 
     return ctx
 
@@ -317,6 +316,8 @@ try:
 
             while self._running:
                 try:
+                    # 매 사이클마다 설정 파일 재로드 (GUI에서 변경된 주기 등 반영)
+                    config._load()
                     run_once(config)
                     _send_heartbeat(config)
                 except Exception:
@@ -377,18 +378,53 @@ def _is_service_running():
         return False
 
 
+def _is_admin():
+    """현재 프로세스가 관리자 권한인지 확인"""
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
 def _service_install():
-    """Lumina Windows 서비스를 등록한다 (관리자 권한 필요)."""
+    """Lumina Windows 서비스를 등록한다 (관리자 권한 필요 → UAC 자동 요청)."""
     if _is_service_installed():
         return True, "이미 등록됨"
 
+    if not _HAS_WIN32:
+        return False, "pywin32 패키지가 필요합니다 (pip install pywin32)"
+
+    # 관리자 권한이 없으면 UAC 권한 상승으로 --install-service 실행
+    if not _is_admin():
+        try:
+            import ctypes
+            if getattr(sys, 'frozen', False):
+                exe = sys.executable
+                params = "--install-service"
+            else:
+                exe = sys.executable
+                params = '"{}" --install-service'.format(os.path.abspath(__file__))
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", exe, params, None, 0)
+            if ret > 32:
+                # UAC 승인됨 — 서비스 등록 프로세스가 별도 실행됨, 완료 대기
+                import time
+                for _ in range(30):
+                    time.sleep(0.5)
+                    if _is_service_installed():
+                        return True, "서비스 등록 완료 (UAC)"
+                return False, "서비스 등록 시간 초과"
+            else:
+                return False, "UAC 권한 상승 거부됨"
+        except Exception as e:
+            return False, str(e)
+
+    # 관리자 권한으로 직접 등록
     if getattr(sys, 'frozen', False):
         binpath = '"{}" --service'.format(sys.executable)
     else:
         binpath = '"{}" "{}" --service'.format(sys.executable, os.path.abspath(__file__))
-
-    if not _HAS_WIN32:
-        return False, "pywin32 패키지가 필요합니다 (pip install pywin32)"
 
     try:
         hscm = win32service.OpenSCManager(
@@ -396,7 +432,7 @@ def _service_install():
         try:
             hs = win32service.CreateService(
                 hscm, "Lumina",
-                "Lumina 자산 자동 탐색 에이전트",
+                "Lumina Agent",
                 win32service.SERVICE_ALL_ACCESS,
                 win32service.SERVICE_WIN32_OWN_PROCESS,
                 win32service.SERVICE_AUTO_START,
@@ -418,9 +454,24 @@ def _service_install():
 
 
 def _service_start():
-    """서비스 시작. 성공 시 True."""
+    """서비스 시작. 관리자 권한 필요 시 UAC 요청."""
     if _is_service_running():
         return True
+    # 관리자 권한 없으면 UAC로 sc start 실행
+    if not _is_admin():
+        try:
+            import ctypes
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", "sc", "start Lumina", None, 0)
+            if ret > 32:
+                import time
+                for _ in range(20):
+                    time.sleep(0.5)
+                    if _is_service_running():
+                        return True
+            return False
+        except Exception:
+            return False
     try:
         r = subprocess.run(
             ['sc', 'start', 'Lumina'],
@@ -445,77 +496,96 @@ def _service_stop():
         return False
 
 
+# ── 자동 시작 (레지스트리) ─────────────────────────────
+_REG_RUN_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+_REG_VALUE_NAME = "Lumina"
+
+
+def _apply_auto_start(enable: bool):
+    """Windows 로그온 시 자동 시작 레지스트리 설정/해제"""
+    import winreg
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_RUN_KEY,
+                             0, winreg.KEY_SET_VALUE)
+        if enable:
+            if getattr(sys, 'frozen', False):
+                exe_path = sys.executable
+            else:
+                exe_path = '"{}" "{}"'.format(sys.executable, os.path.abspath(__file__))
+            winreg.SetValueEx(key, _REG_VALUE_NAME, 0, winreg.REG_SZ, exe_path)
+            logger.info("자동 시작 등록")
+        else:
+            try:
+                winreg.DeleteValue(key, _REG_VALUE_NAME)
+                logger.info("자동 시작 해제")
+            except FileNotFoundError:
+                pass
+        winreg.CloseKey(key)
+    except Exception:
+        logger.warning("자동 시작 레지스트리 설정 실패")
+
+
 # ── GUI 로그 핸들러 ────────────────────────────────────
-class _TkLogHandler(logging.Handler):
-    """로그를 tkinter Text 위젯에 보내는 핸들러"""
+class _GuiLogHandler(logging.Handler):
+    """로그를 메모리 버퍼에 쌓아 두고 GUI에서 폴링"""
 
-    def __init__(self):
+    def __init__(self, maxlen=2000):
         super().__init__()
-        self._queue = []
-        self._text_widget = None
-
-    def attach(self, text_widget):
-        self._text_widget = text_widget
-        for msg in self._queue:
-            self._append(msg)
-        self._queue.clear()
+        self._buffer = []
+        self._maxlen = maxlen
+        self._cursor = 0
+        self._lock = threading.Lock()
 
     def emit(self, record):
         msg = self.format(record)
-        if self._text_widget:
-            self._text_widget.after(0, self._append, msg)
-        else:
-            self._queue.append(msg)
+        with self._lock:
+            self._buffer.append(msg)
+            if len(self._buffer) > self._maxlen:
+                self._buffer = self._buffer[-self._maxlen:]
 
-    def _append(self, msg):
-        tw = self._text_widget
-        if tw:
-            tw.configure(state="normal")
-            tw.insert("end", msg + "\n")
-            tw.see("end")
-            tw.configure(state="disabled")
+    def get_new(self):
+        with self._lock:
+            new = self._buffer[self._cursor:]
+            self._cursor = len(self._buffer)
+            return new
+
+    def clear(self):
+        with self._lock:
+            self._buffer.clear()
+            self._cursor = 0
 
 
-# ── 탭 GUI 메인 윈도우 ────────────────────────────────
+# ── CustomTkinter GUI ─────────────────────────────────
 def _run_gui(config: AgentConfig):
-    import tkinter as tk
-    from tkinter import ttk
+    import customtkinter as ctk
 
-    # ── 색상 / 폰트 ──
-    BG = "#f8f9fb"
-    FG = "#1e293b"
-    SUB = "#64748b"
-    ACCENT = "#475569"
-    OK_COLOR = "#16a34a"
-    ERR_COLOR = "#dc2626"
-    FONT = ("맑은 고딕", 10)
-    FONT_B = ("맑은 고딕", 12, "bold")
-    FONT_S = ("맑은 고딕", 9)
-    FONT_LOG = ("맑은 고딕", 9)
+    # ── 시스템 트레이 지원 ──
+    _HAS_TRAY = False
+    try:
+        import pystray
+        from PIL import Image
+        _HAS_TRAY = True
+    except ImportError:
+        pass
 
-    # ── 백그라운드 수집 (서비스 / 스레드 폴백) ──
+    _tray_icon = [None]
+
+    # ── 백그라운드 수집 ──
     _stop_evt = threading.Event()
     _worker = [None]
-    _using_service = [False]  # True이면 Windows 서비스 모드
+    _using_service = [False]
+
+    log_handler = _GuiLogHandler()
+    _setup_logging(config, gui_handler=log_handler)
 
     def _collection_loop():
-        """스레드 폴백: GUI 프로세스 내 수집 루프"""
         while not _stop_evt.is_set():
             try:
+                config._load()
                 run_once(config)
                 _send_heartbeat(config)
             except Exception:
                 logger.exception("수집 사이클 중 오류")
-            ok, _ = _test_server_connection(config)
-            if ok:
-                root.after(0, lambda: (
-                    lbl_status_dot.configure(fg=OK_COLOR),
-                    lbl_status_text.configure(text="서버 연결됨", fg=OK_COLOR)))
-            else:
-                root.after(0, lambda: (
-                    lbl_status_dot.configure(fg=ERR_COLOR),
-                    lbl_status_text.configure(text="연결 안 됨", fg=ERR_COLOR)))
-            # 수집 주기 대기 중 60초마다 heartbeat 전송
             hb_interval = min(60, config.interval)
             elapsed = 0
             while not _stop_evt.is_set() and elapsed < config.interval:
@@ -540,454 +610,572 @@ def _run_gui(config: AgentConfig):
         _stop_evt.set()
         logger.info("에이전트 중지 요청")
 
-    def _poll_service_status():
-        """서비스 실행 상태를 주기적으로 확인하여 UI 갱신"""
-        def _check():
-            running = _is_service_running()
-            ok, _ = _test_server_connection(config)
-            def _update():
-                if _using_service[0]:
-                    if running:
-                        btn_start.configure(state="disabled")
-                        btn_stop.configure(state="normal")
-                    else:
-                        _using_service[0] = False
-                        btn_start.configure(state="normal")
-                        btn_stop.configure(state="disabled")
-                        lbl_conn.configure(text="서비스 중지됨", fg=SUB)
-                if ok:
-                    lbl_status_dot.configure(fg=OK_COLOR)
-                    lbl_status_text.configure(text="서버 연결됨", fg=OK_COLOR)
-                else:
-                    lbl_status_dot.configure(fg=ERR_COLOR)
-                    lbl_status_text.configure(text="연결 안 됨", fg=ERR_COLOR)
-            root.after(0, _update)
-        threading.Thread(target=_check, daemon=True).start()
-        root.after(5000, _poll_service_status)
-
-    # ── 윈도우 ──
-    root = tk.Tk()
-    root.title("Lumina — 자산 자동 탐색 에이전트")
-    root.resizable(False, False)
-
-    try:
-        ico_path = os.path.join(os.path.dirname(sys.executable), "lumina.ico")
-        if not os.path.isfile(ico_path):
-            ico_path = os.path.join(os.path.dirname(__file__), "lumina.ico")
-        if os.path.isfile(ico_path):
-            root.iconbitmap(ico_path)
-    except Exception:
-        pass
-
-    w, h = 580, 660
-    x = (root.winfo_screenwidth() - w) // 2
-    y = (root.winfo_screenheight() - h) // 2
-    root.geometry(f"{w}x{h}+{x}+{y}")
-    root.configure(bg=BG)
-
-    # ── 상단 헤더 ──
-    hdr = tk.Frame(root, bg=BG)
-    hdr.pack(fill="x", padx=20, pady=(14, 4))
-    tk.Label(hdr, text="Lumina Agent", font=FONT_B, bg=BG, fg=FG
-             ).pack(side="left")
-    lbl_status_dot = tk.Label(hdr, text="\u25cf", font=("맑은 고딕", 14),
-                              bg=BG, fg=SUB)
-    lbl_status_dot.pack(side="right", padx=(4, 0))
-    lbl_status_text = tk.Label(hdr, text="대기 중", font=FONT_S, bg=BG, fg=SUB)
-    lbl_status_text.pack(side="right")
-
-    def _update_status():
-        def _check():
-            ok, msg = _test_server_connection(config)
-            if ok:
-                root.after(0, lambda: (
-                    lbl_status_dot.configure(fg=OK_COLOR),
-                    lbl_status_text.configure(text="서버 연결됨", fg=OK_COLOR)))
-            else:
-                root.after(0, lambda: (
-                    lbl_status_dot.configure(fg=ERR_COLOR),
-                    lbl_status_text.configure(text="연결 안 됨", fg=ERR_COLOR)))
-        threading.Thread(target=_check, daemon=True).start()
-
-    # ── 탭 ──
-    nb = ttk.Notebook(root)
-    nb.pack(fill="both", expand=True, padx=12, pady=(4, 12))
-
-    # ━━━ 탭 1: 서버 설정 ━━━
-    tab_cfg = tk.Frame(nb, bg=BG)
-    nb.add(tab_cfg, text="  서버 설정  ")
-
-    form = tk.Frame(tab_cfg, bg=BG)
-    form.pack(padx=30, pady=20, fill="x")
-
-    # 프로토콜
-    row0 = tk.Frame(form, bg=BG)
-    row0.pack(fill="x", pady=(0, 10))
-    tk.Label(row0, text="프로토콜", font=FONT, bg=BG, fg=FG, width=10,
-             anchor="w").pack(side="left")
-    proto_var = tk.StringVar(value=config.server_protocol or "https")
-    ttk.Combobox(row0, textvariable=proto_var, values=["https", "http"],
-                 state="readonly", width=10, font=FONT).pack(side="left", padx=(4, 0))
-    ssl_var = tk.BooleanVar(value=config.verify_ssl)
-    tk.Checkbutton(row0, text="SSL 인증서 검증", variable=ssl_var,
-                   font=FONT_S, bg=BG, fg=SUB, activebackground=BG
-                   ).pack(side="right")
-
-    # 서버 IP
-    row1 = tk.Frame(form, bg=BG)
-    row1.pack(fill="x", pady=(0, 10))
-    tk.Label(row1, text="서버 IP", font=FONT, bg=BG, fg=FG, width=10,
-             anchor="w").pack(side="left")
-    ent_host = tk.Entry(row1, font=FONT, width=28)
-    if config.server_host:
-        ent_host.insert(0, config.server_host)
-    else:
-        ent_host.insert(0, "0.0.0.0")
-    ent_host.pack(side="left", padx=(4, 0), fill="x", expand=True)
-
-    # 포트
-    row2 = tk.Frame(form, bg=BG)
-    row2.pack(fill="x", pady=(0, 10))
-    tk.Label(row2, text="포트", font=FONT, bg=BG, fg=FG, width=10,
-             anchor="w").pack(side="left")
-    ent_port = tk.Entry(row2, font=FONT, width=8)
-    ent_port.insert(0, str(config.server_port))
-    ent_port.pack(side="left", padx=(4, 0))
-    tk.Label(row2, text="기본: 8080", font=FONT_S, bg=BG, fg=SUB
-             ).pack(side="left", padx=(8, 0))
-
-    # 수집 주기
-    row3 = tk.Frame(form, bg=BG)
-    row3.pack(fill="x", pady=(0, 10))
-    tk.Label(row3, text="수집 주기", font=FONT, bg=BG, fg=FG, width=10,
-             anchor="w").pack(side="left")
-    ent_interval = tk.Entry(row3, font=FONT, width=8)
-    ent_interval.insert(0, str(config.interval))
-    ent_interval.pack(side="left", padx=(4, 0))
-    tk.Label(row3, text="초 (기본: 3600)", font=FONT_S, bg=BG, fg=SUB
-             ).pack(side="left", padx=(8, 0))
-
-    # ── mTLS 인증서 설정 ──
-    sep = ttk.Separator(form, orient="horizontal")
-    sep.pack(fill="x", pady=(10, 6))
-    tk.Label(form, text="TLS / mTLS 인증서 (선택)", font=FONT_S, bg=BG, fg=SUB
-             ).pack(anchor="w", pady=(0, 6))
-
-    def _make_cert_row(parent, label_text, initial_value):
-        row = tk.Frame(parent, bg=BG)
-        row.pack(fill="x", pady=(0, 6))
-        tk.Label(row, text=label_text, font=FONT_S, bg=BG, fg=FG, width=14,
-                 anchor="w").pack(side="left")
-        ent = tk.Entry(row, font=FONT_S, width=30)
-        if initial_value:
-            ent.insert(0, initial_value)
-        ent.pack(side="left", padx=(4, 4), fill="x", expand=True)
-
-        def _browse():
-            from tkinter import filedialog
-            path = filedialog.askopenfilename(
-                parent=root, title=label_text,
-                filetypes=[("인증서 파일", "*.pem *.crt *.key *.cer"), ("모든 파일", "*.*")])
-            if path:
-                ent.delete(0, "end")
-                ent.insert(0, path)
-
-        tk.Button(row, text="...", command=_browse, font=FONT_S, width=3,
-                  relief="groove", cursor="hand2").pack(side="left")
-        return ent
-
-    ent_ca = _make_cert_row(form, "CA 인증서", config.ca_cert)
-    ent_cert = _make_cert_row(form, "클라이언트 인증서", config.client_cert)
-    ent_key = _make_cert_row(form, "클라이언트 키", config.client_key)
-
-    # 연결 상태 표시 영역
-    status_frame = tk.Frame(form, bg=BG)
-    status_frame.pack(fill="x", pady=(6, 0))
-    lbl_conn = tk.Label(status_frame, text="", font=FONT_S, bg=BG, fg=SUB,
-                        anchor="w")
-    lbl_conn.pack(side="left", fill="x")
-
-    # 버튼
-    btn_frame = tk.Frame(tab_cfg, bg=BG)
-    btn_frame.pack(pady=(0, 10))
-
-    def _on_save():
-        host = ent_host.get().strip()
-        if not host:
-            lbl_conn.configure(text="서버 IP를 입력하세요.", fg=ERR_COLOR)
-            return
-        try:
-            port = int(ent_port.get().strip())
-            if not (1 <= port <= 65535):
-                raise ValueError
-        except ValueError:
-            lbl_conn.configure(text="포트 번호가 올바르지 않습니다. (1–65535)", fg=ERR_COLOR)
-            return
-        try:
-            interval = int(ent_interval.get().strip())
-            if interval < 10:
-                raise ValueError
-        except ValueError:
-            lbl_conn.configure(text="수집 주기는 10초 이상이어야 합니다.", fg=ERR_COLOR)
-            return
-
-        config.server_host = host
-        config.server_port = port
-        config.server_protocol = proto_var.get()
-        config.verify_ssl = ssl_var.get()
-        config.interval = interval
-        config.ca_cert = ent_ca.get().strip()
-        config.client_cert = ent_cert.get().strip()
-        config.client_key = ent_key.get().strip()
-        config.save()
-        lbl_conn.configure(text="설정이 저장되었습니다.", fg=OK_COLOR)
-        logger.info("설정 저장 완료 (server=%s, interval=%ds)", config.server_url, config.interval)
-
-    def _on_test():
-        host = ent_host.get().strip()
-        if not host:
-            lbl_conn.configure(text="서버 IP를 먼저 입력하세요.", fg=ERR_COLOR)
-            return
-        try:
-            port = int(ent_port.get().strip())
-        except ValueError:
-            lbl_conn.configure(text="포트 번호가 올바르지 않습니다.", fg=ERR_COLOR)
-            return
-        proto = proto_var.get()
-        url = f"{proto}://{host}:{port}/api/agent/ping"
-        lbl_conn.configure(text="연결 테스트 중...", fg=SUB)
-        root.update_idletasks()
-
-        def _do_test():
-            try:
-                # 먼저 현재 GUI 값을 config에 임시 반영
-                config.server_host = host
-                config.server_port = port
-                config.server_protocol = proto
-                config.verify_ssl = ssl_var.get()
-                config.ca_cert = ent_ca.get().strip()
-                config.client_cert = ent_cert.get().strip()
-                config.client_key = ent_key.get().strip()
-                ctx = _build_ssl_context(config)
-                req = urllib.request.Request(url, method="GET")
-                with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
-                    root.after(0, lambda: lbl_conn.configure(
-                        text=f"연결 성공 (HTTP {resp.status})", fg=OK_COLOR))
-            except Exception as e:
-                root.after(0, lambda: lbl_conn.configure(
-                    text=f"연결 실패: {e}", fg=ERR_COLOR))
-            root.after(0, _update_status)
-
-        threading.Thread(target=_do_test, daemon=True).start()
-
-    tk.Button(btn_frame, text="연결 테스트", command=_on_test,
-              font=FONT, width=12, relief="groove", cursor="hand2"
-              ).pack(side="left", padx=4)
-    tk.Button(btn_frame, text="저장", command=_on_save,
-              font=FONT, width=10, bg=ACCENT, fg="white",
-              relief="flat", cursor="hand2"
-              ).pack(side="left", padx=4)
-
-    # 에이전트 시작/중지 버튼
-    agent_frame = tk.Frame(tab_cfg, bg=BG)
-    agent_frame.pack(pady=(0, 10))
-
-    def _on_start():
-        _on_save()
+    def _do_agent_start():
+        """에이전트 시작 로직"""
         if not config.server_host:
-            return
-        btn_start.configure(state="disabled")
-        lbl_conn.configure(text="시작 중...", fg=SUB)
-        root.update_idletasks()
-
-        def _boot():
-            # PKI 미등록이면 자동 등록
+            return {"success": False, "message": "서버 IP를 입력하세요."}
+        try:
             if not _is_registered():
                 logger.info("미등록 상태 — 자동 등록 시도")
-                root.after(0, lambda: lbl_conn.configure(
-                    text="서버에 자동 등록 중...", fg=SUB))
                 ok, msg = _register_agent(
                     config.server_host, config.server_port,
-                    config.server_protocol, verify_ssl=config.verify_ssl)
+                    config.server_protocol,
+                    verify_ssl=config.verify_ssl)
                 if ok:
                     pki = _get_pki_paths()
                     config.ca_cert = pki["ca_cert"]
                     config.client_cert = pki["client_cert"]
                     config.client_key = pki["client_key"]
                     config.save()
-                    root.after(0, lambda: ent_ca.delete(0, "end"))
-                    root.after(0, lambda: ent_ca.insert(0, pki["ca_cert"]))
-                    root.after(0, lambda: ent_cert.delete(0, "end"))
-                    root.after(0, lambda: ent_cert.insert(0, pki["client_cert"]))
-                    root.after(0, lambda: ent_key.delete(0, "end"))
-                    root.after(0, lambda: ent_key.insert(0, pki["client_key"]))
                     logger.info("자동 등록 성공")
-                    # 등록 탭 UI 갱신
-                    root.after(0, lambda: (
-                        lbl_reg_dot.configure(fg=OK_COLOR),
-                        lbl_reg_status.configure(text="등록됨 (인증서 있음)", fg=OK_COLOR)))
                 else:
                     logger.warning("자동 등록 실패: %s — 등록 없이 계속 실행", msg)
 
-            # 서비스 모드 시도
             ok_inst, inst_msg = _service_install()
             if ok_inst:
+                if _is_service_running():
+                    logger.info("설정 변경 반영을 위해 서비스 재시작")
+                    _service_stop()
+                    import time as _t
+                    for _ in range(20):
+                        if not _is_service_running():
+                            break
+                        _t.sleep(0.5)
                 if _service_start() or _is_service_running():
                     _using_service[0] = True
                     logger.info("에이전트 시작 — 서비스 모드 (백그라운드)")
-                    root.after(0, lambda: (
-                        btn_stop.configure(state="normal"),
-                        lbl_conn.configure(
-                            text="서비스 실행 중 (창을 닫아도 백그라운드 동작)",
-                            fg=OK_COLOR)))
-                    return
-                else:
-                    logger.warning("서비스 시작 실패 — 스레드 모드로 전환")
-            else:
-                logger.warning("서비스 등록 실패 (%s) — 스레드 모드로 전환", inst_msg)
+                    return {"success": True,
+                            "message": "서비스 실행 중 (창을 닫아도 백그라운드 동작)"}
 
-            # 폴백: 프로세스 내 스레드
             _using_service[0] = False
             _start_worker()
-            root.after(0, lambda: (
-                btn_stop.configure(state="normal"),
-                lbl_conn.configure(
-                    text="에이전트 실행 중 (창 닫으면 중지됨)", fg=OK_COLOR)))
+            return {"success": True,
+                    "message": "에이전트 실행 중 (창을 닫으면 트레이로 최소화)"}
+        except Exception as e:
+            logger.exception("에이전트 시작 실패")
+            return {"success": False, "message": str(e)}
 
-        threading.Thread(target=_boot, daemon=True).start()
-
-    def _on_stop():
-        if _using_service[0]:
-            btn_stop.configure(state="disabled")
-            lbl_conn.configure(text="서비스 중지 중...", fg=SUB)
-            def _do_stop():
+    def _do_agent_stop():
+        try:
+            if _using_service[0]:
                 _service_stop()
                 _using_service[0] = False
                 logger.info("서비스 중지 완료")
-                root.after(0, lambda: (
-                    btn_start.configure(state="normal"),
-                    lbl_conn.configure(text="서비스 중지됨", fg=SUB)))
-            threading.Thread(target=_do_stop, daemon=True).start()
-        else:
-            _stop_worker()
-            btn_start.configure(state="normal")
-            btn_stop.configure(state="disabled")
-            lbl_conn.configure(text="에이전트 중지됨", fg=SUB)
+            else:
+                _stop_worker()
+            return {"success": True, "message": "에이전트 중지됨"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
 
-    btn_start = tk.Button(agent_frame, text="\u25b6  에이전트 시작", command=_on_start,
-                          font=FONT, width=16, bg="#6366F1", fg="white",
-                          relief="flat", cursor="hand2")
-    btn_start.pack(side="left", padx=4)
+    def _do_agent_restart():
+        try:
+            if _using_service[0]:
+                _service_stop()
+                _using_service[0] = False
+                import time as _t
+                for _ in range(20):
+                    if not _is_service_running():
+                        break
+                    _t.sleep(0.5)
+            else:
+                _stop_worker()
+            logger.info("에이전트 재시작 — 중지 완료, 시작 중...")
+            return _do_agent_start()
+        except Exception as e:
+            return {"success": False, "message": str(e)}
 
-    btn_stop = tk.Button(agent_frame, text="\u25a0  에이전트 중지", command=_on_stop,
-                         font=FONT, width=16, bg="#475569", fg="white",
-                         relief="flat", cursor="hand2", state="disabled")
-    btn_stop.pack(side="left", padx=4)
+    # ── 테마 & 색상 ──
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
 
-    # ━━━ 탭 2: 에이전트 등록 ━━━
-    tab_reg = tk.Frame(nb, bg=BG)
-    nb.add(tab_reg, text="  에이전트 등록  ")
+    ACCENT = "#4f46e5"
+    ACCENT_H = "#4338ca"
+    ACCENT_LIGHT = "#eef2ff"
+    OK_GREEN = "#059669"
+    OK_BG = "#ecfdf5"
+    STOP_GRAY = "#6b7280"
+    WARN_ORANGE = "#d97706"
+    ERR_RED = "#dc2626"
+    ERR_BG = "#fef2f2"
+    BG = "#f1f5f9"
+    CARD = "#ffffff"
+    FG = "#0f172a"
+    SUB = "#64748b"
+    BORDER = "#e2e8f0"
+    INPUT_BG = "#f8fafc"
 
-    reg_form = tk.Frame(tab_reg, bg=BG)
-    reg_form.pack(padx=30, pady=20, fill="x")
+    # ── 윈도우 ──
+    app = ctk.CTk()
+    app.title("Lumina Agent")
+    app.geometry("580x700")
+    app.resizable(False, False)
+    app.configure(fg_color=BG)
 
-    # 등록 상태 표시
-    reg_status_frame = tk.Frame(reg_form, bg=BG)
-    reg_status_frame.pack(fill="x", pady=(0, 12))
-    _registered = _is_registered()
-    reg_dot_color = OK_COLOR if _registered else ERR_COLOR
-    reg_status_msg = "등록됨 (인증서 있음)" if _registered else "미등록"
-    lbl_reg_dot = tk.Label(reg_status_frame, text="\u25cf", font=("맑은 고딕", 14),
-                           bg=BG, fg=reg_dot_color)
-    lbl_reg_dot.pack(side="left")
-    lbl_reg_status = tk.Label(reg_status_frame, text=reg_status_msg,
-                              font=FONT, bg=BG, fg=reg_dot_color)
-    lbl_reg_status.pack(side="left", padx=(6, 0))
-
-    if _registered:
-        tk.Label(reg_form, text="이 에이전트는 서버에 등록되어 있습니다.",
-                 font=FONT_S, bg=BG, fg=SUB, anchor="w").pack(fill="x", pady=(0, 8))
-        pki = _get_pki_paths()
-        sep_reg = ttk.Separator(reg_form, orient="horizontal")
-        sep_reg.pack(fill="x", pady=(8, 8))
-        tk.Label(reg_form, text="인증서 파일", font=FONT_S, bg=BG, fg=SUB
-                 ).pack(anchor="w", pady=(0, 4))
-        for lbl, path in [("CA 인증서", pki["ca_cert"]),
-                          ("클라이언트 인증서", pki["client_cert"]),
-                          ("개인키", pki["client_key"])]:
-            r = tk.Frame(reg_form, bg=BG)
-            r.pack(fill="x", pady=1)
-            tk.Label(r, text=f"{lbl}:", font=FONT_S, bg=BG, fg=FG,
-                     width=14, anchor="w").pack(side="left")
-            tk.Label(r, text=path, font=FONT_S, bg=BG, fg=SUB,
-                     anchor="w").pack(side="left", fill="x")
+    # 아이콘 설정
+    ico_path = None
+    if getattr(sys, 'frozen', False):
+        ico_path = os.path.join(os.path.dirname(sys.executable), "lumina.ico")
     else:
-        tk.Label(reg_form, text="에이전트 시작 버튼을 누르면 서버에 자동으로 등록됩니다.",
-                 font=FONT_S, bg=BG, fg=SUB, anchor="w").pack(fill="x", pady=(0, 8))
-        tk.Label(reg_form, text="(서버 IP를 먼저 설정한 후 시작하세요)",
-                 font=FONT_S, bg=BG, fg=SUB, anchor="w").pack(fill="x")
+        ico_path = os.path.join(os.path.dirname(__file__), "lumina.ico")
+    if os.path.isfile(ico_path):
+        app.iconbitmap(ico_path)
 
-    # ━━━ 탭 3: 로그 ━━━
-    tab_log = tk.Frame(nb, bg=BG)
-    nb.add(tab_log, text="  로그  ")
+    # ── 헤더 바 (인디고 그라데이션 느낌) ──
+    header = ctk.CTkFrame(app, fg_color=ACCENT, height=52, corner_radius=0)
+    header.pack(fill="x")
+    header.pack_propagate(False)
 
-    log_frame = tk.Frame(tab_log, bg="#1e1e2e", bd=0, highlightthickness=0)
-    log_frame.pack(fill="both", expand=True, padx=8, pady=8)
+    hdr_inner = ctk.CTkFrame(header, fg_color="transparent")
+    hdr_inner.pack(side="left", padx=24, pady=0, fill="y")
 
-    log_text = tk.Text(log_frame, wrap="word", font=FONT_LOG, bg="#1e1e2e",
-                       fg="#cdd6f4", insertbackground="#cdd6f4",
-                       selectbackground="#45475a", borderwidth=0,
-                       relief="flat", padx=8, pady=8, state="disabled")
+    ctk.CTkLabel(hdr_inner, text="Lumina Agent", font=("Segoe UI Semibold", 17),
+                 text_color="white").pack(side="left", pady=14)
+    ctk.CTkLabel(hdr_inner, text="1.0.1", font=("Segoe UI", 10),
+                 text_color=ACCENT, fg_color="white", corner_radius=6,
+                 width=42, height=20).pack(side="left", padx=(10, 0))
 
-    scrollbar = tk.Scrollbar(log_frame, command=log_text.yview,
-                             bg="#313244", activebackground="#585b70",
-                             troughcolor="#1e1e2e", highlightthickness=0,
-                             borderwidth=0, width=10)
-    scrollbar.pack(side="right", fill="y")
+    hdr_right = ctk.CTkFrame(header, fg_color="transparent")
+    hdr_right.pack(side="right", padx=24, fill="y")
 
-    log_text.configure(yscrollcommand=scrollbar.set)
-    log_text.pack(side="left", fill="both", expand=True)
+    status_dot = ctk.CTkLabel(hdr_right, text="●", font=("Segoe UI", 12),
+                              text_color="#a5b4fc")
+    status_dot.pack(side="right", pady=16)
+    status_label = ctk.CTkLabel(hdr_right, text="중지됨", font=("Segoe UI", 11),
+                                text_color="#c7d2fe")
+    status_label.pack(side="right", padx=(0, 6))
+
+    # ── 스크롤 가능한 메인 영역 ──
+    main_frame = ctk.CTkFrame(app, fg_color=BG, corner_radius=0)
+    main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+
+    # ── 탭뷰 ──
+    tabview = ctk.CTkTabview(main_frame, fg_color=CARD,
+                             segmented_button_fg_color=BORDER,
+                             segmented_button_selected_color=ACCENT,
+                             segmented_button_selected_hover_color=ACCENT_H,
+                             segmented_button_unselected_color=CARD,
+                             segmented_button_unselected_hover_color=ACCENT_LIGHT,
+                             border_width=1, border_color=BORDER,
+                             corner_radius=12)
+    tabview.pack(padx=18, pady=(14, 14), fill="both", expand=True)
+    tabview._segmented_button.configure(font=("Segoe UI Semibold", 12))
+
+    tab_config = tabview.add("서버 설정")
+    tab_reg = tabview.add("에이전트 등록")
+    tab_log = tabview.add("로그")
+
+    # ═══════════════════════════════════════════════
+    # 탭1: 서버 설정
+    # ═══════════════════════════════════════════════
+    # 서버 연결 카드
+    conn_card = ctk.CTkFrame(tab_config, fg_color=CARD, corner_radius=0,
+                              border_width=0)
+    conn_card.pack(fill="x", padx=8, pady=(8, 0))
+
+    ctk.CTkLabel(conn_card, text="서버 연결", font=("Segoe UI Semibold", 14),
+                 text_color=FG).pack(anchor="w", padx=4, pady=(4, 10))
+
+    # 폼 그리드
+    form = ctk.CTkFrame(conn_card, fg_color="transparent")
+    form.pack(fill="x", padx=4)
+    form.columnconfigure(1, weight=1)
+
+    ROW_PAD = (0, 10)
+
+    # Protocol (HTTPS only)
+    ctk.CTkLabel(form, text="Protocol", font=("Segoe UI", 12),
+                 text_color=SUB).grid(row=0, column=0, sticky="w", pady=ROW_PAD)
+    proto_var = ctk.StringVar(value="https")
+    proto_label = ctk.CTkLabel(form, text="HTTPS", font=("Segoe UI", 12, "bold"),
+                               text_color=ACCENT)
+    proto_label.grid(row=0, column=1, sticky="w", padx=(16, 0), pady=ROW_PAD)
+
+    # Server IP
+    ctk.CTkLabel(form, text="Server IP", font=("Segoe UI", 12),
+                 text_color=SUB).grid(row=1, column=0, sticky="w", pady=ROW_PAD)
+    host_entry = ctk.CTkEntry(form, placeholder_text="e.g. 192.168.1.100",
+                              font=("Segoe UI", 12), height=36,
+                              corner_radius=8, border_width=1,
+                              border_color=BORDER, fg_color=INPUT_BG)
+    host_entry.grid(row=1, column=1, sticky="ew", padx=(16, 0), pady=ROW_PAD)
+    if config.server_host:
+        host_entry.insert(0, config.server_host)
+
+    # 포트
+    ctk.CTkLabel(form, text="포트", font=("Segoe UI", 12),
+                 text_color=SUB).grid(row=2, column=0, sticky="w", pady=ROW_PAD)
+    port_entry = ctk.CTkEntry(form, font=("Segoe UI", 12), height=36,
+                              corner_radius=8, border_width=1,
+                              border_color=BORDER, fg_color=INPUT_BG)
+    port_entry.grid(row=2, column=1, sticky="ew", padx=(16, 0), pady=ROW_PAD)
+    port_entry.insert(0, str(config.server_port))
+
+    # 수집 주기
+    ctk.CTkLabel(form, text="수집 주기(초)", font=("Segoe UI", 12),
+                 text_color=SUB).grid(row=3, column=0, sticky="w", pady=ROW_PAD)
+    interval_entry = ctk.CTkEntry(form, font=("Segoe UI", 12), height=36,
+                                  corner_radius=8, border_width=1,
+                                  border_color=BORDER, fg_color=INPUT_BG)
+    interval_entry.grid(row=3, column=1, sticky="ew", padx=(16, 0), pady=ROW_PAD)
+    interval_entry.insert(0, f"{config.interval:,}")
+
+    def _fmt_interval(event=None):
+        raw = interval_entry.get()
+        cursor = interval_entry.index("insert")
+        digits_before = sum(1 for c in raw[:cursor] if c.isdigit())
+        digits_only = "".join(c for c in raw if c.isdigit())
+        if not digits_only:
+            return
+        formatted = f"{int(digits_only):,}"
+        interval_entry.delete(0, "end")
+        interval_entry.insert(0, formatted)
+        new_cursor = 0
+        count = 0
+        for i, ch in enumerate(formatted):
+            if ch.isdigit():
+                count += 1
+            if count == digits_before:
+                new_cursor = i + 1
+                break
+        else:
+            new_cursor = len(formatted)
+        interval_entry.icursor(new_cursor)
+
+    interval_entry.bind("<KeyRelease>", _fmt_interval)
+
+    # 옵션 행
+    opt_frame = ctk.CTkFrame(conn_card, fg_color="transparent")
+    opt_frame.pack(fill="x", padx=4, pady=(4, 0))
+
+    ssl_var = ctk.BooleanVar(value=config.verify_ssl)
+    ctk.CTkSwitch(opt_frame, text="SSL 인증서 검증", variable=ssl_var,
+                  font=("Segoe UI", 12), text_color=SUB,
+                  button_color=ACCENT, button_hover_color=ACCENT_H,
+                  progress_color=ACCENT_LIGHT,
+                  height=24).pack(anchor="w", pady=(0, 6))
+
+    auto_var = ctk.BooleanVar(value=config.auto_start)
+    ctk.CTkSwitch(opt_frame, text="시스템 시작 시 자동 실행",
+                  variable=auto_var, font=("Segoe UI", 12), text_color=SUB,
+                  button_color=ACCENT, button_hover_color=ACCENT_H,
+                  progress_color=ACCENT_LIGHT,
+                  height=24).pack(anchor="w", pady=(0, 4))
+
+    # 버튼 + 메시지
+    btn_frame = ctk.CTkFrame(conn_card, fg_color="transparent")
+    btn_frame.pack(fill="x", padx=4, pady=(14, 4))
+
+    BTN_W = 130
+    ctk.CTkButton(btn_frame, text="저장", font=("Segoe UI Semibold", 12),
+                  fg_color=ACCENT, hover_color=ACCENT_H, height=36,
+                  width=BTN_W, corner_radius=8,
+                  command=lambda: _save_config()).pack(side="left", padx=(0, 8))
+    ctk.CTkButton(btn_frame, text="연결 테스트", font=("Segoe UI", 12),
+                  fg_color="transparent", hover_color=ACCENT_LIGHT,
+                  text_color=ACCENT, border_width=1, border_color=ACCENT,
+                  height=36, width=BTN_W, corner_radius=8,
+                  command=lambda: _test_conn()).pack(side="left")
+
+    msg_label = ctk.CTkLabel(conn_card, text="", font=("Segoe UI", 11),
+                             text_color=OK_GREEN)
+    msg_label.pack(anchor="w", padx=4, pady=(4, 8))
+
+    def _save_config():
+        config.server_protocol = proto_var.get()
+        config.server_host = host_entry.get().strip()
+        config.server_port = int(port_entry.get().strip() or "8080")
+        config.interval = int(interval_entry.get().replace(",", "").strip() or "3600")
+        config.verify_ssl = ssl_var.get()
+        config.auto_start = auto_var.get()
+        config.save()
+        _apply_auto_start(config.auto_start)
+        logger.info("설정 저장 완료 (server=%s, interval=%ds)",
+                    config.server_url, config.interval)
+        msg_label.configure(text="✓ 설정이 저장되었습니다.", text_color=OK_GREEN)
+
+    def _test_conn():
+        host = host_entry.get().strip()
+        if not host:
+            msg_label.configure(text="✗ 서버 IP를 입력하세요.", text_color=ERR_RED)
+            return
+        port = int(port_entry.get().strip() or "8080")
+        proto = proto_var.get()
+        verify = ssl_var.get()
+        config.server_host = host
+        config.server_port = port
+        config.server_protocol = proto
+        config.verify_ssl = verify
+        url = f"{proto}://{host}:{port}/api/agent/ping"
+        msg_label.configure(text="⟳ 연결 테스트 중...", text_color=SUB)
+        app.update()
+        try:
+            ctx = _build_ssl_context(config)
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+                msg_label.configure(text=f"✓ 연결 성공 (HTTP {resp.status})",
+                                    text_color=OK_GREEN)
+        except Exception as e:
+            msg_label.configure(text=f"✗ 연결 실패: {e}", text_color=ERR_RED)
+
+    # ═══════════════════════════════════════════════
+    # 에이전트 제어 (서버 설정 탭 내부)
+    # ═══════════════════════════════════════════════
+    ctrl_sep = ctk.CTkFrame(tab_config, fg_color=BORDER, height=1)
+    ctrl_sep.pack(fill="x", padx=12, pady=(10, 0))
+
+    ctrl_inner = ctk.CTkFrame(tab_config, fg_color="transparent")
+    ctrl_inner.pack(fill="x", padx=12, pady=(12, 8))
+
+    ctk.CTkLabel(ctrl_inner, text="에이전트 제어",
+                 font=("Segoe UI Semibold", 14),
+                 text_color=FG).pack(anchor="w", pady=(0, 12))
+
+    # ── 제어 버튼 아이콘 (PIL) ──
+    from PIL import ImageDraw
+    import math as _m
+    _IC = 64
+    CTRL_BTN = "#4f46e5"
+    CTRL_BTN_H = "#6366f1"
+
+    def _ctrl_ico(fn):
+        im = Image.new("RGBA", (_IC, _IC), (0, 0, 0, 0))
+        fn(ImageDraw.Draw(im))
+        return ctk.CTkImage(light_image=im, dark_image=im, size=(16, 16))
+
+    ico_play = _ctrl_ico(
+        lambda d: d.polygon([(16, 8), (52, 32), (16, 56)], fill="white"))
+    ico_stop = _ctrl_ico(
+        lambda d: d.rounded_rectangle([(14, 14), (50, 50)], radius=5, fill="white"))
+    def _draw_refresh(d):
+        bb = (8, 8, 56, 56)
+        d.arc(bb, 200, 340, fill="white", width=6)
+        d.arc(bb, 20, 160, fill="white", width=6)
+        cx, cy, r = 32, 32, 24
+        for ang, sign in ((340, 1), (160, -1)):
+            a = _m.radians(ang)
+            ex, ey = cx + r * _m.cos(a), cy + r * _m.sin(a)
+            ta = a + _m.pi / 2
+            pa = ta + _m.pi / 2
+            tip = (ex + 10 * _m.cos(ta), ey + 10 * _m.sin(ta))
+            b1 = (ex + 5 * _m.cos(pa), ey + 5 * _m.sin(pa))
+            b2 = (ex - 5 * _m.cos(pa), ey - 5 * _m.sin(pa))
+            d.polygon([tip, b1, b2], fill="white")
+    ico_refresh = _ctrl_ico(_draw_refresh)
+
+    ctrl_btn_frame = ctk.CTkFrame(ctrl_inner, fg_color="transparent")
+    ctrl_btn_frame.pack(fill="x")
+
+    ctrl_msg = ctk.CTkLabel(ctrl_inner, text="", font=("Segoe UI", 11),
+                            text_color=SUB)
+    ctrl_msg.pack(anchor="w", pady=(10, 0))
+
+    def _on_start():
+        ctrl_msg.configure(text="⟳ 시작 중...", text_color=SUB)
+        app.update()
+        def do():
+            r = _do_agent_start()
+            app.after(0, lambda: ctrl_msg.configure(
+                text=("✓ " if r["success"] else "✗ ") + r["message"],
+                text_color=OK_GREEN if r["success"] else ERR_RED))
+        threading.Thread(target=do, daemon=True).start()
+
+    def _on_stop():
+        r = _do_agent_stop()
+        ctrl_msg.configure(
+            text=("✓ " if r["success"] else "✗ ") + r["message"],
+            text_color=OK_GREEN if r["success"] else ERR_RED)
+
+    def _on_restart():
+        ctrl_msg.configure(text="⟳ 재시작 중...", text_color=SUB)
+        app.update()
+        def do():
+            r = _do_agent_restart()
+            app.after(0, lambda: ctrl_msg.configure(
+                text=("✓ " if r["success"] else "✗ ") + r["message"],
+                text_color=OK_GREEN if r["success"] else ERR_RED))
+        threading.Thread(target=do, daemon=True).start()
+
+    ctk.CTkButton(ctrl_btn_frame, text="", image=ico_play,
+                  fg_color=CTRL_BTN, hover_color=CTRL_BTN_H, height=38,
+                  width=48, corner_radius=8,
+                  command=_on_start).pack(side="left", padx=(0, 10))
+    ctk.CTkButton(ctrl_btn_frame, text="", image=ico_stop,
+                  fg_color=CTRL_BTN, hover_color=CTRL_BTN_H, height=38,
+                  width=48, corner_radius=8,
+                  command=_on_stop).pack(side="left", padx=(0, 10))
+    ctk.CTkButton(ctrl_btn_frame, text="", image=ico_refresh,
+                  fg_color=CTRL_BTN, hover_color=CTRL_BTN_H, height=38,
+                  width=48, corner_radius=8,
+                  command=_on_restart).pack(side="left")
+
+    # ═══════════════════════════════════════════════
+    # 탭2: 에이전트 등록
+    # ═══════════════════════════════════════════════
+    reg_frame = ctk.CTkFrame(tab_reg, fg_color="transparent")
+    reg_frame.pack(fill="both", expand=True, padx=16, pady=16)
+
+    # 등록 상태 배지
+    reg_status_label = ctk.CTkLabel(reg_frame, text="",
+                                    font=("Segoe UI Semibold", 13),
+                                    text_color=FG, height=30,
+                                    corner_radius=6)
+    reg_status_label.pack(anchor="w", pady=(0, 16))
+
+    # 인증서 상태 카드
+    cert_card = ctk.CTkFrame(reg_frame, fg_color=INPUT_BG, corner_radius=10,
+                              border_width=1, border_color=BORDER)
+    cert_card.pack(fill="x")
+
+    cert_grid = ctk.CTkFrame(cert_card, fg_color="transparent")
+    cert_grid.pack(fill="x", padx=20, pady=16)
+    cert_grid.columnconfigure(1, weight=1)
+
+    def _make_cert_row(parent, row, label_text):
+        ctk.CTkLabel(parent, text=label_text, font=("Segoe UI", 12),
+                     text_color=SUB).grid(row=row, column=0, sticky="w",
+                                          pady=(0, 8))
+        val = ctk.CTkLabel(parent, text="", font=("Segoe UI Semibold", 12),
+                           text_color=FG)
+        val.grid(row=row, column=1, sticky="e", pady=(0, 8))
+        return val
+
+    ca_val = _make_cert_row(cert_grid, 0, "CA 인증서")
+    cert_val = _make_cert_row(cert_grid, 1, "클라이언트 인증서")
+    key_val = _make_cert_row(cert_grid, 2, "개인키")
+
+    def _update_reg_status():
+        registered = _is_registered()
+        pki = _get_pki_paths()
+        if registered:
+            reg_status_label.configure(text="  ● 등록됨  ", fg_color=OK_BG,
+                                       text_color=OK_GREEN)
+        else:
+            reg_status_label.configure(text="  ● 미등록  ", fg_color=ERR_BG,
+                                       text_color=ERR_RED)
+        def _fstat(path):
+            if os.path.isfile(path):
+                return ("있음", OK_GREEN)
+            return ("없음", ERR_RED)
+        t, c = _fstat(pki["ca_cert"])
+        ca_val.configure(text=t, text_color=c)
+        t, c = _fstat(pki["client_cert"])
+        cert_val.configure(text=t, text_color=c)
+        t, c = _fstat(pki["client_key"])
+        key_val.configure(text=t, text_color=c)
+
+    _update_reg_status()
+
+    # ═══════════════════════════════════════════════
+    # 탭3: 로그
+    # ═══════════════════════════════════════════════
+    log_frame = ctk.CTkFrame(tab_log, fg_color="transparent")
+    log_frame.pack(fill="both", expand=True, padx=4, pady=(4, 4))
+
+    log_text = ctk.CTkTextbox(log_frame, font=("Cascadia Code", 11),
+                              fg_color="#1e1e2e", text_color="#cdd6f4",
+                              scrollbar_button_color="#585b70",
+                              scrollbar_button_hover_color="#7f849c",
+                              corner_radius=10, wrap="word",
+                              state="disabled", height=400)
+    log_text.pack(fill="both", expand=True)
+
+    log_btn_frame = ctk.CTkFrame(log_frame, fg_color="transparent")
+    log_btn_frame.pack(fill="x", pady=(6, 0))
 
     def _clear_log():
+        log_handler.clear()
         log_text.configure(state="normal")
         log_text.delete("1.0", "end")
         log_text.configure(state="disabled")
 
-    log_btn = tk.Frame(tab_log, bg=BG)
-    log_btn.pack(fill="x", padx=8, pady=(0, 8))
-    tk.Button(log_btn, text="로그 지우기", command=_clear_log,
-              font=FONT_S, relief="groove", cursor="hand2"
-              ).pack(side="right")
+    ctk.CTkButton(log_btn_frame, text="로그 지우기", font=("Segoe UI", 11),
+                  fg_color="transparent", hover_color=ACCENT_LIGHT,
+                  text_color=SUB, border_width=1, border_color=BORDER,
+                  height=30, width=100, corner_radius=8,
+                  command=_clear_log).pack(side="right")
 
-    # GUI 로그 핸들러 연결
-    gui_log_handler = _TkLogHandler()
-    gui_log_handler.attach(log_text)
-    _setup_logging(config, gui_handler=gui_log_handler)
+    # ── 폴링: 상태 + 로그 ──
+    def _poll():
+        # 상태 업데이트
+        running_svc = _is_service_running()
+        running_thr = _worker[0] is not None and _worker[0].is_alive()
+        running = _using_service[0] or running_svc or running_thr
+        if running:
+            status_dot.configure(text_color="#4ade80")
+            status_label.configure(text="실행 중", text_color="#bbf7d0")
+        else:
+            status_dot.configure(text_color="#a5b4fc")
+            status_label.configure(text="중지됨", text_color="#c7d2fe")
 
-    # 서비스 상태 초기 확인 및 주기적 폴링 시작
-    def _init_service_check():
-        running = _is_service_running()
-        installed = _is_service_installed() if not running else True
-        def _apply():
-            if running:
-                _using_service[0] = True
-                btn_start.configure(state="disabled")
-                btn_stop.configure(state="normal")
-                lbl_conn.configure(
-                    text="서비스 실행 중 (창을 닫아도 백그라운드 동작)", fg=OK_COLOR)
-            elif installed:
-                lbl_conn.configure(text="서비스 등록됨 (중지 상태)", fg=SUB)
-        root.after(0, _apply)
-    threading.Thread(target=_init_service_check, daemon=True).start()
-    root.after(5000, _poll_service_status)
+        # 로그 업데이트
+        new_logs = log_handler.get_new()
+        if new_logs:
+            log_text.configure(state="normal")
+            for line in new_logs:
+                log_text.insert("end", line + "\n")
+            log_text.see("end")
+            log_text.configure(state="disabled")
 
-    def _on_close():
+        # 등록 상태
+        _update_reg_status()
+
+        app.after(2000, _poll)
+
+    app.after(1000, _poll)
+
+    # ── 트레이 아이콘 ──
+    def _show_window_from_tray():
+        if _tray_icon[0]:
+            _tray_icon[0].stop()
+            _tray_icon[0] = None
+        app.after(0, app.deiconify)
+
+    def _quit_from_tray():
+        if _tray_icon[0]:
+            _tray_icon[0].stop()
+            _tray_icon[0] = None
         if not _using_service[0]:
             _stop_worker()
-        root.destroy()
+        app.after(0, app.destroy)
 
-    root.protocol("WM_DELETE_WINDOW", _on_close)
-    root.mainloop()
+    def _minimize_to_tray():
+        app.withdraw()
+        _ico_path = ico_path
+        try:
+            image = Image.open(_ico_path)
+        except Exception:
+            image = Image.new('RGB', (64, 64), color=(99, 102, 241))
+        menu = pystray.Menu(
+            pystray.MenuItem("열기", lambda: _show_window_from_tray(),
+                             default=True),
+            pystray.MenuItem("종료", lambda: _quit_from_tray()),
+        )
+        icon = pystray.Icon("Lumina", image, "Lumina Agent", menu)
+        _tray_icon[0] = icon
+        threading.Thread(target=icon.run, daemon=True).start()
+
+    def _on_closing():
+        agent_active = (
+            _using_service[0]
+            or (_worker[0] is not None and _worker[0].is_alive())
+        )
+        if agent_active and _HAS_TRAY:
+            _minimize_to_tray()
+        else:
+            if not _using_service[0]:
+                _stop_worker()
+            app.destroy()
+
+    app.protocol("WM_DELETE_WINDOW", _on_closing)
+
+    # ── 서비스 초기 상태 확인 ──
+    def _check_initial():
+        if _is_service_running():
+            _using_service[0] = True
+
+    threading.Thread(target=_check_initial, daemon=True).start()
+
+    app.mainloop()
 
 
 def main():

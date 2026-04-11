@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumina Agent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #f0f2f5; --card: #ffffff; --fg: #1a1a2e; --sub: #6b7280;
+  --accent: #4f46e5; --accent-h: #4338ca; --accent-light: #eef2ff;
+  --ok: #059669; --ok-bg: #ecfdf5; --err: #dc2626; --err-bg: #fef2f2;
+  --warn: #d97706; --warn-bg: #fffbeb; --border: #e5e7eb;
+  --radius: 10px; --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
+}
+body {
+  font-family: 'Segoe UI', -apple-system, sans-serif;
+  background: var(--bg); color: var(--fg); font-size: 14px;
+  line-height: 1.5; overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* ── 헤더 ── */
+.header {
+  background: var(--card); border-bottom: 1px solid var(--border);
+  padding: 16px 24px; display: flex; align-items: center;
+  box-shadow: var(--shadow);
+}
+.header-logo { display: flex; align-items: center; gap: 10px; }
+.header-logo .icon {
+  width: 32px; height: 32px; background: var(--accent);
+  border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-weight: 700; font-size: 15px;
+}
+.header-logo h1 { font-size: 17px; font-weight: 600; }
+.header-logo .ver {
+  font-size: 11px; color: var(--sub); background: var(--bg);
+  padding: 2px 8px; border-radius: 12px; margin-left: 4px;
+}
+.header-status {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+}
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+}
+.status-badge.idle { background: var(--bg); color: var(--sub); }
+.status-badge.ok { background: var(--ok-bg); color: var(--ok); }
+.status-badge.err { background: var(--err-bg); color: var(--err); }
+.status-badge.warn { background: var(--warn-bg); color: var(--warn); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+}
+.status-dot.pulse { animation: pulse 2s infinite; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: .4; }
+}
+
+/* ── 탭 네비게이션 ── */
+.tabs {
+  display: flex; gap: 0; padding: 0 24px;
+  background: var(--card); border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  padding: 12px 20px; font-size: 13px; font-weight: 500;
+  color: var(--sub); cursor: pointer; border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all .15s;
+}
+.tab-btn:hover { color: var(--fg); }
+.tab-btn.active {
+  color: var(--accent); border-bottom-color: var(--accent); font-weight: 600;
+}
+
+/* ── 탭 컨텐츠 ── */
+.tab-content { display: none; padding: 20px 24px; }
+.tab-content.active { display: block; }
+.card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+  padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-size: 13px; font-weight: 600; color: var(--fg);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.card-title .card-icon {
+  width: 20px; height: 20px; display: flex; align-items: center;
+  justify-content: center; color: var(--accent);
+}
+
+/* ── 폼 필드 ── */
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 500;
+  color: var(--sub); margin-bottom: 5px;
+}
+.form-row { display: flex; gap: 12px; align-items: flex-end; }
+.form-row .form-group { flex: 1; }
+input[type="text"], input[type="number"], select {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; font-family: inherit;
+  background: var(--card); color: var(--fg); transition: border-color .15s;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+
+.checkbox-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+}
+.checkbox-row label { font-size: 13px; color: var(--fg); cursor: pointer; }
+
+/* ── 버튼 ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border-radius: 7px; font-size: 13px;
+  font-weight: 500; font-family: inherit; cursor: pointer;
+  border: 1px solid transparent; transition: all .15s ease;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+.btn-outline { background: var(--card); color: var(--fg); border-color: var(--border); }
+.btn-outline:hover:not(:disabled) { background: var(--bg); }
+.btn-success { background: var(--ok); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #047857; }
+.btn-danger { background: #6b7280; color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #4b5563; }
+.btn-warn { background: var(--warn); color: #fff; }
+.btn-warn:hover:not(:disabled) { background: #b45309; }
+.btn-group { display: flex; gap: 8px; margin-top: 4px; }
+.btn-icon { font-size: 15px; }
+
+/* ── 상태 메시지 ── */
+.msg { font-size: 12px; margin-top: 10px; min-height: 18px; }
+.msg.ok { color: var(--ok); } .msg.err { color: var(--err); }
+.msg.sub { color: var(--sub); } .msg.warn { color: var(--warn); }
+
+/* ── 에이전트 제어 카드 ── */
+.control-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.control-status {
+  margin-left: auto; font-size: 12px; color: var(--sub);
+}
+
+/* ── 등록 탭 ── */
+.reg-status-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.reg-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.reg-dot.ok { background: var(--ok); }
+.reg-dot.err { background: var(--err); }
+.reg-label { font-weight: 500; }
+.cert-list { margin-top: 12px; }
+.cert-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 6px; background: var(--bg);
+  margin-bottom: 6px; font-size: 13px;
+}
+.cert-item .cert-name { width: 120px; color: var(--sub); font-weight: 500; }
+.cert-item .cert-status { font-weight: 500; }
+.cert-item .cert-status.ok { color: var(--ok); }
+.cert-item .cert-status.err { color: var(--err); }
+
+/* ── 로그 탭 ── */
+.log-area {
+  background: #18181b; color: #d4d4d8; border-radius: 8px;
+  padding: 14px; font-size: 12px; font-family: 'Cascadia Code', 'Consolas', monospace;
+  height: 380px; overflow-y: auto; line-height: 1.7;
+  white-space: pre-wrap; word-break: break-all;
+}
+.log-area::-webkit-scrollbar { width: 6px; }
+.log-area::-webkit-scrollbar-track { background: transparent; }
+.log-area::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+.log-toolbar {
+  display: flex; justify-content: flex-end; margin-top: 10px;
+}
+.log-line-info { color: #60a5fa; }
+.log-line-warn { color: #fbbf24; }
+.log-line-err { color: #f87171; }
+</style>
+</head>
+<body>
+
+<!-- ── 헤더 ── -->
+<div class="header">
+  <div class="header-logo">
+    <div class="icon">L</div>
+    <h1>Lumina Agent</h1>
+    <span class="ver">v1.0.1</span>
+  </div>
+  <div class="header-status">
+    <div id="headerBadge" class="status-badge idle">
+      <span class="status-dot"></span>
+      <span id="headerText">대기 중</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── 탭 ── -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="config" onclick="switchTab('config')">서버 설정</button>
+  <button class="tab-btn" data-tab="register" onclick="switchTab('register')">에이전트 등록</button>
+  <button class="tab-btn" data-tab="log" onclick="switchTab('log')">로그</button>
+</div>
+
+<!-- ━━━ 탭 1: 서버 설정 ━━━ -->
+<div id="tab-config" class="tab-content active">
+  <div class="card">
+    <div class="card-title">
+      <span class="card-icon">⚙</span> 서버 연결
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 120px">
+        <label>프로토콜</label>
+        <select id="cfgProto">
+          <option value="https">HTTPS</option>
+          <option value="http">HTTP</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>서버 IP</label>
+        <input type="text" id="cfgHost" placeholder="192.168.1.10">
+      </div>
+      <div class="form-group" style="flex:0 0 100px">
+        <label>포트</label>
+        <input type="number" id="cfgPort" placeholder="8080">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 120px">
+        <label>수집 주기</label>
+        <input type="number" id="cfgInterval" placeholder="3600" min="10">
+      </div>
+      <div class="form-group" style="flex:1; align-self: flex-end;">
+        <span style="font-size:12px; color:var(--sub)">초 (최소 10, 기본 3600)</span>
+      </div>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="cfgSSL"><label for="cfgSSL">SSL 인증서 검증</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="cfgAutoStart"><label for="cfgAutoStart">Windows 로그온 시 자동 시작</label>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="testConnection()">연결 테스트</button>
+      <button class="btn btn-primary" onclick="saveConfig()">저장</button>
+    </div>
+    <div id="cfgMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span class="card-icon">▶</span> 에이전트 제어
+    </div>
+    <div class="control-row">
+      <div class="btn-group">
+        <button id="btnStart" class="btn btn-success" onclick="agentStart()">
+          <span class="btn-icon">▶</span> 시작
+        </button>
+        <button id="btnStop" class="btn btn-danger" onclick="agentStop()" disabled>
+          <span class="btn-icon">■</span> 중지
+        </button>
+        <button id="btnRestart" class="btn btn-warn" onclick="agentRestart()" disabled>
+          <span class="btn-icon">↻</span> 재시작
+        </button>
+      </div>
+      <div id="controlStatus" class="control-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━ 탭 2: 에이전트 등록 ━━━ -->
+<div id="tab-register" class="tab-content">
+  <div class="card">
+    <div class="card-title">
+      <span class="card-icon">🔐</span> 등록 상태
+    </div>
+    <div class="reg-status-row">
+      <span id="regDot" class="reg-dot err"></span>
+      <span id="regLabel" class="reg-label">확인 중...</span>
+    </div>
+    <p id="regDesc" style="font-size:13px; color:var(--sub); margin-bottom: 8px;"></p>
+    <div id="certList" class="cert-list" style="display:none">
+      <div class="cert-item">
+        <span class="cert-name">CA 인증서</span>
+        <span id="certCa" class="cert-status">—</span>
+      </div>
+      <div class="cert-item">
+        <span class="cert-name">클라이언트 인증서</span>
+        <span id="certClient" class="cert-status">—</span>
+      </div>
+      <div class="cert-item">
+        <span class="cert-name">개인키</span>
+        <span id="certKey" class="cert-status">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━ 탭 3: 로그 ━━━ -->
+<div id="tab-log" class="tab-content">
+  <div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:0">
+        <span class="card-icon">📋</span> 실시간 로그
+      </div>
+    </div>
+    <div id="logArea" class="log-area"></div>
+    <div class="log-toolbar">
+      <button class="btn btn-outline" onclick="clearLog()" style="font-size:12px;padding:5px 12px">로그 지우기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 탭 전환 ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c) {
+    c.classList.toggle('active', c.id === 'tab-' + name);
+  });
+}
+
+// ── 헤더 상태 뱃지 ──
+function setHeaderStatus(state, text) {
+  var badge = document.getElementById('headerBadge');
+  var dot = badge.querySelector('.status-dot');
+  badge.className = 'status-badge ' + state;
+  dot.className = 'status-dot' + (state === 'ok' ? ' pulse' : '');
+  document.getElementById('headerText').textContent = text;
+}
+
+// ── 메시지 표시 ──
+function showMsg(id, text, cls) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + (cls || 'sub');
+}
+
+// ── 버튼 상태 제어 ──
+function setBtnState(running) {
+  document.getElementById('btnStart').disabled = running;
+  document.getElementById('btnStop').disabled = !running;
+  document.getElementById('btnRestart').disabled = !running;
+}
+
+// ── 설정 로드 ──
+function loadConfig() {
+  pywebview.api.get_config().then(function(cfg) {
+    document.getElementById('cfgProto').value = cfg.protocol || 'https';
+    document.getElementById('cfgHost').value = cfg.host || '';
+    document.getElementById('cfgPort').value = cfg.port || 8080;
+    document.getElementById('cfgInterval').value = cfg.interval || 3600;
+    document.getElementById('cfgSSL').checked = !!cfg.verify_ssl;
+    document.getElementById('cfgAutoStart').checked = !!cfg.auto_start;
+  });
+}
+
+// ── 설정 저장 ──
+function saveConfig() {
+  var cfg = {
+    protocol: document.getElementById('cfgProto').value,
+    host: document.getElementById('cfgHost').value.trim(),
+    port: parseInt(document.getElementById('cfgPort').value) || 8080,
+    interval: parseInt(document.getElementById('cfgInterval').value) || 3600,
+    verify_ssl: document.getElementById('cfgSSL').checked,
+    auto_start: document.getElementById('cfgAutoStart').checked
+  };
+  if (!cfg.host) { showMsg('cfgMsg', '서버 IP를 입력하세요.', 'err'); return; }
+  if (cfg.port < 1 || cfg.port > 65535) { showMsg('cfgMsg', '포트 번호가 올바르지 않습니다. (1–65535)', 'err'); return; }
+  if (cfg.interval < 10) { showMsg('cfgMsg', '수집 주기는 10초 이상이어야 합니다.', 'err'); return; }
+  pywebview.api.save_config(cfg).then(function(r) {
+    showMsg('cfgMsg', r.message, r.success ? 'ok' : 'err');
+  });
+}
+
+// ── 연결 테스트 ──
+function testConnection() {
+  showMsg('cfgMsg', '연결 테스트 중...', 'sub');
+  var cfg = {
+    protocol: document.getElementById('cfgProto').value,
+    host: document.getElementById('cfgHost').value.trim(),
+    port: parseInt(document.getElementById('cfgPort').value) || 8080,
+    verify_ssl: document.getElementById('cfgSSL').checked
+  };
+  if (!cfg.host) { showMsg('cfgMsg', '서버 IP를 먼저 입력하세요.', 'err'); return; }
+  pywebview.api.test_connection(cfg).then(function(r) {
+    showMsg('cfgMsg', r.message, r.success ? 'ok' : 'err');
+    if (r.success) setHeaderStatus('ok', '서버 연결됨');
+    else setHeaderStatus('err', '연결 안 됨');
+  });
+}
+
+// ── 에이전트 시작 ──
+function agentStart() {
+  setBtnState(true);
+  document.getElementById('controlStatus').textContent = '시작 중...';
+  setHeaderStatus('warn', '시작 중...');
+  // 먼저 현재 폼 값 저장
+  saveConfig();
+  pywebview.api.agent_start().then(function(r) {
+    document.getElementById('controlStatus').textContent = r.message;
+    if (r.success) {
+      setHeaderStatus('ok', '실행 중');
+      setBtnState(true);
+    } else {
+      setHeaderStatus('err', '시작 실패');
+      setBtnState(false);
+    }
+  });
+}
+
+// ── 에이전트 중지 ──
+function agentStop() {
+  document.getElementById('controlStatus').textContent = '중지 중...';
+  setHeaderStatus('warn', '중지 중...');
+  pywebview.api.agent_stop().then(function(r) {
+    document.getElementById('controlStatus').textContent = r.message;
+    setHeaderStatus('idle', '대기 중');
+    setBtnState(false);
+  });
+}
+
+// ── 에이전트 재시작 ──
+function agentRestart() {
+  setBtnState(false);
+  document.getElementById('btnRestart').disabled = true;
+  document.getElementById('controlStatus').textContent = '재시작 중...';
+  setHeaderStatus('warn', '재시작 중...');
+  pywebview.api.agent_restart().then(function(r) {
+    document.getElementById('controlStatus').textContent = r.message;
+    if (r.success) {
+      setHeaderStatus('ok', '실행 중');
+      setBtnState(true);
+    } else {
+      setHeaderStatus('err', '재시작 실패');
+      setBtnState(false);
+    }
+  });
+}
+
+// ── 등록 상태 로드 ──
+function loadRegStatus() {
+  pywebview.api.get_reg_status().then(function(r) {
+    var dot = document.getElementById('regDot');
+    var label = document.getElementById('regLabel');
+    var desc = document.getElementById('regDesc');
+    var certList = document.getElementById('certList');
+    if (r.registered) {
+      dot.className = 'reg-dot ok';
+      label.textContent = '등록됨 (인증서 있음)';
+      label.style.color = 'var(--ok)';
+      desc.textContent = '이 에이전트는 서버에 등록되어 있습니다.';
+      certList.style.display = 'block';
+      setCertStatus('certCa', r.ca_exists);
+      setCertStatus('certClient', r.cert_exists);
+      setCertStatus('certKey', r.key_exists);
+    } else {
+      dot.className = 'reg-dot err';
+      label.textContent = '미등록';
+      label.style.color = 'var(--err)';
+      desc.textContent = '에이전트 시작 버튼을 누르면 서버에 자동으로 등록됩니다. (서버 IP를 먼저 설정한 후 시작하세요)';
+      certList.style.display = 'none';
+    }
+  });
+}
+
+function setCertStatus(id, exists) {
+  var el = document.getElementById(id);
+  el.textContent = exists ? '✓ 확인됨' : '✗ 파일 없음';
+  el.className = 'cert-status ' + (exists ? 'ok' : 'err');
+}
+
+// ── 로그 ──
+function appendLog(text) {
+  var area = document.getElementById('logArea');
+  var cls = '';
+  if (text.indexOf('[WARNING]') !== -1) cls = 'log-line-warn';
+  else if (text.indexOf('[ERROR]') !== -1) cls = 'log-line-err';
+  else if (text.indexOf('[INFO]') !== -1) cls = 'log-line-info';
+  if (cls) {
+    area.innerHTML += '<span class="' + cls + '">' + escapeHtml(text) + '</span>\n';
+  } else {
+    area.textContent += text + '\n';
+  }
+  area.scrollTop = area.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '';
+}
+
+function escapeHtml(text) {
+  var d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+// ── 상태 폴링 ──
+function pollStatus() {
+  pywebview.api.get_status().then(function(s) {
+    if (s.running) {
+      setBtnState(true);
+      if (s.server_ok) setHeaderStatus('ok', '서버 연결됨');
+      else setHeaderStatus('err', '연결 안 됨');
+      document.getElementById('controlStatus').textContent = s.mode_msg || '실행 중';
+    } else {
+      setBtnState(false);
+      setHeaderStatus('idle', '대기 중');
+    }
+  });
+}
+
+// ── 초기화 ──
+window.addEventListener('pywebviewready', function() {
+  loadConfig();
+  loadRegStatus();
+  setInterval(pollStatus, 5000);
+  // 로그 폴링
+  setInterval(function() {
+    pywebview.api.get_new_logs().then(function(lines) {
+      for (var i = 0; i < lines.length; i++) appendLog(lines[i]);
+    });
+  }, 1000);
+});
+</script>
+</body>
+</html>

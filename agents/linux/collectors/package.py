@@ -3,8 +3,6 @@
 rpm, dpkg, snap, flatpak 등 패키지 매니저별로 설치 패키지를 수집한다.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import shutil
@@ -55,7 +53,7 @@ class PackageCollector(BaseCollector):
             raw = subprocess.check_output(
                 ["rpm", "-qa", "--queryformat",
                  "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{VENDOR}\\t%{INSTALLTIME:date}\\t%{LICENSE}\\n"],
-                text=True, timeout=60,
+                universal_newlines=True, timeout=60,
             )
         except (FileNotFoundError, subprocess.SubprocessError):
             return items
@@ -82,7 +80,7 @@ class PackageCollector(BaseCollector):
             raw = subprocess.check_output(
                 ["dpkg-query", "-W", "-f",
                  "${Package}\\t${Version}\\t${Maintainer}\\t${Status}\\n"],
-                text=True, timeout=60,
+                universal_newlines=True, timeout=60,
             )
         except (FileNotFoundError, subprocess.SubprocessError):
             return items
@@ -109,7 +107,7 @@ class PackageCollector(BaseCollector):
         items: List[Dict[str, Any]] = []
         try:
             raw = subprocess.check_output(
-                ["apk", "info", "-v"], text=True, timeout=60
+                ["apk", "info", "-v"], universal_newlines=True, timeout=60
             )
         except (FileNotFoundError, subprocess.SubprocessError):
             return items
@@ -147,7 +145,7 @@ class PackageCollector(BaseCollector):
         try:
             raw = subprocess.check_output(
                 [pip_cmd, "list", "--format=columns"],
-                text=True, timeout=60, stderr=subprocess.DEVNULL,
+                universal_newlines=True, timeout=60, stderr=subprocess.DEVNULL,
             )
         except (FileNotFoundError, subprocess.SubprocessError):
             return items
@@ -171,7 +169,7 @@ class PackageCollector(BaseCollector):
         items: List[Dict[str, Any]] = []
         try:
             raw = subprocess.check_output(
-                ["snap", "list"], text=True, timeout=30
+                ["snap", "list"], universal_newlines=True, timeout=30
             )
         except (FileNotFoundError, subprocess.SubprocessError):
             return items

@@ -7,11 +7,10 @@
     python3 agent.py --conf /etc/lumina/lumina.conf
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import logging
+import logging.handlers
 import os
 import signal
 import sys
@@ -33,33 +32,103 @@ from linux.collectors.package import PackageCollector
 logger = logging.getLogger("lumina")
 
 _running = True
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+_LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
+
+_LEVEL_MAP = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+}
 
 
-def _setup_logging():
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    ))
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
+def _setup_logging(config=None):
+    # type: (AgentConfig) -> None
+    """Configure console + rotating file logging from config."""
+    level = logging.INFO
+    log_file = "/var/log/lumina/lumina.log"
+    max_bytes = 50 * 1024 * 1024
+    backup_count = 5
 
-    # 파일 로그
-    log_dir = "/var/log/lumina"
-    os.makedirs(log_dir, exist_ok=True)
-    fh = logging.FileHandler(os.path.join(log_dir, "lumina.log"), encoding="utf-8")
-    fh.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    ))
+    if config is not None:
+        level = _LEVEL_MAP.get(config.log_level, logging.INFO)
+        log_file = config.log_file
+        max_bytes = config.log_max_size_mb * 1024 * 1024
+        backup_count = config.log_backup_count
+
+    logger.setLevel(level)
+
+    # console handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+    logger.addHandler(ch)
+
+    # rotating file handler
+    log_dir = os.path.dirname(log_file)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    fh = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8",
+    )
+    fh.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
     logger.addHandler(fh)
 
 
 def _signal_handler(signum, frame):
     global _running
-    logger.info("종료 시그널 수신 (signal=%d), 에이전트를 중지합니다.", signum)
+    logger.info("Shutdown signal received (signal=%d), stopping agent.", signum)
     _running = False
 
 
-def _push_to_server(config: AgentConfig, payload: dict) -> bool:
+def _build_ssl_context(config):
+    # type: (AgentConfig) -> ssl.SSLContext
+    """Build an SSL context from config (verify_ssl, ca_cert, mTLS)."""
+    import ssl
+    if config.verify_ssl:
+        ctx = ssl.create_default_context()
+        if config.ca_cert:
+            ctx.load_verify_locations(config.ca_cert)
+    else:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    if config.client_cert and config.client_key:
+        ctx.load_cert_chain(config.client_cert, config.client_key)
+    return ctx
+
+
+def _build_opener(config, ssl_context=None):
+    # type: (AgentConfig, ...) -> urllib.request.OpenerDirector
+    """Build a urllib opener with optional proxy and SSL support."""
+    handlers = []  # type: list
+    if config.proxy:
+        proxy_handler = urllib.request.ProxyHandler({
+            "https": config.proxy,
+        })
+        handlers.append(proxy_handler)
+    else:
+        # no_proxy: use direct connection
+        handlers.append(urllib.request.ProxyHandler({}))
+    if ssl_context is not None:
+        handlers.append(urllib.request.HTTPSHandler(context=ssl_context))
+    return urllib.request.build_opener(*handlers)
+
+
+def _auth_headers(config):
+    # type: (AgentConfig) -> dict
+    """Return auth headers if tokens are configured."""
+    headers = {"Content-Type": "application/json"}
+    if config.auth_token:
+        headers["Authorization"] = "Bearer %s" % config.auth_token
+    elif config.enrollment_token:
+        headers["X-Enrollment-Token"] = config.enrollment_token
+    return headers
+
+
+def _push_to_server(config, payload):
+    # type: (AgentConfig, dict) -> bool
     """수집 결과를 서버로 전송. 성공 시 True, 실패 시 False (로컬 저장 fallback)."""
     if not config.server_url:
         return False
@@ -69,23 +138,25 @@ def _push_to_server(config: AgentConfig, payload: dict) -> bool:
         req = urllib.request.Request(
             config.server_url,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=_auth_headers(config),
             method="POST",
         )
-        ctx = ssl.create_default_context()
-        if not config.verify_ssl:
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
-            logger.info("서버 전송 완료 (status=%d, url=%s)", resp.status, config.server_url)
-            return True
+        ctx = _build_ssl_context(config)
+        opener = _build_opener(config, ssl_context=ctx)
+        resp = opener.open(req, timeout=config.read_timeout)
+        try:
+            logger.info("Data sent to server (status=%d)", resp.status)
+        finally:
+            resp.close()
+        return True
     except (urllib.error.URLError, OSError) as e:
-        logger.warning("서버 전송 실패 → 로컬 저장 (error=%s)", e)
+        logger.warning("Server unreachable, saving locally (error=%s)", e)
         return False
 
 
-def run_once(config: AgentConfig):
-    """수집 1회 실행"""
+def run_once(config):
+    # type: (AgentConfig) -> None
+    """수집 1회 실행 (with retry backoff on failure)"""
     collectors = []
     if "interface" in config.collectors:
         collectors.append(InterfaceCollector())
@@ -94,75 +165,117 @@ def run_once(config: AgentConfig):
     if "package" in config.collectors:
         collectors.append(PackageCollector())
 
-    logger.info("수집 시작 (hostname=%s, collectors=%s)", config.hostname, [c.name for c in collectors])
+    logger.info("Collection started (hostname=%s, collectors=%s)", config.hostname, [c.name for c in collectors])
     payload = build_payload(collectors)
 
-    # 서버 전송 시도 → 실패 시 로컬 JSON 저장
-    if not _push_to_server(config, payload):
+    # 서버 전송 시도 with exponential backoff
+    sent = False
+    wait = config.retry_interval
+    max_wait = config.max_retry_interval
+    attempts = 0
+    while not sent and _running:
+        sent = _push_to_server(config, payload)
+        if sent:
+            logger.info("Collection complete -> sent to server")
+            break
+        attempts += 1
+        if attempts >= 3:
+            # give up after 3 retries in a single cycle
+            break
+        logger.info("Retrying in %ds (attempt=%d)", wait, attempts)
+        # interruptible sleep
+        slept = 0
+        while _running and slept < wait:
+            time.sleep(min(5, wait - slept))
+            slept += 5
+        wait = min(wait * 2, max_wait)
+
+    if not sent:
         out_path = config.output_path()
         save_payload(payload, out_path)
-        logger.info("수집 완료 → %s", out_path)
-    else:
-        logger.info("수집 완료 → 서버 전송 성공")
+        logger.info("Collection complete -> %s", out_path)
 
 
-def _send_heartbeat(config: AgentConfig):
+def _send_heartbeat(config):
+    # type: (AgentConfig) -> None
     """서버에 heartbeat 전송"""
     if not config.server_host:
         return
     import ssl as _ssl
     import socket as _sock
     try:
-        url = f"{config.server_protocol}://{config.server_host}:{config.server_port}/api/agent/heartbeat"
+        url = "%s://%s:%s/api/agent/heartbeat" % (config.server_protocol, config.server_host, config.server_port)
         body = json.dumps({"hostname": config.hostname or _sock.gethostname()}).encode("utf-8")
-        ctx = _ssl.create_default_context()
-        if not config.verify_ssl:
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
         req = urllib.request.Request(
             url, data=body,
-            headers={"Content-Type": "application/json"},
+            headers=_auth_headers(config),
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=5, context=ctx):
-            pass
+        ctx = _build_ssl_context(config)
+        opener = _build_opener(config, ssl_context=ctx)
+        resp = opener.open(req, timeout=config.connect_timeout)
+        resp.close()
     except Exception:
         pass
 
 
+def _interactive_setup(config):
+    """Interactive server connection setup"""
+    print("\n===== Lumina Server Connection Setup =====")
+    print("Enter the server information to send agent data.\n")
+    if config.server_host:
+        print("  Current setting: %s\n" % config.server_url)
+    host = input("  Server IP [%s]: " % (config.server_host or "")).strip() or config.server_host
+    port = input("  Port [%s]: " % config.server_port).strip() or str(config.server_port)
+    verify = input("  Verify SSL certificate (y/N) [%s]: " % ("y" if config.verify_ssl else "N")).strip().lower()
+    if not host:
+        print("No server IP provided. Exiting.")
+        sys.exit(0)
+    config.server_protocol = "https"
+    config.server_host = host
+    try:
+        config.server_port = int(port)
+    except ValueError:
+        config.server_port = 443
+    config.verify_ssl = verify in ("y", "yes")
+    config.save()
+    print("\nConfiguration saved: %s" % config.server_url)
+    print("Start service: systemctl start lumina-agent\n")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Lumina 자산 자동 탐색 에이전트 (Linux)")
-    parser.add_argument("--once", action="store_true", help="1회 수집 후 종료")
-    parser.add_argument("--conf", default=None, help="설정 파일 경로")
+    parser = argparse.ArgumentParser(description="Lumina Asset Discovery Agent (Linux)")
+    parser.add_argument("--once", action="store_true", help="Collect once and exit")
+    parser.add_argument("--setup", action="store_true", help="Configure server connection and exit")
+    parser.add_argument("--conf", default=None, help="Config file path")
     args = parser.parse_args()
 
-    _setup_logging()
+    _setup_logging()  # basic logging before config load
 
     config = AgentConfig(conf_path=args.conf)
 
+    # reconfigure logging with actual config values
+    for h in logger.handlers[:]:
+        logger.removeHandler(h)
+    _setup_logging(config)
+
+    # --setup 모드: 대화형 설정 후 종료
+    if args.setup:
+        _interactive_setup(config)
+        return
+
     # server_host가 미설정이면 CLI로 입력받기
     if not config.server_url:
-        print("\n===== Lumina 서버 연결 설정 =====")
-        print("에이전트가 데이터를 전송할 서버 정보를 입력하세요.\n")
-        proto = input("  프로토콜 [https]: ").strip() or "https"
-        host = input("  서버 IP: ").strip()
-        port = input("  포트 [8080]: ").strip() or "8080"
-        verify = input("  SSL 인증서 검증 (y/N): ").strip().lower()
-        if not host:
-            print("서버 IP가 입력되지 않아 종료합니다.")
-            sys.exit(0)
-        config.server_protocol = proto
-        config.server_host = host
-        try:
-            config.server_port = int(port)
-        except ValueError:
-            config.server_port = 8080
-        config.verify_ssl = verify in ("y", "yes")
-        config.save()
-        logger.info("서버 연결 설정 저장 완료: %s", config.server_url)
+        if not sys.stdin.isatty():
+            logger.error("Server connection not configured. "
+                         "Run 'lumina-agent --setup' in a terminal "
+                         "to complete initial setup.")
+            sys.exit(1)
+        _interactive_setup(config)
 
-    logger.info("에이전트 시작 (interval=%ds, output=%s, server=%s)",
-                config.interval, config.output_dir, config.server_url or "(없음)")
+    logger.info("Agent started (interval=%ds, output=%s, server=%s)",
+                config.interval, config.output_dir,
+                "configured" if config.server_url else "(none)")
 
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
@@ -177,7 +290,7 @@ def main():
             run_once(config)
             _send_heartbeat(config)
         except Exception:
-            logger.exception("수집 사이클 중 예기치 않은 오류")
+            logger.exception("Unexpected error during collection cycle")
 
         # interval 동안 60초 간격으로 heartbeat 전송
         elapsed = 0
@@ -191,7 +304,7 @@ def main():
                 except Exception:
                     pass
 
-    logger.info("에이전트 종료")
+    logger.info("Agent stopped")
 
 
 if __name__ == "__main__":

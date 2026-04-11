@@ -3222,8 +3222,8 @@ def show(key: str, token: str | None = None):
     # -----------------------------------------------------------------------
     _HW_BASE_KEYS = {
         'hw_server_onpremise', 'hw_server_cloud', 'hw_server_frame', 'hw_server_workstation',
-        'hw_storage_storage', 'hw_storage_backup', 'hw_storage_ptl',
-        'hw_san_director', 'hw_san_sansw',
+        'hw_storage_storage', 'hw_storage_backup', 'hw_storage_ptl', 'hw_storage_san',
+        'hw_san_director', 'hw_san_sansw', 'hw_san_switch',
         'hw_network_l2', 'hw_network_l4', 'hw_network_l7', 'hw_network_ap', 'hw_network_dedicateline',
         'hw_security_firewall', 'hw_security_vpn', 'hw_security_ids', 'hw_security_ips',
         'hw_security_hsm', 'hw_security_kms', 'hw_security_wips', 'hw_security_etc',

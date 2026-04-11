@@ -11,6 +11,8 @@ After=network-online.target mariadb.service
 Wants=network-online.target
 # DB가 같은 서버에 있는 경우에만 활성화
 # Requires=mariadb.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 # ── 실행 계정 (root 실행 금지) ────────────────────────────
@@ -32,8 +34,6 @@ WorkingDirectory=/opt/blossom/lumina/ap
 # ── 재시작 정책 ──────────────────────────────────────────
 Restart=on-failure
 RestartSec=10
-StartLimitIntervalSec=300
-StartLimitBurst=5
 
 # ── 타임아웃 ─────────────────────────────────────────────
 TimeoutStartSec=30
@@ -69,10 +69,7 @@ PrivateTmp=yes
 # 커널 보호
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
-ProtectKernelLogs=yes
 ProtectControlGroups=yes
-ProtectClock=yes
-ProtectHostname=yes
 
 # 네트워크 (수신 :5100 + DB :3306 연결만 필요)
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

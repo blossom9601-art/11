@@ -750,6 +750,7 @@ from app.routes.common import (                             # noqa: E402
     safe_strip as _common_safe_strip,
     resolve_actor_user_id as _common_resolve_actor_user_id,
     get_pagination_args as _common_get_pagination_args,
+    paginate_query as _paginate_query,
 )
 
 # ── 파일 업로드 보안 헬퍼 ──
@@ -1209,9 +1210,14 @@ def update_dr_training(training_id: int):
     if not row or int(row.is_deleted or 0) != 0:
         return api_not_found()
 
+    client_version = payload.get('version')
+    if client_version is not None and int(client_version) != (row.version or 1):
+        return api_error('다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', status=409)
+
     _dr_training_apply_payload(row, payload, strict_required=False)
     row.updated_at = now
     row.updated_by_user_id = actor_user_id
+    row.version = (row.version or 1) + 1
     db.session.commit()
     return api_response(item=_dr_training_to_item(row))
 
@@ -2176,10 +2182,13 @@ def list_backup_storage_pools():
         query = BkStoragePool.query
         if not include_deleted:
             query = query.filter((BkStoragePool.is_deleted == 0) | (BkStoragePool.is_deleted.is_(None)))
-        rows = query.order_by(BkStoragePool.id.desc()).all()
+        query = query.order_by(BkStoragePool.id.desc())
+        result = _paginate_query(query, default_size=200)
+        rows = result['items']
         asset_name_map = _hw_asset_name_map([r.storage_asset_id for r in rows])
         items = [_bk_storage_pool_to_dict(r, asset_name_map) for r in rows]
-        return jsonify({'success': True, 'items': items, 'total': len(items)})
+        return jsonify({'success': True, 'items': items, 'total': result['total'],
+                        'page': result.get('page'), 'pages': result.get('pages')})
     except Exception:
         logger.exception('Failed to list backup storage pools')
         return jsonify({'success': False, 'message': '스토리지 풀 목록 조회 중 오류가 발생했습니다.'}), 500
@@ -2240,6 +2249,10 @@ def update_backup_storage_pool(pool_id: int):
         if not row or int(row.is_deleted or 0) != 0:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
 
+        client_version = payload.get('version')
+        if client_version is not None and int(client_version) != (row.version or 1):
+            return jsonify({'success': False, 'message': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
         if 'pool_name' in payload:
             cand = _s(payload, 'pool_name')
             if cand:
@@ -2253,6 +2266,7 @@ def update_backup_storage_pool(pool_id: int):
 
         row.updated_at = now
         row.updated_by = actor_user_id
+        row.version = (row.version or 1) + 1
         db.session.commit()
         asset_name_map = _hw_asset_name_map([row.storage_asset_id])
         return jsonify({'success': True, 'item': _bk_storage_pool_to_dict(row, asset_name_map)})
@@ -2311,10 +2325,11 @@ def list_backup_target_policies():
             query = query.filter((BkBackupTargetPolicy.is_deleted == 0) | (BkBackupTargetPolicy.is_deleted.is_(None)))
         if system_name:
             query = query.filter(BkBackupTargetPolicy.system_name == system_name)
-        rows = query.order_by(BkBackupTargetPolicy.id.desc()).all()
-        pool_name_map = {int(r.id): (r.pool_name or '') for r in BkStoragePool.query.filter((BkStoragePool.is_deleted == 0) | (BkStoragePool.is_deleted.is_(None))).all()}
-        items = [_bk_target_policy_to_dict(r, pool_name_map) for r in rows]
-        return jsonify({'success': True, 'items': items, 'total': len(items)})
+        query = query.order_by(BkBackupTargetPolicy.id.desc())
+        result = _paginate_query(query, default_size=200)
+        items = [_bk_target_policy_to_dict(r) for r in result['items']]
+        return jsonify({'success': True, 'items': items, 'total': result['total'],
+                        'page': result.get('page'), 'pages': result.get('pages')})
     except Exception:
         logger.exception('Failed to list backup target policies')
         return jsonify({'success': False, 'message': '백업 정책 목록 조회 중 오류가 발생했습니다.'}), 500
@@ -2456,6 +2471,10 @@ def update_backup_target_policy(policy_id: int):
         if not row or int(row.is_deleted or 0) != 0:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
 
+        client_version = payload.get('version')
+        if client_version is not None and int(client_version) != (row.version or 1):
+            return jsonify({'success': False, 'message': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
         # ── 변경이력: before 캡처 ──
         _bk_gov_old_data = _bk_target_policy_to_dict(row)
 
@@ -2565,6 +2584,7 @@ def update_backup_target_policy(policy_id: int):
 
         row.updated_at = now
         row.updated_by = actor_user_id
+        row.version = (row.version or 1) + 1
         db.session.commit()
         row = BkBackupTargetPolicy.query.options(joinedload(BkBackupTargetPolicy.storage_pool)).get(row.id)
 
@@ -2666,10 +2686,13 @@ def list_backup_libraries():
         query = BkLibrary.query
         if not include_deleted:
             query = query.filter((BkLibrary.is_deleted == 0) | (BkLibrary.is_deleted.is_(None)))
-        rows = query.order_by(BkLibrary.id.desc()).all()
+        query = query.order_by(BkLibrary.id.desc())
+        result = _paginate_query(query, default_size=200)
+        rows = result['items']
         asset_name_map = _hardware_asset_names_by_ids([r.backup_device_asset_id for r in rows])
         items = [_bk_library_to_dict(r, asset_name_map) for r in rows]
-        return jsonify({'success': True, 'items': items, 'total': len(items)})
+        return jsonify({'success': True, 'items': items, 'total': result['total'],
+                        'page': result.get('page'), 'pages': result.get('pages')})
     except Exception:
         logger.exception('Failed to list backup libraries')
         return jsonify({'success': False, 'message': '백업 라이브러리 목록 조회 중 오류가 발생했습니다.'}), 500
@@ -2730,6 +2753,10 @@ def update_backup_library(library_id: int):
         if not row or int(row.is_deleted or 0) != 0:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
 
+        client_version = payload.get('version')
+        if client_version is not None and int(client_version) != (row.version or 1):
+            return jsonify({'success': False, 'message': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
         if 'library_name' in payload:
             cand = _s(payload, 'library_name')
             if cand:
@@ -2743,6 +2770,7 @@ def update_backup_library(library_id: int):
 
         row.updated_at = now
         row.updated_by = actor_user_id
+        row.version = (row.version or 1) + 1
         db.session.commit()
         asset_name_map = _hardware_asset_names_by_ids([row.backup_device_asset_id])
         return jsonify({'success': True, 'item': _bk_library_to_dict(row, asset_name_map)})
@@ -5536,6 +5564,10 @@ def update_wrk_report(report_id: int):
         if row.status == 'ARCHIVED':
             return jsonify({'success': False, 'message': 'ARCHIVED 상태의 문서는 수정할 수 없습니다.'}), 409
 
+        client_version = payload.get('version')
+        if client_version is not None and int(client_version) != (row.version or 1):
+            return jsonify({'success': False, 'message': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 수정해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
         if 'task_title' in payload or 'title' in payload:
             task_title = (payload.get('task_title') or payload.get('title') or '').strip()
             if task_title:
@@ -5686,6 +5718,7 @@ def update_wrk_report(report_id: int):
 
         row.updated_at = datetime.utcnow()
         row.updated_by_user_id = actor_user_id
+        row.version = (row.version or 1) + 1
 
         if _sync_wrk_report_status(row):
             pass
@@ -6446,7 +6479,13 @@ def update_calendar_schedule(schedule_id: int):
             return jsonify({'success': False, 'message': '사용자 세션이 만료되었습니다.'}), 401
         if not _calendar_can_edit(schedule, actor_user_id, actor_profile):
             return jsonify({'success': False, 'message': '일정 수정 권한이 없습니다.'}), 403
+
+        client_version = payload.get('version')
+        if client_version is not None and int(client_version) != (schedule.version or 1):
+            return jsonify({'success': False, 'message': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
         _apply_schedule_payload(schedule, payload, actor_user_id, is_create=False)
+        schedule.version = (schedule.version or 1) + 1
         db.session.commit()
 
         # 캘린더 리마인더 알림 재생성
@@ -8069,21 +8108,27 @@ def _migrate_hardcoded_zones():
         }
         zones = {z.zone_key: z.id for z in DcAccessZone.query.all()}
         permissions = DcAccessPermission.query.all()
+        # 기존 junction 행을 일괄 로드하여 N+1 방지
+        perm_ids = [p.permission_id for p in permissions]
+        existing_set = set()
+        if perm_ids:
+            existing_rows = DcAccessPermissionZone.query.filter(
+                DcAccessPermissionZone.permission_id.in_(perm_ids)
+            ).all()
+            existing_set = {(pz.permission_id, pz.zone_id) for pz in existing_rows}
         for perm in permissions:
             for col, key in zone_map.items():
                 zone_id = zones.get(key)
                 if not zone_id:
                     continue
+                if (perm.permission_id, zone_id) in existing_set:
+                    continue
                 val = getattr(perm, col, 'X') or 'X'
-                existing = DcAccessPermissionZone.query.filter_by(
-                    permission_id=perm.permission_id, zone_id=zone_id
-                ).first()
-                if not existing:
-                    db.session.add(DcAccessPermissionZone(
-                        permission_id=perm.permission_id,
-                        zone_id=zone_id,
-                        value=val.upper() if val.upper() in ('O', 'X') else 'X'
-                    ))
+                db.session.add(DcAccessPermissionZone(
+                    permission_id=perm.permission_id,
+                    zone_id=zone_id,
+                    value=val.upper() if val.upper() in ('O', 'X') else 'X'
+                ))
         db.session.commit()
     except Exception as e:
         try:
@@ -8251,18 +8296,6 @@ def _dc_access_permission_to_dict(row: DcAccessPermission, zone_values: Optional
     if zone_values is not None:
         for zone_key, val in zone_values.items():
             payload[zone_key] = val
-    else:
-        # fallback: junction 테이블에서 직접 로드
-        try:
-            if _dc_access_zone_tables_ready():
-                pz_rows = DcAccessPermissionZone.query.filter_by(permission_id=row.permission_id).all()
-                zones = {z.id: z.zone_key for z in DcAccessZone.query.filter_by(is_deleted=0).all()}
-                for pz in pz_rows:
-                    key = zones.get(pz.zone_id)
-                    if key:
-                        payload[key] = pz.value or 'X'
-        except Exception:
-            pass
 
     return payload
 
@@ -8337,14 +8370,17 @@ def datacenter_access_permissions_list():
     if status:
         query = query.filter(DcAccessPermission.status == status)
 
-    rows = query.order_by(DcAccessPermission.permission_id.desc()).all()
+    rows = query.order_by(DcAccessPermission.permission_id.desc())
+    result = _paginate_query(rows, default_size=100)
 
     # 동적 zone 값 일괄 로드
     _ensure_access_zone_tables()
-    perm_ids = [r.permission_id for r in rows]
+    perm_ids = [r.permission_id for r in result['items']]
     zone_values_map = _load_all_zone_values(perm_ids)
 
-    return jsonify([_dc_access_permission_to_dict(r, zone_values=zone_values_map.get(r.permission_id, {})) for r in rows])
+    items = [_dc_access_permission_to_dict(r, zone_values=zone_values_map.get(r.permission_id, {})) for r in result['items']]
+    return jsonify({'success': True, 'items': items, 'total': result['total'],
+                    'page': result.get('page'), 'pages': result.get('pages')})
 
 
 @api_bp.route('/api/datacenter/access/permissions', methods=['POST'])
@@ -8439,6 +8475,11 @@ def datacenter_access_permissions_update(permission_id: int):
         return jsonify({'error': 'not found'}), 404
 
     data = request.get_json(silent=True) or {}
+
+    client_version = data.get('version')
+    if client_version is not None and int(client_version) != (row.version or 1):
+        return jsonify({'error': '다른 사용자가 이미 수정한 데이터입니다. 새로고침 후 다시 시도해 주세요.', 'error_code': 'VERSION_MISMATCH'}), 409
+
     last_changed_by = data.get('last_changed_by') or data.get('actor_user_id')
     if not last_changed_by:
         return jsonify({'error': 'last_changed_by is required'}), 400
@@ -8492,6 +8533,7 @@ def datacenter_access_permissions_update(permission_id: int):
     row.last_changed_at = now
     row.last_changed_by = last_changed_by
     row.updated_at = now
+    row.version = (row.version or 1) + 1
 
     db.session.commit()
 
@@ -10331,6 +10373,8 @@ def get_prj_project_my_access(project_id: int):
     except Exception:
         logger.exception('Failed to check project access %s', project_id)
         return jsonify({'success': True, 'access': 'read', 'reason': 'error'})
+
+@api_bp.route('/api/prj/projects', methods=['POST'])
 def create_prj_project():
     actor_user_id = _coerce_positive_int(_resolve_actor_user_id())
     if not actor_user_id:

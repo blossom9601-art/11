@@ -606,7 +606,7 @@
 				var ts = (r.received_at || '').replace('T',' ').substring(0, 16);
 				var osLabel = r.os_version || r.os_type || '-';
 				var isOnline = r.status === 'online';
-				var dotColor = isOnline ? '#16a34a' : '#94a3b8';
+				var dotColor = isOnline ? '#6366F1' : '#94a3b8';
 				var dotTitle = isOnline ? '온라인' : '오프라인';
 				html += '<tr data-pending-id="' + r.id + '" style="border-bottom:1px solid #f1f5f9;">' +
 					'<td style="padding:11px 12px;text-align:center;" title="' + dotTitle + '">' +

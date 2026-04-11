@@ -1,0 +1,27 @@
+#
+# Lumina Agent Configuration
+# Blossom IT Asset Management — 자산 자동 탐색 에이전트
+#
+
+[server]
+# 서버 IP 또는 도메인 (첫 실행 시 자동으로 입력 프롬프트가 나타납니다)
+host =
+
+# 서버 포트 (기본값: 8080)
+port = 8080
+
+# 통신 프로토콜 (https / http)
+protocol = https
+
+# SSL 인증서 검증 (운영환경에서는 true 권장)
+verify_ssl = true
+
+[agent]
+# 수집 주기 (초). 기본값: 3600 (1시간)
+interval = 3600
+
+# JSON 저장 디렉터리 (서버 전송 실패 시 fallback 저장 경로)
+output_dir = /var/lib/lumina
+
+# 활성화할 수집기 (쉼표 구분)
+collectors = interface, account, package

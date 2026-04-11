@@ -1,7 +1,5 @@
 """Lumina 자산 자동 탐색 에이전트 — 수집기 베이스 클래스"""
 
-from __future__ import annotations
-
 import abc
 import json
 import logging
@@ -44,9 +42,9 @@ def build_payload(collectors: List[BaseCollector]) -> Dict[str, Any]:
             data = col.collect()
             if col.name in payload:
                 payload[col.name] = data
-            logger.info("[%s] %d건 수집 완료", col.name, len(data))
+            logger.info("[%s] %d items collected", col.name, len(data))
         except Exception:
-            logger.exception("[%s] 수집 중 오류 발생", col.name)
+            logger.exception("[%s] Error during collection", col.name)
 
     return payload
 
@@ -55,4 +53,4 @@ def save_payload(payload: Dict[str, Any], path: str) -> None:
     """페이로드를 JSON 파일로 저장"""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
-    logger.info("JSON 저장 완료: %s", path)
+    logger.info("JSON saved: %s", path)

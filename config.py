@@ -3,7 +3,7 @@ from datetime import timedelta
 
 class Config:
     # 기본 설정
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     
     # SQLite 데이터베이스 설정 (개발용)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///blossom.db'
@@ -30,7 +30,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = False
     # 개발 환경에서는 명시 env 우선순위:
     # 1) DATABASE_URL 환경변수
     # 2) BLOSSOM_SQLITE_FILE (상대경로 파일명)

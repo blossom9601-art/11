@@ -30,13 +30,13 @@ def init_brand_setting_table(app):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS brand_setting (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
                     category    VARCHAR(64)  NOT NULL,
-                    key         VARCHAR(128) NOT NULL UNIQUE,
+                    `key`       VARCHAR(128) NOT NULL UNIQUE,
                     value       TEXT,
                     value_type  VARCHAR(20)  NOT NULL DEFAULT 'text',
                     updated_by  VARCHAR(64),
-                    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at  TEXT,
                     is_deleted  INTEGER NOT NULL DEFAULT 0
                 )
@@ -52,7 +52,7 @@ def init_brand_setting_table(app):
             if cnt == 0:
                 for row in _SEED_ROWS:
                     db.session.execute(db.text("""
-                        INSERT INTO brand_setting (category, key, value, value_type)
+                        INSERT INTO brand_setting (category, `key`, value, value_type)
                         VALUES (:category, :key, :value, :value_type)
                     """), row)
                 db.session.commit()
@@ -66,7 +66,7 @@ def init_brand_setting_table(app):
 def get_all_brand_settings():
     """삭제되지 않은 모든 브랜드 설정을 dict 리스트로 반환."""
     rows = db.session.execute(
-        db.text("SELECT id, category, key, value, value_type, updated_by, updated_at "
+        db.text("SELECT id, category, `key`, value, value_type, updated_by, updated_at "
                 "FROM brand_setting WHERE is_deleted=0 ORDER BY category, id")
     ).fetchall()
     return [dict(r._mapping) for r in rows]
@@ -75,8 +75,8 @@ def get_all_brand_settings():
 def get_brand_setting(key):
     """단일 키 조회. 없으면 None."""
     row = db.session.execute(
-        db.text("SELECT id, category, key, value, value_type, updated_by, updated_at "
-                "FROM brand_setting WHERE key=:k AND is_deleted=0"),
+        db.text("SELECT id, category, `key`, value, value_type, updated_by, updated_at "
+                "FROM brand_setting WHERE `key`=:k AND is_deleted=0"),
         {'k': key}
     ).fetchone()
     return dict(row._mapping) if row else None
@@ -85,7 +85,7 @@ def get_brand_setting(key):
 def get_brand_settings_by_category(category):
     """카테고리별 조회."""
     rows = db.session.execute(
-        db.text("SELECT id, category, key, value, value_type, updated_by, updated_at "
+        db.text("SELECT id, category, `key`, value, value_type, updated_by, updated_at "
                 "FROM brand_setting WHERE category=:c AND is_deleted=0 ORDER BY id"),
         {'c': category}
     ).fetchall()
@@ -97,7 +97,7 @@ def upsert_brand_setting(key, value, category='header', value_type='text', updat
     """키가 있으면 업데이트, 없으면 삽입."""
     now = datetime.utcnow().isoformat()
     existing = db.session.execute(
-        db.text("SELECT id FROM brand_setting WHERE key=:k"),
+        db.text("SELECT id FROM brand_setting WHERE `key`=:k"),
         {'k': key}
     ).fetchone()
     if existing:
@@ -105,11 +105,11 @@ def upsert_brand_setting(key, value, category='header', value_type='text', updat
             UPDATE brand_setting
                SET value=:v, value_type=:vt, category=:c,
                    updated_by=:u, updated_at=:now, is_deleted=0
-             WHERE key=:k
+             WHERE `key`=:k
         """), {'v': value, 'vt': value_type, 'c': category, 'u': updated_by, 'now': now, 'k': key})
     else:
         db.session.execute(db.text("""
-            INSERT INTO brand_setting (category, key, value, value_type, updated_by, updated_at)
+            INSERT INTO brand_setting (category, `key`, value, value_type, updated_by, updated_at)
             VALUES (:c, :k, :v, :vt, :u, :now)
         """), {'c': category, 'k': key, 'v': value, 'vt': value_type, 'u': updated_by, 'now': now})
     db.session.commit()
@@ -120,7 +120,7 @@ def delete_brand_setting(key, updated_by=None):
     """키를 소프트 삭제."""
     now = datetime.utcnow().isoformat()
     db.session.execute(db.text("""
-        UPDATE brand_setting SET is_deleted=1, updated_by=:u, updated_at=:now WHERE key=:k
+        UPDATE brand_setting SET is_deleted=1, updated_by=:u, updated_at=:now WHERE `key`=:k
     """), {'u': updated_by, 'now': now, 'k': key})
     db.session.commit()
 
@@ -136,18 +136,18 @@ def reset_brand_settings(updated_by=None):
     # 시드 재삽입 (기존 행이 있으면 UPDATE, 없으면 INSERT)
     for row in _SEED_ROWS:
         existing = db.session.execute(db.text(
-            "SELECT id FROM brand_setting WHERE key=:key"
+            "SELECT id FROM brand_setting WHERE `key`=:key"
         ), {'key': row['key']}).fetchone()
         if existing:
             db.session.execute(db.text("""
                 UPDATE brand_setting
                 SET category=:category, value=:value, value_type=:value_type,
                     is_deleted=0, updated_by=:u, updated_at=:now
-                WHERE key=:key
+                WHERE `key`=:key
             """), {**row, 'u': updated_by, 'now': now})
         else:
             db.session.execute(db.text("""
-                INSERT INTO brand_setting (category, key, value, value_type, updated_by, updated_at)
+                INSERT INTO brand_setting (category, `key`, value, value_type, updated_by, updated_at)
                 VALUES (:category, :key, :value, :value_type, :u, :now)
             """), {**row, 'u': updated_by, 'now': now})
     db.session.commit()

@@ -411,6 +411,7 @@ class WrkReport(db.Model):
     updated_by_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
     cleared = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     owner_dept = db.relationship('OrgDepartment', foreign_keys=[owner_dept_id], lazy='joined')
     owner_user = db.relationship('UserProfile', foreign_keys=[owner_user_id], lazy='joined')
@@ -831,6 +832,7 @@ class CalSchedule(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     owner = db.relationship('UserProfile', foreign_keys=[owner_user_id], lazy='joined')
     share_users = db.relationship(
@@ -938,8 +940,8 @@ class SvcTicket(db.Model):
     ticket_type = db.Column(db.Text, nullable=False)
     category = db.Column(db.Text)
 
-    priority = db.Column(db.Text, nullable=False)
-    status = db.Column(db.Text, nullable=False, server_default=db.text("'PENDING'"))
+    priority = db.Column(db.String(64), nullable=False)
+    status = db.Column(db.String(64), nullable=False, server_default=db.text("'PENDING'"))
 
     requester_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
     requester_dept_id = db.Column(db.Integer, db.ForeignKey('org_department.id'))
@@ -1039,7 +1041,7 @@ class PrjProject(db.Model):
         gorf_finance = db.Column(db.Text)
 
         # 진행/일정
-        status = db.Column(db.Text, nullable=False)
+        status = db.Column(db.String(64), nullable=False)
         budget_amount = db.Column(db.Integer)
         start_date = db.Column(db.Text)
         expected_end_date = db.Column(db.Text)
@@ -1224,7 +1226,7 @@ class PrjCostDetail(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('prj_project.id', ondelete='CASCADE'), nullable=False)
-    row_key = db.Column(db.Text, nullable=False)          # "구분|활동명" 식별자
+    row_key = db.Column(db.String(255), nullable=False)    # "구분|활동명" 식별자
     cost_date = db.Column(db.Text)                         # YYYY-MM-DD
     cost_type = db.Column(db.Text)                         # 인건비,외주비,장비구매,...
     content = db.Column(db.Text)                           # 내용
@@ -2159,6 +2161,7 @@ class BkLibrary(db.Model):
     updated_at = db.Column(db.Text)
     updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     created_by_user = db.relationship('UserProfile', foreign_keys=[created_by], lazy='joined')
     updated_by_user = db.relationship('UserProfile', foreign_keys=[updated_by], lazy='joined')
@@ -2280,6 +2283,7 @@ class BkStoragePool(db.Model):
     updated_at = db.Column(db.Text)
     updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     created_by_user = db.relationship('UserProfile', foreign_keys=[created_by], lazy='joined')
     updated_by_user = db.relationship('UserProfile', foreign_keys=[updated_by], lazy='joined')
@@ -2340,6 +2344,7 @@ class BkBackupTargetPolicy(db.Model):
     updated_at = db.Column(db.Text)
     updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     storage_pool = db.relationship('BkStoragePool', foreign_keys=[storage_pool_id], lazy='joined')
     created_by_user = db.relationship('UserProfile', foreign_keys=[created_by], lazy='joined')
@@ -2503,7 +2508,7 @@ class DrTraining(db.Model):
 
     training_year = db.Column(db.Integer, nullable=False)
     # Store as ISO text (YYYY-MM-DD) for SQLite portability and lexicographic ordering.
-    training_date = db.Column(db.Text, nullable=False)
+    training_date = db.Column(db.String(20), nullable=False)
     training_name = db.Column(db.String(200), nullable=False)
 
     training_type = db.Column(db.String(30), nullable=False)
@@ -2526,6 +2531,7 @@ class DrTraining(db.Model):
     updated_at = db.Column(db.Text)
 
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     created_by_user = db.relationship('UserProfile', foreign_keys=[created_by_user_id], lazy='joined')
     updated_by_user = db.relationship('UserProfile', foreign_keys=[updated_by_user_id], lazy='joined')
@@ -2658,9 +2664,9 @@ class UiTaskHistory(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    scope_type = db.Column(db.Text, nullable=False)
+    scope_type = db.Column(db.String(255), nullable=False)
     scope_id = db.Column(db.Integer)
-    scope_ref = db.Column(db.Text)
+    scope_ref = db.Column(db.String(512))
 
     status = db.Column(db.String(32))
     task_no = db.Column(db.String(128))
@@ -2711,7 +2717,7 @@ class DcAccessSystem(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    system_code = db.Column(db.Text, nullable=False, unique=True)
+    system_code = db.Column(db.String(255), nullable=False, unique=True)
     business_status_code = db.Column(db.Text, nullable=False)
     business_name = db.Column(db.Text, nullable=False)
 
@@ -2728,9 +2734,9 @@ class DcAccessSystem(db.Model):
     center_code = db.Column(db.Text)
     system_location = db.Column(db.Text)
 
-    system_dept_code = db.Column(db.Text, db.ForeignKey('org_department.dept_code'))
+    system_dept_code = db.Column(db.String(64), db.ForeignKey('org_department.dept_code'))
     system_manager_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
-    service_dept_code = db.Column(db.Text, db.ForeignKey('org_department.dept_code'))
+    service_dept_code = db.Column(db.String(64), db.ForeignKey('org_department.dept_code'))
     service_manager_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
 
     remark = db.Column(db.Text)
@@ -2756,8 +2762,8 @@ class DcAccessZone(db.Model):
     __tablename__ = 'access_zone'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    zone_name = db.Column(db.Text, nullable=False)
-    zone_key = db.Column(db.Text, nullable=False, unique=True)
+    zone_name = db.Column(db.String(255), nullable=False)
+    zone_key = db.Column(db.String(255), nullable=False, unique=True)
     sort_order = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
     created_at = db.Column(db.Text, nullable=False, server_default=db.text('CURRENT_TIMESTAMP'))
@@ -2803,7 +2809,7 @@ class DcAccessPermission(db.Model):
 
     person_type = db.Column(db.Text)
     access_level = db.Column(db.Text)
-    status = db.Column(db.Text)
+    status = db.Column(db.String(64))
     remark = db.Column(db.Text)
 
     permission_start_date = db.Column(db.Text)
@@ -2819,6 +2825,7 @@ class DcAccessPermission(db.Model):
 
     created_at = db.Column(db.Text, nullable=False, server_default=db.text('CURRENT_TIMESTAMP'))
     updated_at = db.Column(db.Text)
+    version = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
 
     user = db.relationship('UserProfile', foreign_keys=[user_id], lazy='joined')
     department = db.relationship('OrgDepartment', foreign_keys=[department_id], lazy='joined')
@@ -2838,9 +2845,9 @@ class DcAuthorityRecord(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    status = db.Column(db.Text)                    # 활성 / 만료
+    status = db.Column(db.String(64))              # 활성 / 만료
     change_datetime = db.Column(db.Text)            # YYYY-MM-DD HH:MM
-    change_type = db.Column(db.Text)                # 정보 수정 / 정보 삭제 / 신규 등록
+    change_type = db.Column(db.String(64))          # 정보 수정 / 정보 삭제 / 신규 등록
     changed_by = db.Column(db.Text)                 # 변경자 이름
     manager = db.Column(db.Text)                    # 담당자 이름
     change_details = db.Column(db.Text)             # 변경내용 (여러 줄)
@@ -2906,8 +2913,8 @@ class UserMemo(db.Model):
     # Manual layout order within group (lower first). Updated via drag & drop.
     sort_order = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
 
-    created_at = db.Column(db.Text, nullable=False, server_default=db.text('CURRENT_TIMESTAMP'))
-    updated_at = db.Column(db.Text)
+    created_at = db.Column(db.String(32), nullable=False, server_default=db.text('CURRENT_TIMESTAMP'))
+    updated_at = db.Column(db.String(32))
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
 
 
