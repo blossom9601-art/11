@@ -47,6 +47,7 @@ install -m 0644 %{_sourcedir}/common/config.py     %{buildroot}%{_prefix}/common
 install -m 0644 %{_sourcedir}/common/collector.py  %{buildroot}%{_prefix}/common/
 install -m 0644 %{_sourcedir}/common/crypto.py     %{buildroot}%{_prefix}/common/
 install -m 0644 %{_sourcedir}/common/masking.py    %{buildroot}%{_prefix}/common/
+install -m 0644 %{_sourcedir}/common/cli.py        %{buildroot}%{_prefix}/common/
 
 # ── CLI 도구 (lumina) ────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_prefix}/cli/lumina_cli
@@ -143,6 +144,7 @@ LREOF
 %{_prefix}/common/collector.py
 %{_prefix}/common/crypto.py
 %{_prefix}/common/masking.py
+%{_prefix}/common/cli.py
 
 # 관리 스크립트
 %dir %{_prefix}/bin
@@ -197,6 +199,26 @@ getent group lumina >/dev/null 2>&1 || \
 %post
 # tmpfiles.d 적용 — /run/blossom/lumina 생성
 systemd-tmpfiles --create blossom-lumina.conf 2>/dev/null || true
+
+# ── NTP / Timezone 초기 설정 ─────────────────────────────
+# 최초 설치 시에만 적용 ($1 == 1), 업그레이드 시 건너뜀
+if [ $1 -eq 1 ]; then
+    # Timezone → Asia/Seoul
+    timedatectl set-timezone Asia/Seoul 2>/dev/null || true
+
+    # chrony.conf에 pool이 없으면 추가
+    CHRONY_CONF="/etc/chrony.conf"
+    if [ -f "$CHRONY_CONF" ]; then
+        if ! grep -qE '^(pool|server) .*pool\.ntp\.org' "$CHRONY_CONF"; then
+            sed -i '/^server /d;/^pool /d' "$CHRONY_CONF"
+            sed -i '1i\pool 2.rocky.pool.ntp.org iburst' "$CHRONY_CONF"
+        fi
+    fi
+
+    # NTP 활성화 + chronyd 재시작
+    timedatectl set-ntp true 2>/dev/null || true
+    systemctl restart chronyd 2>/dev/null || true
+fi
 
 # TLS 디렉터리 안내
 if [ ! -f %{_confdir}/tls/ca.crt ]; then

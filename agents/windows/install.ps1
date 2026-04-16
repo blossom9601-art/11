@@ -34,8 +34,8 @@ interval = 3600
 # JSON 출력 디렉터리 (서버 전송 실패 시 fallback 저장 경로)
 output_dir = $InstallDir
 
-# 수집 항목 (comma-separated): interface, account, package
-collectors = interface,account,package
+# 수집 항목 (comma-separated): interface, account, authority, firewalld, storage, package
+collectors = interface,account,authority,firewalld,storage,package
 "@ | Out-File -Encoding utf8 -FilePath $ConfFile
     Write-Host "  설정 파일 생성: $ConfFile"
 } else {
@@ -44,7 +44,7 @@ collectors = interface,account,package
 
 # 4) pywin32 설치 확인
 Write-Host "`n  pywin32 설치 확인..."
-$pipResult = & python -m pip show pywin32 2>&1
+& python -m pip show pywin32 *> $null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  pywin32 설치 중..."
     & python -m pip install pywin32

@@ -6,7 +6,7 @@ import platform
 import socket
 
 DEFAULT_INTERVAL = 3600  # 1시간
-DEFAULT_COLLECTORS = ["interface", "account", "package"]
+DEFAULT_COLLECTORS = ["interface", "account", "authority", "firewalld", "storage", "package"]
 DEFAULT_PORT = 443
 DEFAULT_PROTOCOL = "https"
 _ALLOWED_PROTOCOLS = ("https",)  # HTTP is not allowed for security

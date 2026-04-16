@@ -189,7 +189,7 @@ function centerListMain(){
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '센터', columns: ['center_name','location','usage','seismic','rack_qty','hw_qty','sw_qty','line_qty','note'] }
+        { group: '센터', columns: ['center_name','location','usage','seismic','rack_qty','hw_qty','sw_qty','line_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
@@ -666,16 +666,19 @@ function centerListMain(){
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'센터', cols:['center_name','location','usage','seismic','note'] };
+    const group = { title:'센터', cols:['center_name','location','usage','seismic'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow); form.appendChild(section);
     }
 
     function generateFieldInput(col,value=''){
@@ -1282,7 +1285,7 @@ function centerListMain(){
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'센터', cols:['center_name','location','usage','seismic','note'] };
+    const GROUP = { title:'센터', cols:['center_name','location','usage','seismic'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');

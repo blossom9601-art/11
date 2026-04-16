@@ -56,8 +56,9 @@ CREATE USER IF NOT EXISTS 'lumina_admin'@'localhost'
 -- AP Writer: 데이터 적재에 필요한 최소 권한
 GRANT SELECT, INSERT, UPDATE, DELETE ON `lumina`.* TO 'lumina_ap_writer'@'%';
 
--- WEB Reader: 조회 전용 (write 절대 불가)
+-- WEB Reader: 조회 전용 + collected_hosts 승인/상태 UPDATE 허용
 GRANT SELECT ON `lumina`.* TO 'lumina_web_reader'@'%';
+GRANT UPDATE ON `lumina`.`collected_hosts` TO 'lumina_web_reader'@'%';
 
 -- Admin: 전체 권한 (localhost only)
 GRANT ALL PRIVILEGES ON `lumina`.* TO 'lumina_admin'@'localhost';
@@ -89,13 +90,18 @@ CREATE TABLE IF NOT EXISTS `collected_hosts` (
     `first_seen`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `last_seen`     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `is_active`     TINYINT(1)      NOT NULL DEFAULT 1,
+    `approval_status` ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending'
+                    COMMENT '승인 상태 (pending=대기, approved=승인, rejected=거부)',
+    `approved_by`   VARCHAR(255)    DEFAULT NULL COMMENT '승인자 사번',
+    `approved_at`   DATETIME        DEFAULT NULL COMMENT '승인 일시',
     `created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_hostname` (`hostname`),
     KEY `idx_os_type` (`os_type`),
     KEY `idx_last_seen` (`last_seen`),
-    KEY `idx_is_active` (`is_active`)
+    KEY `idx_is_active` (`is_active`),
+    KEY `idx_approval_status` (`approval_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='수집 대상 호스트 마스터';
 
@@ -105,7 +111,7 @@ CREATE TABLE IF NOT EXISTS `collected_interfaces` (
     `host_id`       BIGINT UNSIGNED NOT NULL,
     `name`          VARCHAR(100)    NOT NULL COMMENT 'eth0, ens192 등',
     `ip_address`    VARCHAR(45)     DEFAULT NULL COMMENT 'IPv4/IPv6',
-    `mac_address`   VARCHAR(17)     DEFAULT NULL COMMENT '마스킹 가능',
+    `mac_address`   VARCHAR(100)    DEFAULT NULL COMMENT '마스킹 가능 (MAC/UUID/WWPN)',
     `netmask`       VARCHAR(45)     DEFAULT NULL,
     `gateway`       VARCHAR(45)     DEFAULT NULL,
     `slot`          VARCHAR(100)    DEFAULT NULL,

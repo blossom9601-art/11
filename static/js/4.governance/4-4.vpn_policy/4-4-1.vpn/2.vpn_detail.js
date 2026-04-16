@@ -360,7 +360,7 @@
 
         function buildSelect(name, current, options){
           var opts = ['<option value=""'+(current? '':' selected')+'>선택</option>'].concat(options.map(function(o){ return '<option value="'+esc(o)+'"'+(String(current)===String(o)?' selected':'')+'>'+esc(o)+'</option>'; }));
-          return '<select name="'+name+'" class="form-input">'+opts.join('')+'</select>';
+          return '<select name="'+name+'" class="form-input search-select">'+opts.join('')+'</select>';
         }
 
         function buildVpnEditForm(){

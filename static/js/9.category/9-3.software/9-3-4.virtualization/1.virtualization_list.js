@@ -14,17 +14,219 @@
   function ensureLottie(cb){ if(window.lottie){ cb(); return; } const s=document.createElement('script'); s.src=LOTTIE_CDN; s.async=true; s.onload=()=>cb(); document.head.appendChild(s); }
   function ensureXLSX(){ return new Promise((resolve,reject)=>{ if(window.XLSX){ resolve(); return; } const s=document.createElement('script'); s.src=XLSX_CDN; s.async=true; s.onload=()=>resolve(); s.onerror=()=>reject(new Error('XLSX load failed')); document.head.appendChild(s); }); }
   // Flatpickr
-  const FLATPICKR_CSS='https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+  const FLATPICKR_CSS='/static/vendor/flatpickr/4.6.13/flatpickr.min.css';
   const FLATPICKR_THEME='airbnb';
-  const FLATPICKR_THEME_HREF=`https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/${FLATPICKR_THEME}.css`;
-  const FLATPICKR_JS='https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-  const FLATPICKR_KO='https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js';
+  const FLATPICKR_THEME_HREF=`/static/vendor/flatpickr/4.6.13/themes/${FLATPICKR_THEME}.css`;
+  const FLATPICKR_JS='/static/vendor/flatpickr/4.6.13/flatpickr.min.js';
+  const FLATPICKR_KO='/static/vendor/flatpickr/4.6.13/l10n/ko.js';
   function ensureCss(href,id){ const ex=document.getElementById(id); if(ex&&ex.tagName.toLowerCase()==='link'){ if(ex.getAttribute('href')!==href) ex.setAttribute('href',href); return; } const l=document.createElement('link'); l.rel='stylesheet'; l.href=href; l.id=id; document.head.appendChild(l); }
   function loadScript(src){ return new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src=src; s.async=true; s.onload=()=>resolve(); s.onerror=()=>reject(new Error('Script load failed: '+src)); document.head.appendChild(s); }); }
   async function ensureFlatpickr(){ ensureCss(FLATPICKR_CSS,'flatpickr-css'); ensureCss(FLATPICKR_THEME_HREF,'flatpickr-theme-css'); if(window.flatpickr) return; await loadScript(FLATPICKR_JS); try{ await loadScript(FLATPICKR_KO);}catch(_e){} }
   async function initDatePickers(formId){ const form=document.getElementById(formId); if(!form) return; try{ await ensureFlatpickr(); }catch(_e){ return; } const startEl=form.querySelector('[name="release_date"]'); const endEl=form.querySelector('[name="eosl"]'); function ensureTodayButton(fp){ const cal=fp?.calendarContainer; if(!cal) return; if(cal.querySelector('.fp-today-btn')) return; const btn=document.createElement('button'); btn.type='button'; btn.className='fp-today-btn'; btn.textContent='오늘'; btn.addEventListener('click',()=>{ const now=new Date(); fp.setDate(now,true); }); cal.appendChild(btn);} const opts={ locale:(window.flatpickr?.l10ns?.ko)||'ko', dateFormat:'Y-m-d', allowInput:true, disableMobile:true, onReady:(_,__,inst)=>ensureTodayButton(inst), onOpen:(_,__,inst)=>ensureTodayButton(inst) }; if(startEl && !startEl._flatpickr){ window.flatpickr(startEl,opts);} if(endEl && !endEl._flatpickr){ window.flatpickr(endEl,opts);} }
   // Animations
   let uploadAnim=null;
+  function initUploadAnim(){
+    const el=document.getElementById('upload-anim');
+    if(!el) return;
+    ensureLottie(()=>{
+      try{
+        if(uploadAnim && typeof uploadAnim.destroy==='function'){ uploadAnim.destroy(); }
+        el.innerHTML='';
+        uploadAnim=window.lottie.loadAnimation({
+          container:el,
+          renderer:'svg',
+          loop:true,
+          autoplay:true,
+          path:'/static/image/svg/list/free-animated-upload.json',
+          rendererSettings:{ preserveAspectRatio:'xMidYMid meet', progressiveLoad:true }
+        });
+      }catch(_e){}
+    });
+  }
+
+  function resolveAccentColor(){
+    try{
+      const root=document.documentElement;
+      const rs=getComputedStyle(root);
+      const varNames=['--accent','--accent-color','--primary','--primary-color','--brand','--brand-color'];
+      for(const name of varNames){
+        const v=rs.getPropertyValue(name).trim();
+        if(v && v!=='transparent' && v!=='rgba(0, 0, 0, 0)') return v;
+      }
+      const primaryBtn=document.querySelector('.btn-primary');
+      if(primaryBtn){
+        const cs=getComputedStyle(primaryBtn);
+        const bg=cs.backgroundColor || cs.color;
+        if(bg && bg!=='rgba(0, 0, 0, 0)') return bg;
+      }
+    }catch(_e){}
+    return '#3f51b5';
+  }
+
+  const TABLE_ID='system-table';
+  const TBODY_ID='system-table-body';
+  const COUNT_ID='system-count';
+  const SEARCH_ID='system-search';
+  const SEARCH_CLEAR_ID='system-search-clear';
+  const PAGE_SIZE_ID='system-page-size';
+  const PAGINATION_INFO_ID='system-pagination-info';
+  const PAGE_NUMBERS_ID='system-page-numbers';
+  const SELECT_ALL_ID='system-select-all';
+
+  const COLUMN_MODAL_ID='system-column-modal';
+  const COLUMN_FORM_ID='system-column-form';
+  const COLUMN_BTN_ID='system-column-btn';
+  const COLUMN_CLOSE_ID='system-column-close';
+  const COLUMN_APPLY_ID='system-column-apply';
+  const COLUMN_RESET_ID='system-column-reset';
+  const COLUMN_SELECTALL_BTN_ID='system-column-selectall-btn';
+
+  const ADD_MODAL_ID='system-add-modal';
+  const ADD_BTN_ID='system-add-btn';
+  const ADD_CLOSE_ID='system-add-close';
+  const ADD_SAVE_ID='system-add-save';
+  const ADD_FORM_ID='system-add-form';
+  const EDIT_MODAL_ID='system-edit-modal';
+  const EDIT_FORM_ID='system-edit-form';
+  const EDIT_CLOSE_ID='system-edit-close';
+  const EDIT_SAVE_ID='system-edit-save';
+
+  const DISPOSE_BTN_ID='system-dispose-btn';
+  const DISPOSE_MODAL_ID='system-dispose-modal';
+  const DISPOSE_CLOSE_ID='system-dispose-close';
+  const DISPOSE_CONFIRM_ID='system-dispose-confirm';
+
+  const DELETE_BTN_ID='system-delete-btn';
+  const DELETE_MODAL_ID='system-delete-modal';
+  const DELETE_CLOSE_ID='system-delete-close';
+  const DELETE_CONFIRM_ID='system-delete-confirm';
+
+  const BULK_BTN_ID='system-bulk-btn';
+  const BULK_MODAL_ID='system-bulk-modal';
+  const BULK_CLOSE_ID='system-bulk-close';
+  const BULK_FORM_ID='system-bulk-form';
+  const BULK_APPLY_ID='system-bulk-apply';
+
+  const STATS_BTN_ID='system-stats-btn';
+  const STATS_MODAL_ID='system-stats-modal';
+  const STATS_CLOSE_ID='system-stats-close';
+  const STATS_OK_ID='system-stats-ok';
+
+  window.__analyticsGetData=function(){ return state.filtered.length ? state.filtered : state.data; };
+
+  const UPLOAD_BTN_ID='system-upload-btn';
+  const UPLOAD_MODAL_ID='system-upload-modal';
+  const UPLOAD_CLOSE_ID='system-upload-close';
+  const UPLOAD_INPUT_ID='upload-input';
+  const UPLOAD_DROPZONE_ID='upload-dropzone';
+  const UPLOAD_META_ID='upload-meta';
+  const UPLOAD_FILE_CHIP_ID='upload-file-chip';
+  const UPLOAD_TEMPLATE_BTN_ID='upload-template-download';
+  const UPLOAD_CONFIRM_ID='system-upload-confirm';
+  const UPLOAD_HEADERS_KO=['모델명','제조사','유형','릴리즈 일자','EOSL 일자','수량','비고'];
+  const HEADER_KO_TO_KEY={
+    '모델명':'model',
+    '제조사':'vendor',
+    '유형':'hw_type',
+    '릴리즈 일자':'release_date',
+    'EOSL 일자':'eosl',
+    '수량':'qty',
+    '비고':'note'
+  };
+
+  const API_BASE_URL='/api/sw-virtualization-types';
+  const VENDOR_MANUFACTURER_API='/api/vendor-manufacturers';
+  const JSON_HEADERS={ 'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest' };
+
+  function isEmptyRow(arr){ return !arr || arr.every(v=> String(v??'').trim()===''); }
+  function isIntegerLike(val){ if(val==null) return false; const s=String(val).trim(); if(s==='') return false; return /^-?\d+$/.test(s); }
+  function toIntOrBlank(val){ const s=String(val??'').trim(); if(s==='') return ''; return parseInt(s,10); }
+
+  const BASE_VISIBLE_COLUMNS=['model','vendor','hw_type','release_date','eosl','qty'];
+  const COLUMN_ORDER=['model','vendor','hw_type','release_date','eosl','qty','note'];
+  const COLUMN_MODAL_GROUPS=[
+    { group:'가상화', columns:['model','vendor','hw_type','release_date','eosl','qty'] }
+  ];
+
+  const COLUMN_META={
+    model:{label:'모델명',group:'가상화'},
+    vendor:{label:'제조사',group:'가상화'},
+    hw_type:{label:'유형',group:'가상화'},
+    release_date:{label:'릴리즈 일자',group:'가상화'},
+    eosl:{label:'EOSL 일자',group:'가상화'},
+    qty:{label:'수량',group:'가상화'},
+    note:{label:'비고',group:'가상화'}
+  };
+
+  let state={
+    data:[],
+    filtered:[],
+    pageSize:10,
+    page:1,
+    visibleCols:new Set(BASE_VISIBLE_COLUMNS),
+    search:'',
+    selected:new Set(),
+    sortKey:null,
+    sortDir:'asc',
+    columnFilters:{},
+    isLoading:false
+  };
+
+  let DEMO_COUNTER=null;
+  let vendorNameOptions=[];
+
+  function buildVendorOptions(items){
+    const set=new Set();
+    (items||[]).forEach(item=>{
+      const name=String(item?.manufacturer_name ?? '').trim();
+      if(name) set.add(name);
+    });
+    return [...set].sort((a,b)=>a.localeCompare(b,'ko'));
+  }
+
+  function getVendorOptionsWithValue(value){
+    const v=String(value ?? '').trim();
+    const opts=[...(vendorNameOptions || [])];
+    if(v && !opts.includes(v)) opts.unshift(v);
+    return [''].concat(opts);
+  }
+
+  function renderVendorSelect(currentValue){
+    const v=String(currentValue ?? '').trim();
+    const opts=getVendorOptionsWithValue(v);
+    return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${opts.map(o=>`<option value="${escapeHTML(o)}" ${o===v?'selected':''}>${o===''?'선택':escapeHTML(o)}</option>`).join('')}</select>`;
+  }
+
+  function refreshVendorSelectInAddForm(){
+    const form=document.getElementById(ADD_FORM_ID);
+    if(!form) return;
+    const select=form.querySelector('select[name="vendor"]');
+    if(!select) return;
+    const prev=String(select.value ?? '').trim();
+    const opts=getVendorOptionsWithValue(prev);
+    select.innerHTML=opts.map(o=>`<option value="${escapeHTML(o)}" ${o===prev?'selected':''}>${o===''?'선택':escapeHTML(o)}</option>`).join('');
+  }
+
+  function normalizeVirtualItem(item){
+    if(!item) return null;
+    const normalizedId=Number(item.id);
+    return {
+      id: Number.isFinite(normalizedId) ? normalizedId : item.id,
+      virtual_code: item.virtual_code || '',
+      model: item.model ?? item.virtual_name ?? item.model_name ?? '',
+      vendor: item.vendor ?? item.manufacturer_name ?? '',
+      manufacturer_name: item.manufacturer_name ?? '',
+      manufacturer_code: item.manufacturer_code ?? '',
+      vendor_code: item.vendor_code ?? item.manufacturer_code ?? '',
+      hw_type: item.hw_type ?? item.virtual_family ?? '',
+      release_date: item.release_date ?? '',
+      eosl: item.eosl ?? item.eosl_date ?? '',
+      qty: item.qty ?? item.virtual_count ?? item.usage_count ?? 0,
+      note: item.note ?? item.remark ?? '',
+      remark: item.remark ?? item.note ?? ''
+    };
+  }
+
   function normalizeList(items){ if(!Array.isArray(items)) return []; return items.map(normalizeVirtualItem).filter(Boolean); }
 
   function upsertRow(record, options={}){
@@ -361,7 +563,30 @@
     document.getElementById(BULK_CLOSE_ID)?.addEventListener('click', ()=> closeModal(BULK_MODAL_ID));
     document.getElementById(BULK_APPLY_ID)?.addEventListener('click', ()=>{ const form=document.getElementById(BULK_FORM_ID); if(!form) return; const entries=[...form.querySelectorAll('[data-bulk-field]')].map(el=>({ field:el.getAttribute('data-bulk-field'), value:el.value })).filter(p=> p.value!==''); if(!entries.length){ showMessage('변경할 값을 1개 이상 입력하세요.', '안내'); return; } const ids=new Set(state.selected); state.data=state.data.map(row=>{ if(!ids.has(row.id)) return row; const updated={...row}; entries.forEach(({field,value})=>{ updated[field]=value; }); return updated; }); applyFilter(); closeModal(BULK_MODAL_ID); setTimeout(()=> showMessage(`${ids.size}개 항목에 일괄 변경이 적용되었습니다.`, '완료'), 0); });
     document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ [ADD_MODAL_ID,EDIT_MODAL_ID,COLUMN_MODAL_ID,DISPOSE_MODAL_ID,DELETE_MODAL_ID,BULK_MODAL_ID,UPLOAD_MODAL_ID,'system-download-modal','system-message-modal','system-duplicate-modal'].forEach(closeModal); }});
-    document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(STATS_MODAL_ID); }});
+    
+    // Category-wide duplicate policy override
+    (function(){
+        const policyMessage = '카테고리 정책입니다.\n\n복제는 허용되지 않습니다.';
+        const blockDuplicateAction = function(event){
+            if(event){
+                event.preventDefault();
+                event.stopPropagation();
+                if(typeof event.stopImmediatePropagation === 'function'){
+                    event.stopImmediatePropagation();
+                }
+            }
+            try { closeModal('system-duplicate-modal'); } catch(_e){}
+            showMessage(policyMessage, '오류');
+            return false;
+        };
+
+        const duplicateBtn = document.getElementById('system-duplicate-btn');
+        const duplicateConfirm = document.getElementById('system-duplicate-confirm');
+        if(duplicateBtn){ duplicateBtn.addEventListener('click', blockDuplicateAction, true); }
+        if(duplicateConfirm){ duplicateConfirm.addEventListener('click', blockDuplicateAction, true); }
+    })();
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(STATS_MODAL_ID); }});
     document.getElementById('system-message-close')?.addEventListener('click', ()=> closeModal('system-message-modal'));
     document.getElementById('system-message-ok')?.addEventListener('click', ()=> closeModal('system-message-modal'));
 

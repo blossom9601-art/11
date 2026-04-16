@@ -74,6 +74,30 @@
 
         container.innerHTML = '';
         container.appendChild(wrap);
+
+        // 활성 탭 이름으로 페이지 내 배치도 제목을 동기화한다.
+        var titleSelector = container.getAttribute('data-layout-title-selector') || '';
+        if (titleSelector) {
+          var activeName = '';
+          for (var j = 0; j < data.items.length; j++) {
+            if (hasExactMatch) {
+              if (data.items[j].route_key && data.items[j].route_key === currentKey) {
+                activeName = data.items[j].tab_name || '';
+                break;
+              }
+            } else if (j === 0) {
+              activeName = data.items[j].tab_name || '';
+              break;
+            }
+          }
+          if (activeName) {
+            var titleEl = document.querySelector(titleSelector);
+            if (titleEl) {
+              var suffix = container.getAttribute('data-layout-title-suffix') || ' 배치도';
+              titleEl.textContent = activeName + suffix;
+            }
+          }
+        }
       })
       .catch(function (err) {
         console.error('[PageTabRenderer] fetch error:', err);

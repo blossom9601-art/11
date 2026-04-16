@@ -217,15 +217,17 @@
         isFetching: false,
     };
 
-    const DEFAULT_LOCATION_OPTIONS = ['퓨처센터'];
-
     const searchableSelectMeta = new WeakMap();
     let activeSearchPanel = null;
 
     const API_ENDPOINT = '/api/network/ip-policies';
+    const ORG_CENTER_API_ENDPOINT = '/api/org-centers';
     const API_PAGE_SIZE = 200;
     const JSON_HEADERS = { 'Content-Type': 'application/json' };
     const DETAIL_CACHE_KEY = 'gov:ipPolicy:lastRow';
+
+    let centerLocationNames = [];
+    let centerLocationFetchPromise = null;
 
     // Optional demo: override the visible counter via URL param without changing data/pagination
     // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
@@ -710,14 +712,39 @@
         return (select?.value || '').trim();
     }
 
-    function getKnownLocations(){
-        const set = new Set(DEFAULT_LOCATION_OPTIONS.filter(Boolean));
-        state.data.forEach(row => {
-            const loc = (row.location || '').trim();
-            if(loc){
-                set.add(loc);
+    function extractCenterName(item){
+        if(!item || typeof item !== 'object') return '';
+        return (item.center_name || item.centerName || '').toString().trim();
+    }
+
+    function dedupeAndSortKorean(values){
+        return [...new Set((values || []).map(v => (v || '').toString().trim()).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b, 'ko-KR'));
+    }
+
+    async function fetchCenterLocationNames(force){
+        if(centerLocationFetchPromise && !force){
+            return centerLocationFetchPromise;
+        }
+        centerLocationFetchPromise = (async ()=>{
+            try {
+                const data = await fetchJson(`${ORG_CENTER_API_ENDPOINT}?include_deleted=0`, { method:'GET' });
+                const items = Array.isArray(data.items)
+                    ? data.items
+                    : (Array.isArray(data.rows) ? data.rows : []);
+                centerLocationNames = dedupeAndSortKorean(items.map(extractCenterName));
+            } catch(err){
+                console.warn('[IP Policy] 센터 목록 조회 실패:', err);
+                centerLocationNames = [];
             }
-        });
+            return centerLocationNames;
+        })();
+        return centerLocationFetchPromise;
+    }
+
+    function getKnownLocations(){
+        const set = new Set();
+        centerLocationNames.forEach(name => set.add(name));
         return [...set].sort((a, b) => a.localeCompare(b, 'ko-KR'));
     }
 
@@ -764,6 +791,11 @@
                 populateLocationSelect(select, current);
             });
         });
+    }
+
+    async function refreshCenterLocationOptions(){
+        await fetchCenterLocationNames();
+        refreshLocationSelectOptions();
     }
 
     function buildPolicyPayload(data){
@@ -880,7 +912,10 @@
     }
 
     async function initData(){
-        await refreshPolicies(true);
+        await Promise.all([
+            refreshPolicies(true),
+            refreshCenterLocationOptions(),
+        ]);
     }
 
     function applyFilter(){

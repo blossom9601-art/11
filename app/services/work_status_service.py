@@ -176,23 +176,6 @@ def init_work_status_table(app=None) -> None:
             conn.execute(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{TABLE_NAME}_code ON {TABLE_NAME}(status_code)"
             )
-            # Always ensure the UI's default codes exist (FK-safe) even if other rows already exist.
-            timestamp = _now()
-            actor = 'system'
-            defaults = [
-                ('가동', '', '가동', None),
-                ('예비', '', '예비', None),
-                ('종료', '', '종료', None),
-            ]
-            for code, level, name, desc in defaults:
-                conn.execute(
-                    f"""
-                    INSERT OR IGNORE INTO {TABLE_NAME}
-                        (status_code, status_level, status_name, description, hw_count, sw_count, remark, created_at, created_by, updated_at, updated_by, is_deleted)
-                    VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, 0)
-                    """,
-                    (code, level, name, desc, timestamp, actor, timestamp, actor),
-                )
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
     except Exception:
@@ -324,12 +307,10 @@ def soft_delete_work_statuses(ids: Sequence[Any], actor: str, app=None) -> int:
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

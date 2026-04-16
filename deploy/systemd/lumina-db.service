@@ -1,0 +1,30 @@
+###############################################################################
+# lumina-db.service
+# Blossom Lumina — DB 서버 (MariaDB 래퍼)
+# MariaDB를 lumina-db 데몬으로 관리할 수 있도록 하는 래퍼 유닛
+# 설치 경로: /usr/lib/systemd/system/lumina-db.service
+###############################################################################
+
+[Unit]
+Description=Blossom Lumina DB (MariaDB)
+Documentation=https://blossom.local/docs/lumina-db
+Requires=mariadb.service
+BindsTo=mariadb.service
+After=mariadb.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# MariaDB 시작 대기 후 lumina 스키마 확인
+ExecStart=/bin/bash -c "until mysqladmin ping --silent 2>/dev/null; do sleep 1; done; echo 'Lumina DB ready'"
+
+TimeoutStartSec=30
+
+# ── 로그 ─────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumina-db
+
+[Install]
+WantedBy=multi-user.target

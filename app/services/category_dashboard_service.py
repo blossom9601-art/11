@@ -25,19 +25,40 @@ def _classify_eosl(eosl_date_str, today=None):
     return 'healthy'
 
 
-def _aggregate_hw(rows):
+def _resolve_vendor_name(row, vendor_name_by_code=None):
+    """행 데이터의 제조사 표시명을 반환한다."""
+    vendor_name_by_code = vendor_name_by_code or {}
+    code = (row.get('manufacturer_code') or '').strip()
+    vendor = (row.get('vendor') or '').strip()
+    if vendor and vendor != code:
+        return vendor
+    if code:
+        return vendor_name_by_code.get(code) or code
+    return vendor or '미정'
+
+
+def _aggregate_hw(rows, vendor_name_by_code=None):
     """hw type rows → dashboard dict."""
     today = datetime.utcnow().date()
-    total = len(rows)
+    active_rows = []
+    for r in (rows or []):
+        try:
+            if int(r.get('is_deleted') or 0) != 0:
+                continue
+        except Exception:
+            pass
+        active_rows.append(r)
+
+    total = len(active_rows)
     eosl_stats = {'healthy': 0, 'imminent': 0, 'expired': 0, 'unknown': 0}
     vendor_counts = {}
     type_counts = {}
     risk_items = []
 
-    for r in rows:
+    for r in active_rows:
         cls = _classify_eosl(r.get('eosl_date'), today)
         eosl_stats[cls] += 1
-        vendor = r.get('manufacturer_code') or r.get('vendor') or '미정'
+        vendor = _resolve_vendor_name(r, vendor_name_by_code)
         vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
         hw_type = r.get('_resolved_type') or r.get('form_factor') or ''
         if not hw_type:
@@ -71,7 +92,7 @@ def _aggregate_hw(rows):
     }
 
 
-def _aggregate_sw(rows, type_field='os_type'):
+def _aggregate_sw(rows, type_field='os_type', vendor_name_by_code=None):
     """sw type rows → dashboard dict."""
     today = datetime.utcnow().date()
     total = len(rows)
@@ -83,7 +104,7 @@ def _aggregate_sw(rows, type_field='os_type'):
     for r in rows:
         cls = _classify_eosl(r.get('eosl_date'), today)
         eosl_stats[cls] += 1
-        vendor = r.get('manufacturer_code') or r.get('vendor') or '미정'
+        vendor = _resolve_vendor_name(r, vendor_name_by_code)
         vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
         sw_type = r.get('_resolved_type') or r.get(type_field) or ''
         if not sw_type:
@@ -131,8 +152,22 @@ def compute_hw_dashboard():
         'network': 'network_type',
         'security': 'security_type',
     }
+    try:
+        from app.services.vendor_manufacturer_service import list_vendors
+        vendor_rows = list_vendors(include_deleted=False) or []
+        vendor_name_by_code = {
+            str(r.get('manufacturer_code') or '').strip(): (r.get('manufacturer_name') or '').strip()
+            for r in vendor_rows
+            if str(r.get('manufacturer_code') or '').strip()
+        }
+    except Exception:
+        logger.exception('Failed to fetch vendor name map for HW dashboard')
+        vendor_name_by_code = {}
+
     sections = {}
     all_rows = []
+    server_form_factors = ['서버', '물리서버', '온프레미스', '클라우드', '프레임', '가상서버', '워크스테이션']
+
     for key, fetcher in [
         ('server', list_hw_server_types),
         ('storage', list_hw_storage_types),
@@ -141,17 +176,21 @@ def compute_hw_dashboard():
         ('security', list_hw_security_types),
     ]:
         try:
-            rows = fetcher(include_deleted=False) or []
+            if key == 'server':
+                # Keep dashboard server section aligned with the server tab scope.
+                rows = fetcher(include_deleted=False, form_factors=server_form_factors) or []
+            else:
+                rows = fetcher(include_deleted=False) or []
         except Exception:
             logger.exception('Failed to fetch %s types for HW dashboard', key)
             rows = []
         type_col = _HW_TYPE_FIELDS[key]
         for r in rows:
             r['_resolved_type'] = r.get(type_col) or ''
-        sections[key] = _aggregate_hw(rows)
+        sections[key] = _aggregate_hw(rows, vendor_name_by_code=vendor_name_by_code)
         all_rows.extend(rows)
 
-    summary = _aggregate_hw(all_rows)
+    summary = _aggregate_hw(all_rows, vendor_name_by_code=vendor_name_by_code)
     return {'summary': summary, 'sections': sections}
 
 
@@ -172,6 +211,18 @@ def compute_sw_dashboard():
         'security': 'security_type',
         'high_availability': 'ha_type',
     }
+    try:
+        from app.services.vendor_manufacturer_service import list_vendors
+        vendor_rows = list_vendors(include_deleted=False) or []
+        vendor_name_by_code = {
+            str(r.get('manufacturer_code') or '').strip(): (r.get('manufacturer_name') or '').strip()
+            for r in vendor_rows
+            if str(r.get('manufacturer_code') or '').strip()
+        }
+    except Exception:
+        logger.exception('Failed to fetch vendor name map for SW dashboard')
+        vendor_name_by_code = {}
+
     sections = {}
     all_rows = []
     for key, fetcher in [
@@ -190,8 +241,12 @@ def compute_sw_dashboard():
         type_col = _SW_TYPE_FIELDS[key]
         for r in rows:
             r['_resolved_type'] = r.get(type_col) or ''
-        sections[key] = _aggregate_sw(rows, type_field=_SW_TYPE_FIELDS.get(key, 'sw_type'))
+        sections[key] = _aggregate_sw(
+            rows,
+            type_field=_SW_TYPE_FIELDS.get(key, 'sw_type'),
+            vendor_name_by_code=vendor_name_by_code,
+        )
         all_rows.extend(rows)
 
-    summary = _aggregate_sw(all_rows)
+    summary = _aggregate_sw(all_rows, vendor_name_by_code=vendor_name_by_code)
     return {'summary': summary, 'sections': sections}

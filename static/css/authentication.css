@@ -421,52 +421,46 @@
 /* === 모달별 개별 최대 너비 (system.css 패턴 이식) === */
 .system-stats-modal .server-add-content{ max-width:900px; }
 .system-message-modal .server-add-content{ max-width:640px; }
-.system-delete-modal .server-add-content,
 .system-bulk-modal .server-add-content,
 .system-dispose-modal .server-add-content,
 .system-duplicate-modal .server-add-content,
 .system-download-modal .server-add-content { max-width:800px; }
+.system-delete-modal .server-add-content{ max-width:640px; }
 /* === Dispose/Delete modal detailed layout (ported from system.css) === */
-.system-dispose-modal .server-add-header, .system-delete-modal .server-add-header{ padding:20px 32px; }
-.system-dispose-modal .dispose-title h3, .system-delete-modal .dispose-title h3{ margin:0 0 8px; font-size:24px; font-weight:600; color:#333; }
-.system-dispose-modal .server-add-body, .system-delete-modal .server-add-body{ padding:20px 0 32px 0; min-height:180px; }
+.system-dispose-modal .server-add-header, .system-delete-modal .server-add-header{ padding:20px 32px 16px; }
+.system-dispose-modal .dispose-title h3, .system-delete-modal .dispose-title h3{ margin:0 0 4px; font-size:20px; font-weight:600; color:#1e293b; }
+.system-dispose-modal .dispose-title p, .system-delete-modal .dispose-title p{ margin:0; font-size:13px; color:#64748b; }
+.system-dispose-modal .server-add-body, .system-delete-modal .server-add-body{ padding:16px 0 20px; min-height:auto; flex:0 0 auto; overflow:visible; }
 .system-dispose-modal .dispose-content, .system-delete-modal .dispose-content{ margin:0 32px; display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
-.system-dispose-modal .dispose-text, .system-delete-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:15px; line-height:1.75; }
-.system-dispose-modal .dispose-text p, .system-delete-modal .dispose-text p{ margin:0 0 10px 0; }
-.system-dispose-modal .dispose-text p + p, .system-delete-modal .dispose-text p + p{ margin-top:12px; }
-.system-dispose-modal .server-add-actions, .system-delete-modal .server-add-actions{ padding:24px 32px; background:#f5f5f5; }
+.system-dispose-modal .dispose-text, .system-delete-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:12px; line-height:1.55; word-break:break-word; }
+.system-dispose-modal .dispose-text p, .system-delete-modal .dispose-text p{ margin:0 0 8px 0; }
+.system-dispose-modal .dispose-text p + p, .system-delete-modal .dispose-text p + p{ margin-top:0; }
+.system-delete-modal .dispose-text p:not([data-common-delete="warn"]){ font-size:14px; line-height:1.7; }
+.system-dispose-modal .server-add-actions, .system-delete-modal .server-add-actions{ padding:18px 36px; background:#f8fafc; border-top:1px solid #e3e6eb; }
 .system-dispose-modal .dispose-illust, .system-delete-modal .dispose-illust{ flex:0 0 auto; }
-/* Delete modal illustration (match system.css) */
-/* Reduced sticker sizes for user admin (was 176px) */
-.system-delete-modal .dispose-illust img{ width:120px; height:auto; display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.08)); }
-/* Dispose modal same size as delete modal for consistency */
-.system-dispose-modal .dispose-illust img{ width:120px; height:auto; display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.08)); }
-/* Hover subtle scale (desktop) */
-@media (hover:hover){
-   .system-delete-modal .dispose-illust img:hover, .system-dispose-modal .dispose-illust img:hover{ transform:translateY(-2px); }
-}
+.system-delete-modal .dispose-illust img,
+.system-dispose-modal .dispose-illust img{ width:200px; max-width:min(34vw, 220px); height:auto; display:block; filter:none; border-radius:0; background:transparent !important; }
 @media (max-width:860px){
    .system-dispose-modal .dispose-content, .system-delete-modal .dispose-content{ flex-direction:column; align-items:stretch; }
    .system-dispose-modal .dispose-illust, .system-delete-modal .dispose-illust{ text-align:center; }
    .system-delete-modal .dispose-content{ flex-direction:column; align-items:flex-start; }
-   .system-delete-modal .dispose-illust img{ width:100px; }
+   .system-delete-modal .dispose-illust img{ width:160px; max-width:60vw; }
    .system-dispose-modal .dispose-content{ flex-direction:column; align-items:flex-start; }
-   .system-dispose-modal .dispose-illust img{ width:100px; }
-   .system-dispose-modal .server-add-body, .system-delete-modal .server-add-body{ padding-top:12px; }
+   .system-dispose-modal .dispose-illust img{ width:160px; max-width:60vw; }
 }
 /* Bulk & Stats illustration alignment (prepare for future images) */
 .system-bulk-modal .dispose-illust img, .system-stats-modal .stats-illustration img{ width:120px; height:auto; display:block; filter:drop-shadow(0 4px 10px rgba(0,0,0,.08)); }
-/* Message modal sticker (was full original SVG size). Reduce for parity */
-.system-message-modal .message-illust img{ width:120px; height:auto; display:block; filter:drop-shadow(0 6px 14px rgba(0,0,0,.08)); }
+.system-message-modal .message-illust img{ width:176px; max-width:min(30vw, 176px); height:auto; display:block; filter:none; border-radius:0; background:transparent !important; }
 @media (max-width:860px){
-   .system-message-modal .message-illust img{ width:100px; }
+   .system-message-modal .message-illust img{ width:148px; max-width:56vw; }
 }
 /* Message modal full layout parity with onpremise (system.css) */
 .system-message-modal .server-add-content{ max-width:640px; }
-.system-message-modal .server-add-header{ padding:20px 32px; }
-.system-message-modal .server-add-body{ padding:20px 0 24px 0; }
+.system-message-modal .server-add-header{ padding:20px 32px 16px; }
+.system-message-modal .server-add-body{ padding:16px 0 20px; flex:0 0 auto; overflow:visible; }
 .system-message-modal .dispose-content{ margin:0 32px; display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
-.system-message-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:15px; line-height:1.75; }
+.system-message-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:14px; line-height:1.7; word-break:break-word; }
+.system-message-modal .dispose-text p{ margin:0 0 8px; }
 @media (max-width:680px){
    .system-message-modal .dispose-content{ margin:0 24px; gap:16px; }
 }
@@ -475,6 +469,12 @@
 .system-dispose-modal .btn-primary{ background:#dc2626; border:1px solid #dc2626; }
 .system-dispose-modal .btn-primary:hover{ background:#b91c1c; border-color:#b91c1c; }
 .system-dispose-modal .btn-primary:active{ transform:translateY(1px); }
+.system-delete-modal .server-add-actions .btn-danger{ background:#ef4444 !important; color:#fff !important; border:1px solid #ef4444 !important; }
+.system-delete-modal .server-add-actions .btn-danger:hover{ background:#dc2626 !important; border-color:#dc2626 !important; }
+.system-message-modal .server-add-actions .btn-primary{ background:#64748b !important; color:#fff !important; border:1px solid #64748b !important; box-shadow:none !important; outline:none !important; }
+.system-message-modal .server-add-actions .btn-primary:hover{ background:#475569 !important; border-color:#475569 !important; box-shadow:none !important; }
+.system-message-modal .server-add-actions .btn-primary:focus,
+.system-message-modal .server-add-actions .btn-primary:focus-visible{ box-shadow:none !important; outline:none !important; }
 /* === 통계 모달 내부 레이아웃 (system.css 동기화) === */
 .system-stats-modal .system-stats-body{ padding:16px 0 24px; }
 .system-stats-modal .system-stats-body .form-section{ padding:0 32px; }
@@ -507,8 +507,12 @@
 /* 추가: form-row / form-input (server modal 스타일과 동일) */
 .form-row { display:flex; flex-direction:column; gap:6px; }
 .form-row label { font-size:13px; font-weight:600; color:#475569; }
+.server-add-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input),
+.server-edit-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input) { margin:0; }
 .form-input { width:100%; padding:12px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:13px; background:#fff !important; box-sizing:border-box; color:#374151; transition:border-color .2s ease, box-shadow .2s ease, background .2s ease; }
-.form-input:focus { outline:none; border-color:#e5e7eb; box-shadow:0 0 0 2px rgba(229,231,235,0.5); background:#fff !important; }
+.form-input:focus, .form-input:focus-visible { outline:none !important; border-color:#e5e7eb !important; box-shadow:0 0 0 2px rgba(229,231,235,0.5) !important; background:#fff !important; }
+.user-edit-modal .form-input:focus, .user-edit-modal .form-input:focus-visible,
+.user-edit-modal select.form-input:focus, .user-edit-modal select.form-input:focus-visible { outline:none !important; border-color:#e5e7eb !important; box-shadow:0 0 0 2px rgba(229,231,235,0.5) !important; }
 .required { color:#6366f1; margin-left:4px; font-weight:700; }
 .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 .role-info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; }
@@ -666,6 +670,15 @@
 /* 넓은 행 & textarea */
 .form-row-wide { grid-column:1 / -1; }
 .textarea-large { min-height:180px; resize:vertical; line-height:1.4; font-size:13px; font-weight:400; font-family:inherit; letter-spacing:.2px; }
+.user-add-modal textarea[name="job"],
+.user-edit-modal textarea[name="job"] {
+   display:block;
+   margin-top:0 !important;
+   min-height:calc(1.55em * 6 + 24px) !important;
+   line-height:1.55 !important;
+   padding-top:10px !important;
+   padding-bottom:10px !important;
+}
 /* 섹션 헤더 스타일 (server category2.css 완전 동일) */
 .form-section .section-header { margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #f0f0f0; }
 .form-section .section-header h4 { margin:0; font-size:18px; font-weight:600; color:#333; position:relative; padding-left:16px; }
@@ -1011,3 +1024,26 @@ table#group-table th[data-col], table#group-table td[data-col] { white-space:now
 .sess-link-card-info h4 { margin:0; font-size:14px; font-weight:600; color:#334155; }
 .sess-link-card-info p { margin:2px 0 0; font-size:12px; color:#94a3b8; }
 .sess-link-card-arrow { color:#94a3b8; flex-shrink:0; }
+
+/* ═══ 비밀번호 변경 모달 (로그인 화면) ═══ */
+.chpw-field { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+.chpw-field label { font-size:13px; font-weight:600; color:#334155; }
+.chpw-field input {
+    width:100%; padding:10px 14px; border:1.5px solid #e2e8f0; border-radius:10px;
+    font-size:14px; color:#1e293b; outline:none; transition:border-color .2s, box-shadow .2s;
+    box-sizing:border-box;
+}
+.chpw-field input:focus { border-color:#cbd5e1; box-shadow:0 0 0 3px rgba(203,213,225,.25); }
+.chpw-hint { font-size:11.5px; color:#94a3b8; margin:0 0 8px; line-height:1.5; }
+.chpw-msg { font-size:13px; font-weight:600; min-height:20px; text-align:center; margin-top:4px; }
+.chpw-msg.chpw-success { color:#059669; }
+.chpw-msg.chpw-error { color:#dc2626; }
+
+/* 비밀번호 찾기 스텝 인디케이터 */
+.forgot-steps { display:none; }
+.forgot-step {
+    flex:1; text-align:center; padding:8px 0; font-size:12px; font-weight:600;
+    color:#94a3b8; border-bottom:2px solid #e2e8f0; transition:all .2s;
+}
+.forgot-step.active { color:#6366f1; border-color:#6366f1; }
+.forgot-step.done { color:#059669; border-color:#059669; }

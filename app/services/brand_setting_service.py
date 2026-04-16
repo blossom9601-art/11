@@ -30,7 +30,7 @@ def init_brand_setting_table(app):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS brand_setting (
-                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     category    VARCHAR(64)  NOT NULL,
                     `key`       VARCHAR(128) NOT NULL UNIQUE,
                     value       TEXT,

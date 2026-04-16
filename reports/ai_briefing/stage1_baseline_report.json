@@ -1,0 +1,374 @@
+{
+  "summary": {
+    "measured_at": "2026-04-14T04:47:19",
+    "endpoint": "/api/search/unified",
+    "query_count": 50,
+    "status_200_count": 50,
+    "status_non_200_count": 0,
+    "latency_ms": {
+      "min": 128.23,
+      "max": 267.68,
+      "avg": 156.51,
+      "p50": 144.94,
+      "p95": 229.4,
+      "p99": 253.9
+    },
+    "result_total": {
+      "avg": 4.48,
+      "max": 20,
+      "zero_count": 31
+    }
+  },
+  "samples": [
+    {
+      "query": "서버",
+      "status": 200,
+      "latency_ms": 128.75,
+      "total": 20,
+      "top_title": "서버"
+    },
+    {
+      "query": "온프레미스",
+      "status": 200,
+      "latency_ms": 146.65,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "DB",
+      "status": 200,
+      "latency_ms": 142.37,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "방화벽",
+      "status": 200,
+      "latency_ms": 136.7,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "스위치",
+      "status": 200,
+      "latency_ms": 145.98,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "VPN",
+      "status": 200,
+      "latency_ms": 133.29,
+      "total": 20,
+      "top_title": "VPN 정책"
+    },
+    {
+      "query": "DNS",
+      "status": 200,
+      "latency_ms": 136.55,
+      "total": 5,
+      "top_title": "gov_dns_policy"
+    },
+    {
+      "query": "IP 정책",
+      "status": 200,
+      "latency_ms": 157.23,
+      "total": 5,
+      "top_title": "IP 정책"
+    },
+    {
+      "query": "DR 훈련",
+      "status": 200,
+      "latency_ms": 140.45,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "취약점",
+      "status": 200,
+      "latency_ms": 131.21,
+      "total": 3,
+      "top_title": "취약점 분석"
+    },
+    {
+      "query": "보안",
+      "status": 200,
+      "latency_ms": 222.49,
+      "total": 20,
+      "top_title": "보안장비"
+    },
+    {
+      "query": "백업",
+      "status": 200,
+      "latency_ms": 267.68,
+      "total": 3,
+      "top_title": "백업 정책"
+    },
+    {
+      "query": "스토리지",
+      "status": 200,
+      "latency_ms": 140.14,
+      "total": 20,
+      "top_title": "스토리지"
+    },
+    {
+      "query": "프로젝트",
+      "status": 200,
+      "latency_ms": 173.7,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "작업보고",
+      "status": 200,
+      "latency_ms": 141.07,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "장애",
+      "status": 200,
+      "latency_ms": 142.35,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "점검",
+      "status": 200,
+      "latency_ms": 148.71,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "운영",
+      "status": 200,
+      "latency_ms": 133.76,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "비용",
+      "status": 200,
+      "latency_ms": 173.81,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "OPEX",
+      "status": 200,
+      "latency_ms": 239.56,
+      "total": 16,
+      "top_title": "OPEX"
+    },
+    {
+      "query": "CAPEX",
+      "status": 200,
+      "latency_ms": 195.94,
+      "total": 17,
+      "top_title": "CAPEX"
+    },
+    {
+      "query": "협력사",
+      "status": 200,
+      "latency_ms": 141.63,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "벤더",
+      "status": 200,
+      "latency_ms": 137.4,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "유지보수",
+      "status": 200,
+      "latency_ms": 152.46,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "회사",
+      "status": 200,
+      "latency_ms": 143.44,
+      "total": 3,
+      "top_title": "회사"
+    },
+    {
+      "query": "부서",
+      "status": 200,
+      "latency_ms": 137.5,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "데이터센터",
+      "status": 200,
+      "latency_ms": 148.06,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "상면도",
+      "status": 200,
+      "latency_ms": 148.45,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "랙",
+      "status": 200,
+      "latency_ms": 143.9,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "온도",
+      "status": 200,
+      "latency_ms": 145.97,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "CCTV",
+      "status": 200,
+      "latency_ms": 139.9,
+      "total": 5,
+      "top_title": "CCTV 관리"
+    },
+    {
+      "query": "블로그",
+      "status": 200,
+      "latency_ms": 214.11,
+      "total": 2,
+      "top_title": "블로그"
+    },
+    {
+      "query": "인사이트",
+      "status": 200,
+      "latency_ms": 165.24,
+      "total": 3,
+      "top_title": "인사이트"
+    },
+    {
+      "query": "공지",
+      "status": 200,
+      "latency_ms": 139.71,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "가이드",
+      "status": 200,
+      "latency_ms": 161.66,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "policy",
+      "status": 200,
+      "latency_ms": 146.9,
+      "total": 20,
+      "top_title": "IP 정책"
+    },
+    {
+      "query": "database",
+      "status": 200,
+      "latency_ms": 172.17,
+      "total": 6,
+      "top_title": "소프트웨어"
+    },
+    {
+      "query": "network",
+      "status": 200,
+      "latency_ms": 142.6,
+      "total": 20,
+      "top_title": "네트워크"
+    },
+    {
+      "query": "server",
+      "status": 200,
+      "latency_ms": 138.81,
+      "total": 20,
+      "top_title": "서버"
+    },
+    {
+      "query": "backup",
+      "status": 200,
+      "latency_ms": 142.09,
+      "total": 16,
+      "top_title": "백업 정책"
+    },
+    {
+      "query": "보안 점검",
+      "status": 200,
+      "latency_ms": 128.23,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "네트워크 정책",
+      "status": 200,
+      "latency_ms": 146.61,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "프로젝트 완료",
+      "status": 200,
+      "latency_ms": 137.23,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "업무 현황",
+      "status": 200,
+      "latency_ms": 185.27,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "자산 폐기",
+      "status": 200,
+      "latency_ms": 235.05,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "접근 이력",
+      "status": 200,
+      "latency_ms": 191.21,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "권한",
+      "status": 200,
+      "latency_ms": 150.08,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "모의훈련",
+      "status": 200,
+      "latency_ms": 129.58,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "방화벽 정책",
+      "status": 200,
+      "latency_ms": 146.11,
+      "total": 0,
+      "top_title": ""
+    },
+    {
+      "query": "DB 서버",
+      "status": 200,
+      "latency_ms": 135.65,
+      "total": 0,
+      "top_title": ""
+    }
+  ]
+}

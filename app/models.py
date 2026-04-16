@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Computed
+
 from sqlalchemy.sql import func
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -317,6 +317,7 @@ class UserProfile(db.Model):
     allowed_ip = db.Column(db.Text)  # 쉼표 구분 IP 목록
     job = db.Column(db.Text)
     profile_image = db.Column(db.String(255))
+    location = db.Column(db.String(128))        # 근무지/위치
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # 확장 컬럼 (페이지 컬럼 반영)
@@ -2226,10 +2227,7 @@ class BkTape(db.Model):
     retention_type = db.Column(db.String(32), nullable=False)
 
     backup_size_k = db.Column(db.Integer, nullable=False)
-    backup_size_t = db.Column(
-        db.Float,
-        Computed('ROUND(backup_size_k / 1099511627776.0, 6)', persisted=True),
-    )
+    backup_size_t = db.Column(db.Float)
 
     library_id = db.Column(db.Integer, db.ForeignKey('bk_library.id'), nullable=False)
 

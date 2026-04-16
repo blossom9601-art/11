@@ -341,7 +341,10 @@
 
   /* ── 데이터 로드 ── */
   function load() {
-    fetch('/api/category/hw-dashboard')
+    fetch('/api/category/hw-dashboard', {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         if (!data.success) return;

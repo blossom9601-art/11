@@ -2,7 +2,7 @@
 
 Usage:
   lumina agent list               List all agents
-  lumina agent show <id>          Show agent details
+    lumina agent show <id> [section] Show agent details or collected section
   lumina agent status <id>        Show agent status
   lumina agent find               Search agents
   lumina agent inventory <id>     Show asset inventory
@@ -26,6 +26,17 @@ from lumina_cli.output import (
     print_error,
     print_success,
 )
+
+
+_SHOWABLE_SECTIONS = {
+    "hardware": "Hardware",
+    "interface": "Interface",
+    "account": "Account",
+    "authority": "Authority",
+    "firewalld": "Firewalld",
+    "storage": "Storage",
+    "package": "Package",
+}
 
 
 def _get_client() -> LuminaClient:
@@ -77,16 +88,19 @@ def agent_list(as_json):
 
 @agent_group.command("show")
 @click.argument("agent_id", type=int)
+@click.argument("section", required=False)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def agent_show(agent_id, as_json):
-    """Show agent details."""
+def agent_show(agent_id, section, as_json):
+    """Show agent details or a collected section."""
     try:
         client = _get_client()
-        data = client.agent_show(agent_id)
+        data = client.agent_show(agent_id, section=section)
         item = data.get("item", {})
 
         if as_json:
             print_json(data)
+        elif section:
+            _print_agent_section(agent_id, section, item)
         else:
             display = {
                 "Agent ID": item.get("id"),
@@ -107,6 +121,81 @@ def agent_show(agent_id, as_json):
     except APIError as e:
         print_error(e.message)
         raise SystemExit(1)
+
+
+def _print_agent_section(agent_id, requested_section, item):
+    section = str(item.get("section") or requested_section or "").strip().lower()
+    section_title = _SHOWABLE_SECTIONS.get(section, section.title() or "Section")
+    agent = item.get("agent") or {}
+
+    click.echo(f"\n{'=' * 50}")
+    click.echo(f"  Agent #{agent_id} {section_title}")
+    click.echo(f"  Host: {agent.get('hostname', '-')} ({agent.get('ip_address', '-')})")
+    click.echo(f"{'=' * 50}")
+
+    if section == "hardware":
+        detail = item.get("item") or {}
+        if not detail:
+            click.echo("\n  No hardware data found.\n")
+            return
+        display = {
+            "Hostname": detail.get("hostname") or "-",
+            "FQDN": detail.get("fqdn") or "-",
+            "IP Address": detail.get("ip_address") or "-",
+            "OS Type": detail.get("os_type") or "-",
+            "OS Version": detail.get("os_version") or "-",
+            "Linked Asset": detail.get("linked_asset_id") or "-",
+            "Asset Name": detail.get("asset_name") or "-",
+            "Category": detail.get("asset_category") or "-",
+            "Type": detail.get("asset_type") or "-",
+            "System Name": detail.get("system_name") or "-",
+            "System IP": detail.get("system_ip") or "-",
+            "Mgmt IP": detail.get("mgmt_ip") or "-",
+            "Manufacturer": detail.get("manufacturer") or "-",
+            "Model": detail.get("model") or "-",
+            "Serial Number": detail.get("serial_number") or "-",
+            "Rack": detail.get("rack") or "-",
+            "Slot": detail.get("slot") or "-",
+            "Status": detail.get("status") or "-",
+            "Last Heartbeat": detail.get("last_heartbeat") or "-",
+        }
+        print_detail(display)
+        return
+
+    rows = item.get("rows") or []
+    message = item.get("message")
+    if message and not rows:
+        click.echo(f"\n  {message}\n")
+        return
+    if not rows:
+        click.echo("\n  No collected data found.\n")
+        return
+
+    columns = _infer_columns(rows)
+    print_table(rows, columns, title=f"Agent #{agent_id} {section_title}")
+
+
+def _infer_columns(rows):
+    order = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        for key in row.keys():
+            if key not in order:
+                order.append(key)
+
+    if not order:
+        return [{"key": "value", "label": "Value", "width": 20}]
+
+    columns = []
+    for key in order:
+        width = max(len(str(key)), 12)
+        columns.append({
+            "key": key,
+            "label": key.replace("_", " ").title(),
+            "width": min(max(width, len(key) + 2), 24),
+        })
+    return columns
 
 
 # ── lumina agent status ──────────────────────────────────

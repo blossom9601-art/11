@@ -40,6 +40,9 @@ cp "$AGENT_ROOT/linux/blossom-agent.service"     "$SRC/linux/"  # lumina.service
 cp "$AGENT_ROOT/linux/collectors/__init__.py"    "$SRC/linux/collectors/" 2>/dev/null || touch "$SRC/linux/collectors/__init__.py"
 cp "$AGENT_ROOT/linux/collectors/interface.py"   "$SRC/linux/collectors/"
 cp "$AGENT_ROOT/linux/collectors/account.py"     "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/authority.py"   "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/firewalld.py"   "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/storage.py"     "$SRC/linux/collectors/"
 cp "$AGENT_ROOT/linux/collectors/package.py"     "$SRC/linux/collectors/"
 
 # 기본 설정 파일

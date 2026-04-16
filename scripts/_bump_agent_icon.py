@@ -6,7 +6,7 @@ os.chdir(os.path.join(os.path.dirname(__file__), '..'))
 
 replacements = [
     (r'_hardware_detail\.js\?v=[^"\'>\s]+', '_hardware_detail.js?v=1.2.0'),
-    (r'blossom\.js\?v=[^"\'>\s]+', 'blossom.js?v=20260406_tab'),
+    (r'blossom\.js\?v=[^"\'>\s]+', 'blossom.js?v=20260411_csp'),
     (r'blossom\.css\?v=[^"\'>\s]+', 'blossom.css?v=1.2.4'),
 ]
 

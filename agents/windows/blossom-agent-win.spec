@@ -37,6 +37,9 @@ a = Analysis(
         'windows.collectors',
         'windows.collectors.interface',
         'windows.collectors.account',
+        'windows.collectors.authority',
+        'windows.collectors.firewalld',
+        'windows.collectors.storage',
         'windows.collectors.package',
         # cryptography (에이전트 등록: RSA 키/CSR 생성)
         'cryptography',

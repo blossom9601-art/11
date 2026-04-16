@@ -22,11 +22,12 @@
         });
     }
     // Flatpickr (calendar) loader and initializer
-    const FLATPICKR_CSS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+    const FLATPICKR_VENDOR_BASE = '/static/vendor/flatpickr/4.6.13';
+    const FLATPICKR_CSS = `${FLATPICKR_VENDOR_BASE}/flatpickr.min.css`;
     const FLATPICKR_THEME_NAME = 'airbnb'; // use neutral theme; colors overridden to match accent
-    const FLATPICKR_THEME_HREF = `https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/${FLATPICKR_THEME_NAME}.css`;
-    const FLATPICKR_JS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-    const FLATPICKR_KO = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js';
+    const FLATPICKR_THEME_HREF = `${FLATPICKR_VENDOR_BASE}/themes/${FLATPICKR_THEME_NAME}.css`;
+    const FLATPICKR_JS = `${FLATPICKR_VENDOR_BASE}/flatpickr.min.js`;
+    const FLATPICKR_KO = `${FLATPICKR_VENDOR_BASE}/l10n/ko.js`;
     function ensureCss(href, id){
         const existing = document.getElementById(id);
         if(existing && existing.tagName.toLowerCase() === 'link'){
@@ -164,6 +165,55 @@
     const PAGINATION_INFO_ID = 'system-pagination-info';
     const PAGE_NUMBERS_ID = 'system-page-numbers';
     const SELECT_ALL_ID = 'system-select-all';
+
+    function normalizePolicyLabel(raw){
+        const s = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+        if(!s) return '';
+        return s.replace(/\s*정책\s*$/, '').trim();
+    }
+
+    function resolvePolicyLabel(){
+        let label = '';
+        const tabsRoot = document.getElementById('dynamic-system-tabs');
+        if(tabsRoot){
+            const active = tabsRoot.querySelector('[aria-current="page"], .active, [aria-selected="true"]');
+            if(active){
+                label = normalizePolicyLabel(active.textContent || active.innerText || '');
+            }
+        }
+        if(!label){
+            const pageTitle = document.querySelector('.page-header h1');
+            if(pageTitle){
+                const title = String(pageTitle.textContent || pageTitle.innerText || '').trim();
+                label = normalizePolicyLabel(title.replace(/\s*정책\s*관리\s*$/, '').replace(/\s*관리\s*$/, ''));
+            }
+        }
+        if(!label){
+            label = normalizePolicyLabel(window.__DL_LABEL || '');
+        }
+        return label || '전용회선';
+    }
+
+    function getPolicyTitleText(){
+        return `${resolvePolicyLabel()} 정책`;
+    }
+
+    function getEmptyTitleText(){
+        return `${resolvePolicyLabel()} 내역이 없습니다.`;
+    }
+
+    function applyDynamicLabelText(){
+        const titleEl = document.querySelector('.tab-header-left h2');
+        if(titleEl){
+            const countEl = titleEl.querySelector('.count-badge');
+            const countText = countEl ? (countEl.textContent || '0') : '0';
+            titleEl.innerHTML = `${getPolicyTitleText()} <span class="count-badge" id="${COUNT_ID}">${countText}</span>`;
+        }
+        const emptyTitleEl = document.getElementById('system-empty-title');
+        if(emptyTitleEl){
+            emptyTitleEl.textContent = getEmptyTitleText();
+        }
+    }
 
     // Column modal
     const COLUMN_MODAL_ID = 'system-column-modal';
@@ -488,7 +538,6 @@
             state.data = [];
             state.selected.clear();
             applyFilter();
-            showMessage(e?.message || '전용회선 데이터를 불러오지 못했습니다.', '오류');
         }
     }
 
@@ -549,6 +598,7 @@
     function render(highlightContext){
         const tbody = document.getElementById(TBODY_ID);
         if(!tbody) return;
+        applyDynamicLabelText();
         tbody.innerHTML='';
         // 정렬 적용 (필터 결과에 대해)
         let working = state.filtered;
@@ -579,7 +629,7 @@
                     if(titleEl) titleEl.textContent = '검색 결과가 없습니다.';
                     if(descEl) descEl.textContent = '검색어를 변경하거나 필터를 초기화하세요.';
                 } else {
-                    if(titleEl) titleEl.textContent = '회원사 회선 내역이 없습니다.';
+                    if(titleEl) titleEl.textContent = getEmptyTitleText();
                     if(descEl) descEl.textContent = "우측 상단 '추가' 버튼을 눌러 첫 회선을 등록하세요.";
                 }
             }
@@ -720,6 +770,42 @@
 
     function escapeHTML(str){
         return String(str).replace(/[&<>'"]/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[s]));
+    }
+
+    function collectOrgNameOptions(){
+        const set = new Set();
+        state.data.forEach(row=>{
+            const name = String(row?.org_name || '').trim();
+            if(name) set.add(name);
+        });
+        return Array.from(set).sort((a,b)=> a.localeCompare(b, 'ko'));
+    }
+
+    function buildOrgNameSelectOptions(currentValue){
+        const options = collectOrgNameOptions();
+        const current = String(currentValue || '').trim();
+        const merged = current && !options.includes(current) ? [current, ...options] : options;
+        return ['<option value="">선택</option>']
+            .concat(merged.map(v=>`<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`))
+            .join('');
+    }
+
+    function applyOrgNameSearchable(scopeEl){
+        const root = scopeEl || document;
+        root.querySelectorAll('select[name="org_name"]').forEach(select=>{
+            const current = String(select.value || select.getAttribute('data-current') || '').trim();
+            select.innerHTML = buildOrgNameSelectOptions(current);
+            if(current) select.value = current;
+            select.classList.add('search-select');
+            select.setAttribute('data-searchable', 'true');
+            select.setAttribute('data-placeholder', '기관명 검색');
+            select.setAttribute('data-allow-clear', 'true');
+        });
+        try{
+            if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function'){
+                window.BlossomSearchableSelect.syncAll(root);
+            }
+        }catch(_e){}
     }
 
     // Pagination UI
@@ -933,9 +1019,14 @@
                 wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
             section.appendChild(grid); form.appendChild(section);
         });
+        applyOrgNameSearchable(form);
     }
 
     function generateFieldInput(col,value=''){
+        if(col==='org_name'){
+            const v = String(value??'').trim();
+            return `<select name="org_name" class="form-input search-select" data-searchable="true" data-placeholder="기관명 검색" data-allow-clear="true" data-current="${escapeHTML(v)}" required></select>`;
+        }
         if(col==='status'){
             const v = String(value??'');
             return `<select name="status" class="form-input search-select fk-select" data-placeholder="상태 선택">
@@ -1086,6 +1177,7 @@
         const row = leasedLineApiToUiRow(res.item);
         state.data.unshift(row);
         applyFilter();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
         return row;
     }
 
@@ -1099,6 +1191,7 @@
         if(!res?.success) throw new Error(res?.message || '전용회선 수정 실패');
         state.data[index] = leasedLineApiToUiRow(res.item);
         applyFilter();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
     }
 
     async function deleteSelectedOnServer(){
@@ -1116,6 +1209,7 @@
         state.data = state.data.filter(r=> !delSet.has(r.id));
         state.selected.clear();
         applyFilter();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
         return { deleted };
     }
 
@@ -1403,7 +1497,7 @@
             }
         });
         // add modal
-    document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); initDatePickers(ADD_FORM_ID); });
+    document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { applyOrgNameSearchable(document.getElementById(ADD_FORM_ID)); openModal(ADD_MODAL_ID); initDatePickers(ADD_FORM_ID); });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
             const form = document.getElementById(ADD_FORM_ID); if(!form.checkValidity()){ form.reportValidity(); return; }
@@ -1845,6 +1939,10 @@
     // (조건 필터 관련 함수 제거됨)
 
     async function init(){
+        applyDynamicLabelText();
+        // Dynamic tabs may render after this script; refresh labels once more.
+        setTimeout(applyDynamicLabelText, 250);
+
         // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
         try {
             const params = new URLSearchParams(window.location.search || '');
@@ -1876,6 +1974,7 @@
         // Load persisted sort (if any)
         loadSortPreference();
         await initData();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
         bindEvents();
         render();
         // Page adornments (animation + popover)

@@ -433,8 +433,11 @@
 	ready(initTab43);
 
 	/* SPA re-entry — must live OUTSIDE initTab43 so it is always registered */
-	document.addEventListener('blossom:pageLoaded', function () {
-		console.log('[tab43-hw-model] blossom:pageLoaded fired, re-running initTab43');
-		initTab43();
-	});
+	if (!window.__blsTab43PageLoadedBound) {
+		window.__blsTab43PageLoadedBound = true;
+		document.addEventListener('blossom:pageLoaded', function () {
+			console.log('[tab43-hw-model] blossom:pageLoaded fired, re-running initTab43');
+			initTab43();
+		});
+	}
 })();

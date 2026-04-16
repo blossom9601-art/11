@@ -783,7 +783,6 @@
             state.items = Array.isArray(data.items) ? data.items : [];
         }catch(e){
             console.error(e);
-            alert('패키지 데이터를 불러오지 못했습니다.');
             state.items = [];
         }finally{
             state.isFetching = false;

@@ -15,17 +15,15 @@ StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
-# ── 실행 계정 (root 실행 금지) ────────────────────────────
-Type=notify
-User=lumina-ap
-Group=lumina-ap
+# ── 실행 계정 ────────────────────────────────────────────
+Type=simple
+User=root
 
 # ── 환경 변수 (비밀값 분리 로드) ─────────────────────────
 EnvironmentFile=-/etc/blossom/lumina/secure.env
 
 # ── 실행 명령 ────────────────────────────────────────────
-ExecStart=/usr/bin/python3 /opt/blossom/lumina/ap/wsgi.py \
-    --config /etc/blossom/lumina/ap.conf
+ExecStart=/usr/bin/python3 /opt/blossom/lumina/ap/server.py --port 5100
 ExecReload=/bin/kill -HUP $MAINPID
 
 # ── 작업 디렉터리 ────────────────────────────────────────

@@ -2650,7 +2650,6 @@
         renderStatBlock('stats-software', '업무 상태', countBy(rows, 'business_status', ['가동','유휴','대기']), ['가동','유휴','대기']);
         renderStatBlock('stats-software', '시스템 제조사', countBy(rows, 'vendor'));
     }
-    }
 
     // (조건 필터 관련 함수 제거됨)
 

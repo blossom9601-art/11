@@ -11,6 +11,7 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = 'biz_customer_associate'
+TAB_DISPLAY_NAME = '고객'
 
 
 def _now() -> str:
@@ -33,10 +34,15 @@ def _resolve_db_path(app=None) -> str:
     parsed = urlparse(uri)
     path = parsed.path or ''
     netloc = parsed.netloc or ''
+    is_sqlite_abs = uri.startswith('sqlite:////')
     if path in (':memory:', '/:memory:'):
         return os.path.join(app.instance_path, 'customer_associate.db')
     if netloc not in ('', 'localhost'):
         path = f"//{netloc}{path}"
+    # sqlite:///dev_blossom.db is a project-relative path.
+    # Only sqlite:////... should be treated as absolute filesystem path.
+    if netloc in ('', 'localhost') and path.startswith('/') and not is_sqlite_abs:
+        path = path.lstrip('/')
     if os.path.isabs(path):
         return path
     relative = path.lstrip('/')
@@ -78,6 +84,17 @@ def _normalize_code(seed: str) -> str:
     return base[:60]
 
 
+def _normalize_name(value: Any) -> str:
+    text = str(value or '').strip()
+    # Treat repeated whitespace as a single space so variants are considered duplicates.
+    return re.sub(r'\s+', ' ', text)
+
+
+def _duplicate_name_message(tab_name: Optional[str] = None) -> str:
+    name = _normalize_name(tab_name or TAB_DISPLAY_NAME) or TAB_DISPLAY_NAME
+    return f'동일한 {name}명이 이미 존재합니다.'
+
+
 def _generate_unique_code(conn: sqlite3.Connection, seed: str) -> str:
     base = _normalize_code(seed)
     candidate = base
@@ -107,6 +124,18 @@ def _assert_unique_code(conn: sqlite3.Connection, code: str, record_id: Optional
     ).fetchone()
     if row and (record_id is None or row['id'] != record_id):
         raise ValueError('이미 사용 중인 준회원사 코드입니다.')
+
+
+def _assert_unique_name(conn: sqlite3.Connection, name: str, record_id: Optional[int] = None) -> None:
+    normalized_name = _normalize_name(name)
+    if not normalized_name:
+        raise ValueError('준회원사명은 필수입니다.')
+    row = conn.execute(
+        f"SELECT id FROM {TABLE_NAME} WHERE is_deleted = 0 AND lower(trim(associate_name)) = lower(trim(?))",
+        (normalized_name,),
+    ).fetchone()
+    if row and (record_id is None or row['id'] != record_id):
+        raise ValueError(_duplicate_name_message())
 
 
 def init_customer_associate_table(app=None) -> None:
@@ -249,11 +278,12 @@ def create_customer_associate(data: Dict[str, Any], actor: str, app=None) -> Dic
     app = app or current_app
     actor = (actor or 'system').strip() or 'system'
     payload = _prepare_payload(data, require_all=True)
-    name = payload['associate_name'].strip()
+    name = _normalize_name(payload['associate_name'])
     if not name:
-        raise ValueError('associate_name is required')
+        raise ValueError('준회원사명은 필수입니다.')
     timestamp = _now()
     with _get_connection(app) as conn:
+        _assert_unique_name(conn, name)
         code = payload.get('associate_code')
         if code:
             _assert_unique_code(conn, code)
@@ -292,6 +322,12 @@ def update_customer_associate(record_id: int, data: Dict[str, Any], actor: str, 
     if not payload:
         return get_customer_associate(record_id, app)
     with _get_connection(app) as conn:
+        if 'associate_name' in payload:
+            normalized_name = _normalize_name(payload['associate_name'])
+            if not normalized_name:
+                raise ValueError('준회원사명은 필수입니다.')
+            _assert_unique_name(conn, normalized_name, record_id)
+            payload['associate_name'] = normalized_name
         if 'associate_code' in payload:
             code = payload['associate_code']
             if code:
@@ -304,7 +340,7 @@ def update_customer_associate(record_id: int, data: Dict[str, Any], actor: str, 
             if column in payload:
                 value = payload[column]
                 if column == 'associate_name' and not value:
-                    raise ValueError('associate_name is required')
+                    raise ValueError('준회원사명은 필수입니다.')
                 updates.append(f"{column} = ?")
                 params.append(value)
         if not updates:
@@ -336,12 +372,10 @@ def soft_delete_customer_associates(ids: Iterable[Any], actor: str, app=None) ->
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

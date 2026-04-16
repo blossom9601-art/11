@@ -6,7 +6,9 @@ import uuid
 import json
 import re
 import traceback
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
+import time
 from typing import Any, Dict, List, Optional, Sequence, Union
 from app.models import (
     db,
@@ -99,7 +101,7 @@ from app.models import (
     SmtpConfig,
 )
 from sqlalchemy import text, or_, func, and_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 from app.services.work_category_service import (
@@ -164,6 +166,12 @@ from app.services.org_department_service import (
     create_org_department as svc_create_org_department,
     update_org_department as svc_update_org_department,
     soft_delete_org_departments as svc_soft_delete_org_departments,
+)
+from app.services.org_company_service import (
+    list_org_companies as svc_list_org_companies,
+    create_org_company as svc_create_org_company,
+    update_org_company as svc_update_org_company,
+    soft_delete_org_companies as svc_soft_delete_org_companies,
 )
 from app.services.org_center_service import (
     list_org_centers as svc_list_org_centers,
@@ -388,6 +396,7 @@ from app.services.dynamic_tab_record_service import (
 )
 from app.services.customer_associate_service import (
     list_customer_associates as svc_list_customer_associates,
+    get_customer_associate as svc_get_customer_associate,
     create_customer_associate as svc_create_customer_associate,
     update_customer_associate as svc_update_customer_associate,
     soft_delete_customer_associates as svc_soft_delete_customer_associates,
@@ -734,6 +743,42 @@ from app.services.quality_type_service import (
 
 api_bp = Blueprint('api', __name__)
 
+# ── 인증: 세션 체크 ──
+@api_bp.route('/api/auth/session-check', methods=['GET'])
+def check_session_validity():
+    """현재 세션이 여전히 유효한지 확인한다.
+    
+    프론트엔드 폴링에서 사용: 각 탭이 주기적으로 호출하여
+    해당 세션이 active_sessions에 존재하는지 확인.
+    
+    응답:
+    - 유효: {"valid": true}
+    - 무효: {"valid": false} with 401 status
+    """
+    from app import db
+    
+    sid = session.get('_session_id')
+    emp_no = session.get('emp_no')
+    
+    # 세션이 없거나 emp_no가 없으면 무효
+    if not sid or not emp_no:
+        return jsonify({"valid": False}), 401
+    
+    try:
+        # active_sessions 테이블에서 해당 세션 확인
+        row = db.session.execute(
+            db.text("SELECT 1 FROM active_sessions WHERE session_id = :sid AND UPPER(emp_no) = UPPER(:emp)"),
+            {'sid': sid, 'emp': emp_no}
+        ).fetchone()
+        
+        if row:
+            return jsonify({"valid": True}), 200
+        else:
+            return jsonify({"valid": False}), 401
+    except Exception as e:
+        current_app.logger.error(f"Session check error: {e}")
+        return jsonify({"valid": False, "error": str(e)}), 401
+
 # ── 공통 유틸리티 (common.py) ──
 # 새 엔드포인트 작성 시 아래 유틸리티를 우선 사용한다.
 # 기존 인라인 패턴(_require_login_for_write, _xxx_table_ready 등)은
@@ -924,7 +969,7 @@ def _blog_require_current_user_profile() -> tuple[Optional[UserProfile], Optiona
     if not emp_no:
         return None, ({'success': False, 'message': '로그인이 필요합니다.'}, 401)
     try:
-        prof = UserProfile.query.filter_by(emp_no=emp_no).first()
+        prof = UserProfile.query.filter(UserProfile.emp_no.ilike(emp_no)).first()
     except Exception:
         prof = None
     if not prof:
@@ -1459,7 +1504,7 @@ def _bk_tape_to_dict(row: BkTape) -> dict:
         'backup_policy_name': row.backup_policy_name,
         'retention_type': row.retention_type,
         'backup_size_k': row.backup_size_k,
-        'backup_size_t': row.backup_size_t,
+        'backup_size_t': row.backup_size_t if row.backup_size_t is not None else round((row.backup_size_k or 0) / 1099511627776.0, 6),
         'library_id': row.library_id,
         'library_name': getattr(lib, 'library_name', None),
         'backup_created_date': row.backup_created_date,
@@ -3018,6 +3063,7 @@ def create_backup_tape():
             backup_policy_name=backup_policy_name,
             retention_type=retention_type,
             backup_size_k=backup_size_k_int,
+            backup_size_t=round(backup_size_k_int / 1099511627776.0, 6),
             library_id=library_id,
             backup_created_date=backup_created_date,
             backup_created_year=created_year,
@@ -3083,6 +3129,7 @@ def update_backup_tape(tape_id: int):
             if k_int < 0:
                 return jsonify({'success': False, 'message': 'backup_size_k must be >= 0'}), 400
             row.backup_size_k = k_int
+            row.backup_size_t = round(k_int / 1099511627776.0, 6)
         if 'library_id' in payload:
             cand = _coerce_positive_int(payload.get('library_id'))
             if cand:
@@ -3313,7 +3360,7 @@ def _resolve_viewer_user_id_from_session() -> Optional[int]:
     emp_no = session.get('emp_no')
     if not emp_no:
         return None
-    prof = UserProfile.query.filter_by(emp_no=emp_no).first()
+    prof = UserProfile.query.filter(UserProfile.emp_no.ilike(emp_no)).first()
     return prof.id if prof else None
 
 
@@ -4474,6 +4521,26 @@ def me_profile():
     """
     emp_no = (session.get('emp_no') or '').strip()
     if not emp_no:
+        raw_uid = session.get('user_id')
+        raw_profile_id = session.get('user_profile_id') or session.get('profile_user_id')
+        try:
+            if raw_uid:
+                auth_row = AuthUser.query.filter_by(id=int(raw_uid)).first()
+                if auth_row and getattr(auth_row, 'emp_no', None):
+                    emp_no = (auth_row.emp_no or '').strip()
+        except Exception:
+            emp_no = emp_no or ''
+
+        if not emp_no:
+            try:
+                if raw_profile_id:
+                    profile_row = UserProfile.query.filter_by(id=int(raw_profile_id)).first()
+                    if profile_row and getattr(profile_row, 'emp_no', None):
+                        emp_no = (profile_row.emp_no or '').strip()
+            except Exception:
+                emp_no = emp_no or ''
+
+    if not emp_no:
         return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
 
     prof = UserProfile.query.filter_by(emp_no=emp_no).first()
@@ -4486,7 +4553,7 @@ def me_profile():
             'nickname': (prof.nickname if prof and prof.nickname else ''),
             'department_id': (getattr(prof, 'department_id', None) if prof else None),
             'department': (prof.department if prof and prof.department else ''),
-            'location': (prof.location if prof and prof.location else ''),
+            'location': (getattr(prof, 'location', '') or '' if prof else ''),
             'ext_phone': (prof.ext_phone if prof and prof.ext_phone else ''),
             'mobile_phone': (prof.mobile_phone if prof and prof.mobile_phone else ''),
             'email': (prof.email if prof and prof.email else (auth_user.email if auth_user and auth_user.email else '')),
@@ -4535,8 +4602,38 @@ def me_profile():
         val = _clean_text(payload.get(key), max_len=max_len)
         if key == 'email' and val and '@' not in val:
             return jsonify({'success': False, 'message': '이메일 형식이 올바르지 않습니다.'}), 400
-        if key == 'profile_image' and val and not val.startswith('/static/'):
-            return jsonify({'success': False, 'message': 'invalid_profile_image'}), 400
+        if key == 'profile_image' and val:
+            # Accept a broad set of UI-provided formats and normalize to /static/... path.
+            # Examples:
+            # - https://host/static/image/svg/profil/001-boy.svg
+            # - url("https://host/static/image/svg/profil/001-boy.svg")
+            # - url('/static/image/svg/profil/001-boy.svg')
+            norm = val
+            if norm.startswith('http://') or norm.startswith('https://'):
+                try:
+                    parsed = urlparse(norm)
+                    norm = (parsed.path or '').strip()
+                except Exception:
+                    norm = ''
+
+            if norm.lower().startswith('url(') and norm.endswith(')'):
+                norm = norm[4:-1].strip().strip('"\'')
+                if norm.startswith('http://') or norm.startswith('https://'):
+                    try:
+                        parsed = urlparse(norm)
+                        norm = (parsed.path or '').strip()
+                    except Exception:
+                        norm = ''
+
+            if '/static/' in norm and not norm.startswith('/static/'):
+                idx = norm.find('/static/')
+                norm = norm[idx:]
+
+            if not norm.startswith('/static/'):
+                norm = '/static/image/svg/profil/free-icon-bussiness-man.svg'
+
+            val = _clean_text(norm, max_len=max_len)
+
         if getattr(prof, attr) != val:
             setattr(prof, attr, val)
             changed = True
@@ -4578,7 +4675,7 @@ def me_profile():
         'nickname': prof.nickname or '',
         'department_id': getattr(prof, 'department_id', None),
         'department': prof.department or '',
-        'location': prof.location or '',
+        'location': getattr(prof, 'location', '') or '',
         'ext_phone': prof.ext_phone or '',
         'mobile_phone': prof.mobile_phone or '',
         'email': prof.email or '',
@@ -15504,6 +15601,66 @@ def list_org_departments():
         return jsonify({'success': False, 'message': '부서 목록 조회 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/org-companies', methods=['GET'])
+def list_org_companies():
+    search = (request.args.get('q') or '').strip() or None
+    include_deleted = (request.args.get('include_deleted') or request.args.get('includeDeleted') or '').lower() in ('1', 'true', 'yes')
+    try:
+        rows = svc_list_org_companies(search=search, include_deleted=include_deleted)
+        return jsonify({'success': True, 'items': rows, 'total': len(rows)})
+    except Exception:
+        logger.exception('Failed to fetch org companies')
+        return jsonify({'success': False, 'message': '회사 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/org-companies', methods=['POST'])
+def create_org_company():
+    payload = request.get_json(silent=True) or {}
+    try:
+        record = svc_create_org_company(payload, _resolve_actor())
+        return jsonify({'success': True, 'item': record}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except sqlite3.IntegrityError:
+        logger.exception('Duplicate org company code')
+        return jsonify({'success': False, 'message': '동일한 회사 코드가 이미 존재합니다.'}), 400
+    except Exception:
+        logger.exception('Failed to create org company')
+        return jsonify({'success': False, 'message': '회사 등록 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/org-companies/<int:company_id>', methods=['PUT'])
+def update_org_company(company_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        record = svc_update_org_company(company_id, payload, _resolve_actor())
+        if not record:
+            return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': record})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except sqlite3.IntegrityError:
+        logger.exception('Duplicate org company code on update')
+        return jsonify({'success': False, 'message': '동일한 회사 코드가 이미 존재합니다.'}), 400
+    except Exception:
+        logger.exception('Failed to update org company')
+        return jsonify({'success': False, 'message': '회사 수정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/org-companies/bulk-delete', methods=['POST'])
+def delete_org_companies():
+    payload = request.get_json(silent=True) or {}
+    ids = payload.get('ids')
+    if not isinstance(ids, (list, tuple)) or not ids:
+        return jsonify({'success': False, 'message': '삭제할 항목을 선택하세요.'}), 400
+    try:
+        deleted = svc_soft_delete_org_companies(ids, _resolve_actor())
+        return jsonify({'success': True, 'deleted': deleted})
+    except Exception:
+        logger.exception('Failed to delete org companies')
+        return jsonify({'success': False, 'message': '회사 삭제 중 오류가 발생했습니다.'}), 500
+
+
 @api_bp.route('/api/wrk/vendor-staff-suggest', methods=['GET'])
 def suggest_wrk_vendor_staff():
     """협력직원 자동완성(작업보고서 누적 기록 + 카테고리 벤더 매니저 통합 검색)."""
@@ -20140,6 +20297,18 @@ def create_customer_associate():
         return jsonify({'success': False, 'message': '준회원사 등록 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/customer-associates/<int:associate_id>', methods=['GET'])
+def get_customer_associate(associate_id: int):
+    try:
+        record = svc_get_customer_associate(associate_id)
+        if not record:
+            return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': record})
+    except Exception:
+        logger.exception('Failed to fetch customer associate id=%s', associate_id)
+        return jsonify({'success': False, 'message': '준회원사 상세 조회 중 오류가 발생했습니다.'}), 500
+
+
 @api_bp.route('/api/customer-associates/<int:associate_id>', methods=['PUT'])
 def update_customer_associate(associate_id: int):
     payload = request.get_json(silent=True) or {}
@@ -22087,7 +22256,11 @@ def category_hw_dashboard():
     from app.services.category_dashboard_service import compute_hw_dashboard
     try:
         data = compute_hw_dashboard()
-        return jsonify({'success': True, **data})
+        resp = jsonify({'success': True, **data})
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
     except Exception:
         logger.exception('Failed to compute HW category dashboard')
         return jsonify({'success': False, 'message': '하드웨어 대시보드 데이터 조회 중 오류가 발생했습니다.'}), 500
@@ -24340,6 +24513,712 @@ def search_hardware():
         return jsonify(_sample_search(q, limit))
 
     return jsonify(results)
+
+
+def _as_bool(value: Any, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text_value = str(value).strip().lower()
+    if text_value in ('1', 'true', 'yes', 'y', 'on'):
+        return True
+    if text_value in ('0', 'false', 'no', 'n', 'off'):
+        return False
+    return default
+
+
+def _briefing_fallback(query: str, fallback_used: bool, latency_ms: int, reason: str = '') -> Dict[str, Any]:
+    return {
+        'enabled': True,
+        'version': 'v1',
+        'mode': 'rule_based',
+        'title': '검색 안내',
+        'summary_lines': ([
+            f"'{query}' 기준으로 검색 결과를 안내합니다.",
+            '현재는 규칙 기반으로 관련 항목을 우선 정렬해 표시합니다.',
+            '필요하면 도메인 필터를 사용해 범위를 더 정확하게 좁혀보세요.',
+        ] if query else [
+            '검색 결과를 규칙 기반으로 정리해 안내합니다.',
+            '필요하면 도메인 필터를 사용해 범위를 더 정확하게 좁혀보세요.',
+        ]),
+        'recommended_filters': [],
+        'references': [],
+        'confidence': {
+            'score': 0.0,
+            'grade': 'low',
+            'explain': reason or 'fallback',
+        },
+        'fallback_used': fallback_used,
+        'latency_ms': int(max(0, latency_ms)),
+        'generated_at': datetime.now().isoformat(timespec='seconds'),
+    }
+
+
+def _build_unified_search_briefing(query: str, rows: List[Dict[str, Any]], total: int, latency_ms: int) -> Dict[str, Any]:
+    try:
+        from scripts.ai_briefing.stage3_rules import build_enhanced_briefing
+
+        briefing = build_enhanced_briefing(
+            query=query,
+            rows=rows,
+            total=total,
+            latency_ms=latency_ms,
+        )
+        if not briefing.get('generated_at'):
+            briefing['generated_at'] = datetime.now().isoformat(timespec='seconds')
+        return briefing
+    except Exception:
+        logger.exception('Unified search: stage3 briefing rule import/build failed, fallback to stage2 rule')
+
+    top_refs = []
+    for row in rows[:3]:
+        top_refs.append({
+            'doc_id': str(row.get('id') or ''),
+            'title': str(row.get('title') or ''),
+            'reason': '통합검색 상위 결과',
+        })
+
+    summary_lines = [
+        f"요청하신 '{query}'와 관련된 결과를 총 {total}건 확인했습니다.",
+        '가장 연관성이 높은 항목부터 우선 정렬해 보여드립니다.',
+        '원하시면 도메인 필터로 범위를 좁혀 더 정확하게 확인할 수 있습니다.',
+    ]
+
+    return {
+        'enabled': True,
+        'version': 'v1',
+        'mode': 'rule_based',
+        'title': '검색 안내',
+        'summary_lines': summary_lines,
+        'recommended_filters': [],
+        'references': top_refs,
+        'confidence': {
+            'score': 0.7 if total > 0 else 0.2,
+            'grade': ('high' if total >= 10 else ('medium' if total > 0 else 'low')),
+            'explain': '검색 결과 개수 기반 초기 규칙 점수',
+        },
+        'fallback_used': False,
+        'latency_ms': int(max(0, latency_ms)),
+        'generated_at': datetime.now().isoformat(timespec='seconds'),
+    }
+
+
+@api_bp.route('/api/search/unified', methods=['GET', 'POST'])
+def unified_search_pages():
+    """통합 검색 MVP: 전 도메인 페이지 라우트를 키/메뉴명 기준으로 검색한다."""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'rows': [], 'total': 0, 'error': 'Unauthorized'}), 401
+
+    payload = request.get_json(silent=True) if request.method == 'POST' else None
+
+    def _pick(name: str, default: Any = '') -> Any:
+        if isinstance(payload, dict):
+            return payload.get(name, default)
+        return request.args.get(name, default)
+
+    q = str(_pick('q', '') or '').strip()
+    if not q:
+        include_briefing = _as_bool(_pick('include_briefing', '1'), True)
+        briefing = {
+            'enabled': False,
+            'version': 'v1',
+            'mode': 'disabled',
+            'title': '검색 안내',
+            'summary_lines': [],
+            'recommended_filters': [],
+            'references': [],
+            'confidence': {'score': 0.0, 'grade': 'low', 'explain': 'empty query'},
+            'fallback_used': False,
+            'latency_ms': 0,
+            'generated_at': datetime.now().isoformat(timespec='seconds'),
+        } if include_briefing else None
+        response_payload = {'success': True, 'rows': [], 'total': 0, 'error': ''}
+        if briefing is not None:
+            response_payload['briefing'] = briefing
+        return jsonify(response_payload)
+
+    try:
+        limit = int(_pick('limit', '60'))
+    except Exception:
+        limit = 60
+    limit = max(1, min(limit, 120))
+    include_briefing = _as_bool(_pick('include_briefing', '1'), True)
+    include_page_routes = _as_bool(_pick('include_page_routes', '0'), False)
+
+    allowed_domains = {
+        '시스템',
+        '거버넌스',
+        '데이터센터',
+        '비용관리',
+        '프로젝트',
+        '인사이트',
+        '카테고리',
+    }
+
+    domain_filters = set()
+    raw_domains = _pick('domains', '')
+    if isinstance(raw_domains, list):
+        for token in raw_domains:
+            d = str(token or '').strip()
+            if d in allowed_domains:
+                domain_filters.add(d)
+    else:
+        raw_domains = str(raw_domains or '').strip()
+        if raw_domains:
+            for token in raw_domains.split(','):
+                d = token.strip()
+                if d in allowed_domains:
+                    domain_filters.add(d)
+
+    from app.routes.pages import TEMPLATE_MAP, _resolve_menu_code
+    from app.models import Menu
+
+    # 권한 캐시가 없으면 계산하여 세션에 저장
+    if '_perms' not in session:
+        try:
+            from app.services.permission_service import cache_session_permissions
+            cache_session_permissions(session)
+        except Exception:
+            logger.exception('Unified search: failed to build session permission cache')
+            session['_perms'] = {}
+
+    perms = session.get('_perms') or {}
+    is_admin = (session.get('role') or '').strip().upper() == 'ADMIN'
+
+    def _has_read_permission(menu_code: Optional[str]) -> bool:
+        if is_admin:
+            return True
+        if not menu_code:
+            return False
+
+        value = perms.get(menu_code)
+        if value in ('READ', 'WRITE'):
+            return True
+
+        parts = str(menu_code).split('.')
+        while len(parts) > 1:
+            parts = parts[:-1]
+            parent_code = '.'.join(parts)
+            parent_value = perms.get(parent_code)
+            if parent_value in ('READ', 'WRITE'):
+                return True
+        return False
+
+    def _domain_from_key(key: str) -> Optional[str]:
+        if key.startswith('hw_'):
+            return '시스템'
+        if key.startswith('gov_'):
+            return '거버넌스'
+        if key.startswith('dc_'):
+            return '데이터센터'
+        if key.startswith('cost_'):
+            return '비용관리'
+        if key.startswith('project_') or key.startswith('wf_') or key.startswith('proj_') or key.startswith('task_') or key.startswith('workflow_'):
+            return '프로젝트'
+        if key.startswith('insight_'):
+            return '인사이트'
+        if key.startswith('cat_'):
+            return '카테고리'
+        return None
+
+    key_items = []
+    menu_codes = set()
+    for key, template in TEMPLATE_MAP.items():
+        domain = _domain_from_key(key)
+        if not domain:
+            continue
+        if domain_filters and domain not in domain_filters:
+            continue
+        menu_code = _resolve_menu_code(key)
+        if not _has_read_permission(menu_code):
+            continue
+        if menu_code:
+            menu_codes.add(menu_code)
+        key_items.append((key, template, domain, menu_code))
+
+    menu_name_map: Dict[str, str] = {}
+    if menu_codes:
+        try:
+            rows = Menu.query.filter(Menu.menu_code.in_(list(menu_codes))).all()
+            for row in rows:
+                if row.menu_code:
+                    menu_name_map[row.menu_code] = row.menu_name or row.menu_code
+        except Exception:
+            logger.exception('Failed to load menu names for unified search')
+
+    q_l = q.lower()
+    out = []
+    seen = set()
+
+    domain_route_map: Dict[str, str] = {
+        '시스템': '/p/hw_server_onpremise',
+        '거버넌스': '/p/gov_dr_training',
+        '데이터센터': '/p/dc_rack_list',
+        '비용관리': '/p/cost_opex_dashboard',
+        '프로젝트': '/p/proj_completed',
+        '인사이트': '/p/insight_blog_it',
+        '카테고리': '/p/cat_business_dashboard',
+    }
+
+    domain_menu_map: Dict[str, str] = {
+        '시스템': 'system.server',
+        '거버넌스': 'governance',
+        '데이터센터': 'datacenter',
+        '비용관리': 'cost',
+        '프로젝트': 'project',
+        '인사이트': 'insight',
+        '카테고리': 'category',
+    }
+
+    def _push_row(row: Dict[str, Any]):
+        route = str(row.get('route') or '')
+        rid = str(row.get('id') or '')
+        sig = f"{route}::{rid}"
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append(row)
+
+    def _compute_score(title: str, subtitle: str, base_score: float = 0.8) -> float:
+        qt = (q or '').strip().lower()
+        tt = (title or '').strip().lower()
+        st = (subtitle or '').strip().lower()
+        if not qt:
+            return max(0.0, min(1.0, float(base_score)))
+
+        query_tokens = [t for t in re.split(r'\s+', qt) if t]
+        title_token_hits = sum(1 for t in query_tokens if t in tt)
+        subtitle_token_hits = sum(1 for t in query_tokens if t in st)
+        token_count = float(len(query_tokens) or 1)
+
+        title_ratio = title_token_hits / token_count
+        subtitle_ratio = subtitle_token_hits / token_count
+
+        score = float(base_score)
+        if tt == qt:
+            score += 0.14
+        elif tt.startswith(qt):
+            score += 0.10
+        elif qt in tt:
+            score += 0.06
+        elif qt in st:
+            score += 0.02
+
+        # 제목 토큰 일치 비중을 가장 크게 반영하고, 부제목은 보조 신호로만 사용한다.
+        score += (0.10 * title_ratio) + (0.03 * subtitle_ratio)
+        if query_tokens and title_token_hits == len(query_tokens):
+            score += 0.05
+
+        return max(0.0, min(1.0, score))
+
+    # 1) 실제 데이터 검색 (도메인별)
+    q_like = f"%{q}%"
+
+    if (not domain_filters or '시스템' in domain_filters) and _has_read_permission(domain_menu_map['시스템']):
+        try:
+            rows = Server.query.filter(
+                or_(
+                    Server.name.ilike(q_like),
+                    Server.hostname.ilike(q_like),
+                    Server.ip_address.ilike(q_like),
+                    Server.location.ilike(q_like),
+                )
+            ).limit(20).all()
+            for row in rows:
+                subtitle_parts = [row.hostname or '', row.ip_address or '', row.location or '']
+                _push_row({
+                    'id': f"server:{row.id}",
+                    'key': f"server:{row.id}",
+                    'domain': '시스템',
+                    'type': '서버',
+                    'title': row.name or (row.hostname or f"서버 {row.id}"),
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': f"/p/hw_server_onpremise_detail?asset_id={row.id}",
+                    'score': round(_compute_score(row.name or (row.hostname or ''), ' '.join([p for p in subtitle_parts if p]), 0.90), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: system domain query failed')
+
+    if (not domain_filters or '거버넌스' in domain_filters) and _has_read_permission(domain_menu_map['거버넌스']):
+        try:
+            try:
+                rows = DrTraining.query.filter(
+                    DrTraining.is_deleted == 0,
+                    or_(
+                        DrTraining.training_name.ilike(q_like),
+                        DrTraining.training_type.ilike(q_like),
+                        DrTraining.participant_org.ilike(q_like),
+                        DrTraining.training_result.ilike(q_like),
+                    )
+                ).limit(20).all()
+            except OperationalError as oe:
+                # 일부 레거시 DB는 dr_training.version 컬럼이 없어 ORM 전체 로딩이 실패한다.
+                if 'dr_training.version' not in str(oe).lower():
+                    raise
+                legacy_rows = db.session.execute(text(
+                    """
+                    SELECT training_id, training_name, training_type, training_date, training_result, participant_org
+                    FROM dr_training
+                    WHERE COALESCE(is_deleted, 0) = 0
+                      AND (
+                        LOWER(COALESCE(training_name, '')) LIKE LOWER(:q)
+                        OR LOWER(COALESCE(training_type, '')) LIKE LOWER(:q)
+                        OR LOWER(COALESCE(participant_org, '')) LIKE LOWER(:q)
+                        OR LOWER(COALESCE(training_result, '')) LIKE LOWER(:q)
+                      )
+                    LIMIT 20
+                    """
+                ), {'q': q_like}).fetchall()
+                rows = []
+                for lr in legacy_rows:
+                    rows.append(type('DrTrainingLegacy', (), {
+                        'training_id': lr[0],
+                        'training_name': lr[1],
+                        'training_type': lr[2],
+                        'training_date': lr[3],
+                        'training_result': lr[4],
+                        'participant_org': lr[5],
+                    })())
+            for row in rows:
+                subtitle_parts = [row.training_type or '', row.training_date or '', row.training_result or '']
+                _push_row({
+                    'id': f"dr:{row.training_id}",
+                    'key': f"dr:{row.training_id}",
+                    'domain': '거버넌스',
+                    'type': '모의훈련',
+                    'title': row.training_name or f"훈련 {row.training_id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': f"/p/gov_dr_training?training_id={row.training_id}",
+                    'score': round(_compute_score(row.training_name or '', ' '.join([p for p in subtitle_parts if p]), 0.88), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: governance domain query failed')
+
+    if (not domain_filters or '데이터센터' in domain_filters) and _has_read_permission(domain_menu_map['데이터센터']):
+        try:
+            rows = RackLayout.query.filter(
+                RackLayout.floor_key.ilike(q_like)
+            ).limit(20).all()
+            for row in rows:
+                _push_row({
+                    'id': f"rack:{row.id}",
+                    'key': f"rack:{row.id}",
+                    'domain': '데이터센터',
+                    'type': '상면도',
+                    'title': row.floor_key or f"상면도 {row.id}",
+                    'subtitle': row.updated_by or '',
+                    'route': f"/p/dc_rack_list?rack_id={row.id}",
+                    'score': round(_compute_score(row.floor_key or '', row.updated_by or '', 0.84), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: datacenter domain query failed')
+
+    if (not domain_filters or '비용관리' in domain_filters) and _has_read_permission(domain_menu_map['비용관리']):
+        try:
+            rows = db.session.query(PrjCostDetail, PrjProject).join(
+                PrjProject,
+                PrjProject.id == PrjCostDetail.project_id,
+            ).filter(
+                PrjCostDetail.is_deleted == 0,
+                PrjProject.is_deleted == 0,
+                or_(
+                    PrjCostDetail.content.ilike(q_like),
+                    PrjCostDetail.cost_type.ilike(q_like),
+                    PrjProject.project_name.ilike(q_like),
+                )
+            ).limit(20).all()
+            for detail, project in rows:
+                subtitle_parts = [project.project_name or '', detail.cost_type or '', str(detail.amount or 0)]
+                _push_row({
+                    'id': f"cost:{detail.id}",
+                    'key': f"cost:{detail.id}",
+                    'domain': '비용관리',
+                    'type': '비용항목',
+                    'title': detail.content or f"비용 {detail.id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': f"/p/cost_opex_dashboard?project_id={project.id}",
+                    'score': round(_compute_score(detail.content or '', ' '.join([p for p in subtitle_parts if p]), 0.87), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: cost domain query failed')
+
+    if (not domain_filters or '프로젝트' in domain_filters) and _has_read_permission(domain_menu_map['프로젝트']):
+        try:
+            rows = PrjProject.query.filter(
+                PrjProject.is_deleted == 0,
+                or_(
+                    PrjProject.project_name.ilike(q_like),
+                    PrjProject.project_number.ilike(q_like),
+                    PrjProject.description.ilike(q_like),
+                )
+            ).limit(20).all()
+            for row in rows:
+                subtitle_parts = [row.project_number or '', row.status or '', row.start_date or '']
+                _push_row({
+                    'id': f"project:{row.id}",
+                    'key': f"project:{row.id}",
+                    'domain': '프로젝트',
+                    'type': '프로젝트',
+                    'title': row.project_name or f"프로젝트 {row.id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': f"/p/proj_completed_detail?project_id={row.id}",
+                    'score': round(_compute_score(row.project_name or '', ' '.join([p for p in subtitle_parts if p]), 0.92), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: project domain query failed')
+
+    if (not domain_filters or '인사이트' in domain_filters) and _has_read_permission(domain_menu_map['인사이트']):
+        try:
+            rows = Blog.query.filter(
+                or_(
+                    Blog.title.ilike(q_like),
+                    Blog.tags.ilike(q_like),
+                    Blog.author.ilike(q_like),
+                )
+            ).limit(20).all()
+            for row in rows:
+                subtitle_parts = [row.author or '', row.tags or '']
+                _push_row({
+                    'id': f"blog:{row.id}",
+                    'key': f"blog:{row.id}",
+                    'domain': '인사이트',
+                    'type': '블로그',
+                    'title': row.title or f"게시글 {row.id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': f"/p/insight_blog_it_detail?id={row.id}",
+                    'score': round(_compute_score(row.title or '', ' '.join([p for p in subtitle_parts if p]), 0.90), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: insight domain query failed')
+
+    if (not domain_filters or '카테고리' in domain_filters) and _has_read_permission(domain_menu_map['카테고리']):
+        try:
+            company_rows = Company.query.filter(
+                or_(
+                    Company.name.ilike(q_like),
+                    Company.business_number.ilike(q_like),
+                    Company.address.ilike(q_like),
+                )
+            ).limit(10).all()
+            for row in company_rows:
+                subtitle_parts = [row.business_number or '', row.phone or '']
+                _push_row({
+                    'id': f"company:{row.id}",
+                    'key': f"company:{row.id}",
+                    'domain': '카테고리',
+                    'type': '회사',
+                    'title': row.name or f"회사 {row.id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': '/p/cat_company_center',
+                    'score': round(_compute_score(row.name or '', ' '.join([p for p in subtitle_parts if p]), 0.83), 4),
+                })
+
+            dept_rows = OrgDepartment.query.filter(
+                OrgDepartment.is_deleted == False,
+                or_(
+                    OrgDepartment.dept_name.ilike(q_like),
+                    OrgDepartment.dept_code.ilike(q_like),
+                    OrgDepartment.manager_name.ilike(q_like),
+                )
+            ).limit(10).all()
+            for row in dept_rows:
+                subtitle_parts = [row.dept_code or '', row.manager_name or '']
+                _push_row({
+                    'id': f"dept:{row.id}",
+                    'key': f"dept:{row.id}",
+                    'domain': '카테고리',
+                    'type': '부서',
+                    'title': row.dept_name or row.dept_code or f"부서 {row.id}",
+                    'subtitle': ' · '.join([p for p in subtitle_parts if p]),
+                    'route': '/p/cat_company_department',
+                    'score': round(_compute_score(row.dept_name or '', ' '.join([p for p in subtitle_parts if p]), 0.83), 4),
+                })
+        except Exception:
+            logger.exception('Unified search: category domain query failed')
+
+    # 2) 페이지 라우트 검색 결과(보조)
+    # DB 실데이터 결과가 있을 때는 페이지 라우트 보조 결과를 섞지 않는다.
+    if include_page_routes and not out:
+        for key, template, domain, menu_code in key_items:
+            menu_name = menu_name_map.get(menu_code or '', '')
+            # 메뉴명이 없는 항목은 기술 키(gov_*, hw_* 등) 노출 위험이 있어 보조 결과에서 제외한다.
+            if not menu_name:
+                continue
+            if isinstance(template, (tuple, list)):
+                template_text = ' | '.join([str(v) for v in template if v])
+            else:
+                template_text = str(template or '')
+
+            # 보조 검색은 사용자 표시명(메뉴명) 중심으로만 수행한다.
+            # 내부 코드/템플릿 경로 기준 매칭은 오탐과 보안 노출 가능성이 있어 제외한다.
+            hay = ' '.join([
+                menu_name,
+            ]).lower()
+            if q_l not in hay:
+                continue
+
+            try:
+                pos = hay.index(q_l)
+            except ValueError:
+                pos = 9999
+            # 페이지 결과는 보조 소스이므로 상한을 낮춰 실데이터 결과가 우선되도록 한다.
+            page_rank = max(0.0, 1.0 - (min(pos, 200) / 200.0))
+            score = 0.58 + (page_rank * 0.22)
+            if (menu_name or '').lower().startswith(q_l):
+                score += 0.05
+            elif q_l in (menu_name or '').lower():
+                score += 0.02
+            score = min(score, 0.88)
+
+            _push_row({
+                'id': key,
+                'key': key,
+                'domain': domain,
+                'type': '페이지',
+                'title': menu_name,
+                # 템플릿 파일 경로(예: 4.governance/...)는 보안상 노출하지 않는다.
+                'subtitle': f'{domain} 메뉴 페이지',
+                'route': f'/p/{key}',
+                'score': round(score, 4),
+            })
+
+    out.sort(key=lambda x: (-float(x.get('score') or 0.0), str(x.get('title') or '')))
+    out = out[:limit]
+    response_payload = {'success': True, 'rows': out, 'total': len(out), 'error': ''}
+
+    if include_briefing:
+        briefing_started = time.perf_counter()
+        try:
+            briefing = _build_unified_search_briefing(
+                query=q,
+                rows=out,
+                total=len(out),
+                latency_ms=int((time.perf_counter() - briefing_started) * 1000.0),
+            )
+        except Exception:
+            logger.exception('Unified search briefing build failed')
+            briefing = _briefing_fallback(
+                query=q,
+                fallback_used=True,
+                latency_ms=int((time.perf_counter() - briefing_started) * 1000.0),
+                reason='briefing build failed',
+            )
+        response_payload['briefing'] = briefing
+
+    return jsonify(response_payload)
+
+
+@api_bp.route('/api/search/unified/click', methods=['POST'])
+def unified_search_click_log():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        logger.info(
+            'search_click user_id=%s emp_no=%s query=%s domain=%s type=%s route=%s item_id=%s',
+            session.get('user_id'),
+            session.get('emp_no'),
+            (payload.get('query') or '').strip(),
+            (payload.get('domain') or '').strip(),
+            (payload.get('type') or '').strip(),
+            (payload.get('route') or '').strip(),
+            (payload.get('id') or '').strip(),
+        )
+    except Exception:
+        logger.exception('Unified search click logging failed')
+
+    return jsonify({'success': True, 'error': ''})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  RAG 키워드 검색 엔드포인트  GET /api/search/rag?q=&top=5
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _rag_keyword_search(rag_db_path: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    """rag_chunks에서 LIKE 기반 키워드 검색 후 상위 K개 반환."""
+    try:
+        conn = sqlite3.connect(rag_db_path, timeout=5)
+        conn.row_factory = sqlite3.Row
+        try:
+            pattern = f'%{query}%'
+            rows = conn.execute(
+                """
+                SELECT d.id       AS doc_id,
+                       d.source_domain,
+                       d.source_id,
+                       d.title,
+                       d.route_hint,
+                       d.menu_code,
+                       d.page_key,
+                       d.entity_type,
+                       c.chunk_text,
+                       c.chunk_index
+                FROM rag_chunks  c
+                JOIN rag_documents d ON d.id = c.document_id
+                WHERE d.status = 'active'
+                  AND (c.chunk_text LIKE ? OR d.title LIKE ?)
+                ORDER BY
+                    CASE WHEN d.title LIKE ? THEN 0 ELSE 1 END,
+                    d.updated_at DESC,
+                    c.chunk_index ASC
+                LIMIT ?
+                """,
+                (pattern, pattern, pattern, top_k * 3),
+            ).fetchall()
+
+            # 같은 문서의 중복 제거 (첫 번째 매칭 청크만 유지)
+            seen: set = set()
+            results: List[Dict[str, Any]] = []
+            for row in rows:
+                doc_id = int(row['doc_id'])
+                if doc_id in seen:
+                    continue
+                seen.add(doc_id)
+                snippet = (row['chunk_text'] or '')[:200].strip()
+                results.append({
+                    'doc_id': doc_id,
+                    'domain': row['source_domain'],
+                    'source_id': row['source_id'],
+                    'title': row['title'],
+                    'snippet': snippet,
+                    'route_hint': row['route_hint'],
+                    'menu_code': row['menu_code'],
+                    'page_key': row['page_key'],
+                    'entity_type': row['entity_type'],
+                })
+                if len(results) >= top_k:
+                    break
+
+            return results
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception('RAG keyword search failed db=%s query=%s', rag_db_path, query)
+        return []
+
+
+@api_bp.route('/api/search/rag', methods=['GET'])
+def rag_search_api():
+    """RAG 인덱스 기반 키워드 검색 (근거 문서 반환).
+
+    Query params:
+        q    : 검색어 (필수)
+        top  : 반환 개수 (기본 5, 최대 20)
+    """
+    query = (request.args.get('q') or '').strip()
+    if not query:
+        return jsonify({'success': False, 'error': '검색어가 필요합니다.', 'items': []}), 400
+
+    top_k = min(max(int(request.args.get('top', 5) or 5), 1), 20)
+
+    rag_db_path = os.path.join(current_app.instance_path, 'rag_index.db')
+    if not os.path.exists(rag_db_path):
+        return jsonify({'success': True, 'items': [], 'total': 0, 'note': 'RAG 인덱스 미구축'})
+
+    items = _rag_keyword_search(rag_db_path, query, top_k)
+    return jsonify({'success': True, 'items': items, 'total': len(items), 'query': query})
 
 
 @api_bp.route('/api/software/<category_slug>/<type_slug>/assets', methods=['GET'])
@@ -30691,6 +31570,22 @@ def upload_blog_post_attachments(post_id: int):
             pass
         db.session.commit()
 
+        # RAG 인덱스 잡 등록 (best-effort — 실패해도 응답에 영향 없음)
+        try:
+            from app.services.rag_enqueue import enqueue_attachment_job
+            new_abs_paths = [os.path.join(base_dir, it['stored_name']) for it in new_items]
+            enqueue_attachment_job(
+                instance_path=current_app.instance_path,
+                abs_paths=new_abs_paths,
+                source_domain='인사이트',
+                source_id=f'blog:{post_id}',
+                route_hint=f'/p/insight_blog_it_detail?id={post_id}',
+                menu_code='insight',
+                page_key='insight_blog_it',
+            )
+        except Exception:
+            pass
+
         return jsonify({'success': True, 'attachments': _blog_normalize_attachments_for_response(post_id, merged)})
     except Exception:
         db.session.rollback()
@@ -31479,6 +32374,29 @@ def upload_insight_item_attachments_api(item_id: int):
         for a in attachments:
             a['download_url'] = f"/api/insight/items/{int(item_id)}/attachments/{int(a.get('id'))}/download"
 
+        # RAG 인덱스 잡 등록 (best-effort)
+        try:
+            from app.services.rag_enqueue import enqueue_attachment_job
+            project_root = os.path.abspath(os.path.join(current_app.root_path, os.pardir))
+            uploads_dir = os.path.join(project_root, 'uploads', 'insight_items', str(item_id))
+            new_abs_paths = [
+                os.path.join(uploads_dir, a['stored'])
+                for a in attachments
+                if a.get('stored')
+            ]
+            category = (item.get('category') or '').strip()
+            enqueue_attachment_job(
+                instance_path=current_app.instance_path,
+                abs_paths=new_abs_paths,
+                source_domain='인사이트',
+                source_id=f'tech:{item_id}',
+                route_hint=f'/p/insight_tech_detail?id={item_id}',
+                menu_code='insight',
+                page_key=f'insight_{category}' if category else 'insight_tech',
+            )
+        except Exception:
+            pass
+
         return jsonify({'success': True, 'attachments': attachments}), 201
     except ValueError as ve:
         return jsonify({'success': False, 'message': str(ve)}), 400
@@ -31986,26 +32904,44 @@ def api_wf_designs_list():
         shared = request.args.get('shared')
         shared_val = int(shared) if shared is not None and shared != '' else None
         owner = uid if my_only == '1' else None
-        items, total = _wf_list(
-            status=status, owner_user_id=owner,
-            page=page, per_page=per_page, search=search,
-            shared=shared_val,
-        )
+        try:
+            items, total = _wf_list(
+                status=status, owner_user_id=owner,
+                page=page, per_page=per_page, search=search,
+                shared=shared_val,
+            )
+        except Exception:
+            # 구버전 스키마(예: shared 컬럼 미적용)에서도 목록 화면이 동작하도록
+            # shared 필터 없이 1회 폴백한다.
+            if shared_val is not None:
+                logger.exception('wf-designs list failed with shared filter; fallback without shared')
+                items, total = _wf_list(
+                    status=status, owner_user_id=owner,
+                    page=page, per_page=per_page, search=search,
+                    shared=None,
+                )
+            else:
+                raise
         # 좋아요 정보 집계
         wf_ids = [w.id for w in items]
         like_counts = {}
         my_likes = set()
         if wf_ids:
-            from sqlalchemy import func as _sa_func
-            count_rows = db.session.query(
-                WfDesignLike.workflow_id, _sa_func.count(WfDesignLike.id)
-            ).filter(WfDesignLike.workflow_id.in_(wf_ids)).group_by(WfDesignLike.workflow_id).all()
-            like_counts = {r[0]: r[1] for r in count_rows}
-            if uid:
-                my_rows = db.session.query(WfDesignLike.workflow_id).filter(
-                    WfDesignLike.workflow_id.in_(wf_ids), WfDesignLike.user_id == uid
-                ).all()
-                my_likes = {r[0] for r in my_rows}
+            try:
+                from sqlalchemy import func as _sa_func
+                count_rows = db.session.query(
+                    WfDesignLike.workflow_id, _sa_func.count(WfDesignLike.id)
+                ).filter(WfDesignLike.workflow_id.in_(wf_ids)).group_by(WfDesignLike.workflow_id).all()
+                like_counts = {r[0]: r[1] for r in count_rows}
+                if uid:
+                    my_rows = db.session.query(WfDesignLike.workflow_id).filter(
+                        WfDesignLike.workflow_id.in_(wf_ids), WfDesignLike.user_id == uid
+                    ).all()
+                    my_likes = {r[0] for r in my_rows}
+            except Exception:
+                logger.exception('wf-designs like aggregate failed; continue without like meta')
+                like_counts = {}
+                my_likes = set()
         rows = []
         for w in items:
             # 최신 버전의 definition_json 에서 nodes/edges 추출 (미니 프리뷰용)
@@ -32019,6 +32955,13 @@ def api_wf_designs_list():
                         def_json = raw
                 except Exception:
                     def_json = None
+            owner_name = ''
+            try:
+                owner_obj = getattr(w, 'owner', None)
+                owner_name = getattr(owner_obj, 'name', '') if owner_obj else ''
+            except Exception:
+                owner_name = ''
+
             rows.append({
                 'id': w.id,
                 'name': w.name,
@@ -32026,7 +32969,7 @@ def api_wf_designs_list():
                 'status': w.status,
                 'latest_version': w.latest_version,
                 'owner_user_id': w.owner_user_id,
-                'owner_name': getattr(w.owner, 'name', '') if w.owner else '',
+                'owner_name': owner_name,
                 'thumbnail': w.thumbnail or '',
                 'shared': getattr(w, 'shared', 0) or 0,
                 'created_at': w.created_at,

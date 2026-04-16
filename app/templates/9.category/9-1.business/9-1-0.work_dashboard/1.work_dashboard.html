@@ -11,6 +11,37 @@
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
     <link rel="stylesheet" href="/static/css/capex_executive.css?v=20260316a">
     <link rel="stylesheet" href="/static/css/dashboard_add.css?v=20251109-1">
+    <style>
+        /* SPA first-load에서도 카드 배치를 고정한다. */
+        #work-dashboard-root .work-dash-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            grid-template-rows: auto auto !important;
+            gap: 20px !important;
+            align-items: stretch;
+        }
+
+        #work-dashboard-root .work-dash-grid > .exec-card {
+            min-width: 0;
+        }
+
+        #work-dashboard-root .work-dash-grid > .work-group-card {
+            grid-column: 3 !important;
+            grid-row: 1 / 3 !important;
+        }
+
+        @media (max-width: 1200px) {
+            #work-dashboard-root .work-dash-grid {
+                grid-template-columns: 1fr !important;
+                grid-template-rows: none !important;
+            }
+
+            #work-dashboard-root .work-dash-grid > .work-group-card {
+                grid-column: auto !important;
+                grid-row: auto !important;
+            }
+        }
+    </style>
 </head>
 <body>
     {% include 'layouts/_header.html' %}
@@ -43,24 +74,24 @@
             <!-- Executive Dashboard -->
             <div class="exec-dashboard">
 
-                <section class="work-dash-grid" aria-label="업무 대시보드">
-                    <article class="exec-card analysis-card card chart">
+                <section class="work-dash-grid" id="work-dash-grid" aria-label="업무 대시보드">
+                    <article class="exec-card analysis-card card chart" id="wd-card-classification">
                         <div class="exec-card-title">업무 분류</div>
                         <div class="chart-wrap-inner"><canvas id="chart-classification"></canvas></div>
                     </article>
-                    <article class="exec-card analysis-card card chart">
+                    <article class="exec-card analysis-card card chart" id="wd-card-division">
                         <div class="exec-card-title">업무 구분</div>
                         <div class="chart-wrap-inner"><canvas id="chart-division"></canvas></div>
                     </article>
-                    <article class="exec-card analysis-card card chart work-group-card">
+                    <article class="exec-card analysis-card card chart work-group-card" id="wd-card-group">
                         <div class="exec-card-title">업무 그룹</div>
                         <div class="treemap-wrap" id="chart-group"></div>
                     </article>
-                    <article class="exec-card analysis-card card chart">
+                    <article class="exec-card analysis-card card chart" id="wd-card-operation">
                         <div class="exec-card-title">업무 운영</div>
                         <div class="chart-wrap-inner"><canvas id="chart-operation"></canvas></div>
                     </article>
-                    <article class="exec-card analysis-card card chart">
+                    <article class="exec-card analysis-card card chart" id="wd-card-status">
                         <div class="exec-card-title">업무 상태</div>
                         <div class="chart-wrap-inner"><canvas id="chart-status"></canvas></div>
                     </article>
@@ -72,12 +103,12 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260406_tab"></script>
+    <script src="/static/js/blossom.js?v=20260415_cat_dup_remove2"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
     <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
-    <script src="/static/js/9.category/9-1.business/9-1-0.work_dashboard/1.work_dashboard.js?v=1.3.4"></script>
-    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+    <script src="/static/js/9.category/9-1.business/9-1-0.work_dashboard/1.work_dashboard.js?v=1.4.0"></script>
+    <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

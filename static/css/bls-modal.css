@@ -794,8 +794,8 @@ body.modal-open .server-edit-modal .server-edit-content {
 .dispose-text {
   flex: 1 1 auto;
   color: #475569;
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 13px;
+  line-height: 1.6;
   word-break: break-word;
 }
 
@@ -874,6 +874,12 @@ body.modal-open .server-edit-modal .server-edit-content {
   max-width: 660px;
 }
 
+/* 알림 모달: 공통 삭제 모달과 동일하게 max-width 640px */
+.system-message-modal .server-add-content,
+.bls-download-modal--message .server-add-content {
+  max-width: 640px;
+}
+
 .bls-download-modal .server-add-header,
 .bls-download-modal .server-edit-header,
 .system-download-modal .server-add-header,
@@ -940,6 +946,29 @@ body.modal-open .server-edit-modal .server-edit-content {
   display: block;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.06));
   border-radius: 10px;
+}
+
+.system-message-modal .message-illust img {
+  width: 176px;
+  max-width: min(30vw, 176px);
+  filter: none;
+  border-radius: 0;
+}
+
+.system-delete-modal .dispose-illust img {
+  filter: none;
+  border-radius: 0;
+}
+
+.system-message-modal .server-add-actions .btn-primary {
+  box-shadow: none;
+}
+
+.system-message-modal .server-add-actions .btn-primary:hover,
+.system-message-modal .server-add-actions .btn-primary:focus,
+.system-message-modal .server-add-actions .btn-primary:focus-visible {
+  box-shadow: none;
+  outline: none;
 }
 
 /* 라디오 그룹 (다운로드 범위 선택) */
@@ -1145,6 +1174,11 @@ body.modal-open .server-edit-modal .server-edit-content {
   .system-message-modal .message-illust img {
     width: 160px;
     max-width: 60vw;
+  }
+
+  .system-message-modal .message-illust img {
+    width: 148px;
+    max-width: 56vw;
   }
 
   .bls-download-modal .server-add-actions,

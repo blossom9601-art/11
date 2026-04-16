@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from flask import Blueprint, render_template, abort, request, redirect, url_for, session
 import os
 
@@ -71,7 +73,7 @@ _KEY_MENU_CODE = {
     'category_software': 'category.software', 'category_component': 'category.component',
     'cat_hw_dashboard': 'category.hardware', 'cat_hw': 'category.hardware',
     'cat_sw_dashboard': 'category.software', 'cat_sw': 'category.software',
-    'category_company': 'category.company', 'category_customer': 'category.customer',
+    'category_company': 'category.company', 'cat_company_company': 'category.company', 'cat_company_department': 'category.company', 'cat_company_center': 'category.company', 'category_customer': 'category.customer',
     'category_vendor': 'category.vendor',
     'admin_user': 'settings.user', 'admin_role': 'settings.permission',
     'admin_auth': 'settings.auth', 'admin_security': 'settings.security',
@@ -674,6 +676,7 @@ TEMPLATE_MAP = {
     'cat_component_etc_task': '9.category/9-4.component/9-4-7.etc/tab11-task.html',
     'cat_component_etc_log': '9.category/9-4.component/9-4-7.etc/tab14-log.html',
     'cat_component_etc_file': '9.category/9-4.component/9-4-7.etc/tab15-file.html',
+    'cat_company_company': '9.category/9-5.company/9-5-1.company/1.company_list.html',
     'cat_company_center': '9.category/9-5.company/9-5-1.center/1.center_list.html',
     'cat_company_department': '9.category/9-5.company/9-5-2.department/1.department_list.html',
     'cat_customer_client1': '9.category/9-6.customer/9-6-1.customer/1.client1_list.html',
@@ -754,7 +757,22 @@ def show(key: str, token: str | None = None):
     # blossom.js SPA fetch 요청(X-Requested-With 헤더)이 아닌 경우
     # 최소 셸(header+sidebar+skeleton)을 반환하고, JS가 콘텐츠를 비동기 로드한다.
     _xhr = request.headers.get('X-Requested-With', '')
-    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+    _force_full_render_keys = {
+        'cat_business_dashboard',
+        # 비용관리 탭은 탭 전환 실패 시에도 풀 페이지 이동으로 항상 복구되도록
+        # SPA 셸 우회(직접 방문/기본 링크 이동 시에도 즉시 풀 렌더 반환)
+        'cost_opex_dashboard',
+        'cost_opex_hardware',
+        'cost_opex_software',
+        'cost_opex_etc',
+        'cost_capex_dashboard',
+        'cost_capex_contract',
+        # 워크플로우 디자이너 페이지도 셸 고착 시 즉시 복구되도록 풀 렌더 강제
+        'wf_designer_explore',
+        'wf_designer_manage',
+        'wf_designer_editor',
+    }
+    if key not in _force_full_render_keys and _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
         return render_template(
             'layouts/spa_shell.html',
             current_key=key,
@@ -3904,6 +3922,14 @@ def show(key: str, token: str | None = None):
                         _fn, _code_key, _type_key, _count_key = _lu
                         _dbrow = _fn(int(_hw_id_for_ctx))
                         if _dbrow:
+                            _vendor_code = str(_dbrow.get('manufacturer_code') or '').strip()
+                            _vendor_name = str(_dbrow.get('manufacturer_name') or '').strip()
+                            if not _vendor_name and _vendor_code:
+                                try:
+                                    _vendor_row = get_vendor_by_code(_vendor_code, include_deleted=True)
+                                except Exception:
+                                    _vendor_row = None
+                                _vendor_name = str((_vendor_row or {}).get('manufacturer_name') or (_vendor_row or {}).get('vendor') or '').strip()
                             _server_code_for_ctx = str(_dbrow.get(_code_key) or '').strip()
                             _hw_extra_for_ctx['hw_type'] = str(_dbrow.get(_type_key) or '').strip()
                             _hw_extra_for_ctx['release_date'] = str(_dbrow.get('release_date') or '').strip()
@@ -3914,7 +3940,7 @@ def show(key: str, token: str | None = None):
                             _hw_extra_for_ctx['qty'] = str(_qty) if _qty is not None else ''
                             _hw_extra_for_ctx['note'] = str(_dbrow.get('remark') or '').strip()
                             title = str(_dbrow.get('model_name') or '').strip() or '모델명'
-                            subtitle = str(_dbrow.get('manufacturer_code') or '').strip() or '제조사'
+                            subtitle = _vendor_name or _vendor_code or '제조사'
                             # Persist refreshed data back to session
                             _cb_key = _cat_base_key(key)
                             _ctx_store = session.get('cat_detail_ctx_v1')
@@ -4017,7 +4043,7 @@ def show(key: str, token: str | None = None):
             vendor_row = None
             if vendor_code:
                 try:
-                    vendor_row = get_vendor_by_code(vendor_code)
+                    vendor_row = get_vendor_by_code(vendor_code, include_deleted=True)
                 except Exception:
                     vendor_row = None
             vendor_name = ((vendor_row or {}).get('manufacturer_name') or (vendor_row or {}).get('vendor') or vendor_code).strip()
@@ -4110,7 +4136,7 @@ def show(key: str, token: str | None = None):
             vendor_name = (resolved.get('manufacturer_name') or '').strip()
             if not vendor_name and vendor_code:
                 try:
-                    vendor_row = get_vendor_by_code(vendor_code)
+                    vendor_row = get_vendor_by_code(vendor_code, include_deleted=True)
                 except Exception:
                     vendor_row = None
                 vendor_name = ((vendor_row or {}).get('manufacturer_name') or (vendor_row or {}).get('vendor') or vendor_code).strip()
@@ -4154,7 +4180,7 @@ def show(key: str, token: str | None = None):
             vendor_name = (resolved.get('manufacturer_name') or '').strip()
             if not vendor_name and vendor_code:
                 try:
-                    vendor_row = get_vendor_by_code(vendor_code)
+                    vendor_row = get_vendor_by_code(vendor_code, include_deleted=True)
                 except Exception:
                     vendor_row = None
                 vendor_name = ((vendor_row or {}).get('manufacturer_name') or (vendor_row or {}).get('vendor') or vendor_code).strip()
@@ -4198,7 +4224,7 @@ def show(key: str, token: str | None = None):
             vendor_name = (resolved.get('manufacturer_name') or '').strip()
             if not vendor_name and vendor_code:
                 try:
-                    vendor_row = get_vendor_by_code(vendor_code)
+                    vendor_row = get_vendor_by_code(vendor_code, include_deleted=True)
                 except Exception:
                     vendor_row = None
                 vendor_name = ((vendor_row or {}).get('manufacturer_name') or (vendor_row or {}).get('vendor') or vendor_code).strip()
@@ -4242,7 +4268,7 @@ def show(key: str, token: str | None = None):
             vendor_name = (resolved.get('manufacturer_name') or '').strip()
             if not vendor_name and vendor_code:
                 try:
-                    vendor_row = get_vendor_by_code(vendor_code)
+                    vendor_row = get_vendor_by_code(vendor_code, include_deleted=True)
                 except Exception:
                     vendor_row = None
                 vendor_name = ((vendor_row or {}).get('manufacturer_name') or (vendor_row or {}).get('vendor') or vendor_code).strip()
@@ -4718,44 +4744,45 @@ def show(key: str, token: str | None = None):
     _RACK_LAB_DEFAULTS = {
         'dc_rack_lab1': {
             'page_class': 'page-rack-lab1',
-            'center_name': '퓨처센터(5층)',
-            'bg_image': '/static/image/center/system_lab1/system_lab1.PNG',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': '',
             'overlay_store_key': 'rack_lab1_overlay_boxes',
             'surface_api_base': '/api/system-lab1-surfaces',
-            'center_code': '퓨처센터(5층)',
+            'center_code': '샘플 데이터센터',
         },
         'dc_rack_lab2': {
             'page_class': 'page-system-lab2',
-            'center_name': '퓨처센터(6층)',
-            'bg_image': '/static/image/center/system_lab2/system_lab2.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': '',
             'overlay_store_key': 'rack_lab2_overlay_boxes',
             'surface_api_base': '/api/system-lab2-surfaces',
-            'center_code': '퓨처센터(6층)',
+            'center_code': '샘플 데이터센터',
         },
         'dc_rack_lab3': {
             'page_class': 'page-system-lab3',
-            'center_name': '을지트윈타워(15층)',
-            'bg_image': '/static/image/center/system_lab3/system_lab3.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': 'width:75%; margin:0 auto;',
             'overlay_store_key': 'rack_lab3_overlay_boxes',
             'surface_api_base': '',
-            'center_code': '을지트윈타워(15층)',
+            'center_code': '샘플 데이터센터',
         },
         'dc_rack_lab4': {
             'page_class': 'page-system-lab4',
-            'center_name': '재해복구센터(4층)',
-            'bg_image': '/static/image/center/system_lab4/system_lab4.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': 'width:75%; margin:0 auto;',
             'overlay_store_key': 'rack_lab4_overlay_boxes',
             'surface_api_base': '',
-            'center_code': '재해복구센터(4층)',
+            'center_code': '샘플 데이터센터',
         },
     }
     if key in _RACK_LAB_DEFAULTS or (key.startswith('dc_rack_lab') and key not in ('dc_rack_list',)):
         import json as _json_rack
         _rack_cfg = {}
+        _tab = None
         try:
             _tab = PageTabConfig.query.filter(
                 PageTabConfig.route_key == key,
@@ -4769,7 +4796,8 @@ def show(key: str, token: str | None = None):
         if not _rack_cfg:
             _rack_cfg = _RACK_LAB_DEFAULTS.get(key, {})
         context['page_class'] = _rack_cfg.get('page_class', 'page-rack-lab')
-        context['center_name'] = _rack_cfg.get('center_name', '배치도')
+        # 탭 제목을 center_name 으로 사용
+        context['center_name'] = (_tab.tab_name if _tab and _tab.tab_name else _rack_cfg.get('center_name', '배치도'))
         context['bg_image'] = _rack_cfg.get('bg_image', '')
         context['layout_style'] = _rack_cfg.get('layout_style', '')
         context['overlay_store_key'] = _rack_cfg.get('overlay_store_key', '')
@@ -4786,32 +4814,32 @@ def show(key: str, token: str | None = None):
     _THERMO_LAB_DEFAULTS = {
         'dc_thermo_lab1': {
             'page_class': 'page-system-lab1',
-            'center_name': '퓨처센터(5층)',
-            'bg_image': '/static/image/center/system_lab1/system_lab1.PNG',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': '',
             'overlay_store_key': 'thermo_lab1_overlay_boxes',
             'overlay_floor_key': 'thermo-future-5f',
         },
         'dc_thermo_lab2': {
             'page_class': 'page-system-lab2',
-            'center_name': '퓨처센터(6층)',
-            'bg_image': '/static/image/center/system_lab2/system_lab2.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': '',
             'overlay_store_key': 'thermo_lab2_overlay_boxes',
             'overlay_floor_key': 'thermo-future-6f',
         },
         'dc_thermo_lab3': {
             'page_class': 'page-system-lab3',
-            'center_name': '을지트윈타워(15층)',
-            'bg_image': '/static/image/center/system_lab3/system_lab3.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': 'width:75%; margin:0 auto;',
             'overlay_store_key': 'thermo_lab3_overlay_boxes',
             'overlay_floor_key': 'thermo-eulji-15f',
         },
         'dc_thermo_lab4': {
             'page_class': 'page-system-lab4',
-            'center_name': '재해복구센터(4층)',
-            'bg_image': '/static/image/center/system_lab4/system_lab4.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'layout_style': 'width:75%; margin:0 auto;',
             'overlay_store_key': 'thermo_lab4_overlay_boxes',
             'overlay_floor_key': 'thermo-drcenter-4f',
@@ -4820,6 +4848,7 @@ def show(key: str, token: str | None = None):
     if key in _THERMO_LAB_DEFAULTS or (key.startswith('dc_thermo_lab') and key not in ('dc_thermometer_list', 'dc_thermometer_log')):
         import json as _json_thermo
         _thermo_cfg = {}
+        _tab = None
         try:
             _tab = PageTabConfig.query.filter(
                 PageTabConfig.route_key == key,
@@ -4833,7 +4862,8 @@ def show(key: str, token: str | None = None):
         if not _thermo_cfg:
             _thermo_cfg = _THERMO_LAB_DEFAULTS.get(key, {})
         context['page_class'] = _thermo_cfg.get('page_class', 'page-system-lab')
-        context['center_name'] = _thermo_cfg.get('center_name', '배치도')
+        # 탭 제목을 center_name 으로 사용
+        context['center_name'] = (_tab.tab_name if _tab and _tab.tab_name else _thermo_cfg.get('center_name', '배치도'))
         context['bg_image'] = _thermo_cfg.get('bg_image', '')
         context['layout_style'] = _thermo_cfg.get('layout_style', '')
         context['overlay_store_key'] = _thermo_cfg.get('overlay_store_key', '')
@@ -4842,32 +4872,32 @@ def show(key: str, token: str | None = None):
     _CCTV_LAB_DEFAULTS = {
         'dc_cctv_lab1': {
             'page_class': 'page-cctv-lab1',
-            'center_name': '퓨처센터(5층)',
-            'bg_image': '/static/image/center/system_lab1/system_lab1.PNG',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'api_base': '/api/system-lab1-cctvs',
             'overlay_store_key': 'cctv_lab1_overlay_boxes',
             'legacy_overlay_keys': ['thermo_lab1_overlay_boxes'],
         },
         'dc_cctv_lab2': {
             'page_class': 'page-cctv-lab2',
-            'center_name': '퓨처센터(6층)',
-            'bg_image': '/static/image/center/system_lab2/system_lab2.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'api_base': '/api/system-lab2-cctvs',
             'overlay_store_key': 'cctv_lab2_overlay_boxes',
             'legacy_overlay_keys': ['thermo_lab2_overlay_boxes'],
         },
         'dc_cctv_lab3': {
             'page_class': 'page-cctv-lab3',
-            'center_name': '을지트윈타워(15층)',
-            'bg_image': '/static/image/center/system_lab3/system_lab3.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'api_base': '/api/system-lab3-cctvs',
             'overlay_store_key': 'cctv_lab3_overlay_boxes',
             'legacy_overlay_keys': ['thermo_lab3_overlay_boxes'],
         },
         'dc_cctv_lab4': {
             'page_class': 'page-cctv-lab4',
-            'center_name': '재해복구센터(4층)',
-            'bg_image': '/static/image/center/system_lab4/system_lab4.png',
+            'center_name': 'Sample Datacenter',
+            'bg_image': '/static/image/center/sample/sample_datacenter.svg?v=20260413_4',
             'api_base': '/api/system-lab4-cctvs',
             'overlay_store_key': 'cctv_lab4_overlay_boxes',
             'legacy_overlay_keys': ['thermo_lab4_overlay_boxes'],
@@ -4876,6 +4906,7 @@ def show(key: str, token: str | None = None):
     if key in _CCTV_LAB_DEFAULTS or (key.startswith('dc_cctv_lab') and key != 'dc_cctv_list'):
         import json as _json_cctv
         _cctv_cfg = {}
+        _tab = None
         try:
             _tab = PageTabConfig.query.filter(
                 PageTabConfig.route_key == key,
@@ -4889,7 +4920,8 @@ def show(key: str, token: str | None = None):
         if not _cctv_cfg:
             _cctv_cfg = _CCTV_LAB_DEFAULTS.get(key, {})
         context['page_class'] = _cctv_cfg.get('page_class', 'page-cctv-lab')
-        context['center_name'] = _cctv_cfg.get('center_name', '배치도')
+        # 탭 제목을 center_name 으로 사용
+        context['center_name'] = (_tab.tab_name if _tab and _tab.tab_name else _cctv_cfg.get('center_name', '배치도'))
         context['bg_image'] = _cctv_cfg.get('bg_image', '')
         context['api_base'] = _cctv_cfg.get('api_base', '')
         context['overlay_store_key'] = _cctv_cfg.get('overlay_store_key', '')

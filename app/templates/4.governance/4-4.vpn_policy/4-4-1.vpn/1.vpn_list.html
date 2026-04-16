@@ -127,7 +127,7 @@
             window.__GOV_VPN_POLICY_DETAIL_URL = "{{ url_for('pages.show', key=vpn_base + '_detail') }}";
             window.__GOV_VPN_SCOPE = "{{ vpn_base.replace('gov_vpn_policy', 'VPN').replace('VPN', 'VPN1', 1) if vpn_base == 'gov_vpn_policy' else 'VPN' + vpn_base[-1] }}";
         </script>
-    <script src="/static/js/4.governance/4-4.vpn_policy/4-4-1.vpn/1.vpn_list.js?v=1.0.12"></script>
+    <script src="/static/js/4.governance/4-4.vpn_policy/4-4-1.vpn/1.vpn_list.js?v=1.0.16"></script>
 
         <!-- VPN 정책 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -144,9 +144,13 @@
                         <div class="form-section">
                             <div class="section-header"><h4>기본</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>기관명<span class="required">*</span></label><input name="org_name" class="form-input" placeholder="입력" required></div>
+                                <div class="form-row"><label>기관명<span class="required">*</span></label>
+                                    <select name="org_name" class="form-input search-select" data-searchable="true" data-placeholder="기관명 검색" data-allow-clear="true" required>
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
                                 <div class="form-row"><label>상태</label>
-                                    <select name="status" class="form-input">
+                                    <select name="status" class="form-input search-select">
                                         <option value="">선택</option>
                                         <option value="운용">운용</option>
                                         <option value="해지">해지</option>
@@ -155,7 +159,7 @@
                                 <div class="form-row"><label>회선속도</label><input name="line_speed" class="form-input" placeholder="예: 100M, 1G"></div>
                                 <div class="form-row"><label>회선수</label><input name="line_count" type="number" min="0" step="1" class="form-input" placeholder="숫자"></div>
                                 <div class="form-row"><label>프로토콜</label>
-                                    <select name="protocol" class="form-input">
+                                    <select name="protocol" class="form-input search-select">
                                         <option value="">선택</option>
                                         <option value="TCP">TCP</option>
                                         <option value="UDP">UDP</option>
@@ -331,7 +335,7 @@
 
         {% include 'layouts/_stats_modal.html' %}
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
 </body>
 </html>

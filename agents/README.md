@@ -1,6 +1,6 @@
 # Lumina 자산 자동 탐색 에이전트
 
-호스트에서 인터페이스, 계정, 패키지 정보를 자동 수집하여 Blossom 서버로 전송하는 에이전트입니다.
+호스트에서 인터페이스, 계정, 권한, 방화벽, 스토리지, 패키지 정보를 자동 수집하여 Blossom 서버로 전송하는 에이전트입니다.
 
 ## 수집 항목
 
@@ -8,6 +8,9 @@
 |----|------|------|
 | tab04 | 인터페이스 | NIC, IP, MAC, 슬롯 등 |
 | tab05 | 계정 | Linux/Windows 사용자 계정 |
+| tab06 | 권한 | sudo/admin 그룹 및 권한 구성 |
+| tab08 | 방화벽 | firewalld/iptables/Windows 방화벽 규칙 |
+| tab10 | 스토리지 | 마운트/디스크/볼륨 사용량 |
 | tab13 | 패키지 | 설치된 패키지/프로그램 |
 
 ## 구조
@@ -24,6 +27,12 @@ agents/
 │   └── collectors/
 │       ├── interface.py        # NIC 수집
 │       ├── account.py          # 계정 수집
+│       ├── authority.py        # 권한 수집
+│       ├── firewalld.py        # 방화벽 수집
+│       ├── storage.py          # 스토리지 수집
+│       ├── authority.py        # 권한 수집
+│       ├── firewalld.py        # 방화벽 수집
+│       ├── storage.py          # 스토리지 수집
 │       └── package.py          # 패키지 수집
 └── windows/
     ├── agent.py                # Windows 서비스 메인
@@ -91,7 +100,7 @@ interval = 3600
 output_dir = /var/lib/lumina
 
 # 수집할 항목 (comma-separated)
-collectors = interface,account,package
+collectors = interface,account,authority,firewalld,storage,package
 ```
 
 ### 설정 파일 위치

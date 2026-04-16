@@ -11,9 +11,9 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
     <link rel="stylesheet" href="/static/css/admin.css">
-    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.21">
-    <script defer src="/static/js/blossom.js"></script>
-    <script defer src="/static/js/authentication/11-2.basic/sign-in.js?v=20250228a"></script>
+    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+    <script defer src="/static/js/blossom.js?v=20260412_terms"></script>
+    <script defer src="/static/js/authentication/11-2.basic/sign-in.js?v=20260412_mfa"></script>
 </head>
 <body class="page-auth-signin">
     <div class="login-left"></div>
@@ -43,10 +43,92 @@
                 <button type="submit" class="login-button">로그인</button>
             </form>
             <div class="login-footer">
-                <p>한달에 한번씩 확인하기, <a href="/terms">약관보기</a></p>
+                <p><a href="#" id="open-change-pw">비밀번호 변경</a> &nbsp;|&nbsp; <a href="#" id="open-forgot-pw">비밀번호 찾기</a> &nbsp;|&nbsp; <a href="/terms">약관보기</a></p>
             </div>
         </div>
-        <div class="signin-panel-footer">2025-2026 © BLOSSOM PROJECT</div>
+        <div class="signin-panel-footer">© 2025–2026 BLOSSOM PROJECT. All rights reserved.</div>
+    </div>
+
+    <!-- ═══ 비밀번호 변경 모달 ═══ -->
+    <div id="chpw-modal" class="mfa-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="mfa-modal-card">
+            <div class="mfa-modal-header">
+                <h3>비밀번호 변경</h3>
+                <p>사번과 현재 비밀번호를 확인한 후 새 비밀번호를 설정합니다.</p>
+            </div>
+            <div class="mfa-modal-body">
+                <form id="chpw-form" autocomplete="off">
+                    <div class="chpw-field">
+                        <label for="chpw-emp">사번</label>
+                        <input type="text" id="chpw-emp" name="emp_no" placeholder="사번을 입력하세요" required>
+                    </div>
+                    <div class="chpw-field">
+                        <label for="chpw-cur">현재 비밀번호</label>
+                        <input type="password" id="chpw-cur" name="current_password" placeholder="현재 비밀번호" required>
+                    </div>
+                    <div class="chpw-field">
+                        <label for="chpw-new">새 비밀번호</label>
+                        <input type="password" id="chpw-new" name="new_password" placeholder="8자 이상, 3종 이상 조합" required>
+                    </div>
+                    <div class="chpw-field">
+                        <label for="chpw-confirm">새 비밀번호 확인</label>
+                        <input type="password" id="chpw-confirm" name="confirm_password" placeholder="새 비밀번호 재입력" required>
+                    </div>
+                    <div class="chpw-hint" id="chpw-hint">대문자, 소문자, 숫자, 특수문자 중 3종 이상 포함 (8자 이상)</div>
+                    <div class="chpw-msg" id="chpw-msg"></div>
+                </form>
+            </div>
+            <div class="mfa-modal-footer">
+                <button type="button" class="mfa-cancel-btn" id="chpw-cancel">취소</button>
+                <button type="submit" form="chpw-form" class="mfa-confirm-btn" id="chpw-submit">변경</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ 비밀번호 찾기 모달 (스텝) ═══ -->
+    <div id="forgot-modal" class="mfa-modal-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="mfa-modal-card">
+            <div class="mfa-modal-header">
+                <h3>비밀번호 찾기</h3>
+                <p id="forgot-desc">본인 확인을 위해 정보를 입력해주세요.</p>
+            </div>
+            <div class="mfa-modal-body">
+                <!-- 스텝 인디케이터 -->
+                <div class="forgot-steps">
+                    <span class="forgot-step active" data-step="1">1. 사번</span>
+                    <span class="forgot-step" data-step="2">2. 이메일</span>
+                    <span class="forgot-step" data-step="3">3. 이름</span>
+                </div>
+                <form id="forgot-form" autocomplete="off">
+                    <!-- Step 1: 사번 -->
+                    <div class="forgot-panel" id="forgot-step1">
+                        <div class="chpw-field">
+                            <label for="forgot-emp">사번</label>
+                            <input type="text" id="forgot-emp" name="emp_no" placeholder="사번을 입력하세요" required>
+                        </div>
+                    </div>
+                    <!-- Step 2: 이메일 -->
+                    <div class="forgot-panel" id="forgot-step2" style="display:none">
+                        <div class="chpw-field">
+                            <label for="forgot-email">본인확인 이메일</label>
+                            <input type="email" id="forgot-email" name="email" placeholder="등록된 이메일을 입력하세요">
+                        </div>
+                    </div>
+                    <!-- Step 3: 이름 -->
+                    <div class="forgot-panel" id="forgot-step3" style="display:none">
+                        <div class="chpw-field">
+                            <label for="forgot-name">이름</label>
+                            <input type="text" id="forgot-name" name="name" placeholder="등록된 이름을 입력하세요">
+                        </div>
+                    </div>
+                    <div class="chpw-msg" id="forgot-msg"></div>
+                </form>
+            </div>
+            <div class="mfa-modal-footer">
+                <button type="button" class="mfa-cancel-btn" id="forgot-cancel">취소</button>
+                <button type="button" class="mfa-confirm-btn" id="forgot-next">다음</button>
+            </div>
+        </div>
     </div>
 
     <!-- ═══ MFA 인증 방식 선택 모달 ═══ -->

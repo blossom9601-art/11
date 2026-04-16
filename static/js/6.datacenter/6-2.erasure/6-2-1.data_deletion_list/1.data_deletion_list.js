@@ -299,6 +299,83 @@
     const fkSourceCache = new Map();
     const fkLabelCache = new Map();
 
+    // ── 행 복제 헬퍼 ──
+    function _collectNonEmptyTrimmedSet(rows, key){
+        const set = new Set();
+        (rows || []).forEach(r=>{
+            const v = String(r?.[key] ?? '').trim();
+            if(v) set.add(v);
+        });
+        return set;
+    }
+
+    function _stripTrailingIndexSuffix(value){
+        const s = String(value ?? '').trim();
+        if(!s) return '';
+        const m = s.match(/^(.*?)(\(\d+\))$/);
+        return (m && m[1]) ? String(m[1]).trimEnd() : s;
+    }
+
+    function _makeUniqueWithNumericSuffix(baseValue, existingSet){
+        const base = _stripTrailingIndexSuffix(baseValue);
+        if(!base) return '';
+        let i = 1;
+        let candidate = `${base}(${i})`;
+        while(existingSet.has(candidate)){
+            i += 1;
+            if(i > 9999) break;
+            candidate = `${base}(${i})`;
+        }
+        existingSet.add(candidate);
+        return candidate;
+    }
+
+    function _promisePool(tasks, limit){
+        limit = limit || 6;
+        const queue = [...tasks];
+        const workers = Array.from({length: Math.max(1, limit|0)}, async ()=>{
+            while(queue.length){
+                const fn = queue.shift();
+                await fn();
+            }
+        });
+        return Promise.all(workers);
+    }
+
+    async function fetchAllForCurrentQuery(){
+        const q = (state.search || '').trim();
+        let page = 1;
+        const pageSize = DATA_DELETE_FETCH_LIMIT;
+        const items = [];
+        let total = null;
+        while(true){
+            const params = new URLSearchParams();
+            params.set('page', String(page));
+            params.set('page_size', String(pageSize));
+            if(q) params.set('q', q);
+            const payload = await fetchJSON(`${DATA_DELETE_API_BASE}?${params.toString()}`);
+            const chunk = Array.isArray(payload?.items) ? payload.items : [];
+            items.push(...chunk);
+            total = Number.isFinite(payload?.total) ? payload.total : total;
+            if(chunk.length < pageSize) break;
+            if(total != null && items.length >= total) break;
+            page += 1;
+            if(page > 1000) break;
+        }
+        return items;
+    }
+
+    async function createEntry(payload){
+        const res = await fetchJSON(DATA_DELETE_API_BASE, {
+            method: 'POST',
+            headers: DATA_DELETE_HEADERS,
+            body: JSON.stringify(payload || {}),
+        });
+        if(res?.success === false){ throw new Error(res?.message || '생성 중 오류가 발생했습니다.'); }
+        return res?.item;
+    }
+    // ── /행 복제 헬퍼 ──
+
     let state = {
         data: [],
         filtered: [],
@@ -2352,12 +2429,54 @@
         document.getElementById(STATS_OK_ID)?.addEventListener('click', closeStats);
         // duplicate selected rows — open confirm modal first
         document.getElementById('system-duplicate-btn')?.addEventListener('click', ()=>{
-            showMessage('복제 기능은 서버 연동 준비 중입니다. 신규 등록 기능을 이용해주세요.', '안내');
+            const count = state.selected.size;
+            if(count===0){ showMessage('복제할 행을 먼저 선택하세요.', '안내'); return; }
+            const subtitle = document.getElementById('duplicate-subtitle');
+            if(subtitle){ subtitle.textContent = `선택된 ${count}개의 행을 복제합니다.`; }
+            openModal('system-duplicate-modal');
         });
         document.getElementById('system-duplicate-close')?.addEventListener('click', ()=> closeModal('system-duplicate-modal'));
         document.getElementById('system-duplicate-confirm')?.addEventListener('click', ()=>{
-            closeModal('system-duplicate-modal');
-            showMessage('복제 기능은 서버 연동 준비 중입니다.', '안내');
+            const ids = [...state.selected].filter(x=> Number.isFinite(x));
+            if(!ids.length){ showMessage('선택된 행을 찾을 수 없습니다.', '오류'); closeModal('system-duplicate-modal'); return; }
+
+            fetchAllForCurrentQuery()
+                .then(async (rows)=>{
+                    const mapped = rows.map(adaptServerItem).filter(Boolean);
+                    const idSet = new Set(ids);
+                    const originals = mapped.filter(r=> idSet.has(r.id));
+                    if(!originals.length) throw new Error('선택된 행을 찾을 수 없습니다.');
+                    const existingSer = _collectNonEmptyTrimmedSet(mapped, 'serial');
+                    const clones = originals.map(o=>{
+                        const apiPayload = {};
+                        apiPayload.status = o.status || '';
+                        apiPayload.work_date = o.work_date || '';
+                        apiPayload.work_dept_code = o.work_dept_code || o.work_dept || '';
+                        apiPayload.worker_id = o.worker_id ?? o.worker ?? '';
+                        if(apiPayload.worker_id !== '') apiPayload.worker_id = parseInt(apiPayload.worker_id, 10) || '';
+                        apiPayload.request_dept_code = o.req_dept_code || o.req_dept || '';
+                        apiPayload.requester_id = o.requester_id ?? o.requester ?? '';
+                        if(apiPayload.requester_id !== '') apiPayload.requester_id = parseInt(apiPayload.requester_id, 10) || '';
+                        apiPayload.manufacturer_code = o.manufacturer_code || o.vendor || '';
+                        apiPayload.disk_code = o.disk_code || o.model || '';
+                        const ser = String(o.serial_number || o.serial || '').trim();
+                        apiPayload.serial_number = ser ? _makeUniqueWithNumericSuffix(ser, existingSer) : '';
+                        apiPayload.success = o.success || '';
+                        apiPayload.failure_reason = o.fail_reason || '';
+                        apiPayload.remark = o.remark || '';
+                        return apiPayload;
+                    });
+                    const tasks = clones.map(c=> async ()=>{ await createEntry(c); });
+                    await _promisePool(tasks, 6);
+                    closeModal('system-duplicate-modal');
+                    state.selected.clear();
+                    refreshFromServer();
+                    showMessage(originals.length + '개 행이 복제되었습니다.', '완료');
+                })
+                .catch(err=>{
+                    closeModal('system-duplicate-modal');
+                    showMessage(err?.message || '복제 중 오류가 발생했습니다.', '오류');
+                });
         });
         // dispose (불용처리)
         document.getElementById(DISPOSE_BTN_ID)?.addEventListener('click', ()=>{

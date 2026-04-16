@@ -12,6 +12,7 @@ from app.services.work_status_service import init_work_status_table
 from app.services.work_operation_service import init_work_operation_table
 from app.services.work_group_service import init_work_group_table
 from app.services.org_department_service import init_org_department_table
+from app.services.org_company_service import init_org_company_table
 from app.services.org_center_service import init_org_center_table
 from app.services.org_rack_service import init_org_rack_table
 from app.services.org_thermometer_service import init_org_thermometer_table
@@ -100,6 +101,76 @@ from flask_migrate import Migrate
 import os
 
 
+CATEGORY_PK_GUARD_TABLES = (
+    'biz_work_category',
+    'biz_work_division',
+    'biz_work_status',
+    'biz_work_operation',
+    'biz_work_group',
+    'hw_server_type',
+    'hw_storage_type',
+    'hw_san_type',
+    'hw_network_type',
+    'hw_security_type',
+    'sw_os_type',
+    'sw_db_type',
+    'sw_middleware_type',
+    'sw_virtual_type',
+    'sw_security_sw_type',
+    'sw_ha_type',
+    'cmp_cpu_type',
+    'cmp_memory_type',
+    'cmp_disk_type',
+    'cmp_nic_type',
+    'cmp_hba_type',
+    'cmp_etc_type',
+    'cmp_gpu_type',
+    'org_company',
+    'org_department',
+    'org_center',
+    'biz_customer_member',
+    'biz_customer_associate',
+    'biz_customer_client',
+    'biz_vendor_manufacturer',
+    'biz_vendor_maintenance',
+)
+
+
+CATEGORY_CODE_GUARD_COLUMNS = {
+    'biz_work_category': 'category_code',
+    'biz_work_division': 'division_code',
+    'biz_work_status': 'status_code',
+    'biz_work_operation': 'operation_code',
+    'biz_work_group': 'group_code',
+    'hw_server_type': 'server_code',
+    'hw_storage_type': 'storage_code',
+    'hw_san_type': 'san_code',
+    'hw_network_type': 'network_code',
+    'hw_security_type': 'security_code',
+    'sw_os_type': 'os_code',
+    'sw_db_type': 'db_code',
+    'sw_middleware_type': 'middleware_code',
+    'sw_virtual_type': 'virtual_code',
+    'sw_security_sw_type': 'secsw_code',
+    'sw_ha_type': 'ha_code',
+    'cmp_cpu_type': 'cpu_code',
+    'cmp_memory_type': 'memory_code',
+    'cmp_disk_type': 'disk_code',
+    'cmp_nic_type': 'nic_code',
+    'cmp_hba_type': 'hba_code',
+    'cmp_etc_type': 'etc_code',
+    'cmp_gpu_type': 'gpu_code',
+    'org_company': 'company_code',
+    'org_department': 'dept_code',
+    'org_center': 'center_code',
+    'biz_customer_member': 'customer_code',
+    'biz_customer_associate': 'associate_code',
+    'biz_customer_client': 'customer_code',
+    'biz_vendor_manufacturer': 'manufacturer_code',
+    'biz_vendor_maintenance': 'maintenance_code',
+}
+
+
 def _ensure_org_user_view(app: Flask) -> None:
     """Provide backward-compatible "user" view backed by org_user."""
     # Legacy raw SQL expects historical columns (created_by/updated_by/is_deleted)
@@ -114,7 +185,7 @@ def _ensure_org_user_view(app: Flask) -> None:
             nickname,
             company,
             department,
-            NULL AS location,
+            location,
             ext_phone,
             mobile_phone,
             email,
@@ -153,6 +224,56 @@ def _ensure_org_user_view(app: Flask) -> None:
             traceback.print_exc()
         except Exception:
             pass
+
+
+def _enforce_category_pk_uniqueness(app: Flask) -> None:
+    """Ensure category master tables never allow duplicate primary/business keys."""
+    with app.app_context():
+        engine = db.engine
+        dialect = engine.url.get_backend_name()
+
+        with engine.begin() as conn:
+            for table in CATEGORY_PK_GUARD_TABLES:
+                if dialect == 'sqlite':
+                    row = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table"), {'table': table}).fetchone()
+                    if not row:
+                        continue
+
+                    table_info = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
+                    has_id_pk = any((col.get('name') == 'id' and int(col.get('pk') or 0) > 0) for col in table_info)
+                    has_id_col = any(col.get('name') == 'id' for col in table_info)
+
+                    if has_id_col and not has_id_pk:
+                        idx_name = f"ux_{table}_id"
+                        conn.execute(text(f"CREATE UNIQUE INDEX IF NOT EXISTS {idx_name} ON {table}(id)"))
+
+                duplicate = conn.execute(
+                    text(f"SELECT id, COUNT(*) AS c FROM {table} GROUP BY id HAVING COUNT(*) > 1 LIMIT 1")
+                ).fetchone()
+                if duplicate:
+                    raise RuntimeError(f"[pk-guard] duplicate id detected in {table}: id={duplicate[0]}, count={duplicate[1]}")
+
+            for table, code_col in CATEGORY_CODE_GUARD_COLUMNS.items():
+                if dialect == 'sqlite':
+                    row = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table"), {'table': table}).fetchone()
+                    if not row:
+                        continue
+                    idx_name = f"ux_{table}_{code_col}"
+                    conn.execute(text(f"CREATE UNIQUE INDEX IF NOT EXISTS {idx_name} ON {table}({code_col})"))
+
+                duplicate = conn.execute(
+                    text(
+                        f"SELECT {code_col}, COUNT(*) AS c "
+                        f"FROM {table} "
+                        f"WHERE {code_col} IS NOT NULL AND TRIM({code_col}) <> '' "
+                        f"GROUP BY {code_col} HAVING COUNT(*) > 1 LIMIT 1"
+                    )
+                ).fetchone()
+                if duplicate:
+                    raise RuntimeError(
+                        f"[pk-guard] duplicate business key detected in {table}.{code_col}: "
+                        f"value={duplicate[0]}, count={duplicate[1]}"
+                    )
 
 def create_app(config_name='default'):
     # static 폴더가 프로젝트 루트(static/)에 있으므로 static_folder를 명시적으로 지정
@@ -253,6 +374,26 @@ def create_app(config_name='default'):
     db.init_app(app)
     Migrate(app, db)
     _ensure_org_user_view(app)
+    _enforce_category_pk_uniqueness(app)
+
+    # ── org_user.location 컬럼 마이그레이션 ──
+    def _ensure_org_user_location(application):
+        try:
+            with application.app_context():
+                engine = db.get_engine()
+                with engine.connect() as conn:
+                    try:
+                        conn.execute(db.text("SELECT location FROM org_user LIMIT 1"))
+                    except Exception:
+                        try:
+                            conn.execute(db.text("ALTER TABLE org_user ADD COLUMN location VARCHAR(128)"))
+                            conn.commit()
+                            print('[org-user] added location column', flush=True)
+                        except Exception as _e:
+                            print('[org-user] location column migration failed:', _e, flush=True)
+        except Exception as _e2:
+            print('[org-user] location migration outer error:', _e2, flush=True)
+    _ensure_org_user_location(app)
 
     # ── 보안 감사 로그 테이블 생성 (DB 초기화 후) ──
     from app.security import init_security_tables
@@ -282,7 +423,7 @@ def create_app(config_name='default'):
                     # menu 테이블
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS menu (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             menu_code VARCHAR(64) UNIQUE NOT NULL,
                             menu_name VARCHAR(128) NOT NULL,
                             parent_menu_id INTEGER REFERENCES menu(id),
@@ -293,7 +434,7 @@ def create_app(config_name='default'):
                     # role_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS role_menu_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -303,7 +444,7 @@ def create_app(config_name='default'):
                     # department_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS department_menu_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             dept_id INTEGER NOT NULL REFERENCES org_department(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -313,7 +454,7 @@ def create_app(config_name='default'):
                     # user_menu_permission
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS user_menu_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                             menu_id INTEGER NOT NULL REFERENCES menu(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -323,7 +464,7 @@ def create_app(config_name='default'):
                     # permission_audit_log (확장)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS permission_audit_log (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             target_type VARCHAR(20) NOT NULL DEFAULT 'role',
                             target_id INTEGER NOT NULL DEFAULT 0,
                             menu_code VARCHAR(64) NOT NULL,
@@ -377,7 +518,7 @@ def create_app(config_name='default'):
                     cur = conn.cursor()
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS detail_page (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             page_code VARCHAR(64) UNIQUE NOT NULL,
                             page_name VARCHAR(128) NOT NULL,
                             parent_page_id INTEGER REFERENCES detail_page(id),
@@ -387,7 +528,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS role_detail_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             role_id INTEGER NOT NULL REFERENCES role(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -396,7 +537,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS department_detail_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             dept_id INTEGER NOT NULL REFERENCES org_department(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -405,7 +546,7 @@ def create_app(config_name='default'):
                     """)
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS user_detail_permission (
-                            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                             user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                             page_id INTEGER NOT NULL REFERENCES detail_page(id) ON DELETE CASCADE,
                             permission_type VARCHAR(10) NOT NULL DEFAULT 'NONE',
@@ -556,6 +697,13 @@ def create_app(config_name='default'):
         except Exception as qt_init_err:
             try:
                 print('[quality-type] table init failed:', qt_init_err, flush=True)
+            except Exception:
+                pass
+        try:
+            init_org_company_table(app)
+        except Exception as company_init_err:
+            try:
+                print('[org-company] table init failed:', company_init_err, flush=True)
             except Exception:
                 pass
         try:
@@ -1071,7 +1219,7 @@ def create_app(config_name='default'):
         try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS smtp_config (
-                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     host        TEXT NOT NULL DEFAULT 'smtp.gmail.com',
                     port        INTEGER NOT NULL DEFAULT 587,
                     encryption  TEXT NOT NULL DEFAULT 'STARTTLS',
@@ -1113,7 +1261,7 @@ def create_app(config_name='default'):
         try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS mfa_config (
-                    id                   INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
                     enabled              INTEGER NOT NULL DEFAULT 0,
                     default_type         TEXT    NOT NULL DEFAULT 'totp',
                     totp_enabled         INTEGER NOT NULL DEFAULT 1,
@@ -1133,7 +1281,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS sms_config (
-                    id            INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
                     provider      TEXT    NOT NULL DEFAULT 'coolsms',
                     api_key       TEXT    NOT NULL DEFAULT '',
                     api_secret    TEXT    NOT NULL DEFAULT '',
@@ -1144,7 +1292,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS company_otp_config (
-                    id            INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
                     provider      TEXT    NOT NULL DEFAULT 'initech',
                     api_endpoint  TEXT    NOT NULL DEFAULT '',
                     api_key       TEXT    NOT NULL DEFAULT '',
@@ -1157,7 +1305,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS mfa_pending_codes (
-                    id         INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
                     emp_no     TEXT    NOT NULL,
                     mfa_type   TEXT    NOT NULL,
                     code       TEXT    NOT NULL,
@@ -1178,7 +1326,7 @@ def create_app(config_name='default'):
         try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_policy (
-                    id                       INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
                     min_length               INTEGER NOT NULL DEFAULT 12,
                     max_length               INTEGER NOT NULL DEFAULT 64,
                     expiry_days              INTEGER NOT NULL DEFAULT 90,
@@ -1213,7 +1361,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_policy_log (
-                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     field_name  TEXT NOT NULL,
                     old_value   TEXT,
                     new_value   TEXT,
@@ -1223,7 +1371,7 @@ def create_app(config_name='default'):
             """))
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS banned_passwords (
-                    id   INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id   INTEGER PRIMARY KEY AUTOINCREMENT,
                     word VARCHAR(255) NOT NULL UNIQUE
                 )
             """))
@@ -1268,7 +1416,7 @@ def create_app(config_name='default'):
         try:
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS active_sessions (
-                    id          INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id  VARCHAR(255) NOT NULL UNIQUE,
                     emp_no      VARCHAR(64)  NOT NULL,
                     user_name   TEXT    NOT NULL DEFAULT '',
@@ -1948,10 +2096,10 @@ def create_app(config_name='default'):
         try:
             if current_emp_no:
                 from app.models import AuthUser, UserProfile
-                prof = UserProfile.query.filter_by(emp_no=current_emp_no).first()
+                prof = UserProfile.query.filter(UserProfile.emp_no.ilike(current_emp_no)).first()
                 au = None
                 if not prof:
-                    au = AuthUser.query.filter_by(emp_no=current_emp_no).first()
+                    au = AuthUser.query.filter(AuthUser.emp_no.ilike(current_emp_no)).first()
                     if au:
                         generated_name = au.emp_no or (au.email.split('@')[0] if au.email else None)
                         default_department = '미지정'
@@ -1977,7 +2125,7 @@ def create_app(config_name='default'):
                 else:
                     # fallback: auth_users 테이블 일부 정보
                     if not au:
-                        au = AuthUser.query.filter_by(emp_no=current_emp_no).first()
+                        au = AuthUser.query.filter(AuthUser.emp_no.ilike(current_emp_no)).first()
                     if au:
                         current_user_name = au.emp_no  # 이름 없을 때 사번 표시용
         except Exception as _profile_e:
@@ -2060,7 +2208,7 @@ def create_app(config_name='default'):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS wrk_report_user_clear (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     report_id INTEGER NOT NULL REFERENCES wrk_report(id) ON DELETE CASCADE,
                     user_id INTEGER NOT NULL REFERENCES org_user(id) ON DELETE CASCADE,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2079,4 +2227,49 @@ def create_app(config_name='default'):
             pass
         print('[wrk-report] wrk_report_user_clear migration error:', e, flush=True)
 
+    # ── RAG 인덱스 백그라운드 워커 시작 ──────────────────────────────────────
+    _start_rag_background_worker(app)
+
     return app
+
+
+def _start_rag_background_worker(app) -> None:
+    """RAG 인덱스 잡 큐를 주기적으로 처리하는 데몬 스레드를 시작합니다.
+
+    - 앱 시작 시 한 번만 실행 (이미 실행 중이면 skip)
+    - 10초 간격으로 rag_index_jobs 의 pending 잡을 처리
+    - 처리할 잡이 없으면 sleep 후 재시도만 반복
+    """
+    import os
+    import threading
+    import time
+
+    _WORKER_INTERVAL = 10   # 초
+    _MAX_JOBS_PER_RUN = 20
+
+    # 동일 프로세스에서 중복 실행 방지
+    if getattr(app, '_rag_worker_started', False):
+        return
+    app._rag_worker_started = True
+
+    def _worker_loop():
+        rag_db_path = os.path.join(app.instance_path, 'rag_index.db')
+        while True:
+            try:
+                if os.path.exists(rag_db_path):
+                    import sys
+                    _scripts_dir = os.path.join(app.root_path, '..', 'scripts', 'ai_briefing')
+                    _scripts_dir = os.path.abspath(_scripts_dir)
+                    if _scripts_dir not in sys.path:
+                        sys.path.insert(0, _scripts_dir)
+                    from rag_index_worker import RagIndexWorker  # type: ignore
+                    worker = RagIndexWorker(rag_db_path)
+                    worker.run_until_empty(max_jobs=_MAX_JOBS_PER_RUN)
+                    worker.close()
+            except Exception:
+                pass  # 로그만 남기고 계속 실행
+            time.sleep(_WORKER_INTERVAL)
+
+    t = threading.Thread(target=_worker_loop, name='rag-index-worker', daemon=True)
+    t.start()
+    print('[rag] background worker started (interval=10s)', flush=True)

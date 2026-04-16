@@ -44,14 +44,15 @@
     white-space: nowrap;
 }
 
-/* ── Row action buttons (mirror #system-table .action-btn from system.css) ── */
+/* ── Row action buttons (match info_message_settings.css) ── */
 #vr-table .action-btn { width:36px; height:36px; border:1px solid #e8eaed; background:#ffffff; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; transition:all .2s ease; margin:0 3px; position:relative; overflow:hidden; }
 #vr-table .action-btn::before { content:""; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.1), transparent); transition:left .5s ease; }
 #vr-table .action-btn:hover { background-color:#f8f9fa; border-color:#8b5cf6; box-shadow:0 2px 8px rgba(139, 92, 246, 0.15); transform:translateY(-1px); }
 #vr-table .action-btn:hover::before { left:100%; }
-#vr-table .action-icon { width:18px; height:18px; filter:grayscale(.55) brightness(1.35) contrast(.8); opacity:.46; transition:all .2s ease; display:block; }
-#vr-table .action-btn:hover .action-icon { filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85; transform:scale(1.1); }
-#vr-table td[data-col=actions] { text-align:left; white-space:nowrap; }
+#vr-table .action-icon { width:18px; height:18px; opacity:.45; filter:grayscale(1) brightness(1.2); transition:all .2s ease; display:block; }
+#vr-table .action-btn:hover .action-icon { opacity:1; filter:none; transform:scale(1.1); }
+#vr-table td[data-col=actions],
+#vr-table td.system-actions { text-align:center; white-space:nowrap; }
 
 /* ── Add button — always-on purple (match Onpremise #system-add-btn) ── */
 #vr-add-btn {
@@ -95,6 +96,21 @@
     filter:brightness(0) invert(1) contrast(1); opacity:1; transform:scale(1.08);
 }
 
+/* ── Empty state (match 품질유형 탭 style) ── */
+#vr-empty.system-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:60px 20px 40px; text-align:center; background:linear-gradient(145deg,#f8fafc 0%, #f1f5f9 70%); border:1px dashed #cbd5e1; border-radius:16px; margin-bottom:18px; position:relative; overflow:hidden; }
+#vr-empty[hidden] { display:none !important; }
+#vr-empty .empty-illustration { width:120px; height:120px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.6); border:1px solid #e2e8f0; border-radius:50%; box-shadow:0 4px 18px -6px rgba(0,0,0,0.08) inset, 0 6px 20px -10px rgba(0,0,0,0.15); }
+#vr-empty .empty-icon-img { width:70px; height:70px; opacity:.75; filter:grayscale(.1); }
+#vr-empty h3 { margin:0; font-size:20px; font-weight:600; color:#334155; letter-spacing:-.5px; }
+#vr-empty p { margin:4px 0 0; font-size:14px; color:#64748b; }
+#vr-empty::after { content:""; position:absolute; width:420px; height:420px; background:radial-gradient(circle at center, rgba(148,163,184,0.25), transparent 70%); top:-180px; right:-180px; pointer-events:none; }
+@media (max-width:680px){
+    #vr-empty.system-empty { padding:46px 16px 34px; }
+    #vr-empty .empty-illustration { width:100px; height:100px; }
+    #vr-empty .empty-icon-img { width:58px; height:58px; }
+    #vr-empty h3 { font-size:18px; }
+}
+
 /* ── Selected row highlight (match onpremise) ── */
 #vr-table tbody tr.selected {
     background-color: rgba(99,102,241,0.10) !important;
@@ -118,8 +134,8 @@
 #vr-edit-modal .form-row label { font-size: 14px; font-weight: 500; color: #34495e; margin: 0; }
 #vr-edit-modal .form-input {
     width: 100%; box-sizing: border-box;
-    padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px;
-    font-size: 14px; min-height: 44px; background: #fff !important;
+    padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px;
+    font-size: 14px; height: auto; line-height: 1.4; background: #fff !important;
     color: #0f172a; margin: 0;
     transition: border-color .2s, box-shadow .2s;
 }

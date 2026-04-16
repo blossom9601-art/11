@@ -156,6 +156,18 @@
         });
         return clone;
     }
+    function normalizeBusinessName(name){
+        return String(name || '').trim().toLowerCase();
+    }
+    function hasDuplicateBusinessName(name, excludeId){
+        const target = normalizeBusinessName(name);
+        if(!target) return false;
+        return state.data.some(row=>{
+            const rowId = Number(row && row.id);
+            if(excludeId != null && Number.isFinite(rowId) && rowId === Number(excludeId)) return false;
+            return normalizeBusinessName(row && row.wc_name) === target;
+        });
+    }
     async function apiListWorkDivisions(){
         const res = await fetch(API_BASE_URL, { headers: { 'Accept': 'application/json' } });
         let data;
@@ -413,7 +425,7 @@
         tbody.innerHTML='';
         const emptyEl = document.getElementById('system-empty');
         if(state.isLoading){
-            tbody.innerHTML = `<tr class="loading-row"><td colspan="${TABLE_COLSPAN}">데이터를 불러오는 중입니다...</td></tr>`;
+            tbody.innerHTML = `<tr class="loading-row"><td colspan="${TABLE_COLSPAN}">&nbsp;</td></tr>`;
             if(emptyEl){ emptyEl.hidden = true; }
             const countEl = document.getElementById(COUNT_ID);
             if(countEl){
@@ -620,7 +632,16 @@
         const titleEl = document.getElementById('message-title');
         const contentEl = document.getElementById('message-content');
         if(titleEl) titleEl.textContent = title || '알림';
-        if(contentEl) contentEl.textContent = String(message || '');
+        if(contentEl){
+            contentEl.textContent = String(message || '');
+            contentEl.style.whiteSpace = 'pre-line';
+        }
+        const modalEl = document.getElementById(modalId);
+        const contentWrap = modalEl ? modalEl.querySelector('.server-add-content') : null;
+        if(contentWrap){
+            contentWrap.style.width = '620px';
+            contentWrap.style.maxWidth = 'min(calc(100vw - 24px), 620px)';
+        }
         openModal(modalId);
     }
 
@@ -707,18 +728,24 @@
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
         const groups = [
-            { title:'업무 구분', cols:['wc_name','wc_desc','note'] }
+            { title:'업무 구분', cols:['wc_name','wc_desc'] }
         ];
         groups.forEach(g=>{
             const section = document.createElement('div'); section.className='form-section';
             section.innerHTML = `<div class="section-header"><h4>${g.title}</h4></div>`;
             const grid = document.createElement('div'); grid.className='form-grid';
             g.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-                // Make only note field span full width; description stays single-line
-                wrap.className = (c === 'note') ? 'form-row form-row-wide' : 'form-row';
+                wrap.className = 'form-row';
                 const labelText = COLUMN_META[c]?.label||c;
                 wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-            section.appendChild(grid); form.appendChild(section);
+            section.appendChild(grid);
+            if(COLUMN_META.note){
+                const noteWrap = document.createElement('div');
+                noteWrap.className = 'form-row';
+                noteWrap.innerHTML = `<label>${COLUMN_META.note.label || '비고'}</label>${generateFieldInput('note', row?.note)}`;
+                section.appendChild(noteWrap);
+            }
+            form.appendChild(section);
         });
 
         // Keep counts unchanged (hidden in modal)
@@ -1133,6 +1160,10 @@
             const data = collectForm(form);
             const payload = preparePayload(data);
             if(!payload.wc_name){ showMessage('업무 구분명을 입력하세요.', '안내'); return; }
+            if(hasDuplicateBusinessName(payload.wc_name)){
+                showMessage('이미 존재하는 업무 구분입니다.\n\n중복 등록은 허용되지 않습니다.', '오류');
+                return;
+            }
             try {
                 const created = await apiCreateWorkDivision(payload);
                 addRow(created);
@@ -1155,6 +1186,10 @@
             const formData = collectForm(form);
             const payload = preparePayload(formData);
             if(!payload.wc_name){ showMessage('업무 구분명을 입력하세요.', '안내'); return; }
+            if(hasDuplicateBusinessName(payload.wc_name, state.data[index].id)){
+                showMessage('이미 존재하는 업무 구분입니다.\n\n중복 수정은 허용되지 않습니다.', '오류');
+                return;
+            }
             try {
                 const updated = await apiUpdateWorkDivision(state.data[index].id, payload);
                 updateRow(index, updated);
@@ -1365,28 +1400,8 @@
         });
         document.getElementById('system-duplicate-close')?.addEventListener('click', ()=> closeModal('system-duplicate-modal'));
         document.getElementById('system-duplicate-confirm')?.addEventListener('click', async ()=>{
-            const originals = state.data.filter(r=> state.selected.has(r.id));
-            if(!originals.length){ showMessage('선택된 행을 찾을 수 없습니다.', '오류'); closeModal('system-duplicate-modal'); return; }
-            let success = 0;
-            try {
-                for(const row of originals){
-                    const payload = {
-                        wc_name: row.wc_name ? `${row.wc_name}_COPY` : `COPY_${row.id}`,
-                        wc_desc: row.wc_desc || '',
-                        hw_count: row.hw_count === '' ? null : row.hw_count,
-                        sw_count: row.sw_count === '' ? null : row.sw_count,
-                        note: row.note || ''
-                    };
-                    const created = await apiCreateWorkDivision(payload);
-                    addRow(created);
-                    success++;
-                }
-                closeModal('system-duplicate-modal');
-                showMessage(`${success}개 행이 복제되었습니다.`, '완료');
-            } catch(err){
-                console.error(err);
-                showMessage((err && err.message) || '복제 중 오류가 발생했습니다.', '오류');
-            }
+            closeModal('system-duplicate-modal');
+            showMessage('카테고리 정책입니다.\n\n복제는 허용되지 않습니다.', '오류');
         });
         // dispose (불용처리)
         document.getElementById(DISPOSE_BTN_ID)?.addEventListener('click', ()=>{
@@ -1501,20 +1516,23 @@
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
         const GROUPS = [
-            { title:'업무 구분', cols:['wc_name','wc_desc','note'] }
+            { title:'업무 구분', cols:['wc_name','wc_desc'] }
         ];
         form.innerHTML = GROUPS.map(g=>{
             const fields = g.cols.filter(c=> !EXCLUDE.has(c));
             if(!fields.length) return '';
             const grid = fields.map(col=>{
                 const meta = COLUMN_META[col]; if(!meta) return '';
-                const wide = (col === 'note');
-                return `<div class="${wide ? 'form-row form-row-wide' : 'form-row'}"><label>${meta.label}</label>${inputFor(col)}</div>`;
+                return `<div class="form-row"><label>${meta.label}</label>${inputFor(col)}</div>`;
             }).join('');
+            const noteRow = COLUMN_META.note
+                ? `<div class="form-row"><label>${COLUMN_META.note.label}</label>${inputFor('note')}</div>`
+                : '';
             return `
                 <div class="form-section">
                     <div class="section-header"><h4>${g.title}</h4></div>
                     <div class="form-grid">${grid}</div>
+                    ${noteRow}
                 </div>`;
         }).join('');
         // no extra widgets for this bulk form

@@ -509,10 +509,9 @@
 		var form = document.getElementById('mfa-settings-form');
 		if (!form) return;
 		form.querySelectorAll('input, select, button').forEach(function(el) {
-			if (el.id === 'mfa-enabled' || el.id === 'mfa-test-login') return;
+			if (el.id === 'mfa-enabled' || el.id === 'mfa-save-btn' || el.id === 'mfa-test-login') return;
 			el.disabled = disabled;
 		});
-		form.classList.toggle('is-disabled', disabled);
 	}
 
 	function maskValue(value, type) {
@@ -571,13 +570,19 @@
 				persistSettings();
 				updateOverviewChips();
 			} else { fill(); }
+			// 페이지 로드 완료 후 TOTP 활성 상태면 QR 즉시 생성
+			var totpEl = document.getElementById('mfa-totp-enabled');
+			if (totpEl && totpEl.checked) { updateTotpQr(form.secret.value); }
 		});
 
 		['totp', 'sms', 'email', 'company-otp'].forEach(function(m) {
 			var chk = document.getElementById('mfa-' + m + '-enabled');
-			if (chk) chk.addEventListener('change', function() { toggleMfaPanels(); });
+			if (chk) chk.addEventListener('change', function() {
+				toggleMfaPanels();
+				// TOTP 활성화 시 QR 즉시 생성
+				if (m === 'totp' && chk.checked) { updateTotpQr(form.secret.value); }
+			});
 		});
-
 		form.addEventListener('submit', function(event) {
 			event.preventDefault();
 			var totpOn = !!document.getElementById('mfa-totp-enabled')?.checked;
@@ -640,7 +645,6 @@
 				qrBox.innerHTML = '<p class="helper-text" style="text-align:center;color:#ef4444">QR 오류: ' + (e.message || '') + '</p>';
 			});
 		}
-
 		loadFromServer().then(function(cfg2) {
 			if (cfg2 && cfg2.totp_secret) updateTotpQr(cfg2.totp_secret);
 		}).catch(function() {});

@@ -218,6 +218,8 @@ body.insight-page .toast{
 /* Modals */
 .insight-page .server-add-modal{ display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:150; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
 .insight-page .server-add-modal.show{ display:block; }
+/* Insight 추가 모달: flex 기반 중앙 정렬 (position:absolute 대신) */
+.insight-page #insight-add-modal.show{ display:flex !important; align-items:center; justify-content:center; }
 .insight-page .modal-overlay-full{ position:fixed !important; inset:0 !important; width:100% !important; height:100% !important; background:rgba(17,24,39,0.55); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); z-index:1300; }
 .insight-page .server-add-content{ position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:90%; max-width:800px; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; }
 .insight-page .server-add-header{ background:linear-gradient(135deg,#f8fafc 0%, #f1f5f9 100%); padding:20px 32px; position:relative; border-bottom:1px solid #e9ecef; }
@@ -228,6 +230,14 @@ body.insight-page .toast{
 .insight-page .server-add-body{ background:#fff; padding:24px 0; flex:1; overflow-y:auto; overflow-x:hidden; }
 .insight-page .server-add-actions{ background:#f5f5f5; padding:24px 32px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e0e0e0; box-shadow:0 -2px 10px rgba(0,0,0,.1); }
 .insight-page .server-add-actions.align-right{ justify-content:flex-end; }
+.insight-page .server-add-content,
+.insight-page .server-edit-content{
+	/* 모달 위치는 고정하고, 등장 시 이동(translate transition)만 제거 */
+	transition:opacity .12s ease !important;
+	animation:none !important;
+	/* 모달 기본 배치를 약간 위로 올림 */
+	margin-top:-48px;
+}
 .insight-page .action-buttons{ display:flex; gap:12px; }
 .insight-page .action-buttons.right{ justify-content:flex-end; }
 .insight-page .btn-primary{ background:#64748b; color:#fff; border:1px solid #64748b; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:.25s; }
@@ -623,20 +633,48 @@ body.insight-page .toast{
 /* Blog add modal form layout */
 .blog-add-sections{ padding:0 32px 10px; }
 .blog-add-section + .blog-add-section{ margin-top:18px; }
+.blog-add-section{ display:flex; flex-direction:column; gap:6px !important; }
 
 .blog-add-section-title{
-	font-size:14px;
+	font-size:14px !important;
 	font-weight:800;
 	color:#111827;
-	margin-bottom:10px;
+	line-height:1 !important;
+	height:14px !important;
+	min-height:14px !important;
+	max-height:14px !important;
+	margin:0 !important;
+	padding:0 !important;
+	overflow:hidden;
 }
 
-.blog-add-field{ display:flex; flex-direction:column; gap:8px; }
-.blog-add-field input{
-	border:1px solid #e5e7eb;
+/* hidden input 명시적 숨김 (flex 레이아웃 참여 방지) */
+.blog-add-field input[type="hidden"]{
+	display:none !important;
+	width:0 !important;
+	height:0 !important;
+	padding:0 !important;
+	margin:0 !important;
+	border:0 !important;
+}
+
+.blog-add-field{ display:flex; flex-direction:column; gap:0; margin:0 !important; padding:0 !important; }
+.blog-add-field input:not([type="hidden"]){
+	box-sizing:border-box !important;
+	border:1px solid #e5e7eb !important;
 	border-radius:10px;
-	padding:12px 12px;
-	font-size:15px;
+	padding:12px 12px !important;
+	font-size:15px !important;
+	line-height:1.4 !important;
+	height:47px !important;
+	min-height:47px !important;
+	max-height:47px !important;
+	margin:0 !important;
+	background-color:#ffffff !important;
+	outline:none !important;
+	box-shadow:none !important;
+	-webkit-appearance:none;
+	appearance:none;
 }
 
 /* Insight detail modal: read-only display fields (no input boxes) */
@@ -652,24 +690,32 @@ body.insight-page .toast{
 	align-items:center;
 	white-space:pre-wrap;
 }
+/* hidden 속성이 있을 때 반드시 숨김 (display:flex가 hidden을 덮어쓰는 것 방지) */
+#insight-add-modal .blog-view-field[hidden],
+#blog-add-modal .blog-view-field[hidden]{
+	display:none !important;
+	height:0 !important;
+	min-height:0 !important;
+	padding:0 !important;
+	margin:0 !important;
+	border:0 !important;
+}
 .insight-page #insight-add-modal .blog-view-field.blog-view-tags{
 	align-items:flex-start;
 }
 
-/* Remove browser default focus ring (black outline) for modal fields */
-.blog-page .blog-add-field input:focus,
-.blog-page .blog-add-field input:focus-visible{
-	outline:none;
-	box-shadow:none;
-	border-color:#e5e7eb;
+/* Focus / validation: 분리된 규칙 (:-moz-ui-invalid를 합치면 Chrome이 전체 규칙 무시) */
+.blog-add-field input:not([type="hidden"]):focus,
+.blog-add-field input:not([type="hidden"]):focus-visible{
+	outline:none !important;
+	box-shadow:none !important;
+	border-color:#e5e7eb !important;
 }
-
-/* Insight pages reuse the blog-style editor modal */
-.insight-page .blog-add-field input:focus,
-.insight-page .blog-add-field input:focus-visible{
-	outline:none;
-	box-shadow:none;
-	border-color:#e5e7eb;
+.blog-add-field input:not([type="hidden"]):invalid,
+.blog-add-field input:not([type="hidden"]):valid{
+	outline:none !important;
+	box-shadow:none !important;
+	border-color:#e5e7eb !important;
 }
 
 /* Blog add modal: increase modal size for a more spacious layout */
@@ -680,8 +726,12 @@ body.insight-page .toast{
 	max-height:92vh;
 }
 
-/* Insight add/edit modal: same sizing as blog add modal */
+/* Insight add/edit modal: same sizing as blog add modal + flex centering */
 .insight-page #insight-add-modal .server-add-content{
+	position:relative;
+	top:auto;
+	left:auto;
+	transform:none;
 	width:94vw;
 	max-width:1180px;
 	height:92vh;
@@ -694,6 +744,10 @@ body.insight-page .toast{
 }
 
 @media (max-width: 720px){
+	.insight-page .server-add-content,
+	.insight-page .server-edit-content{
+		margin-top:-20px;
+	}
 	.blog-page #blog-add-modal .server-add-content{
 		width:96vw;
 		height:94vh;
@@ -1425,13 +1479,59 @@ body.insight-page .toast{
 }
 
 .blog-detail-page .blog-post-header{
+	display:flex;
+	align-items:flex-start;
+	justify-content:space-between;
 	padding:14px 18px 0;
+	gap:8px;
+}
+
+.blog-post-header-actions{
+	display:flex;
+	align-items:center;
+	gap:4px;
+}
+
+.blog-action-btn{
+	width:32px;
+	height:32px;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	background:#f3f4f6;
+	border:1px solid #d1d5db;
+	border-radius:6px;
+	cursor:pointer;
+	transition:all .2s ease;
+	color:#6b7280;
+	flex-shrink:0;
+}
+
+.blog-action-btn:hover{
+	background:#e5e7eb;
+	border-color:#9ca3af;
+	color:#111827;
+	box-shadow:0 2px 4px rgba(0,0,0,.05);
+}
+
+.blog-action-btn.danger:hover{
+	background:#fee2e2;
+	border-color:#f87171;
+	color:#dc2626;
+}
+
+.blog-action-btn-icon{
+	width:18px;
+	height:18px;
+	object-fit:contain;
 }
 
 .blog-author{
 	display:flex;
 	align-items:center;
 	gap:12px;
+	flex:1;
+	min-width:0;
 }
 
 .blog-author-avatar{

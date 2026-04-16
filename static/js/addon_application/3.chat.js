@@ -76,6 +76,7 @@
   const state = {
     isLive: false,
     currentUserId: Number.isFinite(parseInt(chatConfig.profileId, 10)) ? parseInt(chatConfig.profileId, 10) : null,
+    currentUserImage: chatConfig.userImage || '',
     activeDirectoryKey: null,
   };
   const SELF_CONV_PREFIX = 'self-';
@@ -156,6 +157,18 @@
     const num = Number(candidate);
     if (!Number.isFinite(num)) return false;
     return num === Number(state.currentUserId);
+  }
+
+  function isSelfIdentity(member){
+    if (!member) return false;
+    if (isSelfUserId(member.id)) return true;
+    const memberEmp = String(member.empNo || member.emp_no || '').trim().toLowerCase();
+    const selfEmp = String(chatConfig.empNo || '').trim().toLowerCase();
+    if (memberEmp && selfEmp && memberEmp === selfEmp) return true;
+    const memberName = String(member.name || '').trim().toLowerCase();
+    const selfName = String(chatConfig.userName || '').trim().toLowerCase();
+    if (memberName && selfName && memberName === selfName) return true;
+    return false;
   }
 
   function getStorage(){
@@ -286,13 +299,14 @@
   function resolveChatConfig(){
     const el = document.getElementById('chat-config');
     if (!el) {
-      return { roomsUrl: '/api/chat/rooms', apiRoot: '/api/chat', profileId: null, userName: '', empNo: '' };
+      return { roomsUrl: '/api/chat/rooms', apiRoot: '/api/chat', profileId: null, userName: '', empNo: '', userImage: '' };
     }
     const roomsUrlAttr = el.getAttribute('data-rooms-url') || '/api/chat/rooms';
     const apiRootAttr = el.getAttribute('data-api-root');
     const directoryUrlAttr = el.getAttribute('data-directory-url') || '/api/chat/directory';
     const profileIdAttr = parseInt(el.getAttribute('data-profile-id'), 10);
     const userDeptAttr = el.getAttribute('data-user-dept') || '';
+    const userImageAttr = el.getAttribute('data-user-image') || '';
     const cfg = {
       roomsUrl: roomsUrlAttr,
       apiRoot: apiRootAttr || deriveApiRoot(roomsUrlAttr),
@@ -301,6 +315,7 @@
       userName: el.getAttribute('data-user-name') || '',
       empNo: el.getAttribute('data-user-emp-no') || '',
       userDept: userDeptAttr || '',
+      userImage: userImageAttr || '',
     };
     if (typeof el.remove === 'function') {
       el.remove();
@@ -441,6 +456,11 @@
       const empNoRaw = member.emp_no || member.empNo || user.emp_no || user.empNo || '';
       const empNo = empNoRaw ? String(empNoRaw) : '';
       const avatarSrc = resolveAvatarSrc(member.avatar || member.profile_image || user.profile_image || user.avatar_url, user.name || member.name);
+      const candidate = {
+        id: uid,
+        empNo,
+        name: user.name || member.name || '',
+      };
       return {
         id: uid,
         name: user.name || '',
@@ -450,7 +470,7 @@
         extPhone,
         mobilePhone,
         empNo,
-        isSelf: state.currentUserId != null && uid === state.currentUserId,
+        isSelf: isSelfIdentity(candidate),
       };
     }
     if (typeof member === 'object' && member.name) {
@@ -467,7 +487,7 @@
         extPhone,
         mobilePhone,
         empNo,
-        isSelf: !!member.isSelf,
+        isSelf: !!member.isSelf || isSelfIdentity(member),
       };
     }
     return null;
@@ -544,7 +564,7 @@
           id: f.id,
           name: f.original_name || f.name || '파일',
           size: f.file_size,
-          url: f.file_path,
+          url: f.file_path || f.download_url || f.raw_url || f.url || '',
         }))
       : [];
     return {
@@ -599,6 +619,18 @@
 
   function defaultSelfDept(){
     return displayDeptName(chatConfig.userDept || initialProfileDeptLabel || '');
+  }
+
+  function resolveSelfAvatar(){
+    return resolveAvatarSrc(state.currentUserImage || chatConfig.userImage || '', defaultSelfName());
+  }
+
+  function syncHeaderAvatarWithSelf(){
+    const accountBtn = document.getElementById('btn-account');
+    if (!accountBtn) return;
+    const img = accountBtn.querySelector('img.header-avatar-icon');
+    if (!img) return;
+    img.src = resolveSelfAvatar();
   }
 
   function requestHydrateRefresh(){
@@ -806,7 +838,7 @@
       if (empNo && !entry.empNo) entry.empNo = empNo;
       if (!entry.name) entry.name = name;
       if (!entry.department) entry.department = normalizedDept;
-      if (!entry.avatar) entry.avatar = resolveAvatarSrc('', name);
+      entry.avatar = resolveSelfAvatar();
       const merged = new Set(entry.convIds || []);
       selfConvIds.forEach(id => merged.add(id));
       entry.convIds = Array.from(merged);
@@ -822,7 +854,7 @@
       name,
       department: normalizedDept,
       email: '',
-      avatar: resolveAvatarSrc('', name),
+      avatar: resolveSelfAvatar(),
       extPhone: '',
       mobilePhone: '',
       job: '',
@@ -1220,6 +1252,7 @@
         const li = createEl('li', 'chat-item' + (c.id === activeId ? ' active' : ''));
         li.dataset.id = c.id;
         const contact = primaryContact(c);
+        const selfConv = isSelfConversation(c);
         const left = Array.isArray(c.groupAvatars) && c.groupAvatars.length ? (()=>{
           const wrap = createEl('div', 'avatar-stack sm');
           c.groupAvatars.slice(0,3).forEach(src => {
@@ -1230,7 +1263,7 @@
             wrap.appendChild(im);
           });
           return wrap;
-        })() : avatarImg(contact?.avatar || c.avatar, contact?.name || c.name);
+        })() : avatarImg(selfConv ? resolveSelfAvatar() : (contact?.avatar || c.avatar), contact?.name || c.name);
         const deptRaw = contact?.department || c.dept || '';
         const deptLabel = deptRaw ? displayDeptName(deptRaw) : '';
         const subline = (deptLabel && deptLabel !== '소속 미지정') ? `<div class="subline">${deptLabel}</div>` : '';
@@ -1435,6 +1468,8 @@
             chip.href = f.url;
             chip.target = '_blank';
             chip.rel = 'noopener';
+            chip.setAttribute('download', f.name || 'download');
+            chip.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
           }
           row.appendChild(chip);
         });
@@ -1589,14 +1624,18 @@
     if (typeof conv.id === 'string' && conv.id.startsWith(SELF_CONV_PREFIX)) return true;
     const members = materializeMembers(conv);
     if (!members.length) return false;
-    const hasSelf = members.some(member => member?.isSelf);
-    const hasOthers = members.some(member => member && !member.isSelf);
+    const hasSelf = members.some(member => isSelfIdentity(member) || member?.isSelf);
+    const hasOthers = members.some(member => member && !(isSelfIdentity(member) || member.isSelf));
     return hasSelf && !hasOthers;
   }
 
   function materializeMembers(conv){
     if (!conv || !Array.isArray(conv.members)) return [];
-    return conv.members.map(resolveMemberMeta).map(enrichMemberProfile).filter(Boolean);
+    return conv.members
+      .map(resolveMemberMeta)
+      .map(enrichMemberProfile)
+      .filter(Boolean)
+      .map(member => ({ ...member, isSelf: !!member.isSelf || isSelfIdentity(member) }));
   }
 
   function primaryContact(conv){
@@ -1616,6 +1655,7 @@
 
   function updateProfilePanel(conv, isGroup){
     const contact = conv ? primaryContact(conv) : null;
+    const selfConv = isSelfConversation(conv);
     if (profile.nameEl) {
       profile.nameEl.textContent = conv ? (isGroup ? (conv.name || '') : (contact?.name || conv.name || '')) : '';
     }
@@ -1632,7 +1672,7 @@
       profile.locationEl.textContent = contact?.department || conv?.dept || '';
     }
     if (profile.avatarEl) {
-      const baseSrc = conv ? (isGroup ? conv.avatar : (contact?.avatar || conv.avatar)) : null;
+      const baseSrc = conv ? (selfConv ? resolveSelfAvatar() : (isGroup ? conv.avatar : (contact?.avatar || conv.avatar))) : null;
       renderAvatarInto(profile.avatarEl, baseSrc, contact?.name || conv?.name || '');
     }
     if (profile.lastEl) {
@@ -1923,6 +1963,10 @@
       conv.groupAvatars.slice(0,3).forEach(src => {
         wrap.appendChild(avatarImg(src, 'member', 'sm'));
       });
+      return;
+    }
+    if (isSelfConversation(conv)) {
+      wrap.appendChild(avatarImg(resolveSelfAvatar(), defaultSelfName(), 'sm'));
       return;
     }
     const contact = primaryContact(conv);
@@ -2220,7 +2264,13 @@
     renderPendingAttachments();
     const when = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
     const localMessage = { id: Date.now(), who: 'out', text: text || '', time: when };
-    if (attachments.length) localMessage.files = attachments.map(f => ({ name: f?.name || '파일', size: f?.size }));
+    if (attachments.length) {
+      localMessage.files = attachments.map(f => ({
+        name: f?.name || '파일',
+        size: f?.size,
+        url: (f && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') ? URL.createObjectURL(f) : '',
+      }));
+    }
 
     const finalize = (previewText, displayLabel = when)=>{
       if (conv) {
@@ -2553,12 +2603,21 @@
         state.currentUserId = uid;
         chatConfig.profileId = uid;
       }
+      if (data?.profile_image) {
+        state.currentUserImage = data.profile_image;
+        chatConfig.userImage = data.profile_image;
+      }
     } catch (err) {
       console.warn('[chat] Failed to resolve whoami', err);
     }
   }
 
   ensureCurrentUserId().finally(()=>{
+    // Initialize current user's profile image from DB
+    if (state.currentUserImage && profile.avatarEl) {
+      renderAvatarInto(profile.avatarEl, state.currentUserImage, chatConfig.userName || '');
+    }
+    syncHeaderAvatarWithSelf();
     hydrateFromApi();
   });
 

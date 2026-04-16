@@ -18,6 +18,7 @@ ROLE_PERMISSION_FIELDS = (
     'datacenter', 'cost', 'project', 'category', 'insight'
 )
 ADMIN_SESSION_ROLES = ('admin', 'ADMIN', '관리자')
+TEMP_PASSWORD_TTL_MINUTES = 10
 
 
 def _parse_user_agent(ua):
@@ -128,6 +129,24 @@ def _unregister_active_session():
         return
     try:
         db.session.execute(db.text("DELETE FROM active_sessions WHERE session_id = :sid"), {'sid': sid})
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+def _unregister_all_user_sessions(emp_no):
+    """해당 사용자의 모든 session을 active_sessions에서 제거한다.
+    한 페이지에서 로그아웃하면 다른 브라우저/탭의 모든 세션도 무효화.
+    """
+    if not emp_no:
+        return
+    try:
+        db.session.execute(db.text(
+            "DELETE FROM active_sessions WHERE UPPER(emp_no) = UPPER(:emp)"
+        ), {'emp': emp_no})
         db.session.commit()
     except Exception:
         try:
@@ -622,6 +641,15 @@ def login():
             db.session.add(login_history)
             db.session.commit()
             return render_template('authentication/11-2.basic/sign-in.html')
+
+        # 비밀번호 찾기로 발급된 임시 비밀번호 만료 확인
+        if profile and profile.password_expires_at:
+            now_utc = datetime.utcnow()
+            if profile.password_expires_at <= now_utc:
+                flash('임시 비밀번호가 만료되었습니다. 비밀번호 찾기를 다시 진행해주세요.', 'error')
+                db.session.add(login_history)
+                db.session.commit()
+                return render_template('authentication/11-2.basic/sign-in.html')
         
         # 로그인 성공
         user.last_login_at = datetime.utcnow()
@@ -641,13 +669,33 @@ def login():
         # ── MFA 검사 ──────────────────────────────────────────────
         mfa_cfg = _get_mfa_config()
         if mfa_cfg.get('enabled'):
-            # MFA 활성화: 세션에 임시 pending 정보만 저장하고, MFA 인증 후 최종 로그인 완료
-            session['pending_mfa_emp_no'] = user.emp_no
-            session['pending_mfa_user_id'] = user.id
-            # AJAX 로그인이면 JSON 응답, 일반 폼 제출이면 MFA 페이지 렌더
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
-                return jsonify({'mfa_required': True, 'emp_no': user.emp_no})
-            return render_template('authentication/11-2.basic/sign-in.html', mfa_required=True, mfa_emp_no=user.emp_no)
+            # 실제 사용 가능한 MFA 방식이 있는지 사전 검증
+            _has_usable_mfa = False
+            _totp_secret = (mfa_cfg.get('totp_secret') or '').replace('-', '').replace(' ', '')
+            if mfa_cfg.get('totp_enabled') and _totp_secret:
+                _has_usable_mfa = True
+            if not _has_usable_mfa:
+                _p = UserProfile.query.filter_by(emp_no=user.emp_no).first()
+                if mfa_cfg.get('sms_enabled') and _p and (_p.mobile_phone or '').strip():
+                    _has_usable_mfa = True
+                if mfa_cfg.get('email_enabled') and _p and (_p.email or '').strip():
+                    _has_usable_mfa = True
+            if not _has_usable_mfa and mfa_cfg.get('company_otp_enabled'):
+                _otp = CompanyOtpConfig.query.filter_by(id=1).first()
+                if _otp and _otp.enabled and (_otp.api_endpoint or '').strip():
+                    _has_usable_mfa = True
+            if not _has_usable_mfa:
+                current_app.logger.warning(
+                    f'[login] MFA 활성화 상태이나 사용 가능한 인증 방식 없음 — MFA 건너뜀 emp_no={user.emp_no}'
+                )
+            else:
+                # MFA 활성화: 세션에 임시 pending 정보만 저장하고, MFA 인증 후 최종 로그인 완료
+                session['pending_mfa_emp_no'] = user.emp_no
+                session['pending_mfa_user_id'] = user.id
+                # AJAX 로그인이면 JSON 응답, 일반 폼 제출이면 MFA 페이지 렌더
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return jsonify({'mfa_required': True, 'emp_no': user.emp_no})
+                return render_template('authentication/11-2.basic/sign-in.html', mfa_required=True, mfa_emp_no=user.emp_no)
 
         # ── MFA 미사용: 기존 로직 그대로 ──────────────────────────
         # 세션에 사용자 정보 저장 및 ADMIN 불변 강제
@@ -705,12 +753,17 @@ def login():
         if user.needs_terms():
             session['pending_terms_user_id'] = user.id
             flash('서비스 이용 약관 확인이 필요합니다. 약관에 동의 후 계속 진행해주세요.', 'error')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'redirect': url_for('auth.terms')})
             return redirect(url_for('auth.terms'))
 
         # 활성 세션 등록
         _register_active_session(user.emp_no, getattr(user, 'name', '') or user.emp_no)
 
         flash('로그인되었습니다.', 'success')
+        # AJAX 로그인 → JSON 응답 (SPA URL 갱신용)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'redirect': url_for('main.dashboard')})
         # 첫 화면: 지정된 대시보드 템플릿으로 리다이렉트
         return redirect(url_for('main.dashboard'))
 
@@ -719,7 +772,8 @@ def login():
 @auth_bp.route('/logout')
 def logout():
     emp_no = session.get('emp_no', '')
-    _unregister_active_session()
+    # 해당 사용자의 모든 세션을 삭제 — 다중 탭 로그아웃 동기화
+    _unregister_all_user_sessions(emp_no)
     session.clear()
     # 감사 로그 기록
     try:
@@ -1010,6 +1064,14 @@ def settings_password():
             user.set_password(new_password)
             db.session.add(user)
             try:
+                prof = UserProfile.query.filter_by(emp_no=user.emp_no).first()
+                if prof:
+                    prof.password_changed_at = datetime.utcnow()
+                    prof.password_expires_at = None
+                    db.session.add(prof)
+            except Exception:
+                pass
+            try:
                 hist = AuthPasswordHistory(
                     emp_no=user.emp_no,
                     password_hash=user.password_hash,
@@ -1089,6 +1151,144 @@ def register():
     
     return render_template('authentication/sign-up.html')
 
+@auth_bp.route('/api/change-password-public', methods=['POST'])
+def change_password_public():
+    """로그인 화면에서 사번 + 현재 비밀번호 인증 후 새 비밀번호 설정"""
+    import json, re
+    data = request.get_json(silent=True) or {}
+    emp_no = (data.get('emp_no') or '').strip()
+    current_pw = data.get('current_password') or ''
+    new_pw = data.get('new_password') or ''
+    confirm_pw = data.get('confirm_password') or ''
+
+    if not emp_no or not current_pw or not new_pw:
+        return jsonify(success=False, error='모든 항목을 입력해주세요.'), 400
+
+    user = AuthUser.query.filter_by(emp_no=emp_no).first()
+    if not user:
+        return jsonify(success=False, error='사번 또는 비밀번호가 올바르지 않습니다.'), 401
+
+    if not user.check_password(current_pw):
+        return jsonify(success=False, error='사번 또는 비밀번호가 올바르지 않습니다.'), 401
+
+    if new_pw != confirm_pw:
+        return jsonify(success=False, error='새 비밀번호가 일치하지 않습니다.'), 400
+
+    if len(new_pw) < 8:
+        return jsonify(success=False, error='비밀번호는 8자 이상이어야 합니다.'), 400
+
+    has_upper = bool(re.search(r'[A-Z]', new_pw))
+    has_lower = bool(re.search(r'[a-z]', new_pw))
+    has_digit = bool(re.search(r'[0-9]', new_pw))
+    has_symbol = bool(re.search(r'[^A-Za-z0-9]', new_pw))
+    types = sum([has_upper, has_lower, has_digit, has_symbol])
+    if types < 3:
+        return jsonify(success=False, error='대문자, 소문자, 숫자, 특수문자 중 3종 이상 포함해야 합니다.'), 400
+
+    if current_pw == new_pw:
+        return jsonify(success=False, error='현재 비밀번호와 다른 비밀번호를 입력해주세요.'), 400
+
+    user.set_password(new_pw)
+    profile = UserProfile.query.filter_by(emp_no=emp_no).first()
+    if profile:
+        profile.password_changed_at = datetime.utcnow()
+        profile.password_expires_at = None
+        db.session.add(profile)
+    db.session.commit()
+    return jsonify(success=True, message='비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.')
+
+@auth_bp.route('/api/forgot-password/verify', methods=['POST'])
+def forgot_password_verify():
+    """비밀번호 찾기 스텝별 검증"""
+    data = request.get_json(silent=True) or {}
+    step   = data.get('step', 1)
+    emp_no = (data.get('emp_no') or '').strip()
+
+    if not emp_no:
+        return jsonify(success=False, error='사번을 입력해주세요.'), 400
+
+    user = AuthUser.query.filter_by(emp_no=emp_no).first()
+    if not user:
+        return jsonify(success=False, error='등록되지 않은 사번입니다.'), 400
+
+    if step == 1:
+        return jsonify(success=True)
+
+    profile = UserProfile.query.filter_by(emp_no=emp_no).first()
+    email = (data.get('email') or '').strip().lower()
+
+    if step == 2:
+        if not email:
+            return jsonify(success=False, error='이메일을 입력해주세요.'), 400
+        user_email = (user.email or '').strip().lower()
+        profile_email = (profile.email or '').strip().lower() if profile else ''
+        if email != user_email and email != profile_email:
+            return jsonify(success=False, error='등록된 이메일과 일치하지 않습니다.'), 400
+        return jsonify(success=True)
+
+    return jsonify(success=False, error='잘못된 요청입니다.'), 400
+
+@auth_bp.route('/api/forgot-password', methods=['POST'])
+def forgot_password_api():
+    """사번 + 이메일 + 이름 확인 후 등록된 이메일로 임시 비밀번호를 발송"""
+    import secrets, string
+    data = request.get_json(silent=True) or {}
+    emp_no = (data.get('emp_no') or '').strip()
+    email  = (data.get('email') or '').strip().lower()
+    name   = (data.get('name') or '').strip()
+
+    if not emp_no or not email or not name:
+        return jsonify(success=False, error='모든 항목을 입력해주세요.'), 400
+
+    user = AuthUser.query.filter_by(emp_no=emp_no).first()
+    profile = UserProfile.query.filter_by(emp_no=emp_no).first() if user else None
+
+    if not user:
+        return jsonify(success=False, error='등록되지 않은 사번입니다.'), 400
+
+    # 이메일 검증
+    user_email = (user.email or '').strip().lower()
+    profile_email = (profile.email or '').strip().lower() if profile else ''
+    if email != user_email and email != profile_email:
+        return jsonify(success=False, error='등록된 이메일과 일치하지 않습니다.'), 400
+
+    # 이름 검증
+    profile_name = (profile.name or '').strip() if profile else ''
+    if not profile_name or profile_name != name:
+        return jsonify(success=False, error='등록된 이름과 일치하지 않습니다.'), 400
+
+    # 임시 비밀번호 생성: 12자 (대소문자+숫자+특수문자 보장)
+    alphabet = string.ascii_letters + string.digits + '!@#$%&*'
+    while True:
+        temp_pw = ''.join(secrets.choice(alphabet) for _ in range(12))
+        has_upper = any(c.isupper() for c in temp_pw)
+        has_lower = any(c.islower() for c in temp_pw)
+        has_digit = any(c.isdigit() for c in temp_pw)
+        has_sym   = any(c in '!@#$%&*' for c in temp_pw)
+        if has_upper and has_lower and has_digit and has_sym:
+            break
+
+    # 비밀번호 변경 + 임시 비밀번호 만료시각 부여
+    now_utc = datetime.utcnow()
+    user.set_password(temp_pw)
+    user.login_fail_cnt = 0
+    user.locked_until = None
+    user.status = 'active'
+    if profile:
+        profile.password_changed_at = now_utc
+        profile.password_expires_at = now_utc + timedelta(minutes=TEMP_PASSWORD_TTL_MINUTES)
+        db.session.add(profile)
+    db.session.commit()
+
+    # 이메일 발송
+    try:
+        _send_temp_password_email(user.email.strip(), emp_no, temp_pw)
+    except Exception as e:
+        print(f'[forgot-password] email send failed: {e}', flush=True)
+        return jsonify(success=False, error='이메일 발송에 실패했습니다. 관리자에게 문의하세요.'), 500
+
+    return jsonify(success=True, message=f'임시 비밀번호를 이메일로 발송했습니다. 발급 후 {TEMP_PASSWORD_TTL_MINUTES}분 이내에 사용해주세요.')
+
 @auth_bp.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
     if request.method == 'POST':
@@ -1120,22 +1320,19 @@ def new_password():
 
 @auth_bp.route('/terms', methods=['GET', 'POST'])
 def terms():
-    # 로그인 직후 또는 재동의가 필요한 경우 접근
-    user_id = session.get('user_id') or session.get('pending_terms_user_id')
-    if not user_id:
-        flash('로그인이 필요합니다.', 'error')
-        return redirect(url_for('auth.login'))
-
-    user = AuthUser.query.get(user_id)
-    if not user:
-        flash('사용자 정보를 찾을 수 없습니다.', 'error')
-        return redirect(url_for('auth.login'))
+    # GET: 누구나 열람 가능 (비로그인 포함)
+    # POST: 로그인 사용자만 동의 처리
+    user_id = session.get('pending_terms_user_id') or session.get('user_id')
+    user = AuthUser.query.get(user_id) if user_id else None
 
     if request.method == 'POST':
+        if not user:
+            flash('로그인이 필요합니다.', 'error')
+            return redirect(url_for('auth.login'))
         agree = request.form.get('terms_agree')
         if not agree:
             flash('약관에 동의해야 계속 진행할 수 있습니다.', 'error')
-            return render_template('authentication/11-2.basic/terms.html')
+            return render_template('authentication/11-2.basic/terms.html', can_agree=True)
         # 동의 처리: 현재 시각 기록 (UTC)
         user.last_terms_accepted_at = datetime.utcnow()
         db.session.commit()
@@ -1143,7 +1340,8 @@ def terms():
         flash('약관에 동의되었습니다.', 'success')
         return redirect(url_for('main.dashboard'))
 
-    return render_template('authentication/11-2.basic/terms.html')
+    view_only = bool(session.get('user_id')) and not session.get('pending_terms_user_id')
+    return render_template('authentication/11-2.basic/terms.html', can_agree=bool(user), view_only=view_only)
 
 @auth_bp.route('/admin/auth/locked', methods=['GET', 'POST'])
 def admin_locked_users():
@@ -1762,6 +1960,23 @@ def admin_delete_users():
     emp_nos = [e.strip() for e in emp_nos_raw.split(',') if e.strip()]
     if not emp_nos:
         return jsonify({'error':'validation','message':'유효한 emp_nos 없음'}), 400
+
+    # 안전장치: 관리자 계정은 API 레벨에서 삭제 금지
+    blocked_admins = []
+    for emp in emp_nos:
+        user = AuthUser.query.filter_by(emp_no=emp).first()
+        if not user:
+            continue
+        emp_upper = (user.emp_no or '').strip().upper()
+        role_upper = (user.role or '').strip().upper()
+        if emp_upper == 'ADMIN' or role_upper == 'ADMIN':
+            blocked_admins.append(emp)
+    if blocked_admins:
+        return jsonify({
+            'error': 'forbidden',
+            'message': '관리자 계정은 삭제할 수 없습니다.',
+            'blocked': blocked_admins
+        }), 403
 
     deleted = []
     for emp in emp_nos:
@@ -3215,22 +3430,44 @@ def admin_mfa_config_put():
 
 @auth_bp.route('/api/mfa/status', methods=['GET'])
 def mfa_status():
-    """로그인 페이지에서 MFA 활성화 여부 및 허용된 인증 방식을 조회한다. 비인증 요청도 허용."""
+    """로그인 페이지에서 MFA 활성화 여부 및 실제 사용 가능한 인증 방식을 조회한다.
+    각 방식별로 실제 설정/등록 여부를 검증하여 사용 불가한 방식은 제외한다."""
     cfg = _get_mfa_config()
     available_methods = []
+
+    # TOTP: 시크릿 키가 설정되어 있어야 사용 가능
     if cfg.get('totp_enabled', True):
-        available_methods.append('totp')
+        totp_secret = (cfg.get('totp_secret') or '').replace('-', '').replace(' ', '')
+        if totp_secret:
+            available_methods.append('totp')
+
+    # SMS: 로그인 중인 사용자의 휴대번호가 등록되어 있어야 사용 가능
     if cfg.get('sms_enabled', True):
-        available_methods.append('sms')
+        emp_no = session.get('pending_mfa_emp_no')
+        if emp_no:
+            p = UserProfile.query.filter_by(emp_no=emp_no).first()
+            if p and (p.mobile_phone or '').strip():
+                available_methods.append('sms')
+
+    # 이메일: 로그인 중인 사용자의 이메일이 등록되어 있어야 사용 가능
     if cfg.get('email_enabled', True):
-        available_methods.append('email')
+        emp_no = session.get('pending_mfa_emp_no')
+        if emp_no:
+            p = UserProfile.query.filter_by(emp_no=emp_no).first()
+            if p and (p.email or '').strip():
+                available_methods.append('email')
+
+    # 사내 OTP: 서버 설정이 완료되어 있어야 사용 가능
     if cfg.get('company_otp_enabled', False):
-        available_methods.append('company_otp')
-    # 아무것도 없으면 기본 TOTP
-    if not available_methods:
-        available_methods = ['totp']
+        otp_cfg = CompanyOtpConfig.query.filter_by(id=1).first()
+        if otp_cfg and otp_cfg.enabled and (otp_cfg.api_endpoint or '').strip():
+            available_methods.append('company_otp')
+
+    # 사용 가능한 방식이 없으면 MFA 비활성 상태로 응답
+    effective_enabled = cfg['enabled'] and len(available_methods) > 0
+
     return jsonify({
-        'enabled': cfg['enabled'],
+        'enabled': effective_enabled,
         'allow_user_choice': cfg['allow_user_choice'],
         'default_type': cfg['default_type'],
         'methods': available_methods,
@@ -3411,6 +3648,47 @@ def _send_mfa_email(to_addr, code, ttl_seconds):
         <div style="font-size:32px;font-weight:bold;letter-spacing:8px;background:#f1f5f9;
                     padding:16px 24px;border-radius:12px;text-align:center;margin:16px 0;">{code}</div>
         <p style="color:#64748b;font-size:13px;">이 코드는 {minutes}분간 유효합니다. 본인이 요청하지 않았다면 무시하세요.</p>
+    </div>"""
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+    use_auth = getattr(smtp_cfg, 'use_auth', True)
+    if use_auth is None:
+        use_auth = True
+    encryption = (smtp_cfg.encryption or 'STARTTLS').upper()
+    if encryption == 'SSL':
+        server = smtplib.SMTP_SSL(smtp_cfg.host, smtp_cfg.port or 465, timeout=15)
+    else:
+        server = smtplib.SMTP(smtp_cfg.host, smtp_cfg.port or 587, timeout=15)
+        if encryption == 'STARTTLS':
+            server.starttls()
+    if use_auth and smtp_cfg.username and smtp_cfg.password:
+        server.login(smtp_cfg.username, smtp_cfg.password)
+    server.sendmail(msg['From'], [to_addr], msg.as_string())
+    server.quit()
+
+
+def _send_temp_password_email(to_addr, emp_no, temp_pw):
+    """SMTP 설정을 이용해 임시 비밀번호 이메일을 발송한다."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    smtp_cfg = SmtpConfig.query.filter_by(id=1).first()
+    if not smtp_cfg or not smtp_cfg.host:
+        raise RuntimeError('SMTP 서버가 설정되지 않았습니다.')
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = '[Blossom] 임시 비밀번호 안내'
+    msg['From'] = smtp_cfg.from_email or smtp_cfg.username or 'noreply@blossom.local'
+    msg['To'] = to_addr
+    html = f"""<div style="max-width:480px;margin:0 auto;padding:24px;">
+        <h2 style="color:#6366f1;">Blossom 임시 비밀번호</h2>
+        <p>사번 <strong>{emp_no}</strong> 계정의 임시 비밀번호가 발급되었습니다.</p>
+        <div style="font-size:22px;font-weight:bold;background:#f1f5f9;
+                    padding:16px 24px;border-radius:12px;text-align:center;margin:16px 0;
+                    letter-spacing:2px;color:#1e293b;">{temp_pw}</div>
+        <p style="color:#f59e0b;font-size:13px;font-weight:600;">
+            ⏰ 이 임시 비밀번호는 발급 후 <strong>{TEMP_PASSWORD_TTL_MINUTES}분</strong> 이내에만 사용할 수 있습니다.
+        </p>
+        <p style="color:#dc2626;font-size:13px;font-weight:600;">로그인 후 반드시 비밀번호를 변경해주세요.</p>
+        <p style="color:#64748b;font-size:12px;">본인이 요청하지 않았다면 즉시 관리자에게 문의하세요.</p>
     </div>"""
     msg.attach(MIMEText(html, 'html', 'utf-8'))
     use_auth = getattr(smtp_cfg, 'use_auth', True)

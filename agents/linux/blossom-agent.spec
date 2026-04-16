@@ -30,6 +30,9 @@ install -m 755 %{_sourcedir}/linux/agent.py        %{buildroot}/opt/lumina/linux
 install -m 644 %{_sourcedir}/linux/collectors/__init__.py    %{buildroot}/opt/lumina/linux/collectors/
 install -m 644 %{_sourcedir}/linux/collectors/interface.py   %{buildroot}/opt/lumina/linux/collectors/
 install -m 644 %{_sourcedir}/linux/collectors/account.py     %{buildroot}/opt/lumina/linux/collectors/
+install -m 644 %{_sourcedir}/linux/collectors/authority.py   %{buildroot}/opt/lumina/linux/collectors/
+install -m 644 %{_sourcedir}/linux/collectors/firewalld.py   %{buildroot}/opt/lumina/linux/collectors/
+install -m 644 %{_sourcedir}/linux/collectors/storage.py     %{buildroot}/opt/lumina/linux/collectors/
 install -m 644 %{_sourcedir}/linux/collectors/package.py     %{buildroot}/opt/lumina/linux/collectors/
 
 # 설정 디렉터리 (lumina user r/w)

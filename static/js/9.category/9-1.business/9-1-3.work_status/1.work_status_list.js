@@ -446,11 +446,11 @@
         if(!tbody) return;
         if(state.isLoading){
             const colCount = COLUMN_ORDER.length + 2; // checkbox + actions
-            tbody.innerHTML = `<tr class="table-loading-row"><td colspan="${colCount}" class="loading-cell">데이터를 불러오는 중입니다...</td></tr>`;
+            tbody.innerHTML = `<tr class="table-loading-row"><td colspan="${colCount}" class="loading-cell">&nbsp;</td></tr>`;
             const emptyEl = document.getElementById('system-empty');
             if(emptyEl) emptyEl.hidden = true;
             const infoEl = document.getElementById(PAGINATION_INFO_ID);
-            if(infoEl) infoEl.textContent = '불러오는 중...';
+            if(infoEl) infoEl.textContent = '';
             const container = document.getElementById(PAGE_NUMBERS_ID);
             if(container) container.innerHTML='';
             ['system-first','system-prev','system-next','system-last'].forEach(id=>{
@@ -667,7 +667,16 @@
         const titleEl = document.getElementById('message-title');
         const contentEl = document.getElementById('message-content');
         if(titleEl) titleEl.textContent = title || '알림';
-        if(contentEl) contentEl.textContent = String(message || '');
+        if(contentEl){
+            contentEl.textContent = String(message || '');
+            contentEl.style.whiteSpace = 'pre-line';
+        }
+        const modalEl = document.getElementById(modalId);
+        const contentWrap = modalEl ? modalEl.querySelector('.server-add-content') : null;
+        if(contentWrap){
+            contentWrap.style.width = '620px';
+            contentWrap.style.maxWidth = 'min(calc(100vw - 24px), 620px)';
+        }
         openModal(modalId);
     }
 
@@ -770,18 +779,24 @@
         form.innerHTML='';
         form.dataset.recordId = row?.id || '';
         const groups = [
-            { title:'업무 상태', cols:['wc_name','wc_desc','note'] }
+            { title:'업무 상태', cols:['wc_name','wc_desc'] }
         ];
         groups.forEach(g=>{
             const section = document.createElement('div'); section.className='form-section';
             section.innerHTML = `<div class="section-header"><h4>${g.title}</h4></div>`;
             const grid = document.createElement('div'); grid.className='form-grid';
             g.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-                // Make only note field span full width; description stays single-line
-                wrap.className = (c === 'note') ? 'form-row form-row-wide' : 'form-row';
+                wrap.className = 'form-row';
                 const labelText = COLUMN_META[c]?.label||c;
                 wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-            section.appendChild(grid); form.appendChild(section);
+            section.appendChild(grid);
+            if(COLUMN_META.note){
+                const noteWrap = document.createElement('div');
+                noteWrap.className = 'form-row';
+                noteWrap.innerHTML = `<label>${COLUMN_META.note.label || '비고'}</label>${generateFieldInput('note', row?.note)}`;
+                section.appendChild(noteWrap);
+            }
+            form.appendChild(section);
         });
 
         // Keep counts unchanged (hidden in modal)
@@ -1256,7 +1271,7 @@
                 return;
             }
             if(hasStatusName(payload.wc_name)){
-                showMessage('이미 존재하는 업무 상태입니다. 다른 이름을 입력하세요.', '중복 확인');
+                showMessage('이미 존재하는 업무 상태입니다.\n\n중복 등록은 허용되지 않습니다.', '오류');
                 return;
             }
             const button = document.getElementById(ADD_SAVE_ID);
@@ -1288,7 +1303,7 @@
             const raw = collectForm(form);
             const payload = buildPayloadFromFormData(raw);
             if(hasStatusName(payload.wc_name, recordId)){
-                showMessage('이미 존재하는 업무 상태입니다. 다른 이름을 입력하세요.', '중복 확인');
+                showMessage('이미 존재하는 업무 상태입니다.\n\n중복 수정은 허용되지 않습니다.', '오류');
                 return;
             }
             const button = document.getElementById(EDIT_SAVE_ID);
@@ -1563,47 +1578,8 @@
         });
         document.getElementById('system-duplicate-close')?.addEventListener('click', ()=> closeModal('system-duplicate-modal'));
         document.getElementById('system-duplicate-confirm')?.addEventListener('click', async ()=>{
-            const originals = state.data.filter(r=> state.selected.has(r.id));
-            if(!originals.length){
-                showMessage('선택된 행을 찾을 수 없습니다.', '오류');
-                closeModal('system-duplicate-modal');
-                return;
-            }
-            const button = document.getElementById('system-duplicate-confirm');
-            const taken = new Set(state.data.map(r=> normStatusName(r.wc_name)).filter(Boolean));
-            const failures = [];
-            let success = 0;
-            try {
-                setButtonLoading(button, true, '복제 중...');
-                for(const row of originals){
-                    const cloneName = makeUniqueStatusName(row.wc_name, taken);
-                    const payload = {
-                        wc_name: cloneName,
-                        wc_desc: row.wc_desc || '',
-                        note: row.note || '',
-                        hw_count: row.hw_count ?? null,
-                        sw_count: row.sw_count ?? null,
-                        wc_color: row.wc_color || getFallbackColorByName(row.wc_name) || DEFAULT_STATUS_COLOR_CLASS,
-                    };
-                    try {
-                        await apiCreateStatus(payload);
-                        success += 1;
-                    } catch(err){
-                        failures.push(`${cloneName}: ${extractErrorMessage(err, '복제 실패')}`);
-                    }
-                }
-            } finally {
-                setButtonLoading(button, false);
-            }
             closeModal('system-duplicate-modal');
-            await reloadStatuses();
-            if(!failures.length){
-                showMessage(`${success}개 행이 복제되었습니다.`, '완료');
-            } else {
-                const preview = failures.slice(0, 5).join('\n');
-                const more = failures.length > 5 ? `\n...외 ${failures.length - 5}건 실패` : '';
-                showMessage(`${success}건 성공, ${failures.length}건 실패\n${preview}${more}`, '복제 결과');
-            }
+            showMessage('카테고리 정책입니다.\n\n복제는 허용되지 않습니다.', '오류');
         });
         // dispose (불용처리)
         document.getElementById(DISPOSE_BTN_ID)?.addEventListener('click', ()=>{
@@ -1744,20 +1720,23 @@
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
         const GROUPS = [
-            { title:'업무 상태', cols:['wc_name','wc_desc','note'] }
+            { title:'업무 상태', cols:['wc_name','wc_desc'] }
         ];
         form.innerHTML = GROUPS.map(g=>{
             const fields = g.cols.filter(c=> !EXCLUDE.has(c));
             if(!fields.length) return '';
             const grid = fields.map(col=>{
                 const meta = COLUMN_META[col]; if(!meta) return '';
-                const wide = (col === 'note');
-                return `<div class="${wide ? 'form-row form-row-wide' : 'form-row'}"><label>${meta.label}</label>${inputFor(col)}</div>`;
+                return `<div class="form-row"><label>${meta.label}</label>${inputFor(col)}</div>`;
             }).join('');
+            const noteRow = COLUMN_META.note
+                ? `<div class="form-row"><label>${COLUMN_META.note.label}</label>${inputFor('note')}</div>`
+                : '';
             return `
                 <div class="form-section">
                     <div class="section-header"><h4>${g.title}</h4></div>
                     <div class="form-grid">${grid}</div>
+                    ${noteRow}
                 </div>`;
         }).join('');
         // no extra widgets for this bulk form

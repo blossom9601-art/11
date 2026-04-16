@@ -2081,6 +2081,18 @@ th[data-col="lic_period"] {
 .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 .form-row { display:flex; flex-direction:column; gap:8px; }
 .form-row label { font-weight:500; color:#34495e; font-size:14px; }
+/* Runbook alignment: reset components.css .form-row margin/flex for IP/DNS/AD modals */
+body.page-gov-ip-policy .modal-overlay-full .form-grid .form-row,
+body.page-gov-dns-policy .modal-overlay-full .form-grid .form-row,
+body.page-gov-ad-policy .modal-overlay-full .form-grid .form-row{
+	gap:8px;
+	margin-bottom:0;
+}
+body.page-gov-ip-policy .modal-overlay-full .form-grid .form-row > *,
+body.page-gov-dns-policy .modal-overlay-full .form-grid .form-row > *,
+body.page-gov-ad-policy .modal-overlay-full .form-grid .form-row > *{
+	flex:none;
+}
 .form-input { padding:12px 16px; border:2px solid #e5e7eb; border-radius:8px; font-size:14px; background:#fff; transition:border-color .2s, box-shadow .2s; font-family: inherit; }
 .server-add-modal .form-input,
 .server-edit-modal .form-input{

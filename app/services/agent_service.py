@@ -726,6 +726,17 @@ def _upsert_packages(
     return stats
 
 
+def _summarize_payload(payload: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
+    interfaces = payload.get("interfaces") or []
+    accounts = payload.get("accounts") or []
+    packages = payload.get("packages") or []
+    return {
+        "interfaces": {"captured": len(interfaces), "synced": 0},
+        "accounts": {"captured": len(accounts), "synced": 0},
+        "packages": {"captured": len(packages), "synced": 0},
+    }
+
+
 # ── 메인 처리 함수 ────────────────────────────────────────
 
 def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=None) -> Dict[str, Any]:
@@ -810,23 +821,7 @@ def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=N
         page_prefix = _page_key_prefix(asset.get("asset_category", ""), asset.get("asset_type", ""))
         system_name = asset.get("system_name") or asset.get("asset_name") or hostname
 
-        results = {}
-
-        # 인터페이스
-        ifaces = payload.get("interfaces", [])
-        if ifaces:
-            scope_key = f"{page_prefix}_if"
-            results["interfaces"] = _upsert_interfaces(conn, asset_id, scope_key, system_name, ifaces)
-
-        # 계정
-        accounts = payload.get("accounts", [])
-        if accounts:
-            results["accounts"] = _upsert_accounts(conn, asset_id, scope, accounts, system_key=system_name)
-
-        # 패키지
-        packages = payload.get("packages", [])
-        if packages:
-            results["packages"] = _upsert_packages(conn, asset_id, scope, packages)
+        results = _summarize_payload(payload)
 
         # 연동된 에이전트의 received_at도 갱신 (active 판정에 사용)
         conn.execute(
@@ -1036,24 +1031,7 @@ def link_agent_to_asset(pending_id: int, asset_id: int, *, app=None) -> Dict[str
 
         # payload 복원 후 upsert
         payload = json.loads(pending["payload"])
-        scope = _scope_from_category(asset["asset_category"] or "")
-        page_prefix = _page_key_prefix(asset["asset_category"] or "", asset["asset_type"] or "")
-        system_name = asset["system_name"] or asset["asset_name"] or pending["hostname"]
-
-        results = {}
-
-        ifaces = payload.get("interfaces", [])
-        if ifaces:
-            scope_key = f"{page_prefix}_if"
-            results["interfaces"] = _upsert_interfaces(conn, asset_id, scope_key, system_name, ifaces)
-
-        accounts = payload.get("accounts", [])
-        if accounts:
-            results["accounts"] = _upsert_accounts(conn, asset_id, scope, accounts, system_key=system_name)
-
-        packages = payload.get("packages", [])
-        if packages:
-            results["packages"] = _upsert_packages(conn, asset_id, scope, packages)
+        results = _summarize_payload(payload)
 
         # pending 연동 완료 처리
         conn.execute(

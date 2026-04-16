@@ -267,35 +267,42 @@
         if(_ssStyled) return; _ssStyled = true;
         var s = document.createElement('style');
         s.textContent = [
-            '.bls-ss-ctrl{position:relative;width:100%;}',
-            '.bls-ss-ctrl .bls-ss-native{display:none;}',
-            '.bls-ss-btn{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 34px 10px 14px;',
-            '  background:#fff;color:#1f2937;font-size:13px;text-align:left;cursor:pointer;',
-            '  position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;box-sizing:border-box;',
-            '  transition:border-color .2s ease,box-shadow .2s ease,background .2s ease;}',
-            '.bls-ss-btn::after{content:"";position:absolute;right:14px;top:50%;width:0;height:0;',
-            '  border-left:5px solid transparent;border-right:5px solid transparent;',
-            '  border-top:6px solid #475569;transform:translateY(-40%);pointer-events:none;}',
-            '.bls-ss-btn:hover{border-color:#a5b4fc;}',
-            '.bls-ss-btn:focus-visible{outline:none;border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.15);}',
-            '.bls-ss-btn:not(.has-val){color:#9ca3af;}',
-            '.bls-ss-btn.has-val{font-weight:500;color:#0f172a;}',
-            '.bls-ss-btn[disabled]{cursor:not-allowed;opacity:.55;background:#f9fafb;}',
-            '.bls-ss-panel{position:fixed;background:#fff;border:1px solid #d6dae3;border-radius:10px;',
-            '  box-shadow:0 16px 36px rgba(15,23,42,.18);display:flex;flex-direction:column;',
-            '  overflow:hidden;z-index:99999;max-height:260px;}',
-            '.bls-ss-panel__hd{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #eef2f7;}',
-            '.bls-ss-panel__inp{flex:1;border:1px solid #d6dae3;border-radius:6px;padding:6px 8px;font-size:13px;}',
-            '.bls-ss-panel__inp:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.15);}',
-            '.bls-ss-panel__cls{border:none;background:#f1f5f9;border-radius:6px;padding:0 10px;',
-            '  font-size:12px;cursor:pointer;color:#475569;}',
-            '.bls-ss-panel__cls:hover{background:#e2e8f0;}',
-            '.bls-ss-panel__list{padding:4px 0;overflow-y:auto;max-height:200px;}',
-            '.bls-ss-panel__item{width:100%;text-align:left;padding:7px 12px;border:none;background:transparent;',
-            '  cursor:pointer;font-size:13px;color:#0f172a;display:block;}',
-            '.bls-ss-panel__item:hover,.bls-ss-panel__item.active{background:rgba(99,102,241,.08);}',
-            '.bls-ss-panel__item.sel{font-weight:600;color:#4f46e5;}',
-            '.bls-ss-panel__empty{padding:12px;font-size:13px;color:#6b7280;text-align:center;}'
+            '.fk-searchable-control{position:relative;width:100%;}',
+            '.fk-searchable-control .fk-search-native-hidden{display:none;}',
+            '.fk-searchable-control .fk-searchable-display{',
+            '  width:100%;box-sizing:border-box;border:1px solid #e5e7eb;background-color:#fff;border-radius:8px;',
+            '  padding:12px 42px 12px 14px;min-height:44px;font-size:14px;text-align:left;color:#0f172a;',
+            '  transition:border-color .15s ease, box-shadow .15s ease;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+            '}',
+            '.modal-overlay-full .fk-searchable-control .fk-searchable-display{border-width:1px;}',
+            '.fk-searchable-control .fk-searchable-display:focus{outline:none;border-color:#e5e7eb;box-shadow:0 0 0 2px rgba(229,231,235,0.5);}',
+            '.fk-searchable-control .fk-searchable-display::after{',
+            '  content:"";position:absolute;top:50%;right:12px;width:0;height:0;',
+            '  border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #475569;',
+            '  transform:translateY(-25%);pointer-events:none;',
+            '}',
+            '.fk-searchable-control .fk-searchable-display:not(.has-value){color:#94a3b8;}',
+            '.fk-searchable-control .fk-searchable-clear{',
+            '  position:absolute;top:50%;right:34px;transform:translateY(-50%);border:none;background:transparent;',
+            '  color:#94a3b8;font-size:12px;cursor:pointer;padding:2px 4px;opacity:0;transition:opacity .15s ease;',
+            '}',
+            '.fk-searchable-control:hover .fk-searchable-clear{opacity:1;}',
+            '.fk-searchable-control .fk-searchable-clear:hover{color:#0f172a;}',
+            '.fk-searchable-control.is-disabled .fk-searchable-display,.fk-searchable-control.is-disabled .fk-searchable-clear{cursor:not-allowed;opacity:.6;}',
+            '.fk-search-panel{',
+            '  position:fixed;background-color:#fff;border:1px solid #e5e7eb;border-radius:12px;',
+            '  box-shadow:0 20px 40px rgba(15,23,42,.18);z-index:9999;max-height:380px;',
+            '  display:flex;flex-direction:column;overflow:hidden;',
+            '}',
+            '.fk-search-panel__header{display:flex;gap:8px;padding:12px;border-bottom:1px solid #eef2f7;}',
+            '.fk-search-panel__input{flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:14px;}',
+            '.fk-search-panel__input:focus{outline:none;border-color:#e5e7eb;box-shadow:0 0 0 2px rgba(229,231,235,0.5);}',
+            '.fk-search-panel__close{border:none;background:#f1f5f9;border-radius:8px;padding:0 12px;font-size:13px;cursor:pointer;color:#475569;}',
+            '.fk-search-panel__list{padding:6px 0;max-height:260px;overflow-y:auto;overscroll-behavior:contain;}',
+            '.fk-search-panel__item{width:100%;text-align:left;padding:10px 16px;border:none;background:transparent;cursor:pointer;font-size:14px;color:#0f172a;}',
+            '.fk-search-panel__item:hover,.fk-search-panel__item.active{background-color:rgba(99,102,241,.08);}',
+            '.fk-search-panel__item.selected,.fk-search-panel__item.is-selected{font-weight:600;color:#4f46e5;}',
+            '.fk-search-panel__empty{padding:16px;font-size:14px;color:#6b7280;}'
         ].join('\n');
         document.head.appendChild(s);
     }
@@ -334,12 +341,14 @@
         sel.dataset.blsSS = '1';
         _injectSSCSS();
         var td = sel.parentNode;
-        var ctrl = document.createElement('div'); ctrl.className = 'bls-ss-ctrl';
-        var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'bls-ss-btn';
+        var ctrl = document.createElement('div'); ctrl.className = 'fk-searchable-control';
+        var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'fk-searchable-display';
+        var clearBtn = document.createElement('button'); clearBtn.type = 'button'; clearBtn.className = 'fk-searchable-clear'; clearBtn.textContent = '✕'; clearBtn.title = '선택 해제';
         btn.setAttribute('aria-haspopup', 'dialog');
-        sel.classList.add('bls-ss-native');
+        sel.classList.add('fk-search-native-hidden');
         td.insertBefore(ctrl, sel);
         ctrl.appendChild(btn);
+        ctrl.appendChild(clearBtn);
         ctrl.appendChild(sel);
 
         function syncBtn(){
@@ -347,23 +356,25 @@
             var hasVal = !!(o && o.value && !o.disabled);
             btn.textContent = hasVal ? o.text : '선택';
             btn.title = hasVal ? o.text : '선택';
-            btn.classList.toggle('has-val', hasVal);
+            btn.classList.toggle('has-value', hasVal);
             btn.disabled = !!sel.disabled;
+            clearBtn.style.visibility = hasVal ? 'visible' : 'hidden';
+            ctrl.classList.toggle('is-disabled', !!sel.disabled);
         }
 
         function openPanel(){
             if(sel.disabled) return;
             _ssClose();
-            var panel = document.createElement('div'); panel.className = 'bls-ss-panel';
+            var panel = document.createElement('div'); panel.className = 'fk-search-panel';
             panel.setAttribute('role', 'dialog');
-            var hd = document.createElement('div'); hd.className = 'bls-ss-panel__hd';
-            var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'bls-ss-panel__inp';
+            var hd = document.createElement('div'); hd.className = 'fk-search-panel__header';
+            var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'fk-search-panel__input';
             inp.placeholder = '검색어 입력'; inp.autocomplete = 'off';
-            var cls = document.createElement('button'); cls.type = 'button'; cls.className = 'bls-ss-panel__cls'; cls.textContent = '닫기';
+            var cls = document.createElement('button'); cls.type = 'button'; cls.className = 'fk-search-panel__close'; cls.textContent = '닫기';
             hd.appendChild(inp); hd.appendChild(cls); panel.appendChild(hd);
-            var list = document.createElement('div'); list.className = 'bls-ss-panel__list'; list.setAttribute('role', 'listbox');
+            var list = document.createElement('div'); list.className = 'fk-search-panel__list'; list.setAttribute('role', 'listbox');
             panel.appendChild(list);
-            var emptyEl = document.createElement('div'); emptyEl.className = 'bls-ss-panel__empty'; emptyEl.textContent = '검색 결과가 없습니다.'; emptyEl.hidden = true;
+            var emptyEl = document.createElement('div'); emptyEl.className = 'fk-search-panel__empty'; emptyEl.textContent = '검색 결과가 없습니다.'; emptyEl.hidden = true;
             panel.appendChild(emptyEl);
             document.body.appendChild(panel);
 
@@ -382,7 +393,7 @@
                 var curVal = sel.value || '';
                 filtered.forEach(function(it, j){
                     var b = document.createElement('button'); b.type = 'button';
-                    b.className = 'bls-ss-panel__item' + (it.value === curVal ? ' sel' : '');
+                    b.className = 'fk-search-panel__item' + (it.value === curVal ? ' selected' : '');
                     b.textContent = it.text; b.dataset.val = it.value;
                     b.setAttribute('role', 'option'); b.tabIndex = -1;
                     if(it.value === curVal) focusIdx = j;
@@ -401,7 +412,7 @@
                 focusIdx = -1; renderItems();
             }
             function focusItem(idx){
-                var items = list.querySelectorAll('.bls-ss-panel__item');
+                var items = list.querySelectorAll('.fk-search-panel__item');
                 if(!items.length) return;
                 idx = Math.max(0, Math.min(idx, items.length - 1)); focusIdx = idx;
                 items.forEach(function(b, i){ b.classList.toggle('active', i === idx); });
@@ -420,7 +431,7 @@
             inp.addEventListener('keydown', function(e){
                 if(e.key === 'ArrowDown'){
                     e.preventDefault();
-                    var items = list.querySelectorAll('.bls-ss-panel__item');
+                    var items = list.querySelectorAll('.fk-search-panel__item');
                     if(items.length) focusItem(focusIdx < 0 ? 0 : Math.min(focusIdx + 1, items.length - 1));
                     if(items[focusIdx]) items[focusIdx].focus();
                 } else if(e.key === 'Enter'){
@@ -433,10 +444,10 @@
                 } else if(e.key === 'Escape'){ _ssClose(); }
             });
             list.addEventListener('keydown', function(e){
-                var isItem = e.target && e.target.classList.contains('bls-ss-panel__item');
+                var isItem = e.target && e.target.classList.contains('fk-search-panel__item');
                 if(!isItem) return;
-                if(e.key === 'ArrowDown'){ e.preventDefault(); focusItem(focusIdx + 1); var items = list.querySelectorAll('.bls-ss-panel__item'); if(items[focusIdx]) items[focusIdx].focus(); }
-                else if(e.key === 'ArrowUp'){ e.preventDefault(); if(focusIdx <= 0){ inp.focus(); focusIdx = -1; return; } focusItem(focusIdx - 1); var items2 = list.querySelectorAll('.bls-ss-panel__item'); if(items2[focusIdx]) items2[focusIdx].focus(); }
+                if(e.key === 'ArrowDown'){ e.preventDefault(); focusItem(focusIdx + 1); var items = list.querySelectorAll('.fk-search-panel__item'); if(items[focusIdx]) items[focusIdx].focus(); }
+                else if(e.key === 'ArrowUp'){ e.preventDefault(); if(focusIdx <= 0){ inp.focus(); focusIdx = -1; return; } focusItem(focusIdx - 1); var items2 = list.querySelectorAll('.fk-search-panel__item'); if(items2[focusIdx]) items2[focusIdx].focus(); }
                 else if(e.key === 'Escape'){ e.preventDefault(); _ssClose(); }
             });
             st._hOut = function(e){
@@ -456,6 +467,13 @@
         }
 
         btn.addEventListener('click', function(e){ e.preventDefault(); openPanel(); });
+        clearBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            if(sel.disabled) return;
+            sel.value = '';
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            syncBtn();
+        });
         sel.addEventListener('change', function(){ syncBtn(); });
         var mo = new MutationObserver(function(){ syncBtn(); });
         mo.observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
@@ -463,11 +481,143 @@
         return ctrl;
     }
 
+    // -------------------- 소속(부서) 드롭다운 데이터 --------------------
+    var _deptOptionCache = null;
+    var _deptOptionPending = null;
+    var _companyOptionCache = null;
+    var _companyOptionPending = null;
+
+    function fetchCompanyNames(force){
+        if(!force && Array.isArray(_companyOptionCache)) return Promise.resolve(_companyOptionCache.slice());
+        if(!force && _companyOptionPending) return _companyOptionPending;
+        var url = '/api/org-companies?_ts=' + Date.now();
+        _companyOptionPending = fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r){
+                if(!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(data){
+                var items = Array.isArray(data && data.items) ? data.items : [];
+                var seen = {};
+                var names = [];
+                items.forEach(function(it){
+                    var name = (it && it.company_name ? String(it.company_name) : '').trim();
+                    if(!name || seen[name]) return;
+                    seen[name] = true;
+                    names.push(name);
+                });
+                names.sort(function(a,b){ return a.localeCompare(b, 'ko'); });
+                _companyOptionCache = names;
+                return names.slice();
+            })
+            .catch(function(){
+                return Array.isArray(_companyOptionCache) ? _companyOptionCache.slice() : [];
+            })
+            .finally(function(){ _companyOptionPending = null; });
+        return _companyOptionPending;
+    }
+
+    function bindCompanySelect(selectEl, selectedValue){
+        if(!selectEl) return;
+        var selected = (selectedValue || '').trim();
+        fetchCompanyNames().then(function(names){
+            var exists = {};
+            selectEl.innerHTML = '';
+            var ph = document.createElement('option');
+            ph.value = '';
+            ph.textContent = '회사 선택';
+            selectEl.appendChild(ph);
+            names.forEach(function(name){
+                var opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                exists[name] = true;
+                selectEl.appendChild(opt);
+            });
+            if(selected && selected !== '-' && !exists[selected]){
+                var legacy = document.createElement('option');
+                legacy.value = selected;
+                legacy.textContent = selected;
+                selectEl.appendChild(legacy);
+            }
+            selectEl.value = (selected && selected !== '-') ? selected : '';
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            blsSearchableSelect(selectEl);
+        });
+    }
+
+    function fetchDepartmentNames(force){
+        if(!force && Array.isArray(_deptOptionCache)) return Promise.resolve(_deptOptionCache.slice());
+        if(!force && _deptOptionPending) return _deptOptionPending;
+        var url = '/api/org-departments?_ts=' + Date.now();
+        _deptOptionPending = fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r){
+                if(!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(data){
+                var items = Array.isArray(data && data.items) ? data.items : [];
+                var seen = {};
+                var names = [];
+                items.forEach(function(it){
+                    var name = (it && it.dept_name ? String(it.dept_name) : '').trim();
+                    if(!name || seen[name]) return;
+                    seen[name] = true;
+                    names.push(name);
+                });
+                names.sort(function(a,b){ return a.localeCompare(b, 'ko'); });
+                _deptOptionCache = names;
+                return names.slice();
+            })
+            .catch(function(){
+                return Array.isArray(_deptOptionCache) ? _deptOptionCache.slice() : [];
+            })
+            .finally(function(){ _deptOptionPending = null; });
+        return _deptOptionPending;
+    }
+
+    function bindDepartmentSelect(selectEl, selectedValue){
+        if(!selectEl) return;
+        var selected = (selectedValue || '').trim();
+        fetchDepartmentNames().then(function(names){
+            var exists = {};
+            selectEl.innerHTML = '';
+            var ph = document.createElement('option');
+            ph.value = '';
+            ph.textContent = '소속 선택';
+            selectEl.appendChild(ph);
+            names.forEach(function(name){
+                var opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                exists[name] = true;
+                selectEl.appendChild(opt);
+            });
+            if(selected && selected !== '-' && !exists[selected]){
+                var legacy = document.createElement('option');
+                legacy.value = selected;
+                legacy.textContent = selected;
+                selectEl.appendChild(legacy);
+            }
+            selectEl.value = (selected && selected !== '-') ? selected : '';
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            blsSearchableSelect(selectEl);
+        });
+    }
+
     // -------------------- 공용 POST 헬퍼 --------------------
     function apiPost(url, data){
         const fd = new FormData();
         Object.keys(data||{}).forEach(k=>{ if(data[k]!==undefined && data[k]!==null) fd.append(k, data[k]); });
-        return fetch(url, {method:'POST', body:fd, credentials:'same-origin'})
+        return fetch(url, {
+            method:'POST',
+            body:fd,
+            credentials:'same-origin',
+            headers: {
+                // CSRF 미들웨어는 AJAX 헤더(X-Requested-With)를 허용 조건으로 사용한다.
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
             .then(r => {
                 const ct = r.headers.get('content-type')||'';
                 if(!r.ok) return r.text().then(t=>{ throw new Error('HTTP '+r.status+' '+t.slice(0,200)); });
@@ -521,7 +671,9 @@
     function buildRow(u){
         const roleMap = { 'ADMIN':'관리자','admin':'관리자','USER':'사용자','user':'사용자','TEAM_LEADER':'팀장','team_leader':'팀장','APPROVER':'승인권자','approver':'승인권자','AUDITOR':'감사자','auditor':'감사자' };
         const roleLabel = roleMap[u.role] || u.role;
-        const disabled = (u.role === 'ADMIN') ? ' disabled' : '';
+        const roleUpper = String(u.role || '').toUpperCase();
+        const isAdminUser = (roleUpper === 'ADMIN' || roleLabel === '관리자');
+        const disabled = isAdminUser ? ' disabled' : '';
         const visible = readVisibleSetEarly();
         const hc = c => visible.has(c) ? '' : ' col-hidden';
         // 관리자 아이콘 (경로 정정, 불필요한 fallback 제거하여 잔여 문자("'">") 출력 방지)
@@ -764,6 +916,9 @@
         selectAll.addEventListener('change', ()=>{
             const boxes = tbody.querySelectorAll('input.system-row-select');
             boxes.forEach(b=>{ if(!b.disabled){ b.checked = selectAll.checked; b.dispatchEvent(new Event('change')); }});
+            if(selectAll.checked && tbody.querySelector('input.system-row-select:disabled')){
+                showMessage('알림','관리자 계정은 삭제할 수 없어 선택에서 제외됩니다.');
+            }
         });
         tbody.addEventListener('change', e=>{
             const cb = e.target.closest('input.system-row-select'); if(!cb) return;
@@ -777,10 +932,21 @@
             // 체크박스 자체 클릭은 기본 change 처리 사용
             if(e.target.closest('input.system-row-select')) return;
             const tr = e.target.closest('tr'); if(!tr) return;
-            const cb = tr.querySelector('input.system-row-select'); if(!cb || cb.disabled) return;
+            const cb = tr.querySelector('input.system-row-select');
+            if(!cb) return;
+            if(cb.disabled){
+                showMessage('알림','관리자 계정은 삭제할 수 없습니다.');
+                return;
+            }
             cb.checked = !cb.checked;
             // 기존 change 로직 재사용하여 스타일/전체선택 동기화
             cb.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        // 관리자 행의 비활성 체크박스 클릭 시 삭제 불가 안내
+        tbody.addEventListener('click', e=>{
+            const cb = e.target.closest('input.system-row-select:disabled');
+            if(!cb) return;
+            showMessage('알림','관리자 계정은 삭제할 수 없습니다.');
         });
     }
 
@@ -909,8 +1075,8 @@
                 <div class="form-section">
                     <div class="section-header"><h4>기본 정보 <small style=\"font-weight:400;\">(빈 값은 변경 안 함)</small></h4></div>
                     <div class="form-grid">
-                        <div class="form-row"><label>회사</label><input class="form-input" type="text" name="company" placeholder="회사" maxlength="128"></div>
-                        <div class="form-row"><label>소속</label><input class="form-input" type="text" name="department" placeholder="소속" maxlength="128"></div>
+                        <div class="form-row"><label>회사</label><select class="form-input" name="company" id="bulk-company"><option value="">회사 선택</option></select></div>
+                        <div class="form-row"><label>소속</label><select class="form-input" name="department" id="bulk-department"><option value="">소속 선택</option></select></div>
                         <div class="form-row"><label>재직</label><select class="form-input" name="employment_status">
                                 <option value="">(변경 없음)</option>
                                 <option value="재직">재직</option>
@@ -933,6 +1099,10 @@
             if(avatarBtn){ avatarBtn.addEventListener('click', ()=> openProfilePicker('bulk')); }
         }
         function open(){ build(); modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); applyModalA11y(modal, '#system-bulk-apply'); }
+        function hydrateMasterSelects(){
+            bindCompanySelect(form.querySelector('select[name="company"]'));
+            bindDepartmentSelect(form.querySelector('select[name="department"]'));
+        }
         function close(){ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); closeModal(modal); }
         function selectedRows(){ return Array.from(document.querySelectorAll('#system-table tbody tr')).filter(tr=>tr.querySelector('input.system-row-select:checked')); }
         bulkBtn.addEventListener('click', ()=>{
@@ -949,6 +1119,7 @@
             if(sub) sub.textContent = `선택된 ${sel.length}명의 사용자에서 지정한 필드를 일괄 변경합니다.`;
             console.debug('[bulk-modal] opening with selection count=', sel.length);
             open();
+            hydrateMasterSelects();
             applyBtn.disabled = false;
         });
         closeBtn.addEventListener('click', close); modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
@@ -1097,6 +1268,19 @@
         return { showImage, clearImage };
     }
 
+    function enableAutoGrowTextarea(textarea){
+        if(!textarea) return;
+        const minHeight = textarea.getBoundingClientRect().height;
+        function resize(){
+            textarea.style.setProperty('height', 'auto', 'important');
+            textarea.style.setProperty('height', Math.max(textarea.scrollHeight, minHeight) + 'px', 'important');
+        }
+        textarea.addEventListener('input', resize);
+        textarea.addEventListener('change', resize);
+        textarea.addEventListener('keyup', resize);
+        resize();
+    }
+
     // -------------------- 사용자 추가 모달 --------------------
     function initAddModal(){
         const addBtn = document.getElementById('system-add-btn');
@@ -1104,10 +1288,11 @@
         const closeBtn = document.getElementById('user-add-close');
         const form = document.getElementById('user-add-form');
         const saveBtn = document.getElementById('user-add-save');
+        const jobTextarea = form ? form.querySelector('textarea[name="job"]') : null;
         if(!addBtn || !modal || !closeBtn || !form || !saveBtn) return;
 
-        function open(){ modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); validate(); }
-        function close(){ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); }
+        function open(){ modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); validate(); if(jobTextarea){ jobTextarea.dispatchEvent(new Event('input', { bubbles:true })); } }
+        function close(){ modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); if(jobTextarea){ jobTextarea.style.height=''; } }
         function validate(){
             const emp = form.emp_no.value.trim();
             const name = form.name.value.trim();
@@ -1165,12 +1350,13 @@
         closeBtn.addEventListener('click', close);
         modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
         form.addEventListener('input', validate);
-        form.addEventListener('submit', e=>{ e.preventDefault(); if(saveBtn.disabled) return; const user = collect(); const roleErr = checkUniqueRolePerDept(user.role, user.department); if(roleErr){ showMessage('알림', roleErr); return; } addUserServer(user); form.reset(); const sigCtrl = document.getElementById('add-signature-img'); if(sigCtrl){ sigCtrl.src=''; sigCtrl.style.display='none'; } const sigPh = document.getElementById('add-signature-placeholder'); if(sigPh) sigPh.style.display=''; const sigData = document.getElementById('add-signature-data'); if(sigData) sigData.value=''; const sigRm = document.getElementById('add-signature-remove'); if(sigRm) sigRm.disabled=true; validate(); close(); });
+        form.addEventListener('submit', e=>{ e.preventDefault(); if(saveBtn.disabled) return; const user = collect(); const roleErr = checkUniqueRolePerDept(user.role, user.department); if(roleErr){ showMessage('알림', roleErr); return; } addUserServer(user); form.reset(); if(jobTextarea){ jobTextarea.dispatchEvent(new Event('input', { bubbles:true })); } const sigCtrl = document.getElementById('add-signature-img'); if(sigCtrl){ sigCtrl.src=''; sigCtrl.style.display='none'; } const sigPh = document.getElementById('add-signature-placeholder'); if(sigPh) sigPh.style.display=''; const sigData = document.getElementById('add-signature-data'); if(sigData) sigData.value=''; const sigRm = document.getElementById('add-signature-remove'); if(sigRm) sigRm.disabled=true; validate(); close(); });
         // Profile preview button launches picker
         const addPreviewBtn = document.getElementById('profile-preview-btn');
         if(addPreviewBtn){ addPreviewBtn.addEventListener('click', ()=> openProfilePicker('add')); }
         // 서명 이미지 업로드 초기화
         initSignatureUpload('add');
+        enableAutoGrowTextarea(jobTextarea);
         // 역할 옵션 자동 주입 (없을 경우)
         const roleSelect = form.querySelector('select[name="role"]');
         if(roleSelect && roleSelect.options.length === 0){
@@ -1181,6 +1367,14 @@
         // 검색 가능 드롭다운 적용 (역할, 재직)
         blsSearchableSelect(form.querySelector('select[name="role"]'));
         blsSearchableSelect(form.querySelector('select[name="employment_status"]'));
+        bindCompanySelect(form.querySelector('select[name="company"]'));
+        bindDepartmentSelect(form.querySelector('select[name="department"]'));
+
+        // 모달 오픈 시 최신 부서 목록 갱신
+        addBtn.addEventListener('click', ()=>{
+            bindCompanySelect(form.querySelector('select[name="company"]'));
+            bindDepartmentSelect(form.querySelector('select[name="department"]'));
+        });
     }
 
     // -------------------- 프로필 선택 공용 모달 --------------------
@@ -1337,6 +1531,7 @@
         const triggerBtn = document.getElementById('system-delete-btn');
         const modal = document.getElementById('system-delete-modal');
         const closeBtn = document.getElementById('system-delete-close');
+        const cancelBtn = document.getElementById('system-delete-cancel');
         const confirmBtn = document.getElementById('system-delete-confirm');
         const subtitle = document.getElementById('delete-subtitle');
         if(!triggerBtn || !modal || !closeBtn || !confirmBtn || !subtitle) return;
@@ -1350,17 +1545,11 @@
             subtitle.textContent = `선택된 ${count}명의 사용자를 정말 삭제처리하시겠습니까?`;
             // Parity: confirm disabled when 0, enabled otherwise
             confirmBtn.disabled = count === 0;
-            // Illustration swap: 0 selection -> base "이미지" (process), >0 -> confirmation "이미지2" (option)
             try {
                 const illuImg = modal.querySelector('.dispose-illust img');
                 if(illuImg){
-                    if(count === 0){
-                        illuImg.src = '/static/image/svg/list/free-sticker-process.svg';
-                        illuImg.alt = '선택 없음 안내 이미지';
-                    } else {
-                        illuImg.src = '/static/image/svg/list/free-sticker-option.svg';
-                        illuImg.alt = '삭제 확인 이미지';
-                    }
+                    illuImg.src = '/static/image/svg/list/free-sticker-process.svg';
+                    illuImg.alt = '삭제 확인 이미지';
                 }
             } catch(_e){ /* ignore swap errors */ }
             modal.classList.add('show');
@@ -1409,6 +1598,7 @@
             open();
         });
         closeBtn.addEventListener('click', close);
+        if(cancelBtn) cancelBtn.addEventListener('click', close);
         modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
         confirmBtn.addEventListener('click', proceed);
         // Dynamic update while modal is open (selection changes)
@@ -1457,6 +1647,7 @@
         const closeBtn = document.getElementById('user-edit-close');
         const saveBtn = document.getElementById('user-edit-save');
         const form = document.getElementById('user-edit-form');
+        const jobTextarea = form ? form.querySelector('textarea[name="job"]') : null;
         const tbody = document.getElementById('system-table-body');
         const profileBtn = document.getElementById('edit-profile-preview-btn');
         const profileImg = document.getElementById('edit-profile-preview-img');
@@ -1496,6 +1687,7 @@
             // 재직 셀렉트 동기화
             const esSel = form.querySelector('select[name="employment_status"]');
             if(esSel) esSel.dispatchEvent(new Event('change',{bubbles:true}));
+            if(jobTextarea){ jobTextarea.style.height=''; }
         }
         closeBtn?.addEventListener('click', close);
         modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
@@ -1514,9 +1706,12 @@
         }
         // 서명 이미지 업로드 초기화
         editSigCtrl = initSignatureUpload('edit');
+        enableAutoGrowTextarea(jobTextarea);
         // 검색 가능 드롭다운 적용 (역할, 재직)
         blsSearchableSelect(form.querySelector('select[name="role"]'));
         blsSearchableSelect(form.querySelector('select[name="employment_status"]'));
+        bindCompanySelect(form.querySelector('select[name="company"]'));
+        bindDepartmentSelect(form.querySelector('select[name="department"]'));
 
         tbody?.addEventListener('click', e=>{
             const btn = e.target.closest('button[data-action="edit"]');
@@ -1527,8 +1722,8 @@
             form.emp_no.value = get('emp_no');
             form.name.value = get('name');
             form.nickname.value = get('nickname');
-            form.company.value = get('company') === '-' ? '' : get('company');
-            form.department.value = get('department');
+            bindCompanySelect(form.querySelector('select[name="company"]'), get('company') === '-' ? '' : get('company'));
+            bindDepartmentSelect(form.querySelector('select[name="department"]'), get('department'));
             { const es = get('employment_status'); const esSel = form.employment_status; if(esSel){ for(let i=0;i<esSel.options.length;i++){ if(esSel.options[i].value===es){esSel.selectedIndex=i;break;} } esSel.dispatchEvent(new Event('change',{bubbles:true})); } }
             form.ext_phone.value = get('ext_phone');
             form.mobile_phone.value = get('mobile_phone');
@@ -1570,6 +1765,7 @@
             }
             form.allowed_ip.value = get('allowed_ip');
             form.job.value = get('job');
+            if(jobTextarea){ jobTextarea.dispatchEvent(new Event('input', { bubbles:true })); }
             const imgEl = tr.querySelector('td[data-col="profile"] img');
             const src = imgEl? imgEl.getAttribute('src'): '/static/image/svg/profil/free-icon-bussiness-man.svg';
             profileImg.src = src; profileInput.value = src;

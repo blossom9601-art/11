@@ -213,7 +213,7 @@
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '컴포넌트', columns: ['model','spec','vendor','part_no','reference_tpmc','note'] }
+        { group: '컴포넌트', columns: ['model','spec','vendor','part_no','reference_tpmc'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
@@ -671,7 +671,7 @@
                     // 상세 페이지 동적 딥링크 생성 (Unix / High Availability 패턴 동일): 비어있지 않은 필드만 query에 추가
                     const base = window.__CPU_DETAIL_URL || '#';
                     const qParts = [];
-                    ['id','model','spec','vendor','part_no','note'].forEach(k=>{
+                    ['id','model','spec','vendor','part_no'].forEach(k=>{
                         const v = row[k];
                         if(v != null){
                             const s = String(v).trim();
@@ -910,16 +910,19 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'컴포넌트', cols:['model','spec','vendor','part_no','reference_tpmc','note'] };
+    const group = { title:'컴포넌트', cols:['model','spec','vendor','part_no','reference_tpmc'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow); form.appendChild(section);
         initCommaInputs(EDIT_FORM_ID);
     }
 
@@ -943,7 +946,18 @@
         if(col==='note'){
             return `<textarea name="note" class="form-input textarea-large" rows="6">${value??''}</textarea>`;
         }
-        // default text input for vendor, etc.
+        if(col==='vendor'){
+            const _cur = String(value ?? '').trim();
+            const _list = Array.isArray(vendorNameOptions) ? vendorNameOptions : [];
+            let _opts = '<option value="">선택</option>';
+            _opts += _list
+                .map(function(n){
+                    return '<option value="' + escapeHTML(n) + '"' + (n===_cur ? ' selected' : '') + '>' + escapeHTML(n) + '</option>';
+                })
+                .join('');
+            return '<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="선택">' + _opts + '</select>';
+        }
+        // default text input
         return `<input name="${col}" type="text" class="form-input" value="${value??''}">`;
     }
 
@@ -1664,6 +1678,7 @@
         // message modal bindings
         document.getElementById('system-message-close')?.addEventListener('click', ()=> closeModal('system-message-modal'));
         document.getElementById('system-message-ok')?.addEventListener('click', ()=> closeModal('system-message-modal'));
+    }
 
     function buildBulkForm(){
         const form = document.getElementById(BULK_FORM_ID); if(!form) return;
@@ -1672,7 +1687,7 @@
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
             return `<input type="text" class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-        const GROUP = { title:'컴포넌트', cols:['model','spec','vendor','part_no','note'] };
+        const GROUP = { title:'컴포넌트', cols:['model','spec','vendor','part_no'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');
@@ -1697,9 +1712,9 @@
     }
 
     function buildStats(){
-    const swEl = document.getElementById('stats-software');
-    const verEl = document.getElementById('stats-versions');
-    const checkEl = document.getElementById('stats-check');
+        const swEl = document.getElementById('stats-software');
+        const verEl = document.getElementById('stats-versions');
+        const checkEl = document.getElementById('stats-check');
         if(swEl) swEl.innerHTML = '';
         if(verEl) verEl.innerHTML = '';
         if(checkEl) checkEl.innerHTML = '';
@@ -1719,7 +1734,6 @@
             return acc;
         }, {});
         renderStatBlock('stats-check', '수량 합계(제조사)', qtyByVendor);
-    }
     }
 
     // (조건 필터 관련 함수 제거됨)
@@ -1760,7 +1774,8 @@
         render();
         loadVendorManufacturers();
         // Page adornments (animation + popover)
-}
+    }
+
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 

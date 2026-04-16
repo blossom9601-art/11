@@ -275,11 +275,10 @@ def soft_delete_vendor_manufacturer_software(vendor_id: int, item_id: int, actor
     vendor_id = int(vendor_id)
     item_id = int(item_id)
     actor = (actor or 'system').strip() or 'system'
-    ts = _now()
     with _get_connection(app) as conn:
         cur = conn.execute(
-            f"UPDATE {SOFTWARE_TABLE} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE vendor_id = ? AND id = ? AND is_deleted = 0",
-            (ts, actor, vendor_id, item_id),
+            f"DELETE FROM {SOFTWARE_TABLE} WHERE vendor_id = ? AND id = ?",
+            (vendor_id, item_id),
         )
         if cur.rowcount == 0:
             return False

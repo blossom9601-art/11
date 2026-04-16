@@ -3135,7 +3135,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	if (gridEl) {
 		loadTopTags();
-		resetAndLoad('');
+		resetAndLoad('').then(() => {
+			try {
+				const pendingRaw = sessionStorage.getItem('blossom:blog:pending_edit_v1');
+				if (pendingRaw) {
+					sessionStorage.removeItem('blossom:blog:pending_edit_v1');
+					const pendingEdit = JSON.parse(pendingRaw);
+					if (pendingEdit && pendingEdit.postId) {
+						openEditModalForPost(pendingEdit.postId, pendingEdit.author);
+					}
+				}
+			} catch (_e) { /* ignore */ }
+		});
 	}
 
 	// When coming back from detail page, browsers may restore the list from bfcache

@@ -197,12 +197,10 @@ def _resolve_db_path(app=None) -> str:
         if netloc not in ("", "localhost"):
             path = f"//{netloc}{path}"
 
-        # On Windows, urlparse('sqlite:///dev_blossom.db').path becomes '/dev_blossom.db'.
-        # Treat that as an instance-local filename, not an absolute path (C:\\dev_blossom.db).
-        if os.name == 'nt' and path.startswith('/') and not path.startswith('//'):
-            # '/C:/...' -> 'C:/...'
-            if len(path) >= 4 and path[1].isalpha() and path[2] == ':' and path[3] == '/':
-                path = path[1:]
+        # sqlite:///file.db -> path='/file.db' (single leading / = relative)
+        # sqlite:////abs.db  -> path='//abs.db' (double leading / = absolute)
+        if path.startswith('/') and not path.startswith('//'):
+            path = path.lstrip('/')
 
         if os.path.isabs(path):
             return os.path.abspath(path)
@@ -249,45 +247,8 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: str) -> None:
         return {str(r[1]) for r in rows}  # r[1] = column name
 
     def ensure_default_work_status_codes() -> None:
-        # The software UI currently submits human-readable Korean values as `work_status_code`
-        # (e.g., '가동/유휴/대기'). Ensure they exist as FK-safe codes.
-        if not has_table("biz_work_status"):
-            return
-        cols = table_columns("biz_work_status")
-        required = {
-            "status_code",
-            "status_level",
-            "status_name",
-            "description",
-            "hw_count",
-            "sw_count",
-            "remark",
-            "created_at",
-            "created_by",
-            "updated_at",
-            "updated_by",
-            "is_deleted",
-        }
-        if not required.issubset(cols):
-            return
-        timestamp = _now()
-        actor = "system"
-        defaults = [
-            ("가동", "", "가동", None),
-            ("유휴", "", "유휴", None),
-            ("대기", "", "대기", None),
-        ]
-        for code, level, name, desc in defaults:
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO biz_work_status
-                    (status_code, status_level, status_name, description,
-                     hw_count, sw_count, remark,
-                     created_at, created_by, updated_at, updated_by, is_deleted)
-                VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, 0)
-                """,
-                (code, level, name, desc, timestamp, actor, timestamp, actor),
-            )
+        # No-op: FK seed was removed. Status codes must be populated by the user.
+        pass
 
     def needs_fk_heal() -> bool:
         targets = [t.strip().lower() for t in fk_targets(TABLE_NAME)]

@@ -1000,6 +1000,50 @@
 			return tr;
 		}
 
+		function renderDraftRow(){
+			var tr = document.createElement('tr');
+			tr.innerHTML = [
+				'<td><input type="checkbox" class="if-row-check" aria-label="행 선택"></td>',
+				'<td data-col="slot"><input type="text" value="" placeholder="슬롯"></td>',
+				'<td data-col="port"><input type="text" value="" placeholder="포트"></td>',
+				'<td data-col="iface"><input type="text" value="" placeholder="인터페이스"></td>',
+				'<td data-col="serial"><input type="text" value="" placeholder="UUID"></td>',
+				'<td data-col="peer"><select class="search-select" data-searchable-scope="page" data-placeholder="연결 시스템 선택" data-allow-clear="true"><option value="">선택</option></select></td>',
+				'<td data-col="peer_port"><select class="search-select" data-searchable-scope="page" data-placeholder="연결 포트 선택" data-allow-clear="true"><option value="">선택</option></select></td>',
+				'<td data-col="remark"><input type="text" value="" placeholder="비고"></td>',
+				'<td class="system-actions table-actions"><button class="action-btn js-if-toggle" data-action="save" type="button" title="저장" aria-label="저장"><img src="/static/image/svg/save.svg" alt="저장" class="action-icon"></button> <button class="action-btn danger js-if-del" data-action="delete" type="button" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="action-icon"></button></td>'
+			].join('');
+			if(ifIsPeerLinkedScope(scopeKey)){
+				var serialInput = tr.querySelector('td[data-col="serial"] input');
+				if(serialInput){
+					serialInput.disabled = true;
+					serialInput.placeholder = '자동 연동';
+					serialInput.title = '연결 시스템에서 자동으로 가져옵니다';
+				}
+			}
+			return tr;
+		}
+
+		function openDraftRow(){
+			var tbody = table.querySelector('tbody');
+			if(!tbody) return;
+			var draft = renderDraftRow();
+			if(tbody.firstChild) tbody.insertBefore(draft, tbody.firstChild);
+			else tbody.appendChild(draft);
+			ifEnsurePeerCache().then(function(){
+				var sel = draft.querySelector('td[data-col="peer"] select');
+				ifPopulatePeerSelect(sel, ifPeerCache.items, '');
+				ifEnsureSearchableSoon(draft);
+				ifUpdatePeerPortSelectForRow(draft);
+			}).catch(function(){});
+			ifState.page = 1;
+			updateEmptyState();
+			try{
+				var firstInput = draft.querySelector('input');
+				if(firstInput) firstInput.focus();
+			}catch(_){ }
+		}
+
 		async function ifSyncAllPeerFields(){
 			if(!ifIsPeerLinkedScope(scopeKey)) return;
 			var tbody = table.querySelector('tbody');
@@ -1392,6 +1436,13 @@ pageSize:10 };
 		if(refreshBtn){
 			refreshBtn.addEventListener('click', function(){
 				ifLoadPage(ifState.page);
+			});
+		}
+
+		var addBtn = document.getElementById('if-row-add');
+		if(addBtn){
+			addBtn.addEventListener('click', function(){
+				openDraftRow();
 			});
 		}
 

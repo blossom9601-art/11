@@ -67,9 +67,10 @@ def _resolve_db_path(app=None) -> str:
         return os.path.join(app.instance_path, 'dev_blossom.db')
     if netloc not in ('', 'localhost'):
         path = f"//{netloc}{path}"
-    if os.name == 'nt' and path.startswith('/') and not path.startswith('//'):
-        if len(path) >= 4 and path[1].isalpha() and path[2] == ':' and path[3] == '/':
-            path = path[1:]
+    # sqlite:///file.db -> path='/file.db' (single leading / = relative)
+    # sqlite:////abs.db  -> path='//abs.db' (double leading / = absolute)
+    if path.startswith('/') and not path.startswith('//'):
+        path = path.lstrip('/')
     if os.path.isabs(path):
         return os.path.abspath(path)
     relative = path.lstrip('/')

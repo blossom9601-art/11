@@ -327,6 +327,48 @@ def _resolve_manufacturer_code(conn: sqlite3.Connection, payload: Dict[str, Any]
         f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_name = ? AND is_deleted = 0",
         (name,),
     ).fetchone()
+    if not row:
+        row = conn.execute(
+            f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_code = ? AND is_deleted = 0",
+            (name,),
+        ).fetchone()
+    if not row:
+        legacy_name = name
+        if '_' in name:
+            head, tail = name.rsplit('_', 1)
+            if tail.isdigit() and head.strip():
+                legacy_name = head.strip()
+        if legacy_name != name:
+            row = conn.execute(
+                f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_name = ? AND is_deleted = 0",
+                (legacy_name,),
+            ).fetchone()
+            if not row:
+                row = conn.execute(
+                    f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_code = ? AND is_deleted = 0",
+                    (legacy_name,),
+                ).fetchone()
+    if not row:
+        # Legacy data may reference soft-deleted manufacturers; allow resolve as a fallback.
+        row = conn.execute(
+            f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_name = ? ORDER BY is_deleted ASC, id ASC LIMIT 1",
+            (name,),
+        ).fetchone()
+    if not row:
+        row = conn.execute(
+            f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_code = ? ORDER BY is_deleted ASC, id ASC LIMIT 1",
+            (name,),
+        ).fetchone()
+    if not row and legacy_name != name:
+        row = conn.execute(
+            f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_name = ? ORDER BY is_deleted ASC, id ASC LIMIT 1",
+            (legacy_name,),
+        ).fetchone()
+        if not row:
+            row = conn.execute(
+                f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_code = ? ORDER BY is_deleted ASC, id ASC LIMIT 1",
+                (legacy_name,),
+            ).fetchone()
     if row:
         return row['manufacturer_code']
     raise ValueError('제조사 정보를 찾을 수 없습니다.')
@@ -438,17 +480,6 @@ def init_hw_network_type_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{TABLE_NAME}_manufacturer ON {TABLE_NAME}(manufacturer_code)"
             )
-
-            # Backfill hw_server_type entries so network models are selectable by server_code.
-            try:
-                rows = conn.execute(
-                    f"SELECT network_code, model_name, manufacturer_code, network_type, release_date, eosl_date, remark "
-                    f"FROM {TABLE_NAME} WHERE is_deleted = 0"
-                ).fetchall()
-                for row in rows:
-                    _sync_hw_server_type_from_network_row(conn, dict(row), actor='system')
-            except Exception:
-                logger.exception('Failed to backfill hw_server_type from %s', TABLE_NAME)
 
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
@@ -661,13 +692,16 @@ def soft_delete_hw_network_types(ids: Iterable[Any], actor: str, app=None) -> in
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
+        codes = [r['network_code'] for r in conn.execute(
+            f"SELECT network_code FROM {TABLE_NAME} WHERE id IN ({placeholders})", safe_ids
+        ).fetchall() if r['network_code']]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? "
-            f"WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
+        if codes:
+            code_ph = ','.join('?' for _ in codes)
+            conn.execute(f"DELETE FROM hw_server_type WHERE server_code IN ({code_ph})", codes)
         conn.commit()
         return cur.rowcount

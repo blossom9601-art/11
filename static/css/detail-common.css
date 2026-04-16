@@ -149,6 +149,11 @@ html.sidebar-hidden .main-content {
 
 .server-edit-modal .form-input.textarea-large { min-height:100px; line-height:1.5; resize:vertical; }
 
+.server-add-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input),
+.server-edit-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input) {
+  margin: 0;
+}
+
 .server-edit-modal .form-row .form-input { width:100%; box-sizing:border-box; padding:8px 14px; }
 
 .server-edit-modal .server-edit-body .form-section { margin-bottom:24px; padding:0 32px; }

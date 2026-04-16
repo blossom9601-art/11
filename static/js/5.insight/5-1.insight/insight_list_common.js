@@ -149,21 +149,37 @@
     const titleFieldEl = modalTitleInput ? modalTitleInput.closest('.blog-add-field') : null;
     const tagsFieldEl = tagsInputEl ? tagsInputEl.closest('.blog-add-field') : null;
 
-    const titleViewEl = titleFieldEl ? (function(){
-      const el = document.createElement('div');
-      el.className = 'blog-view-field';
-      el.hidden = true;
-      titleFieldEl.appendChild(el);
-      return el;
-    })() : null;
+    // view-field 요소는 사용하지 않으므로 생성하지 않음 (여백 방지)
+    var titleViewEl = null;
+    var tagsViewEl = null;
 
-    const tagsViewEl = tagsFieldEl ? (function(){
-      const el = document.createElement('div');
-      el.className = 'blog-view-field blog-view-tags';
-      el.hidden = true;
-      tagsFieldEl.appendChild(el);
-      return el;
-    })() : null;
+    function normalizeModalNativeValidation(){
+      if(modalForm){
+        modalForm.setAttribute('novalidate', 'novalidate');
+      }
+      if(modalTitleInput){
+        modalTitleInput.setAttribute('spellcheck', 'false');
+        modalTitleInput.removeAttribute('required');
+        try{ modalTitleInput.setCustomValidity(''); }catch(_e){}
+        modalTitleInput.classList.remove('is-invalid', 'input-error');
+        modalTitleInput.removeAttribute('aria-invalid');
+      }
+    }
+
+    function normalizeTitleFieldVisual(){
+      if(!modalTitleInput) return;
+      try{ modalTitleInput.setCustomValidity(''); }catch(_e){}
+      modalTitleInput.classList.remove('is-invalid', 'input-error');
+      modalTitleInput.removeAttribute('aria-invalid');
+      // Styling is handled entirely by CSS — no inline style manipulation.
+    }
+
+    normalizeModalNativeValidation();
+    normalizeTitleFieldVisual();
+    if(modalTitleInput){
+      modalTitleInput.addEventListener('blur', normalizeTitleFieldVisual);
+      modalTitleInput.addEventListener('input', normalizeTitleFieldVisual);
+    }
 
     function refreshViewFields(){
       if(titleViewEl) titleViewEl.textContent = String(modalTitleInput && modalTitleInput.value ? modalTitleInput.value : '').trim();
@@ -593,7 +609,7 @@
     }
     function exec(cmd, value){
       if(!editorEl) return;
-      editorEl.focus();
+      editorEl.focus({preventScroll:true});
       restoreSelection();
       try{ document.execCommand(cmd, false, value); }catch(_e){}
       saveSelection();
@@ -677,7 +693,7 @@
 
     function insertStyledZeroWidthSpan(styleText){
       if(!editorEl) return;
-      editorEl.focus();
+      editorEl.focus({preventScroll:true});
       restoreSelection();
       const sel = window.getSelection();
       if(!sel || sel.rangeCount === 0) return;
@@ -699,7 +715,7 @@
       const sizePx = Number(px);
       if(!Number.isFinite(sizePx) || sizePx <= 0) return;
       if(!editorEl) return;
-      editorEl.focus();
+      editorEl.focus({preventScroll:true});
       restoreSelection();
       const sel = window.getSelection();
       if(!sel || sel.rangeCount === 0) return;
@@ -1461,6 +1477,7 @@
       state.editingId = null;
       state.viewingId = null;
       applyModalViewMode(false);
+      normalizeModalNativeValidation();
       if(modalTitleText) modalTitleText.textContent = `기술자료 ${label} 추가`;
       if(modalSubtitleText) modalSubtitleText.textContent = `${label} 기술자료를 등록합니다.`;
       if(modalSubmitBtn) modalSubmitBtn.textContent = '등록';
@@ -1489,6 +1506,7 @@
         state.editingId = item.id;
         state.viewingId = null;
         applyModalViewMode(false);
+        normalizeModalNativeValidation();
         if(modalTitleText) modalTitleText.textContent = `기술자료 ${label} 수정`;
         if(modalSubtitleText) modalSubtitleText.textContent = `${label} 기술자료를 수정합니다.`;
         if(modalSubmitBtn) modalSubmitBtn.textContent = '수정';
@@ -1516,6 +1534,7 @@
     function closeAddModal(){
       setModalOpen(modalEl, false);
       if(modalForm) modalForm.reset();
+      normalizeModalNativeValidation();
       // Keep default font size locked to 16px (form.reset() resets selects).
       if(sizeSelectEl) sizeSelectEl.value = '16';
       state.editingId = null;
@@ -1725,11 +1744,30 @@
     if(editorEl){
       editorEl.addEventListener('keyup', saveSelection);
       editorEl.addEventListener('mouseup', saveSelection);
+      // ── 스크롤 점프 방지 ──
+      // 브라우저는 focus 이벤트 *전에* 네이티브 scroll-into-view를 수행하므로,
+      // mousedown 시점에 scrollTop을 미리 저장하고 overflow를 잠가야 한다.
+      var _preFocusST = null;
+      editorEl.addEventListener('mousedown', function(){
+        var bodyEl = editorEl.closest && editorEl.closest('.server-add-body');
+        if(bodyEl){
+          _preFocusST = bodyEl.scrollTop;
+          bodyEl.style.overflowY = 'hidden';
+        }
+      });
       editorEl.addEventListener('focus', ()=>{
-        // When the caret enters the editor, ensure new typing stays at 16px.
+        var bodyEl = editorEl.closest && editorEl.closest('.server-add-body');
+        var targetST = _preFocusST != null ? _preFocusST : (bodyEl ? bodyEl.scrollTop : 0);
+        _preFocusST = null;
+        if(bodyEl && bodyEl.style.overflowY !== 'hidden') bodyEl.style.overflowY = 'hidden';
         enforceFixedFontSize16();
-        // If the caret is collapsed, seed a 16px ZW span for subsequent typing.
-        try{ applyFontSizePx(16); }catch(_e){}
+        if(bodyEl){
+          bodyEl.scrollTop = targetST;
+          requestAnimationFrame(function(){
+            bodyEl.scrollTop = targetST;
+            bodyEl.style.overflowY = '';
+          });
+        }
       });
       editorEl.addEventListener('paste', ()=>{
         // Normalize pasted content (often carries font-size spans).

@@ -48,6 +48,7 @@ rm -rf %{buildroot}
 # ── AP 서버 코드 ─────────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_prefix}/ap
 install -m 0644 %{_sourcedir}/ap/__init__.py    %{buildroot}%{_prefix}/ap/
+install -m 0755 %{_sourcedir}/ap/server.py      %{buildroot}%{_prefix}/ap/
 install -m 0644 %{_sourcedir}/ap/receiver.py    %{buildroot}%{_prefix}/ap/
 install -m 0644 %{_sourcedir}/ap/queue.py       %{buildroot}%{_prefix}/ap/
 install -m 0644 %{_sourcedir}/ap/parser.py      %{buildroot}%{_prefix}/ap/
@@ -92,6 +93,7 @@ TMPEOF
 # AP 코드
 %dir %{_prefix}/ap
 %{_prefix}/ap/__init__.py
+%{_prefix}/ap/server.py
 %{_prefix}/ap/receiver.py
 %{_prefix}/ap/queue.py
 %{_prefix}/ap/parser.py

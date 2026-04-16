@@ -2,28 +2,78 @@
 // - Profile image picker (DB-backed via /api/me/profile)
 // - Motto (message) inline edit (DB-backed)
 (function(){
-  document.addEventListener('DOMContentLoaded', function(){
+  function initMemberSettingsPage(){
     const $ = (s, r=document) => r.querySelector(s);
+
+    function ensureProfilePickerShell(){
+      if (document.getElementById('profile-picker')) return;
+      const shell = document.createElement('div');
+      shell.innerHTML = '' +
+        '<div id="profile-picker" class="profile-picker" aria-hidden="true" role="dialog" aria-modal="true">' +
+        '  <div class="picker-backdrop" data-picker-close></div>' +
+        '  <div class="picker-dialog" role="document">' +
+        '    <div class="picker-header">' +
+        '      <h3 class="picker-title">프로필 이미지 선택</h3>' +
+        '      <button class="btn-icon" data-picker-close title="닫기">×</button>' +
+        '    </div>' +
+        '    <div class="picker-body">' +
+        '      <div class="picker-grid" aria-label="프로필 이미지 목록" role="list"></div>' +
+        '    </div>' +
+        '  </div>' +
+        '</div>';
+      const root = shell.firstElementChild;
+      if (root) document.body.appendChild(root);
+    }
+
+    ensureProfilePickerShell();
 
     const empNo = (document.querySelector('#btn-account')?.getAttribute('data-emp-no') || '').trim();
     const currentName = (document.querySelector('.admin-page .identity .name')?.textContent || '').trim();
   	const LS_IMG_GLOBAL = 'blossom.profileImageSrc';
   	const LS_IMG = empNo ? `blossom.profileImageSrc.${empNo}` : LS_IMG_GLOBAL;
+      const DEFAULT_PROFILE_AVATAR = '/static/image/svg/profil/free-icon-bussiness-man.svg';
 
     const avatar = $('.admin-page .avatar');
+    if (!avatar) return;
+    if (avatar.dataset.memberSettingsBound === '1') return;
+    avatar.dataset.memberSettingsBound = '1';
+
     const headerIcon = $('#btn-account .header-icon');
 
-    const picker = $('#profile-picker');
-    const pickerGrid = picker?.querySelector('.picker-grid');
-    const pickerCloseBtn = picker?.querySelector('[data-picker-close]');
+    function getPicker(){ return document.getElementById('profile-picker'); }
+    function getPickerGrid(){ return getPicker()?.querySelector('.picker-grid'); }
+
+    function setProfileImage(src){
+    if (!src) return;
+    if (avatar) avatar.style.backgroundImage = `url('${src}')`;
+    if (headerIcon) {
+    headerIcon.src = src;
+    headerIcon.classList.add('header-avatar-icon');
+    }
+    }
 
     function applyProfileImage(src){
-      if (!src) return;
-      if (avatar) avatar.style.backgroundImage = `url('${src}')`;
-      if (headerIcon) {
-        headerIcon.src = src;
-        headerIcon.classList.add('header-avatar-icon');
-      }
+    const candidate = String(src || '').trim() || DEFAULT_PROFILE_AVATAR;
+    const probe = new Image();
+    probe.onload = () => { setProfileImage(candidate); };
+    probe.onerror = () => {
+    setProfileImage(DEFAULT_PROFILE_AVATAR);
+    try {
+      localStorage.setItem(LS_IMG_GLOBAL, DEFAULT_PROFILE_AVATAR);
+      if (empNo) localStorage.setItem(LS_IMG, DEFAULT_PROFILE_AVATAR);
+    } catch {}
+    };
+    probe.src = candidate;
+    }
+
+    function getCurrentAvatarSrc(){
+    try {
+    const bg = avatar ? window.getComputedStyle(avatar).backgroundImage : '';
+    const match = /url\(["']?(.*?)["']?\)/.exec(bg || '');
+    if (match && match[1]) return match[1];
+    } catch {}
+    const memberImg = getMyMemberCardAvatars()[0];
+    return memberImg ? (memberImg.getAttribute('src') || '') : '';
     }
 
     async function updateMeProfile(payload) {
@@ -76,6 +126,9 @@
     const profileImages = names.map(n => `/static/image/svg/profil/${n}.svg`);
 
     function openPicker(){
+      ensureProfilePickerShell();
+      const picker = getPicker();
+      const pickerGrid = getPickerGrid();
       if (!picker || !pickerGrid) return;
       if (!pickerGrid.hasChildNodes()){
         profileImages.forEach(src => {
@@ -114,9 +167,12 @@
     }
 
     function closePicker(){
+      const picker = getPicker();
       picker?.classList.remove('open');
       picker?.setAttribute('aria-hidden', 'true');
     }
+
+    window.__blossomMemberOpenPicker = openPicker;
 
     avatar?.addEventListener('click', openPicker);
     avatar?.addEventListener('keydown', (e) => {
@@ -125,13 +181,15 @@
         openPicker();
       }
     });
-    pickerCloseBtn?.addEventListener('click', closePicker);
-    picker?.addEventListener('click', (e) => {
+    getPicker()?.querySelector('[data-picker-close]')?.addEventListener('click', closePicker);
+    getPicker()?.addEventListener('click', (e) => {
       if (e.target && e.target.hasAttribute('data-picker-close')) closePicker();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && picker?.classList.contains('open')) closePicker();
+      if (e.key === 'Escape' && getPicker()?.classList.contains('open')) closePicker();
     });
+
+	applyProfileImage(getCurrentAvatarSrc());
 
     // ---- Motto inline edit ----
     const bioOpenBtn = document.getElementById('btn-edit-bio');
@@ -251,5 +309,35 @@
       const src = e.detail?.src;
       if (src) applyMemberCardAvatar(src);
     });
-  });
+  }
+
+  function runMemberSettingsInit(){
+    try { initMemberSettingsPage(); } catch (err) { console.error(err); }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runMemberSettingsInit, { once: true });
+  } else {
+    runMemberSettingsInit();
+  }
+
+  if (document.documentElement.dataset.memberPickerDelegationBound !== '1') {
+    document.documentElement.dataset.memberPickerDelegationBound = '1';
+    document.addEventListener('click', function(e){
+      const avatar = e.target && typeof e.target.closest === 'function'
+        ? e.target.closest('.admin-page .avatar')
+        : null;
+      if (!avatar) return;
+      if ((window.location.pathname || '').indexOf('/settings/member') < 0) return;
+      if (typeof window.__blossomMemberOpenPicker === 'function') {
+        window.__blossomMemberOpenPicker();
+        return;
+      }
+      if (typeof window.openHeaderAvatarPicker === 'function') {
+        window.openHeaderAvatarPicker();
+      }
+    });
+  }
+
+  document.addEventListener('blossom:spa:navigated', runMemberSettingsInit);
 })();

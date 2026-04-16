@@ -26,7 +26,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/usr/bin/gunicorn \
     --config /opt/blossom/lumina/web/gunicorn.conf.py \
     --chdir /opt/blossom/lumina/web \
-    wsgi:app
+    wsgi:application
 ExecReload=/bin/kill -HUP $MAINPID
 
 # ── 작업 디렉터리 ────────────────────────────────────────

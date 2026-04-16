@@ -34,8 +34,8 @@ interval = 3600
 # JSON 출력 디렉터리 (서버 전송 실패 시 fallback 저장 경로)
 output_dir = /var/lib/lumina
 
-# 수집 항목 (comma-separated): interface, account, package
-collectors = interface,account,package
+# 수집 항목 (comma-separated): interface, account, authority, firewalld, storage, package
+collectors = interface,account,authority,firewalld,storage,package
 EOF
     echo "  설정 파일 생성: $CONF_DIR/lumina.conf"
     echo "  ※ server_url에 Blossom 서버 IP를 입력하세요!"

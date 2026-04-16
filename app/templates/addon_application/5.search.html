@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?{{ blossom_css_version }}">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content search-page">
+        <div class="content-wrapper">
+            <section id="search-briefing" class="search-briefing" hidden></section>
+            <section id="search-rag-evidence" class="search-rag-evidence" hidden></section>
+            <section id="search-active-filters" class="search-active-filters" hidden></section>
+            <div id="search-summary" class="search-summary">헤더 검색창에 키워드를 입력하면 결과가 표시됩니다.</div>
+            <div id="search-results" class="search-results"></div>
+            <div id="search-empty" class="search-empty" hidden>
+                <div class="search-empty-visual">
+                    <img id="search-empty-sticker" class="search-empty-sticker" src="" alt="검색 결과 안내 스티커">
+                </div>
+                <div id="search-empty-title" class="search-empty-title">검색 결과가 없습니다.</div>
+                <div id="search-empty-description" class="search-empty-description">다른 키워드로 다시 검색해 보세요.</div>
+                <ul class="search-empty-tips">
+                    <li>단어의 철자가 정확한지 확인해 보세요.</li>
+                    <li>검색어를 더 짧게 입력하거나 일반적인 표현으로 바꿔 보세요.</li>
+                    <li>부서명, 시스템명, 프로젝트명처럼 대표 키워드로 다시 검색해 보세요.</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        window.BLOSSOM_SEARCH_STICKERS = {{ search_stickers|tojson }};
+    </script>
+    <script src="/static/js/blossom.js?{{ blossom_js_version }}"></script>
+    <script src="/static/js/addon_application/5.search.js?{{ search_js_version }}"></script>
+    <!-- version: search_js_version={{ search_js_version }} -->
+</body>
+</html>

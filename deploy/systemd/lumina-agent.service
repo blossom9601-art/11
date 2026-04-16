@@ -1,0 +1,86 @@
+###############################################################################
+# lumina-agent.service
+# Blossom Lumina — Agent (자산 자동 탐색 에이전트)
+# 설치 경로: /usr/lib/systemd/system/lumina-agent.service
+###############################################################################
+
+[Unit]
+Description=Blossom Lumina Agent (Asset Discovery)
+Documentation=https://blossom.local/docs/lumina-agent
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+# ── 실행 계정 (root 실행 금지) ────────────────────────────
+Type=simple
+User=lumina
+Group=lumina
+
+# ── 실행 명령 ────────────────────────────────────────────
+ExecStart=/usr/bin/python3 /opt/blossom/lumina/agent/agent.py \
+    --conf /etc/blossom/lumina/agent.conf
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── 작업 디렉터리 ────────────────────────────────────────
+WorkingDirectory=/opt/blossom/lumina/agent
+
+# ── 재시작 정책 ──────────────────────────────────────────
+Restart=on-failure
+RestartSec=30
+
+# ── 타임아웃 ─────────────────────────────────────────────
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# ── 로그 ─────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumina-agent
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 보안 강화 (systemd 샌드박스)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 파일시스템 보호
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/blossom/lumina/agent
+ReadWritePaths=/var/log/blossom/lumina/agent
+ReadOnlyPaths=/etc/blossom/lumina
+ReadOnlyPaths=/opt/blossom/lumina
+
+# 임시 파일 격리
+PrivateTmp=yes
+
+# 커널 보호
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# 네트워크 (AP :5100 전송만 필요)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+# 권한 제한
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# 장치 접근: /sys/class/net 읽기 필요
+PrivateDevices=yes
+
+# 시스템 콜 제한
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@mount @reboot @swap @clock @debug @obsolete @raw-io
+
+# 메모리 보호
+MemoryDenyWriteExecute=yes
+
+# ulimit
+LimitNOFILE=4096
+LimitNPROC=256
+
+[Install]
+WantedBy=multi-user.target

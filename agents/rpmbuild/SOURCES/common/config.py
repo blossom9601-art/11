@@ -6,7 +6,7 @@ import platform
 import socket
 
 DEFAULT_INTERVAL = 3600  # 1시간
-DEFAULT_COLLECTORS = ["interface", "account", "package"]
+DEFAULT_COLLECTORS = ["interface", "account", "authority", "firewalld", "storage", "package"]
 DEFAULT_PORT = 8080
 DEFAULT_PROTOCOL = "https"
 API_PATH = "/api/agent/upload"

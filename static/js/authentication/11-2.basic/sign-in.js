@@ -30,10 +30,19 @@
         el.setAttribute('aria-hidden', 'true');
     }
 
+    /* ── 페이지 로드 시 MFA 필요 플래그가 설정되어 있으면 자동으로 MFA 선택 모달 열기 ── */
+    if (mfaRequired && mfaEmpNo) {
+        showMfaSelect();
+    }
+
     /* ── MFA 인증 방식 선택 모달 ── */
     function showMfaSelect() {
-        fetch('/api/mfa/status')
-            .then(function (r) { return r.json(); })
+        fetch('/api/mfa/status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) {
+                var ct = (r.headers.get('content-type') || '');
+                if (!ct.includes('application/json')) throw new Error('not_json');
+                return r.json();
+            })
             .then(function (data) {
                 var list = document.getElementById('mfa-method-list');
                 if (!data.enabled) { loginForm.submit(); return; }
@@ -63,10 +72,12 @@
 
         fetch('/api/mfa/send-code', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ emp_no: emp, mfa_type: method })
         })
             .then(function (r) {
+                var ct = (r.headers.get('content-type') || '');
+                if (!ct.includes('application/json')) throw new Error('인증 코드 전송에 실패했습니다.');
                 if (!r.ok) return r.json().then(function (e) { throw e; });
                 return r.json();
             })
@@ -145,10 +156,14 @@
 
         fetch('/api/mfa/verify', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ emp_no: emp, code: code, mfa_type: type })
         })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                var ct = (r.headers.get('content-type') || '');
+                if (!ct.includes('application/json')) throw new Error('server_error');
+                return r.json();
+            })
             .then(function (data) {
                 if (data.verified) {
                     closeModal(codeModal);
@@ -190,9 +205,185 @@
     /* ── ESC 키 ── */
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
-            if (codeModal.classList.contains('show')) { closeModal(codeModal); clearInterval(timerInterval); }
+            if (forgotModal.classList.contains('show')) { closeModal(forgotModal); }
+            else if (chpwModal.classList.contains('show')) { closeModal(chpwModal); }
+            else if (codeModal.classList.contains('show')) { closeModal(codeModal); clearInterval(timerInterval); }
             else if (selectModal.classList.contains('show')) { closeModal(selectModal); }
         }
+    });
+
+    /* ── 비밀번호 변경 모달 ── */
+    var chpwModal = document.getElementById('chpw-modal');
+    var chpwForm  = document.getElementById('chpw-form');
+    var chpwMsg   = document.getElementById('chpw-msg');
+
+    document.getElementById('open-change-pw').addEventListener('click', function (e) {
+        e.preventDefault();
+        chpwForm.reset();
+        chpwMsg.textContent = '';
+        chpwMsg.className = 'chpw-msg';
+        var empField = document.getElementById('chpw-emp');
+        var loginEmp = document.getElementById('employee_id').value.trim();
+        if (loginEmp) empField.value = loginEmp;
+        openModal(chpwModal);
+        requestAnimationFrame(function () { (loginEmp ? document.getElementById('chpw-cur') : empField).focus(); });
+    });
+
+    document.getElementById('chpw-cancel').addEventListener('click', function () { closeModal(chpwModal); });
+    chpwModal.addEventListener('click', function (e) { if (e.target === chpwModal) closeModal(chpwModal); });
+
+    chpwForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('chpw-submit');
+        btn.disabled = true;
+        btn.textContent = '처리 중…';
+        chpwMsg.textContent = '';
+        chpwMsg.className = 'chpw-msg';
+
+        var body = {
+            emp_no: document.getElementById('chpw-emp').value.trim(),
+            current_password: document.getElementById('chpw-cur').value,
+            new_password: document.getElementById('chpw-new').value,
+            confirm_password: document.getElementById('chpw-confirm').value
+        };
+
+        fetch('/api/change-password-public', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+            if (res.ok && res.data.success) {
+                chpwMsg.textContent = res.data.message || '비밀번호가 변경되었습니다.';
+                chpwMsg.className = 'chpw-msg chpw-success';
+                chpwForm.reset();
+                setTimeout(function () { closeModal(chpwModal); }, 2000);
+            } else {
+                chpwMsg.textContent = res.data.error || '변경에 실패했습니다.';
+                chpwMsg.className = 'chpw-msg chpw-error';
+            }
+        })
+        .catch(function () {
+            chpwMsg.textContent = '서버 통신 중 오류가 발생했습니다.';
+            chpwMsg.className = 'chpw-msg chpw-error';
+        })
+        .finally(function () {
+            btn.disabled = false;
+            btn.textContent = '변경';
+        });
+    });
+
+    /* ── 비밀번호 찾기 모달 (스텝) ── */
+    var forgotModal = document.getElementById('forgot-modal');
+    var forgotForm  = document.getElementById('forgot-form');
+    var forgotMsg   = document.getElementById('forgot-msg');
+    var forgotStep  = 1;
+    var forgotBtn   = document.getElementById('forgot-next');
+    var stepEls     = document.querySelectorAll('.forgot-step');
+
+    function showForgotStep(n) {
+        forgotStep = n;
+        forgotMsg.textContent = ''; forgotMsg.className = 'chpw-msg';
+        for (var i = 1; i <= 3; i++) {
+            document.getElementById('forgot-step' + i).style.display = i === n ? '' : 'none';
+        }
+        stepEls.forEach(function (el) {
+            el.classList.toggle('active', parseInt(el.dataset.step) === n);
+            el.classList.toggle('done', parseInt(el.dataset.step) < n);
+        });
+        forgotBtn.textContent = n < 3 ? '다음' : '임시 비밀번호 발송';
+        var focusId = n === 1 ? 'forgot-emp' : n === 2 ? 'forgot-email' : 'forgot-name';
+        requestAnimationFrame(function () { document.getElementById(focusId).focus(); });
+    }
+
+    document.getElementById('open-forgot-pw').addEventListener('click', function (e) {
+        e.preventDefault();
+        forgotForm.reset();
+        showForgotStep(1);
+        var loginEmp = document.getElementById('employee_id').value.trim();
+        if (loginEmp) document.getElementById('forgot-emp').value = loginEmp;
+        openModal(forgotModal);
+        requestAnimationFrame(function () { document.getElementById('forgot-emp').focus(); });
+    });
+
+    document.getElementById('forgot-cancel').addEventListener('click', function () { closeModal(forgotModal); });
+    forgotModal.addEventListener('click', function (e) { if (e.target === forgotModal) closeModal(forgotModal); });
+
+    forgotBtn.addEventListener('click', function () {
+        forgotMsg.textContent = ''; forgotMsg.className = 'chpw-msg';
+        if (forgotStep === 1) {
+            var empVal = document.getElementById('forgot-emp').value.trim();
+            if (!empVal) { forgotMsg.textContent = '사번을 입력해주세요.'; forgotMsg.className = 'chpw-msg chpw-error'; return; }
+            forgotBtn.disabled = true;
+            fetch('/api/forgot-password/verify', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 1, emp_no: empVal })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                if (res.data.success) { showForgotStep(2); }
+                else { forgotMsg.textContent = res.data.error; forgotMsg.className = 'chpw-msg chpw-error'; }
+            })
+            .catch(function () { forgotMsg.textContent = '서버 통신 오류'; forgotMsg.className = 'chpw-msg chpw-error'; })
+            .finally(function () { forgotBtn.disabled = false; });
+        } else if (forgotStep === 2) {
+            var emailVal = document.getElementById('forgot-email').value.trim();
+            if (!emailVal) { forgotMsg.textContent = '이메일을 입력해주세요.'; forgotMsg.className = 'chpw-msg chpw-error'; return; }
+            forgotBtn.disabled = true;
+            fetch('/api/forgot-password/verify', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 2, emp_no: document.getElementById('forgot-emp').value.trim(), email: emailVal })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                if (res.data.success) { showForgotStep(3); }
+                else { forgotMsg.textContent = res.data.error; forgotMsg.className = 'chpw-msg chpw-error'; }
+            })
+            .catch(function () { forgotMsg.textContent = '서버 통신 오류'; forgotMsg.className = 'chpw-msg chpw-error'; })
+            .finally(function () { forgotBtn.disabled = false; });
+        } else {
+            if (!document.getElementById('forgot-name').value.trim()) {
+                forgotMsg.textContent = '이름을 입력해주세요.'; forgotMsg.className = 'chpw-msg chpw-error'; return;
+            }
+            forgotBtn.disabled = true; forgotBtn.textContent = '발송 중…';
+            fetch('/api/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    emp_no: document.getElementById('forgot-emp').value.trim(),
+                    email: document.getElementById('forgot-email').value.trim(),
+                    name: document.getElementById('forgot-name').value.trim()
+                })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                if (res.ok && res.data.success) {
+                    forgotMsg.textContent = res.data.message;
+                    forgotMsg.className = 'chpw-msg chpw-success';
+                    forgotForm.reset();
+                    setTimeout(function () { closeModal(forgotModal); }, 3000);
+                } else {
+                    forgotMsg.textContent = res.data.error || '요청 처리에 실패했습니다.';
+                    forgotMsg.className = 'chpw-msg chpw-error';
+                }
+            })
+            .catch(function () {
+                forgotMsg.textContent = '서버 통신 중 오류가 발생했습니다.';
+                forgotMsg.className = 'chpw-msg chpw-error';
+            })
+            .finally(function () {
+                forgotBtn.disabled = false;
+                forgotBtn.textContent = '임시 비밀번호 발송';
+            });
+        }
+    });
+
+    /* Enter 키로 다음 스텝 이동 */
+    ['forgot-emp', 'forgot-email', 'forgot-name'].forEach(function (id) {
+        document.getElementById(id).addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); forgotBtn.click(); }
+        });
     });
 
     /* ── 로그인 폼 submit → AJAX 인증 → MFA 체크 ── */

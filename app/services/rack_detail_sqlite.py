@@ -41,12 +41,10 @@ def resolve_sqlite_db_path(app=None) -> str:
     if netloc not in ('', 'localhost'):
         path = f"//{netloc}{path}"
 
-    # On Windows, urlparse('sqlite:///dev_blossom.db').path becomes '/dev_blossom.db'.
-    # Treat that as instance-local filename (instance/dev_blossom.db), not absolute.
-    # Also support absolute Windows paths that appear as '/C:/...'.
-    if os.name == 'nt' and path.startswith('/') and not path.startswith('//'):
-        if re.match(r'^/[A-Za-z]:', path):
-            path = path[1:]
+    # sqlite:///file.db -> path='/file.db' (single leading / = relative)
+    # sqlite:////abs.db  -> path='//abs.db' (double leading / = absolute)
+    if path.startswith('/') and not path.startswith('//'):
+        path = path.lstrip('/')
 
     if os.path.isabs(path):
         return os.path.abspath(path)

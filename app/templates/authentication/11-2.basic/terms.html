@@ -64,6 +64,12 @@
                     </ol>
                 </div>
                 </div>
+                {% if view_only %}
+                <div class="terms-actions">
+                    <button type="button" class="login-button" onclick="history.back()">뒤로 돌아가기</button>
+                </div>
+                {% else %}
+                {% if can_agree %}
                 <div class="terms-consent">
                     <label class="consent-label" for="terms_agree">
                         <input type="checkbox" id="terms_agree" name="terms_agree" value="Y" required>
@@ -73,9 +79,11 @@
                 <div class="terms-actions">
                     <button type="submit" class="login-button" id="terms-ok">확인</button>
                 </div>
+                {% endif %}
                 <div class="terms-back">
                     <a href="/login" class="back-to-signin">로그인</a> 페이지로 돌아가기
                 </div>
+                {% endif %}
             </div>
             </form>
         </div>

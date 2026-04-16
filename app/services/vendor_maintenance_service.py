@@ -479,18 +479,10 @@ def soft_delete_vendor_maintenance_manager(app=None, *, vendor_id: int, manager_
     manager_id = _sanitize_int(manager_id)
     if vendor_id <= 0 or manager_id <= 0:
         return 0
-    actor = (actor or 'system').strip() or 'system'
-    now = _now()
     with _get_connection(app) as conn:
         cur = conn.execute(
-            f"""
-            UPDATE {MANAGER_TABLE_NAME}
-               SET is_deleted = 1,
-                   updated_at = ?,
-                   updated_by = ?
-             WHERE id = ? AND vendor_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
-            """,
-            (now, actor, manager_id, vendor_id),
+            f"DELETE FROM {MANAGER_TABLE_NAME} WHERE id = ? AND vendor_id = ?",
+            (manager_id, vendor_id),
         )
         conn.commit()
         return int(cur.rowcount or 0)
@@ -704,12 +696,10 @@ def soft_delete_maintenance_vendors(ids: Iterable[Any], actor: str, app=None) ->
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

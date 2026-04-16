@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS org_user (
     locked INTEGER DEFAULT 0,
     fail_cnt INTEGER DEFAULT 0,
     note TEXT,
+    motto TEXT,
     is_deleted INTEGER NOT NULL DEFAULT 0
 );
 
@@ -186,7 +187,8 @@ SELECT
     password_expires_at,
     locked,
     fail_cnt,
-    note
+    note,
+    motto
 FROM org_user;
 
 CREATE TABLE IF NOT EXISTS hardware (

@@ -350,7 +350,7 @@
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '준회원사', columns: ['member_name','address','manager_count','line_qty','note'] }
+        { group: '준회원사', columns: ['member_name','address','manager_count','line_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
@@ -767,16 +767,19 @@
             hidden.value = (row && row[c] != null) ? String(row[c]) : '';
             form.appendChild(hidden);
         });
-        const group = { title:'준회원사', cols:['member_name','address','note'] };
+        const group = { title:'준회원사', cols:['member_name','address'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow); form.appendChild(section);
     }
 
     function generateFieldInput(col,value=''){
@@ -1375,7 +1378,7 @@
     document.getElementById(DISPOSE_CLOSE_ID)?.addEventListener('click', ()=> closeModal(DISPOSE_MODAL_ID));
         document.getElementById(DISPOSE_CONFIRM_ID)?.addEventListener('click', ()=>{
             // 수집 대상 열: 시스템 제조사, 시스템 모델명, 시스템 일련번호, 시스템 가상화, 시스템 장소, 시스템 위치, 시스템 슬롯, 시스템 크기, 시스템 담당부서, 시스템 담당자
-            const fields = ['member_name','address','manager','line_qty','note'];
+            const fields = ['member_name','address','manager','line_qty'];
             const selected = state.data.filter(r=> state.selected.has(r.id)).map(r=>{
                 const obj = { id: r.id };
                 fields.forEach(f=> obj[f] = r[f] ?? '');
@@ -1471,7 +1474,7 @@
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'준회원사', cols:['member_name','address','manager_count','line_qty','note'] };
+    const GROUP = { title:'준회원사', cols:['member_name','address','manager_count','line_qty'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');

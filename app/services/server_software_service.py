@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Server detail-page software table persistence (sqlite3).
 
 This backs the "tab02-software" tables on server detail pages.
@@ -6,8 +8,6 @@ We intentionally store this in the same SQLite DB file as the other
 instance-local data (typically instance/dev_blossom.db) by resolving the
 path from SQLALCHEMY_DATABASE_URI, with an optional override.
 """
-
-from __future__ import annotations
 
 import logging
 import os

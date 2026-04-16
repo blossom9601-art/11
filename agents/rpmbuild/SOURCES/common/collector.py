@@ -36,6 +36,9 @@ def build_payload(collectors: List[BaseCollector]) -> Dict[str, Any]:
         "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "interfaces": [],
         "accounts": [],
+        "authorities": [],
+        "firewalld": [],
+        "storage": [],
         "packages": [],
     }
 

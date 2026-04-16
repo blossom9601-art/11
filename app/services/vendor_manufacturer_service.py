@@ -92,6 +92,11 @@ def _normalize_code(seed: str) -> str:
     return base[:60]
 
 
+def _normalize_name(value: Any) -> str:
+    text = str(value or '').strip()
+    return re.sub(r'\s+', ' ', text)
+
+
 def _generate_unique_code(conn: sqlite3.Connection, seed: str) -> str:
     base = _normalize_code(seed)
     candidate = base
@@ -121,6 +126,18 @@ def _assert_unique_code(conn: sqlite3.Connection, code: str, record_id: Optional
     ).fetchone()
     if row and (record_id is None or row['id'] != record_id):
         raise ValueError('이미 사용 중인 제조사 코드입니다.')
+
+
+def _assert_unique_name(conn: sqlite3.Connection, name: str, record_id: Optional[int] = None) -> None:
+    normalized_name = _normalize_name(name)
+    if not normalized_name:
+        raise ValueError('manufacturer_name is required')
+    row = conn.execute(
+        f"SELECT id FROM {TABLE_NAME} WHERE is_deleted = 0 AND lower(trim(manufacturer_name)) = lower(trim(?))",
+        (normalized_name,),
+    ).fetchone()
+    if row and (record_id is None or row['id'] != record_id):
+        raise ValueError('동일한 제조사명이 이미 존재합니다.')
 
 
 def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
@@ -392,18 +409,10 @@ def soft_delete_vendor_manufacturer_manager(vendor_id: int, manager_id: int, act
     manager_id = _sanitize_int(manager_id)
     if vendor_id <= 0 or manager_id <= 0:
         return 0
-    actor = (actor or 'system').strip() or 'system'
-    now = _now()
     with _get_connection(app) as conn:
         cur = conn.execute(
-            f"""
-            UPDATE {MANAGER_TABLE_NAME}
-               SET is_deleted = 1,
-                   updated_at = ?,
-                   updated_by = ?
-             WHERE id = ? AND vendor_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
-            """,
-            (now, actor, manager_id, vendor_id),
+            f"DELETE FROM {MANAGER_TABLE_NAME} WHERE id = ? AND vendor_id = ?",
+            (manager_id, vendor_id),
         )
         conn.commit()
         return int(cur.rowcount or 0)
@@ -557,11 +566,12 @@ def create_vendor(data: Dict[str, Any], actor: str, app=None) -> Dict[str, Any]:
     app = app or current_app
     actor = (actor or 'system').strip() or 'system'
     payload = _prepare_payload(data, require_all=True)
-    name = payload['manufacturer_name'].strip()
+    name = _normalize_name(payload['manufacturer_name'])
     if not name:
         raise ValueError('manufacturer_name is required')
     timestamp = _now()
     with _get_connection(app) as conn:
+        _assert_unique_name(conn, name)
         code = payload.get('manufacturer_code')
         if code:
             _assert_unique_code(conn, code)
@@ -633,6 +643,12 @@ def update_vendor(record_id: int, data: Dict[str, Any], actor: str, app=None) ->
     if not payload:
         return get_vendor(record_id, app)
     with _get_connection(app) as conn:
+        if 'manufacturer_name' in payload:
+            normalized_name = _normalize_name(payload['manufacturer_name'])
+            if not normalized_name:
+                raise ValueError('manufacturer_name is required')
+            _assert_unique_name(conn, normalized_name, record_id)
+            payload['manufacturer_name'] = normalized_name
         if 'manufacturer_code' in payload:
             code = payload['manufacturer_code']
             if code:
@@ -687,12 +703,10 @@ def soft_delete_vendors(ids: Iterable[Any], actor: str, app=None) -> int:
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

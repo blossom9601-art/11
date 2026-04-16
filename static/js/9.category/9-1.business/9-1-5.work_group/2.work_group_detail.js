@@ -50,6 +50,7 @@
           try{
             if(!container) return;
             container.innerHTML = '';
+            var fallbackMounted = false;
             var wrap = document.createElement('span');
             wrap.style.display = 'flex';
             wrap.style.alignItems = 'center';
@@ -68,15 +69,36 @@
                 animBox.style.width = '240px';
                 animBox.style.maxWidth = '100%';
                 animBox.style.height = '180px';
+                animBox.style.backgroundColor = '#f8fafc';
+                animBox.style.backgroundImage = "url(\"data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 84'%3E%3Crect x='6' y='6' width='108' height='72' rx='12' fill='%23eef2f7' stroke='%23cbd5e1'/%3E%3Cpath d='M34 44l8 8 16-16' fill='none' stroke='%2364758b' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M66 52h22M66 40h34M66 28h28' stroke='%23718096' stroke-width='4.5' stroke-linecap='round'/%3E%3C/svg%3E\")";
+                animBox.style.backgroundRepeat = 'no-repeat';
+                animBox.style.backgroundPosition = 'center';
+                animBox.style.backgroundSize = '120px 84px';
+                animBox.style.border = '1px solid #e2e8f0';
+                animBox.style.borderRadius = '12px';
                 animBox.style.pointerEvents = 'none';
                 var altMsg = altText || '데이터 없음';
                 animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
                 wrap.appendChild(animBox);
                 try{
-                  window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, path: jsonPath });
+                  if(!wrap.parentNode){ container.appendChild(wrap); }
+                  var _anim1 = window.lottie.loadAnimation({
+                    container: animBox,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    path: jsonPath,
+                    rendererSettings: { preserveAspectRatio: 'xMidYMid meet' }
+                  });
+                  // Some environments render only the first frame unless playback is nudged.
+                  try {
+                    setTimeout(function(){
+                      try { _anim1.goToAndPlay(0, true); } catch(_g1) { try { _anim1.play(); } catch(_p1) {} }
+                    }, 40);
+                  } catch(_t1) {}
                   var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
                   (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
-                  wrap.appendChild(capWrap); container.appendChild(wrap); return true;
+                  wrap.appendChild(capWrap); if(!wrap.parentNode){ container.appendChild(wrap); } return true;
                 }catch(_a){ return false; }
               }catch(_){ return false; }
             }
@@ -89,7 +111,10 @@
             function renderImageFallback(){
               try{
                 var img = document.createElement('img'); var altMsg = altText || '데이터 없음'; img.alt = (altMsg+'').split('\n')[0]; img.style.maxWidth='240px'; img.style.width='100%'; img.style.height='auto';
+                var inlineSvg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 220'><rect x='8' y='8' width='304' height='204' rx='18' fill='#f8fafc' stroke='#cbd5e1'/><circle cx='112' cy='102' r='34' fill='#e2e8f0' stroke='#94a3b8'/><path d='M160 138h54M160 116h88M160 94h72' stroke='#64748b' stroke-width='10' stroke-linecap='round'/><path d='M98 103l12 12 26-26' fill='none' stroke='#475569' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+                var inlineSvgData = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(inlineSvg);
                 var candidates = [
+                  inlineSvgData,
                   '/blossom/static/image/svg/free-animated-no-data/no-data.svg','/blossom/static/image/svg/free-animated-no-data/animated.svg','/blossom/static/image/svg/free-animated-no-data/animation.svg','/blossom/static/image/svg/free-animated-no-data/index.svg','/blossom/static/image/svg/free-animated-no-data.svg','/blossom/static/image/svg/free-animated-no-data/no-data.gif','/blossom/static/image/svg/free-animated-no-data.gif',
                   '/static/image/svg/free-animated-no-data/no-data.svg','/static/image/svg/free-animated-no-data/animated.svg','/static/image/svg/free-animated-no-data/animation.svg','/static/image/svg/free-animated-no-data/index.svg','/static/image/svg/free-animated-no-data.svg','/static/image/svg/free-animated-no-data/no-data.gif','/static/image/svg/free-animated-no-data.gif'
                 ];
@@ -237,6 +262,7 @@
         // Since this script is only included on Work Group templates, use a DOM-based guard.
         var isWorkGroupAnyTab = !!document.getElementById('page-header-title') || !!document.querySelector('.server-detail-tabs');
         if(!isWorkGroupAnyTab) return;
+        try { window.__wgNoDataV2 = true; } catch(_f) {}
 
         function safeTrim(v){ return (v==null)?'':String(v).trim(); }
         function fetchJson(url){
@@ -415,9 +441,20 @@
           try{ return new URLSearchParams((location && location.search) || ''); }catch(_){ return new URLSearchParams(); }
         }
         function refreshLinksAndUrlFromPayload(p){
-          // Clean URL mode: do NOT push query params into the URL.
-          // The server session (cat_detail_ctx_v1) holds the context.
-          // Tab links are already clean in the template (no query string).
+          // Keep page URL clean, but ensure tab links always carry id context.
+          // This avoids intermittent tab redirects when session context is missing.
+          try{
+            var gid = '';
+            if (p && (p.group_id || p.id)) {
+              gid = String(p.group_id || p.id).trim();
+            }
+            if (!gid) {
+              var qs = getQueryParams();
+              gid = String(qs.get('id') || qs.get('group_id') || '').trim();
+            }
+            if (!gid) return;
+            ensureTabLinksHaveSearch('?id=' + encodeURIComponent(gid));
+          }catch(_){ }
         }
 
         // Keep context across the 7 tabs by appending search to tab links.
@@ -470,6 +507,7 @@
           try{
             if(!container) return;
             container.innerHTML = '';
+            try { container.setAttribute('data-nodata-mounted', '1'); } catch(_m) {}
             var wrap = document.createElement('span');
             wrap.style.display = 'flex';
             wrap.style.alignItems = 'center';
@@ -480,47 +518,141 @@
             wrap.style.boxSizing = 'border-box';
             wrap.style.flexDirection = 'column';
             var jsonPath = '/static/image/svg/free-animated-no-data.json';
-            function renderLottie(){
+            var altMsg = altText || '데이터 없음';
+
+            function renderTextOnly(){
               try{
-                if(!window.lottie){ return false; }
+                wrap.innerHTML = '';
+                var capWrap=document.createElement('span');
+                capWrap.style.display='block';
+                capWrap.style.marginTop='8px';
+                capWrap.style.textAlign='center';
+                (altMsg+'').split('\n').forEach(function(line, i){
+                  var cap=document.createElement('span');
+                  cap.textContent=line;
+                  cap.style.display='block';
+                  cap.style.fontSize = i===0 ? '14px' : '13px';
+                  cap.style.color='#64748b';
+                  capWrap.appendChild(cap);
+                });
+                wrap.appendChild(capWrap);
+                if(!wrap.parentNode) container.appendChild(wrap);
+              }catch(_t){ }
+            }
+
+            function attachCaption(){
+              var capWrap = document.createElement('span');
+              capWrap.style.display='block';
+              capWrap.style.marginTop='8px';
+              capWrap.style.textAlign='center';
+              (altMsg+'').split('\n').forEach(function(line, idx){
+                var cap=document.createElement('span');
+                cap.textContent=line;
+                cap.style.display='block';
+                cap.style.fontSize = idx===0 ? '14px' : '13px';
+                cap.style.color = '#64748b';
+                capWrap.appendChild(cap);
+              });
+              wrap.appendChild(capWrap);
+            }
+
+            function startLottie(){
+              try{
+                if(!window.lottie){ renderTextOnly(); return; }
                 var animBox = document.createElement('span');
                 animBox.style.display = 'inline-block';
                 animBox.style.width = '240px';
                 animBox.style.maxWidth = '100%';
                 animBox.style.height = '180px';
                 animBox.style.pointerEvents = 'none';
-                var altMsg = altText || '데이터 없음';
                 animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
+
+                wrap.innerHTML = '';
                 wrap.appendChild(animBox);
-                try{
-                  window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, path: jsonPath });
-                  var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
-                  (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
-                  wrap.appendChild(capWrap); container.appendChild(wrap); return true;
-                }catch(_a){ return false; }
+                attachCaption();
+                if(!wrap.parentNode) container.appendChild(wrap);
+
+                var anim = window.lottie.loadAnimation({
+                  container: animBox,
+                  renderer: 'svg',
+                  loop: true,
+                  autoplay: true,
+                  path: jsonPath,
+                  rendererSettings: { preserveAspectRatio: 'xMidYMid meet' }
+                });
+
+                try {
+                  setTimeout(function(){
+                    try { anim.goToAndPlay(0, true); } catch(_g2) { try { anim.play(); } catch(_p2) {} }
+                  }, 40);
+                } catch(_t2) {}
+
+                // When the JSON resolves to an empty SVG shell, retry with canvas using same JSON.
+                try {
+                  setTimeout(function(){
+                    try {
+                      var svg = animBox.querySelector('svg');
+                      var vectorCount = svg ? svg.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,image,text,use').length : 0;
+                      if(vectorCount > 2) return;
+                      try { if(anim && anim.destroy) anim.destroy(); } catch(_d) {}
+                      fetch(jsonPath, { credentials:'same-origin' })
+                        .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('json')); })
+                        .then(function(data){
+                          animBox.innerHTML = '';
+                          window.lottie.loadAnimation({
+                            container: animBox,
+                            renderer: 'canvas',
+                            loop: true,
+                            autoplay: true,
+                            animationData: data
+                          });
+                        })
+                        .catch(function(){ renderTextOnly(); });
+                    } catch(_v) { renderTextOnly(); }
+                  }, 1200);
+                } catch(_tv) {}
+              }catch(_){ renderTextOnly(); }
+            }
+
+            function renderLottie(){
+              try{
+                if(!window.lottie){ return false; }
+                startLottie();
+                return true;
               }catch(_){ return false; }
+            }
+            function loadScriptOnce(src, onDone){
+              try{
+                if(!src){ onDone(false); return; }
+                var key = 'blsLottieScript:' + src;
+                var prior = document.querySelector('script[data-bls-key="'+key+'"]');
+                if(prior){
+                  if(window.lottie){ onDone(true); return; }
+                  prior.addEventListener('load', function(){ onDone(!!window.lottie); }, { once:true });
+                  prior.addEventListener('error', function(){ onDone(false); }, { once:true });
+                  return;
+                }
+                var script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.setAttribute('data-bls-key', key);
+                script.onload = function(){ onDone(!!window.lottie); };
+                script.onerror = function(){ onDone(false); };
+                document.head.appendChild(script);
+              }catch(_){ onDone(false); }
             }
             function loadLottieAndRender(){
               try{
-                var script = document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js'; script.async=true;
-                script.onload=function(){ if(!renderLottie()) renderImageFallback(); }; script.onerror=function(){ renderImageFallback(); }; document.head.appendChild(script);
-              }catch(_){ renderImageFallback(); }
+                loadScriptOnce('/static/js/vendor/lottie.min.js?v=5.12.2', function(okLocal){
+                  if(okLocal && renderLottie()) return;
+                  loadScriptOnce('https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js', function(okCdn){
+                    if(okCdn && renderLottie()) return;
+                    renderTextOnly();
+                  });
+                });
+              }catch(_){ renderTextOnly(); }
             }
-            function renderImageFallback(){
-              try{
-                var img = document.createElement('img'); var altMsg = altText || '데이터 없음'; img.alt = (altMsg+'').split('\n')[0]; img.style.maxWidth='240px'; img.style.width='100%'; img.style.height='auto';
-                var candidates = [
-                  '/blossom/static/image/svg/free-animated-no-data/no-data.svg','/blossom/static/image/svg/free-animated-no-data/animated.svg','/blossom/static/image/svg/free-animated-no-data/animation.svg','/blossom/static/image/svg/free-animated-no-data/index.svg','/blossom/static/image/svg/free-animated-no-data.svg','/blossom/static/image/svg/free-animated-no-data/no-data.gif','/blossom/static/image/svg/free-animated-no-data.gif',
-                  '/static/image/svg/free-animated-no-data/no-data.svg','/static/image/svg/free-animated-no-data/animated.svg','/static/image/svg/free-animated-no-data/animation.svg','/static/image/svg/free-animated-no-data/index.svg','/static/image/svg/free-animated-no-data.svg','/static/image/svg/free-animated-no-data/no-data.gif','/static/image/svg/free-animated-no-data.gif'
-                ];
-                var idx=0; function setNext(){ if(idx>=candidates.length) return; img.src=candidates[idx++]; }
-                img.onerror=function(){ setNext(); }; setNext(); wrap.appendChild(img);
-                var capWrap=document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
-                (altText||'데이터 없음').split('\n').forEach(function(line, i){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = i===0 ? '14px' : '13px'; cap.style.color='#64748b'; capWrap.appendChild(cap); });
-                wrap.appendChild(capWrap); container.appendChild(wrap);
-              }catch(_f){ }
-            }
-            if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderImageFallback(); } }
+            if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderTextOnly(); } }
           }catch(_){ }
         }
         function getInt(v){ var n=parseInt(String(v||'').replace(/[^0-9-]/g,''),10); return (isNaN(n)||!isFinite(n))?0:n; }

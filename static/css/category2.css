@@ -629,6 +629,22 @@
 .status-pill{ display:inline-flex; align-items:center; gap:8px; padding:4px 14px; border:1px solid #e5e7eb; border-radius:9999px; background:#ffffff; box-shadow:0 1px 2px rgba(0,0,0,.04); color:#374151; }
 .server-data-table td[data-col="work_status"]{ white-space:nowrap; text-align:left; }
 
+/* Business > Work Status: match 설정>페이지관리 상태 스타일 */
+#system-table td[data-col="wc_name"] .status-pill{
+	padding: 4px 14px;
+	gap: 8px;
+	border-radius: 9999px;
+	font-size: 13px;
+	white-space: nowrap;
+}
+#system-table td[data-col="wc_name"] .status-dot{
+	width: 10px;
+	height: 10px;
+}
+#system-table td[data-col="wc_name"] .status-text{
+	font-weight: 500;
+}
+
 /* Dispose modal — align look & feel with System Add modal */
 .system-dispose-modal .server-add-content{ max-width:800px; }
 .system-dispose-modal .server-add-header{ padding:20px 32px; }
@@ -668,6 +684,8 @@ th[data-col="lic_period"] {
 
 /* --- Software: Larger description box spanning full width --- */
 .form-grid .form-row.form-row-wide { grid-column: 1 / -1; }
+/* form-grid 다음의 form-row (비고) 위에 여백 추가 */
+.form-section .form-grid + .form-row { margin-top: 12px; }
 .form-input.textarea-large {
 	min-height: 160px;
 	line-height: 1.5;
@@ -734,7 +752,10 @@ th[data-col="lic_period"] {
 }
 
 /* Message modal (alert replacement) */
-.system-message-modal .server-add-content{ max-width:640px; }
+.system-message-modal .server-add-content{
+	width:min(calc(100vw - 40px), 620px);
+	max-width:min(calc(100vw - 40px), 620px);
+}
 .system-message-modal .server-add-header{ padding:20px 32px; }
 .system-message-modal .server-add-body{ padding:20px 0 24px 0; }
 .system-message-modal .dispose-content{ margin:0 32px; display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
@@ -742,6 +763,7 @@ th[data-col="lic_period"] {
 .system-message-modal .message-illust{ flex:0 0 auto; }
 .system-message-modal .message-illust img{ width:160px; max-width:100%; height:auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,.08)); }
 @media (max-width:680px){
+	.system-message-modal .server-add-content{ width:calc(100% - 12px); max-width:calc(100% - 12px); }
 	.system-message-modal .dispose-content{ margin:0 24px; gap:16px; }
 	.system-message-modal .message-illust img{ width:120px; }
 }
@@ -869,6 +891,15 @@ th[data-col="lic_period"] {
 .server-add-modal select.form-input:focus, .server-edit-modal select.form-input:focus {
 	border-color:#64748b;
 	box-shadow:0 0 0 3px rgba(100,116,139,.18);
+}
+/* 카테고리 모달 입력박스 focus: 연한 회색 외각선 */
+.server-add-modal input.form-input:focus:not([type="hidden"]),
+.server-edit-modal input.form-input:focus:not([type="hidden"]),
+.server-add-modal textarea.form-input:focus,
+.server-edit-modal textarea.form-input:focus {
+	border-color:#cbd5e1;
+	outline:none;
+	box-shadow:0 0 0 3px rgba(203,213,225,0.4);
 }
 .server-add-modal select.form-input:disabled, .server-edit-modal select.form-input:disabled {
 	background-color:#f1f5f9; color:#94a3b8; cursor:not-allowed; border-color:#e2e8f0; }

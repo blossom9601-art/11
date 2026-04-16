@@ -26,7 +26,7 @@
 
 		<div class="server-add-body">
 			<div class="modal-body-stack" id="{{ prefix }}-modal-body-stack">
-				<form id="{{ prefix }}-add-form" {% if modal_form_autocomplete_off|default(false) %}autocomplete="off"{% endif %}>
+				<form id="{{ prefix }}-add-form" novalidate{% if modal_form_autocomplete_off|default(false) %} autocomplete="off"{% endif %}>
 					<div class="blog-add-sections">
 						<div class="blog-add-section">
 							<div class="blog-add-section-title">제목</div>

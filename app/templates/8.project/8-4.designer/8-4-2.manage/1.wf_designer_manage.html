@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/wf_designer.css?v=5.45">
+    <link rel="stylesheet" href="/static/css/wf_designer.css?v=6.34">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -121,30 +121,47 @@
         </div>
     </div>
 
-    <!-- 삭제 확인 모달 -->
-    <div class="modal-overlay" id="wfm-delete-modal" style="display:none;">
-        <div class="modal-content server-add-content" style="max-width:420px;">
+    <!-- 공통 알림 모달 -->
+    {% include 'layouts/_message_modal.html' %}
+
+    <!-- 공통 삭제처리 모달 -->
+    <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+        <div class="server-add-content">
             <div class="server-add-header">
                 <div class="server-add-title dispose-title">
-                    <h3>워크플로우 삭제</h3>
-                    <p class="server-add-subtitle" id="wfm-delete-subtitle">선택한 워크플로우를 삭제하시겠습니까?</p>
+                    <h3 id="delete-modal-title">삭제처리</h3>
+                    <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 워크플로우를 정말 삭제처리하시겠습니까?</p>
                 </div>
-                <button class="close-btn" type="button" id="wfm-delete-close" title="닫기">
+                <button class="close-btn" type="button" id="system-delete-close" title="닫기">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
             </div>
-            <div class="server-add-footer">
-                <button class="btn-cancel" type="button" id="wfm-delete-cancel">취소</button>
-                <button class="btn-danger" type="button" id="wfm-delete-confirm">삭제</button>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p>삭제처리는 선택한 워크플로우를 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                        <p>확인 후에는 선택된 워크플로우에 대해 삭제 프로세스를 진행합니다.</p>
+                        <p data-common-delete="warn">삭제된 데이터는 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="system-delete-cancel">취소</button>
+                    <button type="button" class="btn-danger" id="system-delete-confirm">삭제</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/blossom.js?v=20260406_tab"></script>
+    <script src="/static/js/blossom.js?v=20260412_terms"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
-    <script src="/static/js/8.project/8-4.designer/8-4-2.manage/1.wf_designer_manage.js?v=20260308a"></script>
-    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+    <script src="/static/js/8.project/8-4.designer/8-4-2.manage/1.wf_designer_manage.js?v=20260413wf3"></script>
+    <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

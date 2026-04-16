@@ -346,38 +346,6 @@ def init_work_group_table(app=None) -> None:
                 f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_TABLE_NAME}_user_id ON {MANAGER_TABLE_NAME}(user_id)"
             )
 
-            # Seed a minimal default group so FK dropdowns are not empty in fresh DBs.
-            # biz_work_group requires valid status_code + dept_code, so only seed when
-            # both parent tables have at least one active row.
-            try:
-                existing = conn.execute(
-                    f"SELECT 1 FROM {TABLE_NAME} WHERE is_deleted = 0 LIMIT 1"
-                ).fetchone()
-                if not existing:
-                    status_row = conn.execute(
-                        "SELECT status_code FROM biz_work_status WHERE is_deleted = 0 ORDER BY id ASC LIMIT 1"
-                    ).fetchone()
-                    dept_row = conn.execute(
-                        "SELECT dept_code FROM org_department WHERE is_deleted = 0 ORDER BY id ASC LIMIT 1"
-                    ).fetchone()
-                    status_code = (status_row["status_code"] if status_row else None) or None
-                    dept_code = (dept_row["dept_code"] if dept_row else None) or None
-                    if status_code and dept_code:
-                        now = _now()
-                        conn.execute(
-                            f"""
-                            INSERT OR IGNORE INTO {TABLE_NAME}
-                                (group_code, group_name, description, status_code, dept_code,
-                                 member_count, hw_count, sw_count, priority, remark,
-                                 created_at, created_by, updated_at, updated_by, is_deleted)
-                            VALUES
-                                (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, 0)
-                            """,
-                            ("\uae30\ud0c0", "\uae30\ud0c0", "", status_code, dept_code, "", now, "system", now, "system"),
-                        )
-            except Exception:
-                logger.exception("Failed to seed default work group")
-
             # Re-enable FK enforcement for subsequent operations.
             try:
                 conn.execute('PRAGMA foreign_keys = ON')
@@ -488,6 +456,14 @@ def init_work_group_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{SERVICE_TABLE_NAME}_is_deleted ON {SERVICE_TABLE_NAME}(is_deleted)"
             )
+            # ------ migration: add service_description column if missing ------
+            try:
+                svc_cols = [c[1] for c in conn.execute(f"PRAGMA table_info({SERVICE_TABLE_NAME})").fetchall()]
+                if 'service_description' not in svc_cols:
+                    conn.execute(f"ALTER TABLE {SERVICE_TABLE_NAME} ADD COLUMN service_description TEXT")
+                    logger.info('Added service_description column to %s', SERVICE_TABLE_NAME)
+            except Exception as _svc_mig_err:
+                logger.warning('column migration skipped for %s: %s', SERVICE_TABLE_NAME, _svc_mig_err)
 
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
@@ -1299,40 +1275,8 @@ def _norm_text(value: Any) -> str:
 
 
 def _ensure_work_group_fk_seed(conn: sqlite3.Connection) -> None:
-    """Best-effort seed of minimal FK rows used by work-group forms.
-
-    This is intentionally idempotent and safe to call frequently.
-    """
-    timestamp = _now()
-    actor = 'system'
-    try:
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO biz_work_status
-                (status_code, status_level, status_name, description, hw_count, sw_count, remark, created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES
-                ('가동', '', '가동', NULL, 0, 0, NULL, ?, ?, ?, ?, 0),
-                ('예비', '', '예비', NULL, 0, 0, NULL, ?, ?, ?, ?, 0),
-                ('종료', '', '종료', NULL, 0, 0, NULL, ?, ?, ?, ?, 0)
-            """,
-            (timestamp, actor, timestamp, actor, timestamp, actor, timestamp, actor, timestamp, actor, timestamp, actor),
-        )
-    except Exception:
-        # If the table isn't available for some reason, ignore; resolution will fail later with a clear error.
-        pass
-    try:
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO org_department
-                (dept_code, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code,
-                 created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES
-                ('DEFAULT', '기본부서', NULL, NULL, NULL, 0, 0, 0, NULL, NULL, ?, ?, ?, ?, 0)
-            """,
-            (timestamp, actor, timestamp, actor),
-        )
-    except Exception:
-        pass
+    """No-op: FK seed was removed. Tables must be populated by the user."""
+    pass
 
 
 def _resolve_fk_codes(conn: sqlite3.Connection, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1508,10 +1452,9 @@ def soft_delete_work_groups(ids: Sequence[Any], actor: str, app=None) -> int:
             ).fetchall()
         except Exception:
             rows = []
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         for r in rows or []:
             try:

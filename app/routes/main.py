@@ -126,23 +126,35 @@ def addon_chat():
         chat_rooms_url = '/api/chat/rooms'
     chat_api_root = chat_rooms_url.rsplit('/', 1)[0] if '/' in chat_rooms_url else '/api/chat'
     chat_js_version = _static_asset_stamp('js/addon_application/3.chat.js')
-    fallback_context = {}
-    if not session.get('emp_no'):
-        demo_profile = UserProfile.query.order_by(UserProfile.id.asc()).first()
-        if demo_profile:
-            fallback_context = {
-                'current_emp_no': demo_profile.emp_no,
-                'current_user_name': demo_profile.name or demo_profile.emp_no,
-                'current_user_profile_id': demo_profile.id,
-                'current_user_department': demo_profile.department or '',
-                'current_profile_image': demo_profile.profile_image,
+    
+    # Pass current user information if logged in, otherwise empty fallback
+    context = {
+        'current_emp_no': '',
+        'current_user_name': '',
+        'current_user_profile_id': '',
+        'current_user_department': '',
+        'current_profile_image': '',
+    }
+    
+    emp_no = session.get('emp_no')
+    if emp_no:
+        # User is logged in - get their full profile
+        prof = UserProfile.query.filter(UserProfile.emp_no.ilike(emp_no)).first()
+        if prof:
+            context = {
+                'current_emp_no': prof.emp_no,
+                'current_user_name': prof.name or prof.emp_no,
+                'current_user_profile_id': prof.id,
+                'current_user_department': prof.department or '',
+                'current_profile_image': prof.profile_image or '',
             }
+    
     return render_template(
         'addon_application/3.chat.html',
         chat_rooms_url=chat_rooms_url,
         chat_api_root=chat_api_root,
         chat_js_version=chat_js_version,
-        **fallback_context,
+        **context,
     )
 
 @main_bp.route('/addon/calendar')
@@ -173,6 +185,34 @@ def addon_calendar():
         calendar_api_root=calendar_api_root or '/api',
         calendar_js_version=calendar_js_version,
         calendar_vendor_version=calendar_vendor_version,
+    )
+
+
+@main_bp.route('/addon/search')
+def addon_search():
+    """통합 검색 결과 페이지"""
+    if not _is_spa_fetch():
+        return render_template('layouts/spa_shell.html', current_key='addon_search', menu_code=None)
+    q = (request.args.get('q') or '').strip()
+    domains = (request.args.get('domains') or '').strip()
+    search_dir = os.path.join(os.path.dirname(current_app.root_path), 'static', 'image', 'svg', 'search')
+    search_stickers = []
+    try:
+        for name in sorted(os.listdir(search_dir)):
+            if not name.lower().endswith('.svg'):
+                continue
+            search_stickers.append(f'/static/image/svg/search/{name}')
+    except Exception:
+        search_stickers = []
+
+    return render_template(
+        'addon_application/5.search.html',
+        query=q,
+        domains=domains,
+        search_stickers=search_stickers,
+        blossom_js_version=_static_asset_stamp('js/blossom.js'),
+        search_js_version=_static_asset_stamp('js/addon_application/5.search.js'),
+        blossom_css_version=_static_asset_stamp('css/blossom.css'),
     )
 
 

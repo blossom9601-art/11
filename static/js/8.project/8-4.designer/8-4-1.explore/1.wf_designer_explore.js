@@ -147,7 +147,14 @@
         fetch(API+qs, {credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(data){
-            if(!data.success){ console.error(data); return; }
+            if(!data.success){
+                console.error(data);
+                if(countEl){ countEl.textContent = '0'; countEl.setAttribute('data-count', '0'); }
+                if(grid){ grid.innerHTML=''; grid.style.display='none'; }
+                if(emptyEl){ emptyEl.style.display=''; }
+                renderPagination(0);
+                return;
+            }
             var rows = data.rows||[];
             var total = data.total||0;
             var prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
@@ -233,7 +240,13 @@
 
             renderPagination(total);
         })
-        .catch(function(e){ console.error('load error', e); });
+        .catch(function(e){
+            console.error('load error', e);
+            if(countEl){ countEl.textContent = '0'; countEl.setAttribute('data-count', '0'); }
+            if(grid){ grid.innerHTML=''; grid.style.display='none'; }
+            if(emptyEl){ emptyEl.style.display=''; }
+            renderPagination(0);
+        });
     }
 
     function renderPagination(total){

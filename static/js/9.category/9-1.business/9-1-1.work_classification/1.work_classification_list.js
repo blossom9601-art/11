@@ -154,6 +154,18 @@
         });
         return clone;
     }
+    function normalizeBusinessName(name){
+        return String(name || '').trim().toLowerCase();
+    }
+    function hasDuplicateBusinessName(name, excludeId){
+        const target = normalizeBusinessName(name);
+        if(!target) return false;
+        return state.data.some(row=>{
+            const rowId = Number(row && row.id);
+            if(excludeId != null && Number.isFinite(rowId) && rowId === Number(excludeId)) return false;
+            return normalizeBusinessName(row && row.wc_name) === target;
+        });
+    }
     async function apiListWorkCategories(){
         const res = await fetch(API_BASE_URL, { headers: { 'Accept': 'application/json' } });
         let data;
@@ -423,7 +435,7 @@
         tbody.innerHTML='';
         const emptyEl = document.getElementById('system-empty');
         if(state.isLoading){
-            tbody.innerHTML = `<tr class="loading-row"><td colspan="${TABLE_COLSPAN}">데이터를 불러오는 중입니다...</td></tr>`;
+            tbody.innerHTML = `<tr class="loading-row"><td colspan="${TABLE_COLSPAN}">&nbsp;</td></tr>`;
             if(emptyEl){ emptyEl.hidden = true; }
             const countEl = document.getElementById(COUNT_ID);
             if(countEl){
@@ -630,7 +642,16 @@
         const titleEl = document.getElementById('message-title');
         const contentEl = document.getElementById('message-content');
         if(titleEl) titleEl.textContent = title || '알림';
-        if(contentEl) contentEl.textContent = String(message || '');
+        if(contentEl){
+            contentEl.textContent = String(message || '');
+            contentEl.style.whiteSpace = 'pre-line';
+        }
+        const modalEl = document.getElementById(modalId);
+        const contentWrap = modalEl ? modalEl.querySelector('.server-add-content') : null;
+        if(contentWrap){
+            contentWrap.style.width = '620px';
+            contentWrap.style.maxWidth = 'min(calc(100vw - 24px), 620px)';
+        }
         openModal(modalId);
     }
 
@@ -1143,6 +1164,10 @@
             const data = collectForm(form);
             const payload = preparePayload(data);
             if(!payload.wc_name){ showMessage('업무 분류명을 입력하세요.', '안내'); return; }
+            if(hasDuplicateBusinessName(payload.wc_name)){
+                showMessage('이미 존재하는 업무 분류입니다.\n\n중복 등록은 허용되지 않습니다.', '오류');
+                return;
+            }
             try {
                 const created = await apiCreateWorkCategory(payload);
                 addRow(created);
@@ -1165,6 +1190,10 @@
             const formData = collectForm(form);
             const payload = preparePayload(formData);
             if(!payload.wc_name){ showMessage('업무 분류명을 입력하세요.', '안내'); return; }
+            if(hasDuplicateBusinessName(payload.wc_name, state.data[index].id)){
+                showMessage('이미 존재하는 업무 분류입니다.\n\n중복 수정은 허용되지 않습니다.', '오류');
+                return;
+            }
             try {
                 const updated = await apiUpdateWorkCategory(state.data[index].id, payload);
                 updateRow(index, updated);
@@ -1375,28 +1404,8 @@
         });
         document.getElementById('system-duplicate-close')?.addEventListener('click', ()=> closeModal('system-duplicate-modal'));
         document.getElementById('system-duplicate-confirm')?.addEventListener('click', async ()=>{
-            const originals = state.data.filter(r=> state.selected.has(r.id));
-            if(!originals.length){ showMessage('선택된 행을 찾을 수 없습니다.', '오류'); closeModal('system-duplicate-modal'); return; }
-            let success = 0;
-            try {
-                for(const row of originals){
-                    const payload = {
-                        wc_name: row.wc_name ? `${row.wc_name}_COPY` : `COPY_${row.id}`,
-                        wc_desc: row.wc_desc || '',
-                        hw_count: row.hw_count === '' ? null : row.hw_count,
-                        sw_count: row.sw_count === '' ? null : row.sw_count,
-                        note: row.note || ''
-                    };
-                    const created = await apiCreateWorkCategory(payload);
-                    addRow(created);
-                    success++;
-                }
-                closeModal('system-duplicate-modal');
-                showMessage(`${success}개 행이 복제되었습니다.`, '완료');
-            } catch(err){
-                console.error(err);
-                showMessage((err && err.message) || '복제 중 오류가 발생했습니다.', '오류');
-            }
+            closeModal('system-duplicate-modal');
+            showMessage('카테고리 정책입니다.\n\n복제는 허용되지 않습니다.', '오류');
         });
         // dispose (불용처리)
         document.getElementById(DISPOSE_BTN_ID)?.addEventListener('click', ()=>{

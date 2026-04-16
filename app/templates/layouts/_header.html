@@ -22,6 +22,21 @@
 			<span class="system-subtitle"></span>
 		</div>
 	</div>
+  <div class="header-center">
+    <form id="header-search-form" class="header-search-form" action="{{ url_for('main.addon_search') }}" method="get" role="search" aria-label="통합 검색">
+      <input
+        type="search"
+        id="header-search-input"
+        name="q"
+        class="header-search-input"
+        placeholder="검색어를 입력하세요"
+        autocomplete="off"
+      >
+      <button class="header-btn header-search-btn" id="btn-search" title="통합 검색" type="submit">
+        <img src="/static/image/svg/header/free-icon-search.svg" alt="통합 검색" class="header-icon">
+      </button>
+    </form>
+  </div>
 	<div class="header-right">
 		<button class="header-btn" id="btn-sidebar" title="메뉴">
 			<img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">

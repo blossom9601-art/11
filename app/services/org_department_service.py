@@ -97,6 +97,7 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return {
         'id': row['id'],
         'dept_code': row['dept_code'],
+        'company_name': row['company_name'] or '',
         'dept_name': row['dept_name'],
         'description': row['description'] or '',
         'manager_name': row['manager_name'] or '',
@@ -133,6 +134,22 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
         return False
 
 
+def _column_exists(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        for row in rows:
+            if str(row['name']).strip().lower() == column_name.strip().lower():
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _ensure_company_name_column(conn: sqlite3.Connection) -> None:
+    if not _column_exists(conn, TABLE_NAME, 'company_name'):
+        conn.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN company_name TEXT")
+
+
 def init_org_department_table(app=None) -> None:
     app = app or current_app
     try:
@@ -142,6 +159,7 @@ def init_org_department_table(app=None) -> None:
                 CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     dept_code TEXT NOT NULL UNIQUE,
+                    company_name TEXT,
                     dept_name TEXT NOT NULL,
                     description TEXT,
                     manager_name TEXT,
@@ -168,22 +186,7 @@ def init_org_department_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{TABLE_NAME}_name ON {TABLE_NAME}(dept_name)"
             )
-            # Always ensure at least one safe department exists for FK-backed forms.
-            timestamp = _now()
-            actor = 'system'
-            defaults = [
-                ('DEFAULT', '기본부서', None),
-            ]
-            for code, name, desc in defaults:
-                conn.execute(
-                    f"""
-                    INSERT OR IGNORE INTO {TABLE_NAME}
-                        (dept_code, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code,
-                         created_at, created_by, updated_at, updated_by, is_deleted)
-                    VALUES (?, ?, ?, NULL, NULL, 0, 0, 0, NULL, NULL, ?, ?, ?, ?, 0)
-                    """,
-                    (code, name, desc, timestamp, actor, timestamp, actor),
-                )
+            _ensure_company_name_column(conn)
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
     except Exception:
@@ -302,16 +305,17 @@ def _compute_dept_counts(conn: sqlite3.Connection, dept_codes: List[str]) -> Dic
 def list_org_departments(app=None, search: Optional[str] = None, include_deleted: bool = False) -> List[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
+        _ensure_company_name_column(conn)
         clauses = ['1=1']
         params: List[Any] = []
         if not include_deleted:
             clauses.append('is_deleted = 0')
         if search:
             like = f"%{search}%"
-            clauses.append("(dept_name LIKE ? OR dept_code LIKE ? OR description LIKE ? OR remark LIKE ? OR manager_name LIKE ? OR manager_emp_no LIKE ?)")
-            params.extend([like, like, like, like, like, like])
+            clauses.append("(company_name LIKE ? OR dept_name LIKE ? OR dept_code LIKE ? OR description LIKE ? OR remark LIKE ? OR manager_name LIKE ? OR manager_emp_no LIKE ?)")
+            params.extend([like, like, like, like, like, like, like])
         query = (
-            f"SELECT id, dept_code, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted "
+            f"SELECT id, dept_code, company_name, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE {' AND '.join(clauses)} ORDER BY id DESC"
         )
         rows = conn.execute(query, params).fetchall()
@@ -375,8 +379,9 @@ def list_org_departments(app=None, search: Optional[str] = None, include_deleted
 def _fetch_single(dept_id: int, app=None) -> Optional[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
+        _ensure_company_name_column(conn)
         row = conn.execute(
-            f"SELECT id, dept_code, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted FROM {TABLE_NAME} WHERE id = ?",
+            f"SELECT id, dept_code, company_name, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted FROM {TABLE_NAME} WHERE id = ?",
             (dept_id,),
         ).fetchone()
         return _row_to_dict(row) if row else None
@@ -385,6 +390,9 @@ def _fetch_single(dept_id: int, app=None) -> Optional[Dict[str, Any]]:
 def create_org_department(data: Dict[str, Any], actor: str, app=None) -> Dict[str, Any]:
     app = app or current_app
     actor = (actor or 'system').strip() or 'system'
+    company_name = (data.get('company_name') or data.get('company') or '').strip()
+    if not company_name:
+        raise ValueError('company_name is required')
     name = (data.get('dept_name') or '').strip()
     if not name:
         raise ValueError('dept_name is required')
@@ -397,16 +405,18 @@ def create_org_department(data: Dict[str, Any], actor: str, app=None) -> Dict[st
     sw_count = _sanitize_int(data.get('sw_count') or data.get('sw_qty'))
     remark = (data.get('remark') or data.get('note') or '').strip()
     with _get_connection(app) as conn:
+        _ensure_company_name_column(conn)
         dept_code = (data.get('dept_code') or '').strip() or _generate_unique_code(conn, name)
         timestamp = _now()
         conn.execute(
             f"""
             INSERT INTO {TABLE_NAME}
-                (dept_code, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                (dept_code, company_name, dept_name, description, manager_name, manager_emp_no, member_count, hw_count, sw_count, remark, parent_dept_code, created_at, created_by, updated_at, updated_by, is_deleted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             """,
             (
                 dept_code,
+                company_name,
                 name,
                 description or None,
                 manager_name or None,
@@ -432,6 +442,12 @@ def update_org_department(dept_id: int, data: Dict[str, Any], actor: str, app=No
     actor = (actor or 'system').strip() or 'system'
     updates: List[str] = []
     params: List[Any] = []
+    if 'company_name' in data or 'company' in data:
+        company_name = (data.get('company_name') or data.get('company') or '').strip()
+        if not company_name:
+            raise ValueError('company_name is required')
+        updates.append('company_name = ?')
+        params.append(company_name)
     if 'dept_code' in data:
         code = (data.get('dept_code') or '').strip()
         if not code:
@@ -482,6 +498,7 @@ def update_org_department(dept_id: int, data: Dict[str, Any], actor: str, app=No
     updates.extend(['updated_at = ?', 'updated_by = ?'])
     params.extend([timestamp, actor, dept_id])
     with _get_connection(app) as conn:
+        _ensure_company_name_column(conn)
         cur = conn.execute(
             f"UPDATE {TABLE_NAME} SET {', '.join(updates)} WHERE id = ? AND is_deleted = 0",
             params,
@@ -499,12 +516,10 @@ def soft_delete_org_departments(ids: Sequence[Any], actor: str, app=None) -> int
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

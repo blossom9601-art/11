@@ -18,6 +18,40 @@
 (function(){
     'use strict';
 
+    var DEFAULT_INFO_ITEM = {
+        info_title: '보안 준수 안내',
+        info_content: '보안 정책을 확인해주세요.',
+        is_enabled: true
+    };
+
+    var INFO_LOTTIE_LOCAL = '/static/js/vendor/lottie.min.js?v=5.12.2';
+    var INFO_LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
+    var INFO_LOTTIE_PATH = '/static/image/svg/free-animated-icon-information.json';
+    var USE_LOTTIE_STICKER = true;
+
+    function ensureLottie(cb){
+        if(window.lottie){ cb(); return; }
+        var existed = document.querySelector('script[data-info-lottie-loader="1"]');
+        if(existed){
+            existed.addEventListener('load', function(){ cb(); }, { once: true });
+            return;
+        }
+        var s = document.createElement('script');
+        s.src = INFO_LOTTIE_LOCAL;
+        s.async = true;
+        s.setAttribute('data-info-lottie-loader', '1');
+        s.onload = function(){ cb(); };
+        s.onerror = function(){
+            var c = document.createElement('script');
+            c.src = INFO_LOTTIE_CDN;
+            c.async = true;
+            c.setAttribute('data-info-lottie-loader', '1');
+            c.onload = function(){ cb(); };
+            document.head.appendChild(c);
+        };
+        document.head.appendChild(s);
+    }
+
     /* ── 유틸 ── */
     /** XSS 방지용 텍스트 이스케이프 */
     function escapeHtml(str) {
@@ -31,8 +65,8 @@
 
     /* ── menu_key 결정 ── */
     function resolveMenuKey() {
-        // 1) data-info-key 속성
-        var el = document.querySelector('[data-info-key]');
+        // 1) 현재 main 내부의 data-info-key 속성
+        var el = findContainer();
         if (el) return el.getAttribute('data-info-key');
         // 2) 전역 변수
         if (window.__infoMenuKey) return window.__infoMenuKey;
@@ -41,7 +75,12 @@
 
     /* ── 컨테이너 찾기 ── */
     function findContainer() {
-        // data-info-key 를 가진 요소 또는 기존 .page-utility-right
+        // 현재 활성 main 내부의 안내 위젯을 우선 선택한다.
+        var main = document.querySelector('main.main-content');
+        if (main) {
+            return main.querySelector('[data-info-key]')
+                || main.querySelector('.page-utility-right');
+        }
         return document.querySelector('[data-info-key]')
             || document.querySelector('.page-utility-right');
     }
@@ -64,26 +103,79 @@
         trigger.setAttribute('aria-controls', 'info-popover');
         trigger.title = '보안 준수 안내';
 
-        // lottie-player 스크립트 동적 로드
-        if (!document.querySelector('script[src*="lottie-player"]')) {
-            var ls = document.createElement('script');
-            ls.src = 'https://unpkg.com/@lottiefiles/lottie-player@2.0.8/dist/lottie-player.js';
-            document.head.appendChild(ls);
+        var sticker = document.createElement('div');
+        sticker.className = 'info-trigger-icon';
+        sticker.style.width = '64px';
+        sticker.style.height = '64px';
+        sticker.style.display = 'block';
+        sticker.style.position = 'relative';
+        sticker.style.overflow = 'hidden';
+        sticker.style.opacity = '0.92';
+        sticker.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,.08))';
+        sticker.style.pointerEvents = 'none';
+        trigger.appendChild(sticker);
+
+        function renderFallbackIcon(){
+            if(sticker.querySelector('.info-fallback-badge')) return;
+            var badge = document.createElement('div');
+            badge.className = 'info-fallback-badge';
+            badge.setAttribute('aria-hidden', 'true');
+            badge.style.width = '100%';
+            badge.style.height = '100%';
+            badge.style.position = 'absolute';
+            badge.style.left = '0';
+            badge.style.top = '0';
+            badge.style.zIndex = '1';
+            badge.style.borderRadius = '14px';
+            badge.style.display = 'flex';
+            badge.style.alignItems = 'center';
+            badge.style.justifyContent = 'center';
+            badge.style.background = 'linear-gradient(145deg, #4f46e5, #2563eb)';
+            badge.style.color = '#fff';
+            badge.style.fontWeight = '700';
+            badge.style.fontSize = '34px';
+            badge.style.lineHeight = '1';
+            badge.textContent = 'i';
+            sticker.appendChild(badge);
         }
-        var lottie = document.createElement('lottie-player');
-        lottie.setAttribute('src', '/static/image/svg/free-animated-icon-mail.json');
-        lottie.setAttribute('background', 'transparent');
-        lottie.setAttribute('speed', '1');
-        lottie.setAttribute('loop', '');
-        lottie.setAttribute('autoplay', '');
-        lottie.className = 'info-trigger-icon';
-        lottie.style.width  = '64px';
-        lottie.style.height = '64px';
-        lottie.style.opacity = '0.92';
-        lottie.style.filter  = 'drop-shadow(0 6px 14px rgba(0,0,0,.08))';
-        lottie.style.pointerEvents = 'none';
-        lottie.setAttribute('aria-hidden', 'true');
-        trigger.appendChild(lottie);
+
+        // Always render a visible baseline icon first.
+        renderFallbackIcon();
+
+        if (USE_LOTTIE_STICKER) {
+            ensureLottie(function(){
+                if(!window.lottie){ renderFallbackIcon(); return; }
+                try{
+                    var anim = window.lottie.loadAnimation({
+                        container: sticker,
+                        renderer: 'svg',
+                        loop: true,
+                        autoplay: true,
+                        path: INFO_LOTTIE_PATH,
+                        rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
+                    });
+                    if (anim && typeof anim.addEventListener === 'function') {
+                        function layerLottieTop(){
+                            var node = sticker.querySelector('canvas, svg');
+                            if (!node) return;
+                            node.style.position = 'absolute';
+                            node.style.left = '0';
+                            node.style.top = '0';
+                            node.style.width = '100%';
+                            node.style.height = '100%';
+                            node.style.zIndex = '2';
+                        }
+                        anim.addEventListener('DOMLoaded', layerLottieTop);
+                        anim.addEventListener('data_ready', layerLottieTop);
+                        anim.addEventListener('data_failed', function(){
+                            renderFallbackIcon();
+                        });
+                    }
+                }catch(_e){
+                    renderFallbackIcon();
+                }
+            });
+        }
 
         // 팝오버 패널
         var pop = document.createElement('div');
@@ -177,25 +269,37 @@
         var container = findContainer();
         if (!container) return;
 
+        // flicker 방지: 트리거 빌드 완료 전까지 감춤
+        // (finalizeStickerAfterSwap 이 visibility:visible 로 복원해도 이후 동기적으로 덮어씀)
+        container.style.visibility = 'hidden';
+
         fetch('/api/info-messages/' + encodeURIComponent(menuKey), { credentials: 'same-origin' })
             .then(function(r){ return r.json(); })
             .then(function(data){
                 if (!data.success || !data.item) {
-                    // 데이터 없음 → 컨테이너 숨김
-                    container.style.display = 'none';
+                    // 데이터 조회 실패 시에도 기본 스티커는 노출
+                    buildPopover(container, DEFAULT_INFO_ITEM);
+                    container.style.display = '';
+                    container.style.visibility = '';
                     return;
                 }
                 var item = data.item;
                 if (!item.is_enabled) {
-                    // 비활성화 → 숨김
+                    // 비활성화 → 완전 숨김
                     container.style.display = 'none';
+                    container.style.visibility = '';
                     return;
                 }
                 buildPopover(container, item);
+                // 트리거 빌드 완료 후 노출 (빈 컨테이너 노출 방지)
+                container.style.display = '';
+                container.style.visibility = '';
             })
             .catch(function(){
-                // 네트워크 에러 시 조용히 숨김
-                container.style.display = 'none';
+                // 네트워크/파싱 에러 시에도 기본 스티커는 노출
+                buildPopover(container, DEFAULT_INFO_ITEM);
+                container.style.display = '';
+                container.style.visibility = '';
             });
     }
 
@@ -208,4 +312,8 @@
     } else {
         initInfoMessage();
     }
+
+    document.addEventListener('blossom:pageLoaded', function(){
+        initInfoMessage();
+    });
 })();

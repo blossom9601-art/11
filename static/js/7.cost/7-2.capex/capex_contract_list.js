@@ -1108,13 +1108,20 @@
   function bindSearch(){ const input=document.getElementById(SEARCH_ID); const clear=document.getElementById(SEARCH_CLEAR_ID); if(input){ input.addEventListener('input', ()=>{ state.search = input.value||''; applyFilter(); }); } if(clear){ clear.addEventListener('click', ()=>{ const input=document.getElementById(SEARCH_ID); if(input){ input.value=''; } state.search=''; applyFilter(); }); } }
 
   function initFromPage(){
+    // SPA 탭 전환 시 URL 기반 페이지 판별
+    var path = window.location.pathname || '';
+    var isCapex = path.indexOf('cost_capex_contract') >= 0;
+    var isOpex = path.indexOf('cost_opex_') >= 0;
+    if (!isCapex && !isOpex) return;
+
     const tbody = document.getElementById(TBODY_ID);
     const table = document.getElementById(TABLE_ID);
     if(!tbody || !table) return;
     try{
       const main = document.querySelector('main.main-content') || document.body;
-      if(main && main.dataset && main.dataset.contractListInit === '1') return;
-      if(main && main.dataset) main.dataset.contractListInit = '1';
+      var guardKey = isCapex ? 'CAPEX' : 'OPEX';
+      if(main && main.dataset && main.dataset.contractListInit === guardKey) return;
+      if(main && main.dataset) main.dataset.contractListInit = guardKey;
     }catch(_e){}
 
     const sel = document.getElementById(PAGE_SIZE_ID);

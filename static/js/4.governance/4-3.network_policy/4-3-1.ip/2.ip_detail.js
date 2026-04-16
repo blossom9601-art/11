@@ -464,6 +464,36 @@
   }
 
   const API_BASE = '/api/network/ip-policies';
+  const ORG_CENTER_API_BASE = '/api/org-centers';
+  let centerLocationNamesCache = [];
+  let centerLocationNamesPromise = null;
+
+  function dedupeAndSortKorean(values){
+    return [...new Set((values || []).map(v => String(v || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  }
+
+  async function fetchCenterLocationNames(force){
+    if(centerLocationNamesPromise && !force){
+      return centerLocationNamesPromise;
+    }
+    centerLocationNamesPromise = (async ()=>{
+      try {
+        const data = await fetchJson(`${ORG_CENTER_API_BASE}?include_deleted=0`, { method:'GET' });
+        const items = Array.isArray(data.items)
+          ? data.items
+          : (Array.isArray(data.rows) ? data.rows : []);
+        centerLocationNamesCache = dedupeAndSortKorean(
+          items.map(item => item && (item.center_name || item.centerName || ''))
+        );
+      } catch(err){
+        console.warn('[IP Detail] 센터 목록 조회 실패:', err);
+        centerLocationNamesCache = [];
+      }
+      return centerLocationNamesCache;
+    })();
+    return centerLocationNamesPromise;
+  }
 
   // ------------------------------------------------------------
   // Modal helpers (detail.css: .modal-overlay-full.show)
@@ -632,22 +662,29 @@
     section.appendChild(grid);
     form.appendChild(section);
 
-    // Populate location options (keep minimal, but ensure current value is selectable)
+    // Populate location options from org centers (center_name)
     const locSel = form.querySelector('select[name="location"]');
     if(locSel){
-      const defaultLocations = ['퓨처센터'];
-      const candidates = Array.from(new Set([location, ...defaultLocations].filter(Boolean)));
-      const existing = new Set(Array.from(locSel.options).map((o)=> String(o.value || '').trim()));
-      candidates.forEach((opt)=>{
-        const v = String(opt).trim();
-        if(!v || existing.has(v)) return;
-        const o = document.createElement('option');
-        o.value = v;
-        o.textContent = v;
-        locSel.appendChild(o);
-        existing.add(v);
+      const applyLocationOptions = (candidates)=>{
+        const existing = new Set(Array.from(locSel.options).map((o)=> String(o.value || '').trim()));
+        candidates.forEach((opt)=>{
+          const v = String(opt || '').trim();
+          if(!v || existing.has(v)) return;
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          locSel.appendChild(o);
+          existing.add(v);
+        });
+        locSel.value = location && existing.has(location) ? location : '';
+      };
+
+      // Immediate candidates (current value), then async center names merge
+      applyLocationOptions(dedupeAndSortKorean([location]));
+      fetchCenterLocationNames().then((centerNames)=>{
+        applyLocationOptions(dedupeAndSortKorean([location, ...centerNames]));
+        try{ window.BlossomSearchableSelect?.syncAll?.(form); }catch(_e){}
       });
-      locSel.value = location;
     }
 
     // Apply searchable select enhancement in this modal (after options/value are ready)

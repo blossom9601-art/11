@@ -10,8 +10,8 @@
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
 	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
-	<script src="/static/js/blossom.js" defer></script>
-	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20260302a" defer></script>
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20260413b" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -95,8 +95,35 @@
 										</div>
 										<div class="totp-qr-area" id="totp-qr-area">
 											<div class="totp-qr-box" id="totp-qr-box">
-												<p class="helper-text" style="text-align:center;color:#94a3b8">키를 생성하면 QR코드가 표시됩니다.</p>
-											</div>
+											<svg width="108" height="108" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="opacity:0.22;display:block;margin:0 auto">
+												<rect x="8" y="8" width="30" height="30" rx="3" stroke="#64748b" stroke-width="3" fill="none"/>
+												<rect x="16" y="16" width="14" height="14" rx="1" fill="#64748b"/>
+												<rect x="70" y="8" width="30" height="30" rx="3" stroke="#64748b" stroke-width="3" fill="none"/>
+												<rect x="78" y="16" width="14" height="14" rx="1" fill="#64748b"/>
+												<rect x="8" y="70" width="30" height="30" rx="3" stroke="#64748b" stroke-width="3" fill="none"/>
+												<rect x="16" y="78" width="14" height="14" rx="1" fill="#64748b"/>
+												<rect x="46" y="8" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="56" y="8" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="46" y="18" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="46" y="46" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="56" y="46" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="66" y="46" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="76" y="46" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="86" y="46" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="46" y="56" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="66" y="56" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="46" y="66" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="86" y="66" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="56" y="76" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="76" y="76" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="46" y="86" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="76" y="86" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="86" y="86" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="56" y="96" width="6" height="6" rx="1" fill="#64748b"/>
+												<rect x="56" y="18" width="6" height="6" rx="1" fill="#64748b"/>
+											</svg>
+											<p class="helper-text" style="text-align:center;color:#94a3b8;margin-top:6px">키를 생성하면 QR코드가 표시됩니다.</p>
+										</div>
 											<p class="helper-text" style="margin-top:8px">Google Authenticator 등 TOTP 앱으로 QR코드를 스캔하세요.</p>
 										</div>
 								</div>

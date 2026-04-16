@@ -22,7 +22,7 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_room (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     room_type VARCHAR(64) NOT NULL,
                     room_name VARCHAR(255),
                     direct_key VARCHAR(255) UNIQUE,
@@ -42,7 +42,7 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_message (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     room_id INTEGER NOT NULL,
                     sender_user_id INTEGER NOT NULL,
                     content_type VARCHAR(64) NOT NULL DEFAULT 'TEXT',
@@ -64,7 +64,7 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_room_member (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     room_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
                     member_role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
@@ -86,7 +86,7 @@ def init_chat_tables(app=None) -> None:
                 conn,
                 """
                 CREATE TABLE IF NOT EXISTS msg_file (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     message_id INTEGER NOT NULL,
                     file_path TEXT NOT NULL,
                     original_name TEXT NOT NULL,

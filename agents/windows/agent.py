@@ -33,6 +33,9 @@ from common.config import AgentConfig
 from common.collector import build_payload, save_payload
 from windows.collectors.interface import InterfaceCollector
 from windows.collectors.account import AccountCollector
+from windows.collectors.authority import AuthorityCollector
+from windows.collectors.firewalld import FirewalldCollector
+from windows.collectors.storage import StorageCollector
 from windows.collectors.package import PackageCollector
 
 # PKI 등록용 경로
@@ -266,6 +269,12 @@ def run_once(config: AgentConfig):
         collectors.append(InterfaceCollector())
     if "account" in config.collectors:
         collectors.append(AccountCollector())
+    if "authority" in config.collectors:
+        collectors.append(AuthorityCollector())
+    if "firewalld" in config.collectors:
+        collectors.append(FirewalldCollector())
+    if "storage" in config.collectors:
+        collectors.append(StorageCollector())
     if "package" in config.collectors:
         collectors.append(PackageCollector())
 

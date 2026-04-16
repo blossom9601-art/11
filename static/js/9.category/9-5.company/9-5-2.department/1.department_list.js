@@ -71,6 +71,7 @@
         });
     }
     const API_ENDPOINT = '/api/org-departments';
+    const COMPANY_API_ENDPOINT = '/api/org-companies';
     const JSON_HEADERS = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
 
     function parsePositiveInt(value){
@@ -90,6 +91,12 @@
         const opts = options || {};
         const skipEmpty = !!opts.skipEmpty;
         const payload = {};
+        const companyName = sanitizeText(source.company_name ?? source.company);
+        if(companyName){
+            payload.company_name = companyName;
+        } else if(!skipEmpty){
+            payload.company_name = '';
+        }
         const name = sanitizeText(source.dept_name);
         if(name){
             payload.dept_name = name;
@@ -146,6 +153,7 @@
         return {
             id: row?.id ?? null,
             dept_code: row?.dept_code || '',
+            company_name: row?.company_name || row?.company || '',
             dept_name: row?.dept_name || '',
             description: row?.description || '',
             staff_count: safeInt(row?.staff_count ?? row?.member_count),
@@ -171,6 +179,41 @@
         };
     }
 
+    function normalizeDepartmentKey(companyName, deptName){
+        const company = String(companyName || '').trim().toLowerCase();
+        const dept = String(deptName || '').trim().toLowerCase();
+        if(!company || !dept) return '';
+        return `${company}::${dept}`;
+    }
+
+    function dedupeDepartmentRows(rows){
+        const list = Array.isArray(rows) ? rows : [];
+        const seen = new Set();
+        const out = [];
+        list.forEach((row)=>{
+            if(!row) return;
+            const key = normalizeDepartmentKey(row.company_name, row.dept_name);
+            if(!key){
+                out.push(row);
+                return;
+            }
+            if(seen.has(key)) return;
+            seen.add(key);
+            out.push(row);
+        });
+        return out;
+    }
+
+    function hasDepartmentDuplicate(companyName, deptName, excludeId){
+        const key = normalizeDepartmentKey(companyName, deptName);
+        if(!key) return false;
+        return state.data.some((row)=>{
+            if(!row) return false;
+            if(excludeId != null && Number(row.id) === Number(excludeId)) return false;
+            return normalizeDepartmentKey(row.company_name, row.dept_name) === key;
+        });
+    }
+
     async function fetchDepartmentList(){
         const response = await fetch(`${API_ENDPOINT}?_=${Date.now()}`, {
             method: 'GET',
@@ -181,7 +224,8 @@
         if(!response.ok || json.success === false){
             throw new Error(json?.message || '부서 목록을 불러오지 못했습니다.');
         }
-        return Array.isArray(json.items) ? json.items.map(normalizeDepartmentRow) : [];
+        const mapped = Array.isArray(json.items) ? json.items.map(normalizeDepartmentRow) : [];
+        return dedupeDepartmentRows(mapped);
     }
 
     async function createDepartment(payload){
@@ -233,6 +277,7 @@
             const rows = await fetchDepartmentList();
             state.data = rows;
             state.selected.clear();
+            renderCompanyFilterOptions();
         } catch(err){
             console.error(err);
             showMessage(err.message || '부서 데이터를 불러오는 중 오류가 발생했습니다.', '오류');
@@ -240,6 +285,61 @@
             state.isLoading = false;
             applyFilter();
         }
+    }
+
+    let companyOptions = [];
+
+    function renderCompanyFilterOptions(){
+        const select = document.getElementById('system-company-filter');
+        if(!select) return;
+
+        const selected = String(state.companyFilter || '').trim();
+        const dataCompanies = state.data
+            .map((row)=> String(row?.company_name || '').trim())
+            .filter(Boolean);
+        const merged = Array.from(new Set([].concat(companyOptions, dataCompanies, selected ? [selected] : [])))
+            .sort((a, b)=> a.localeCompare(b, 'ko'));
+
+        const options = ['<option value="">전체 회사</option>'];
+        merged.forEach((name)=>{
+            const safe = escapeHTML(name);
+            const selectedAttr = selected === name ? ' selected' : '';
+            options.push(`<option value="${safe}"${selectedAttr}>${safe}</option>`);
+        });
+        select.innerHTML = options.join('');
+    }
+
+    async function ensureCompanyOptions(forceReload){
+        if(!forceReload && companyOptions.length){
+            return companyOptions;
+        }
+        const response = await fetch(`${COMPANY_API_ENDPOINT}?_=${Date.now()}`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+        });
+        const json = await response.json().catch(()=> ({}));
+        if(!response.ok || json.success === false){
+            throw new Error(json?.message || '회사 목록을 불러오지 못했습니다.');
+        }
+        const items = Array.isArray(json.items) ? json.items : [];
+        companyOptions = items
+            .map((row)=> String(row?.company_name || '').trim())
+            .filter(Boolean);
+        renderCompanyFilterOptions();
+        return companyOptions;
+    }
+
+    function renderCompanySelect(selectEl, selectedValue){
+        if(!selectEl) return;
+        const selected = String(selectedValue || '').trim();
+        const options = ['<option value="">회사 선택</option>'];
+        companyOptions.forEach((name)=>{
+            const safe = escapeHTML(name);
+            const selectedAttr = selected === name ? ' selected' : '';
+            options.push(`<option value="${safe}"${selectedAttr}>${safe}</option>`);
+        });
+        selectEl.innerHTML = options.join('');
     }
 
     // Resolve a UI accent color from CSS variables or primary button styles
@@ -349,19 +449,20 @@
 
     // Data + State
     const BASE_VISIBLE_COLUMNS = [
-        'dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty'
+        'company_name','dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty'
     ];
     const COLUMN_ORDER = [
-        'dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty','note'
+        'company_name','dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty','note'
     ];
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '부서', columns: ['dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty','note'] }
+        { group: '부서', columns: ['company_name','dept_name','description','staff_count','rack_qty','hw_qty','sw_qty','line_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
     const COLUMN_META = {
+        company_name:{label:'회사',group:'부서'},
         dept_name:{label:'부서명',group:'부서'},
         description:{label:'설명',group:'부서'},
         staff_count:{label:'담당자수',group:'부서'},
@@ -379,6 +480,7 @@
         page: 1,
         visibleCols: new Set(BASE_VISIBLE_COLUMNS),
         search: '',
+        companyFilter: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
         sortKey: null,
@@ -424,7 +526,13 @@
                 })
             );
         }
-        // 2단계: 컬럼 개별 필터 적용 (오른쪽 클릭 필터)
+        // 2단계: 회사 드롭다운 필터 적용
+        if(state.companyFilter){
+            const companyToken = String(state.companyFilter).trim().toLowerCase();
+            base = base.filter(row => String(row.company_name || '').trim().toLowerCase() === companyToken);
+        }
+
+        // 3단계: 컬럼 개별 필터 적용 (오른쪽 클릭 필터)
         const filterEntries = Object.entries(state.columnFilters).filter(([k,v])=> {
             if(Array.isArray(v)) return v.length>0; return v!=null && v!=='';
         });
@@ -464,8 +572,7 @@
         if(!tbody) return;
         tbody.innerHTML='';
         if(state.isLoading){
-            const colCount = getColumnCount();
-            tbody.innerHTML = `<tr class="loading-row"><td colspan="${colCount}">부서 데이터를 불러오는 중입니다...</td></tr>`;
+            tbody.innerHTML = '';
             const emptyEl = document.getElementById('system-empty');
             if(emptyEl){ emptyEl.hidden = true; }
             updatePagination();
@@ -753,16 +860,19 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-        const group = { title:'부서', cols:['dept_name','description','note'] };
+        const group = { title:'부서', cols:['company_name','dept_name','description'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow); form.appendChild(section);
 
         // Keep staff_count unchanged (hidden field) while hiding it from the modal UI.
         const hiddenStaff = document.createElement('input');
@@ -773,6 +883,16 @@
     }
 
     function generateFieldInput(col,value=''){
+        if(col==='company_name'){
+            const selected = String(value ?? '').trim();
+            const options = ['<option value="">회사 선택</option>'];
+            companyOptions.forEach((name)=>{
+                const safe = escapeHTML(name);
+                const selectedAttr = selected === name ? ' selected' : '';
+                options.push(`<option value="${safe}"${selectedAttr}>${safe}</option>`);
+            });
+            return `<select name="company_name" class="form-input search-select" data-searchable="true" data-placeholder="회사 선택" required>${options.join('')}</select>`;
+        }
         if(col==='rack_qty' || col==='hw_qty' || col==='sw_qty' || col==='line_qty'){
             return `<input name="${col}" type="number" min="0" step="1" class="form-input qty-dashed-lock" value="${value??''}" placeholder="0" readonly tabindex="-1" style="opacity:0.65;cursor:default">`;
         }
@@ -968,6 +1088,13 @@
             }
         });
         updateClearVisibility();
+        const companyFilterSel = document.getElementById('system-company-filter');
+        if(companyFilterSel){
+            companyFilterSel.addEventListener('change', e=>{
+                state.companyFilter = String(e.target.value || '').trim();
+                applyFilter();
+            });
+        }
         const pageSizeSel = document.getElementById(PAGE_SIZE_ID);
         if(pageSizeSel){
             pageSizeSel.addEventListener('change', e=>{
@@ -1007,7 +1134,7 @@
         }); }
         // row edit delegation
         const tbodyEl = document.getElementById(TBODY_ID);
-    tbodyEl?.addEventListener('click', e=>{
+    tbodyEl?.addEventListener('click', async e=>{
             const btn = e.target.closest('.action-btn');
             if(btn){
                 const rid = parseInt(btn.getAttribute('data-id'),10);
@@ -1016,8 +1143,15 @@
                 const row = state.data[realIndex];
                 const action = btn.getAttribute('data-action');
                 if(action==='edit'){
+                    try {
+                        await ensureCompanyOptions();
+                    } catch (err) {
+                        showMessage(err.message || '회사 목록 조회 중 오류가 발생했습니다.', '오류');
+                        return;
+                    }
                     fillEditForm(row);
                     openModal(EDIT_MODAL_ID);
+                    try{ window.BlossomSearchableSelect?.syncAll?.(document.getElementById(EDIT_FORM_ID)); }catch(_e){}
                     const editSaveEl = document.getElementById(EDIT_SAVE_ID);
                     if(editSaveEl){
                         editSaveEl.setAttribute('data-id', String(rid));
@@ -1085,8 +1219,18 @@
         });
         // column selection feature removed for Department page
     // add modal
-    document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> {
+    document.getElementById(ADD_BTN_ID)?.addEventListener('click', async ()=> {
+            try {
+                await ensureCompanyOptions();
+                const addForm = document.getElementById(ADD_FORM_ID);
+                const companySelect = addForm ? addForm.querySelector('[name="company_name"]') : null;
+                renderCompanySelect(companySelect, '');
+            } catch (err) {
+                showMessage(err.message || '회사 목록 조회 중 오류가 발생했습니다.', '오류');
+                return;
+            }
             openModal(ADD_MODAL_ID);
+            try{ window.BlossomSearchableSelect?.syncAll?.(document.getElementById(ADD_FORM_ID)); }catch(_e){}
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
@@ -1094,7 +1238,12 @@
             if(!form.checkValidity()){ form.reportValidity(); return; }
             const data = collectForm(form);
             const payload = buildDepartmentPayload(data);
+            if(!payload.company_name){ showMessage('회사를 선택하세요.', '안내'); return; }
             if(!payload.dept_name){ showMessage('부서명을 입력하세요.', '안내'); return; }
+            if(hasDepartmentDuplicate(payload.company_name, payload.dept_name, null)){
+                showMessage('중복된 부서명입니다. 동일 회사 내 부서명은 중복 등록할 수 없습니다.', '중복 금지');
+                return;
+            }
             const btn = document.getElementById(ADD_SAVE_ID);
             try {
                 if(btn) btn.disabled = true;
@@ -1124,7 +1273,12 @@
             }
             const data = collectForm(form);
             const payload = buildDepartmentPayload(data);
+            if(!payload.company_name){ showMessage('회사를 선택하세요.', '안내'); return; }
             if(!payload.dept_name){ showMessage('부서명을 입력하세요.', '안내'); return; }
+            if(hasDepartmentDuplicate(payload.company_name, payload.dept_name, recordId)){
+                showMessage('중복된 부서명입니다. 동일 회사 내 부서명은 중복 저장할 수 없습니다.', '중복 금지');
+                return;
+            }
             try {
                 if(saveBtn) saveBtn.disabled = true;
                 await updateDepartment(recordId, payload);
@@ -1183,44 +1337,12 @@
         document.getElementById(STATS_OK_ID)?.addEventListener('click', closeStats);
         // duplicate selected rows — open confirm modal first
         document.getElementById('system-duplicate-btn')?.addEventListener('click', ()=>{
-            const count = state.selected.size;
-            if(count===0){ showMessage('복제할 행을 먼저 선택하세요.', '안내'); return; }
-            const subtitle = document.getElementById('duplicate-subtitle');
-            if(subtitle){ subtitle.textContent = `선택된 ${count}개의 행을 복제합니다.`; }
-            openModal('system-duplicate-modal');
+            showMessage('카테고리 중복 금지 정책으로 행 복제는 비활성화되었습니다.', '중복 금지');
         });
         document.getElementById('system-duplicate-close')?.addEventListener('click', ()=> closeModal('system-duplicate-modal'));
         document.getElementById('system-duplicate-confirm')?.addEventListener('click', async ()=>{
-            const originals = state.data.filter(r=> state.selected.has(r.id));
-            if(!originals.length){ showMessage('선택된 행을 찾을 수 없습니다.', '오류'); closeModal('system-duplicate-modal'); return; }
-            const btn = document.getElementById('system-duplicate-confirm');
-            try {
-                if(btn) btn.disabled = true;
-                for(const origin of originals){
-                    const cloneName = origin.dept_name ? `${origin.dept_name}_COPY` : `복제부서_${Date.now()}`;
-                    const payload = buildDepartmentPayload({
-                        ...origin,
-                        dept_name: cloneName,
-                        description: origin.description,
-                        note: origin.note,
-                        staff_count: origin.staff_count,
-                        hw_qty: origin.hw_qty,
-                        sw_qty: origin.sw_qty
-                    });
-                    if(!payload.dept_name){
-                        payload.dept_name = `복제부서_${Date.now()}`;
-                    }
-                    await createDepartment(payload);
-                }
-                closeModal('system-duplicate-modal');
-                await refreshDepartments();
-                showMessage(`${originals.length}개 행이 복제되었습니다.`, '완료');
-            } catch(err){
-                console.error(err);
-                showMessage(err.message || '행 복제 중 오류가 발생했습니다.', '오류');
-            } finally {
-                if(btn) btn.disabled = false;
-            }
+            closeModal('system-duplicate-modal');
+            showMessage('카테고리 중복 금지 정책으로 행 복제는 비활성화되었습니다.', '중복 금지');
         });
         // delete (삭제처리)
         document.getElementById(DELETE_BTN_ID)?.addEventListener('click', ()=>{
@@ -1261,6 +1383,7 @@
                 const row = state.data[realIndex];
                 fillEditForm(row);
                 openModal(EDIT_MODAL_ID);
+                try{ window.BlossomSearchableSelect?.syncAll?.(document.getElementById(EDIT_FORM_ID)); }catch(_e){}
                 const editSaveEl = document.getElementById(EDIT_SAVE_ID);
                 if(editSaveEl){ editSaveEl.setAttribute('data-id', String(onlyId)); }
                 return;
@@ -1270,6 +1393,7 @@
             if(subtitle){ subtitle.textContent = `선택된 ${count}개의 부서에서 지정한 필드를 일괄 변경합니다.`; }
             buildBulkForm();
             openModal(BULK_MODAL_ID);
+            try{ window.BlossomSearchableSelect?.syncAll?.(document.getElementById(BULK_FORM_ID)); }catch(_e){}
         });
         document.getElementById(BULK_CLOSE_ID)?.addEventListener('click', ()=> closeModal(BULK_MODAL_ID));
         document.getElementById(BULK_APPLY_ID)?.addEventListener('click', async ()=>{
@@ -1311,12 +1435,20 @@
     function buildBulkForm(){
         const form = document.getElementById(BULK_FORM_ID); if(!form) return;
         function inputFor(col){
+            if(col === 'company_name'){
+                const options = ['<option value="">회사 선택</option>'];
+                companyOptions.forEach((name)=>{
+                    const safe = escapeHTML(name);
+                    options.push(`<option value="${safe}">${safe}</option>`);
+                });
+                return `<select class="form-input search-select" data-searchable="true" data-placeholder="회사 선택" data-bulk-field="company_name">${options.join('')}</select>`;
+            }
             if(col === 'hw_qty' || col === 'sw_qty') return `<input type="number" min="0" step="1" class="form-input qty-dashed-lock" data-bulk-field="${col}" placeholder="0">`;
             if(col === 'description') return `<input class="form-input" data-bulk-field="description" placeholder="예: 네트워크/보안 담당">`;
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="비고"></textarea>`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-        const GROUP = { title:'부서', cols:['dept_name','description','note'] };
+        const GROUP = { title:'부서', cols:['company_name','dept_name','description'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');
@@ -1392,6 +1524,7 @@
         // Load persisted sort (if any)
         loadSortPreference();
         bindEvents();
+        ensureCompanyOptions().catch(()=>{});
         state.isLoading = true;
         render();
         refreshDepartments();

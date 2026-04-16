@@ -71,10 +71,14 @@ def _resolve_db_path(app=None) -> str:
         if netloc not in ("", "localhost"):
             path = f"//{netloc}{path}"
 
-        # Windows: urlparse('sqlite:///dev_blossom.db').path -> '/dev_blossom.db'
-        if os.name == "nt" and path.startswith("/") and not path.startswith("//"):
-            if len(path) >= 4 and path[1].isalpha() and path[2] == ":" and path[3] == "/":
-                path = path[1:]
+        # urlparse('sqlite:///dev_blossom.db').path -> '/dev_blossom.db'
+        # A single leading '/' means sqlite:/// (instance-relative),
+        # while double '//' means sqlite://// (absolute path).
+        if path.startswith("/") and not path.startswith("//"):
+            path = path.lstrip("/")
+            # Windows drive-letter absolute path should keep drive prefix.
+            if os.name == "nt" and len(path) >= 3 and path[1] == ":" and path[2] == "/":
+                pass
 
         if os.path.isabs(path):
             return os.path.abspath(path)

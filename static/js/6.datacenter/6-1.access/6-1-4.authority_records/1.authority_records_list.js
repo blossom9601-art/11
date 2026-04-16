@@ -1348,7 +1348,7 @@
                 await ensureXLSX();
             }catch(_e){ showMessage('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', '오류'); return; }
             const reader = new FileReader();
-            reader.onload = ()=>{
+            reader.onload = async ()=>{
                 try{
                     const data = new Uint8Array(reader.result);
                     const wb = window.XLSX.read(data, {type:'array'});

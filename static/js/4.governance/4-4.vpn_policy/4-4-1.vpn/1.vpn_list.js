@@ -450,7 +450,6 @@
             await loadDataFromServer();
         } catch(e){
             console.error(e);
-            showMessage(e?.message || 'VPN 정책 데이터를 불러오지 못했습니다.', '오류');
             state.data = [];
             state.selected.clear();
             applyFilter();
@@ -668,6 +667,46 @@
         return String(str).replace(/[&<>'"]/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[s]));
     }
 
+    function collectOrgNameOptions(){
+        const set = new Set();
+        state.data.forEach(row=>{
+            const name = String(row?.org_name || '').trim();
+            if(name) set.add(name);
+        });
+        _partnerCacheByName.forEach((partner, key)=>{
+            const name = String((partner && partner.org_name) || key || '').trim();
+            if(name) set.add(name);
+        });
+        return Array.from(set).sort((a,b)=> a.localeCompare(b, 'ko'));
+    }
+
+    function buildOrgNameSelectOptions(currentValue){
+        const options = collectOrgNameOptions();
+        const current = String(currentValue || '').trim();
+        const merged = current && !options.includes(current) ? [current, ...options] : options;
+        return ['<option value="">선택</option>']
+            .concat(merged.map(v=>`<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`))
+            .join('');
+    }
+
+    function applyOrgNameSearchable(scopeEl){
+        const root = scopeEl || document;
+        root.querySelectorAll('select[name="org_name"]').forEach(select=>{
+            const current = String(select.value || select.getAttribute('data-current') || '').trim();
+            select.innerHTML = buildOrgNameSelectOptions(current);
+            if(current) select.value = current;
+            select.classList.add('search-select');
+            select.setAttribute('data-searchable', 'true');
+            select.setAttribute('data-placeholder', '기관명 검색');
+            select.setAttribute('data-allow-clear', 'true');
+        });
+        try{
+            if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function'){
+                window.BlossomSearchableSelect.syncAll(root);
+            }
+        }catch(_e){}
+    }
+
     // Pagination UI
     function updatePagination(){
         const infoEl = document.getElementById(PAGINATION_INFO_ID);
@@ -877,12 +916,17 @@
                 wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
             section.appendChild(grid); form.appendChild(section);
         });
+        applyOrgNameSearchable(form);
     }
 
     function generateFieldInput(col,value=''){
+        if(col==='org_name'){
+            const v = String(value??'').trim();
+            return `<select name="org_name" class="form-input search-select" data-searchable="true" data-placeholder="기관명 검색" data-allow-clear="true" data-current="${escapeHTML(v)}" required></select>`;
+        }
         if(col==='status'){
             const v = String(value??'');
-            return `<select name="status" class="form-input">
+            return `<select name="status" class="form-input search-select">
                 <option value="" ${v===''?'selected':''}>선택</option>
                 <option value="운용" ${v==='운용'?'selected':''}>운용</option>
                 <option value="해지" ${v==='해지'?'selected':''}>해지</option>
@@ -890,7 +934,7 @@
         }
         if(col==='line_count') return `<input name="line_count" type="number" min="0" step="1" class="form-input" value="${value??''}" placeholder="숫자">`;
         if(col==='line_speed') return `<input name="line_speed" class="form-input" value="${value??''}" placeholder="예: 100M, 1G">`;
-        if(col==='protocol') return `<select name="protocol" class="form-input">
+        if(col==='protocol') return `<select name="protocol" class="form-input search-select">
                 ${['','TCP','UDP','TCP/UDP'].map(o=>`<option value="${o}" ${String(value??'')===o?'selected':''}>${o===''?'선택':o}</option>`).join('')}
             </select>`;
         if(col==='cipher') return `<input name="cipher" class="form-input" value="${value??''}" placeholder="예: AES-256">`;
@@ -905,10 +949,11 @@
         data.id = state.nextId++;
         state.data.unshift(data); // 맨 앞 삽입
         applyFilter();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
     }
 
     function updateRow(index,data){
-        if(state.data[index]){ state.data[index] = {...state.data[index], ...data}; applyFilter(); }
+        if(state.data[index]){ state.data[index] = {...state.data[index], ...data}; applyFilter(); applyOrgNameSearchable(document.getElementById(ADD_FORM_ID)); }
     }
 
     async function findOrCreatePartnerId(orgName){
@@ -1070,6 +1115,7 @@
         });
         state.selected.clear();
         applyFilter();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
     }
 
     function updateSortIndicators(){
@@ -1368,7 +1414,7 @@
             }
         });
         // add modal
-    document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); initDatePickers(ADD_FORM_ID); });
+    document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { applyOrgNameSearchable(document.getElementById(ADD_FORM_ID)); openModal(ADD_MODAL_ID); initDatePickers(ADD_FORM_ID); });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
             const form = document.getElementById(ADD_FORM_ID); if(!form.checkValidity()){ form.reportValidity(); return; }
@@ -1761,7 +1807,7 @@
         const EXCLUDE = new Set([]);
         function inputFor(col){
             if(col === 'status'){
-                return `<select name="status" class="form-input" data-bulk-field="status">
+                return `<select name="status" class="form-input search-select" data-bulk-field="status">
                     <option value="">선택</option>
                     <option value="운용">운용</option>
                     <option value="해지">해지</option>
@@ -1769,7 +1815,7 @@
             }
             if(col === 'protocol'){
                 const opts = ['', 'TCP', 'UDP', 'TCP/UDP'];
-                return `<select name="protocol" class="form-input" data-bulk-field="protocol">${opts.map(o=>`<option value="${o}">${o===''?'선택':o}</option>`).join('')}</select>`;
+                return `<select name="protocol" class="form-input search-select" data-bulk-field="protocol">${opts.map(o=>`<option value="${o}">${o===''?'선택':o}</option>`).join('')}</select>`;
             }
             if(col === 'line_count') return `<input name="line_count" type="number" min="0" step="1" class="form-input" data-bulk-field="line_count" placeholder="숫자">`;
             if(col === 'cipher') return `<input name="cipher" class="form-input" data-bulk-field="cipher" placeholder="예: AES-256">`;
@@ -1864,6 +1910,7 @@
         // Load persisted sort (if any)
         loadSortPreference();
         await initData();
+        applyOrgNameSearchable(document.getElementById(ADD_FORM_ID));
         bindEvents();
         render();
         // Page adornments (animation + popover)

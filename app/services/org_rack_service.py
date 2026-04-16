@@ -90,12 +90,10 @@ def _resolve_db_path(app=None) -> str:
         return os.path.join(app.instance_path, 'org_rack.db')
     if netloc not in ('', 'localhost'):
         path = f"//{netloc}{path}"
-    # On Windows, urlparse('sqlite:///dev_blossom.db').path becomes '/dev_blossom.db'.
-    # Treat that as an instance-local filename, not an absolute path (C:\\dev_blossom.db).
-    # Also handle absolute Windows paths that appear as '/C:/...'.
-    if os.name == 'nt' and path.startswith('/') and not path.startswith('//'):
-        if re.match(r'^/[A-Za-z]:', path):
-            path = path[1:]
+    # sqlite:///file.db -> path='/file.db' (single leading / = relative)
+    # sqlite:////abs.db  -> path='//abs.db' (double leading / = absolute)
+    if path.startswith('/') and not path.startswith('//'):
+        path = path.lstrip('/')
     if os.path.isabs(path):
         return os.path.abspath(path)
 
@@ -426,12 +424,10 @@ def soft_delete_org_racks(ids: Sequence[Any], actor: str, app=None) -> int:
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

@@ -228,15 +228,6 @@ def init_work_operation_table(app=None) -> None:
             )
             conn.commit()
 
-            project_db = os.path.abspath(os.path.join(_project_root(app), 'dev_blossom.db'))
-            target_db = _resolve_db_path(app)
-            if os.path.exists(project_db) and os.path.abspath(project_db) != os.path.abspath(target_db):
-                _copy_table_if_missing_or_empty(
-                    source_db=project_db,
-                    target_conn=conn,
-                    table_name=TABLE_NAME,
-                )
-
             logger.info('%s table ready', TABLE_NAME)
     except Exception:
         logger.exception('Failed to initialize %s table', TABLE_NAME)
@@ -362,12 +353,10 @@ def soft_delete_work_operations(ids: Sequence[Any], actor: str, app=None) -> int
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params,
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

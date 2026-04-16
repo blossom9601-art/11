@@ -121,8 +121,11 @@ class LuminaClient:
     def agent_list(self) -> Dict[str, Any]:
         return self.get("/api/cli/agents")
 
-    def agent_show(self, agent_id: int) -> Dict[str, Any]:
-        return self.get(f"/api/cli/agents/{agent_id}")
+    def agent_show(self, agent_id: int, section: str = None) -> Dict[str, Any]:
+        params = {}
+        if section:
+            params["section"] = section
+        return self.get(f"/api/cli/agents/{agent_id}", params=params or None)
 
     def agent_status(self, agent_id: int) -> Dict[str, Any]:
         return self.get(f"/api/cli/agents/{agent_id}/status")

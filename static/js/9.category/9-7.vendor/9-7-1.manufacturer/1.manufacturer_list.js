@@ -208,7 +208,7 @@
 
     // Data + State
     // "주소", "비고"는 모달에는 유지하지만 목록 화면(테이블)에서는 숨김
-    const ALWAYS_HIDDEN_TABLE_COLS = new Set(['address','note']);
+    const ALWAYS_HIDDEN_TABLE_COLS = new Set(['address']);
     const BASE_VISIBLE_COLUMNS = [
         'vendor','business_number','call_center','hardware_qty','software_qty','component_qty'
     ];
@@ -218,7 +218,7 @@
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '제조사', columns: ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'] }
+        { group: '제조사', columns: ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
@@ -316,8 +316,9 @@
 
     function normalizeVendorRow(item){
         if(!item) return null;
+        const resolvedId = item.id ?? item.vendor_id ?? item.manufacturer_id ?? item.vendorId ?? null;
         return {
-            id: item.id,
+            id: resolvedId,
             vendor: item.vendor || item.manufacturer_name || '',
             address: item.address || '',
             business_number: item.business_number || item.business_no || '',
@@ -334,6 +335,20 @@
         const nextSelected = new Set();
         state.selected.forEach(id => { if(idSet.has(id)) nextSelected.add(id); });
         state.selected = nextSelected;
+    }
+
+    function navigateTo(href){
+        try{
+            if(typeof window.blsSpaNavigate === 'function'){
+                window.blsSpaNavigate(href);
+                return;
+            }
+            if(typeof blsSpaNavigate === 'function'){
+                blsSpaNavigate(href);
+                return;
+            }
+        }catch(_e){ /* ignore and fallback */ }
+        window.location.href = href;
     }
 
     async function apiRequest(url, options){
@@ -548,10 +563,11 @@
                 link.addEventListener('click', (ev)=>{
                     ev.preventDefault();
                     const href = link.getAttribute('href') || link.href;
+                    const vendorId = row.id ?? row.vendor_id ?? row.manufacturer_id;
                     try{
                         const ctx = {
-                            id: row.id,
-                            vendor_id: row.id,
+                            id: vendorId,
+                            vendor_id: vendorId,
                             vendor: row.vendor,
                             address: row.address,
                             business_number: row.business_number,
@@ -567,13 +583,13 @@
                     fetch('/api/vendor/detail-context', {
                         method: 'POST',
                         headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({ key: 'cat_vendor_manufacturer_detail', vendor_id: row.id }),
+                        body: JSON.stringify({ key: 'cat_vendor_manufacturer_detail', vendor_id: vendorId }),
                         credentials: 'same-origin'
                     }).then(function(res){
-                        if(res.ok){ blsSpaNavigate(href); }
-                        else { blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id)); }
+                        if(res.ok){ navigateTo(href); }
+                        else { navigateTo(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(vendorId)); }
                     }).catch(function(){
-                        blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id));
+                        navigateTo(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(vendorId));
                     });
                 });
             }
@@ -855,16 +871,20 @@
             form.appendChild(hid);
         });
 
-    const group = { title:'제조사', cols:['vendor','address','business_number','call_center','note'] };
+    const group = { title:'제조사', cols:['vendor','address','business_number','call_center'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow);
+        form.appendChild(section);
     }
 
     function generateFieldInput(col,value=''){
@@ -1510,7 +1530,7 @@
     document.getElementById(DISPOSE_CLOSE_ID)?.addEventListener('click', ()=> closeModal(DISPOSE_MODAL_ID));
         document.getElementById(DISPOSE_CONFIRM_ID)?.addEventListener('click', ()=>{
             // 수집 대상 열: 시스템 제조사, 시스템 모델명, 시스템 일련번호, 시스템 가상화, 시스템 장소, 시스템 위치, 시스템 슬롯, 시스템 크기, 시스템 담당부서, 시스템 담당자
-            const fields = ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'];
+            const fields = ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'];
             const selected = state.data.filter(r=> state.selected.has(r.id)).map(r=>{
                 const obj = { id: r.id };
                 fields.forEach(f=> obj[f] = r[f] ?? '');
@@ -1618,7 +1638,7 @@
             if(col === 'vendor') return `<input class="form-input" data-bulk-field="vendor" placeholder="값 입력" data-fk-ignore="1">`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'제조사', cols:['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'] };
+    const GROUP = { title:'제조사', cols:['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');

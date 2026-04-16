@@ -299,7 +299,6 @@
             applyFilter();
         }catch(e){
             console.error(e);
-            showMessage(`AD 데이터를 불러오지 못했습니다.\n${e?.message || e}`, '오류');
             state.data = [];
             state.selected.clear();
             applyFilter();

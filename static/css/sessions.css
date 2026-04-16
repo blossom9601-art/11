@@ -130,43 +130,27 @@
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4) !important;
 }
 
-/* ── Status badges ── */
-.sess-badge {
+/* ── Status pill (same as page_tab_admin) ── */
+#sess-table .status-pill {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 16px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    background: #f3f4f6;
+    padding: 4px 14px;
     border: 1px solid #e5e7eb;
-    color: #1f2937;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    color: #374151;
+    font-size: 13px;
+    white-space: nowrap;
 }
-
-.sess-badge-current {
-    background: #f3f4f6;
-    border-color: #e5e7eb;
-    color: #1f2937;
-}
-
-.sess-badge-active {
-    background: #f3f4f6;
-    border-color: #e5e7eb;
-    color: #1f2937;
-}
-
-.sess-badge-dot {
+#sess-table .status-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     display: inline-block;
-    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
 }
-
-.sess-badge-current .sess-badge-dot { background: #6366f1; }
-.sess-badge-active .sess-badge-dot { background: #10b981; }
 
 /* ── Terminate action button in table ── */
 #sess-table .action-btn[data-action="terminate"] {

@@ -37,7 +37,8 @@
 		'cat_company_center', 'cat_company_department'
 	],
 	'customer': [
-		'cat_customer_client1'
+		'cat_customer_client1', 'cat_customer_client1_detail', 'cat_customer_client1_manager',
+		'cat_customer_client1_task', 'cat_customer_client1_log', 'cat_customer_client1_file'
 	],
 	'vendor': [
 		'cat_vendor_maintenance', 'cat_vendor_maintenance_component', 'cat_vendor_maintenance_detail', 'cat_vendor_maintenance_file',
@@ -137,9 +138,9 @@
 	'gov_unused_server': ['gov_unused_hardware', 'gov_unused_server', 'gov_unused_storage', 'gov_unused_san', 'gov_unused_network', 'gov_unused_security'],
 	'dc_access_control': ['dc_access_control', 'dc_access_records', 'dc_authority_control', 'dc_authority_records', 'dc_access_system'],
 	'dc_data_deletion': ['dc_data_deletion', 'dc_data_deletion_system'],
-	'dc_rack_lab1': ['dc_rack_lab1', 'dc_rack_lab2', 'dc_rack_lab3', 'dc_rack_lab4', 'dc_rack_list'],
-	'dc_thermo_lab1': ['dc_thermo_lab1', 'dc_thermo_lab2', 'dc_thermo_lab3', 'dc_thermo_lab4', 'dc_thermometer_list', 'dc_thermometer_log'],
-	'dc_cctv_lab1': ['dc_cctv_lab1', 'dc_cctv_lab2', 'dc_cctv_lab3', 'dc_cctv_lab4', 'dc_cctv_list'],
+	'dc_rack_list': ['dc_rack_lab1', 'dc_rack_lab2', 'dc_rack_lab3', 'dc_rack_lab4', 'dc_rack_list'],
+	'dc_thermometer_list': ['dc_thermo_lab1', 'dc_thermo_lab2', 'dc_thermo_lab3', 'dc_thermo_lab4', 'dc_thermometer_list', 'dc_thermometer_log'],
+	'dc_cctv_list': ['dc_cctv_lab1', 'dc_cctv_lab2', 'dc_cctv_lab3', 'dc_cctv_lab4', 'dc_cctv_list'],
 	'cost_opex_dashboard': [
 		'cost_opex_dashboard',
 		'cost_opex_hardware', 'cost_opex_hardware_detail', 'cost_opex_hardware_contract',
@@ -214,9 +215,9 @@
 				<ul class="submenu">
 					<li><a href="{{ url_for('pages.show', key='dc_access_control') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_access_control') or []) | join(',') }}">출입 관리</a></li>
 					<li><a href="{{ url_for('pages.show', key='dc_data_deletion') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_data_deletion') or []) | join(',') }}">데이터 삭제 관리</a></li>
-					<li><a href="{{ url_for('pages.show', key='dc_rack_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_rack_lab1') or []) | join(',') }}">RACK 관리</a></li>
-					<li><a href="{{ url_for('pages.show', key='dc_thermo_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_thermo_lab1') or []) | join(',') }}">온/습도 관리</a></li>
-					<li><a href="{{ url_for('pages.show', key='dc_cctv_lab1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_cctv_lab1') or []) | join(',') }}">CCTV 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_rack_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_rack_list') or []) | join(',') }}">RACK 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_thermometer_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_thermometer_list') or []) | join(',') }}">온/습도 관리</a></li>
+					<li><a href="{{ url_for('pages.show', key='dc_cctv_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_cctv_list') or []) | join(',') }}">CCTV 관리</a></li>
 				</ul>
 			</li>
 			{% endif %}
@@ -257,7 +258,7 @@
 					<li><a href="{{ url_for('pages.show', key='cat_hw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_hw_dashboard') or []) | join(',') }}">하드웨어</a></li>
 					<li><a href="{{ url_for('pages.show', key='cat_sw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_sw_dashboard') or []) | join(',') }}">소프트웨어</a></li>
 					<li><a href="{{ url_for('pages.show', key='cat_component_cpu') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_component_cpu') or []) | join(',') }}">컴포넌트</a></li>
-					<li><a href="{{ url_for('pages.show', key='cat_company_center') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_company_center') or []) | join(',') }}">회사</a></li>
+					<li><a href="{{ url_for('pages.show', key='cat_company_company') }}" class="submenu-link" data-match-keys="{{ ((_sidebar_match_map.get('cat_company_company') or []) + (_sidebar_match_map.get('cat_company_center') or []) + (_sidebar_match_map.get('cat_company_department') or [])) | join(',') }}">회사</a></li>
 					<li><a href="{{ url_for('pages.show', key='cat_customer_client1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_customer_client1') or []) | join(',') }}">고객</a></li>
 					<li><a href="{{ url_for('pages.show', key='cat_vendor_manufacturer') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_vendor_manufacturer') or []) | join(',') }}">벤더</a></li>
 				</ul>

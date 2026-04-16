@@ -46,9 +46,11 @@ from app.services.pki_service import (
 from app.services.agent_cli_service import (
     list_all_agents,
     get_agent_detail,
+    get_agent_section,
     get_agent_status,
     get_agent_health,
     get_agent_inventory,
+    normalize_agent_section,
     search_agents,
     enable_agent,
     disable_agent,
@@ -195,6 +197,39 @@ def agent_linked_info(asset_id):
         return jsonify({"success": True, "linked": info})
     except Exception:
         logger.exception("연동 에이전트 조회 오류")
+        return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/linked/<int:asset_id>/collected", methods=["GET"])
+def agent_linked_collected(asset_id):
+    """자산에 연동된 에이전트의 수집 payload를 섹션별로 반환"""
+    section = (request.args.get("section") or "").strip()
+    normalized = normalize_agent_section(section)
+    if not normalized:
+        return jsonify({
+            "success": False,
+            "error": "section이 필요합니다. hardware, interface, account, authority, firewalld, storage, package 중 하나를 사용하세요.",
+        }), 400
+
+    try:
+        linked = get_linked_agent(asset_id)
+        if not linked:
+            return jsonify({
+                "success": True,
+                "item": {
+                    "section": normalized,
+                    "rows": [],
+                    "total": 0,
+                    "message": "연동된 에이전트가 없습니다.",
+                },
+            })
+
+        item = get_agent_section(int(linked["id"]), normalized)
+        if not item:
+            return jsonify({"success": False, "error": "Agent not found."}), 404
+        return jsonify({"success": True, "item": item})
+    except Exception:
+        logger.exception("연동 에이전트 수집 데이터 조회 오류")
         return jsonify({"success": False, "error": "서버 내부 오류"}), 500
 
 
@@ -481,9 +516,20 @@ def cli_agent_search():
 @agent_api_bp.route("/api/cli/agents/<int:agent_id>", methods=["GET"])
 @cli_auth_required()
 def cli_agent_show(agent_id):
-    _audit("agent show", target_id=agent_id)
+    section = (request.args.get("section") or "").strip()
+    _audit("agent show", target_id=agent_id, detail=f"section={section or 'detail'}")
     try:
-        item = get_agent_detail(agent_id)
+        if section:
+            normalized = normalize_agent_section(section)
+            if not normalized:
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid section. Use hardware, interface, account, authority, firewalld, storage, or package.",
+                }), 400
+            item = get_agent_section(agent_id, normalized)
+        else:
+            item = get_agent_detail(agent_id)
+
         if not item:
             return jsonify({"success": False, "error": "Agent not found."}), 404
         item = _apply_rbac(item)

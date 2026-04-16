@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/admin.css?v=20260104-30">
+    <link rel="stylesheet" href="/static/css/admin.css?v=20260104-42">
 </head>
 <body class="page-admin-settings">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -26,7 +26,7 @@
                     <div class="identity">
                         <div class="name-row"><h2 class="name">{{ (user.name if user and user.name else '-') }}</h2></div>
                         <div class="bio-row">
-                            <p class="bio">{{ ((user.motto if user and user.motto else '') or (user.note if user and user.note else '') or '디자인은 억지로 하면 안 됩니다. 자연스럽지 않다면 다시 생각해야 합니다.') }}</p>
+                            <p class="bio">{{ ((user.motto if user and user.motto else '') or (user.note if user and user.note else '') or '탐나는 사람') }}</p>
                             <button class="action-btn" id="btn-edit-bio" title="메시지 수정" aria-label="메시지 수정" type="button">
                                 <img src="/static/image/svg/admin/free-icon-pen-square.svg" alt="메시지 수정" class="action-icon">
                             </button>
@@ -99,7 +99,7 @@
 
     </main>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260413-04"></script>
     <!-- Modal editor like 이미지2 -->
     <div id="memo-editor" class="memo-editor-modal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="editor-backdrop" data-editor-close></div>
@@ -175,6 +175,7 @@
             <div class="server-add-header">
                 <div class="server-add-title">
                     <h3 id="memo-group-title">그룹 만들기</h3>
+                    <p class="server-add-subtitle">새 그룹을 만들고 메모를 분류하세요.</p>
                 </div>
                 <button class="close-btn" type="button" id="memo-group-close" title="닫기" aria-label="닫기">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -184,6 +185,9 @@
                 <div class="input-group">
                     <label for="memo-group-name">그룹명</label>
                     <input type="text" id="memo-group-name" name="memo_group_name" placeholder="그룹명을 입력하세요" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="memo-group-modal-illust" aria-hidden="true">
+                    <img src="/static/image/svg/memo/free-icon-table.svg" alt="" loading="lazy" />
                 </div>
             </div>
             <div class="server-add-actions align-right">
@@ -196,23 +200,32 @@
     </div>
 
     <!-- Group delete confirm modal (memo) -->
-    <div id="memo-group-delete-modal" class="server-add-modal system-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-group-delete-title">
+    <div id="memo-group-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="memo-group-delete-title">
         <div class="server-add-content" role="document">
             <div class="server-add-header">
-                <div class="server-add-title">
+                <div class="server-add-title dispose-title">
                     <h3 id="memo-group-delete-title">그룹 삭제</h3>
+                    <p class="server-add-subtitle">선택한 그룹과 메모를 삭제합니다.</p>
                 </div>
                 <button class="close-btn" type="button" id="memo-group-delete-close" title="닫기" aria-label="닫기">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
             </div>
             <div class="server-add-body">
-                <p id="memo-group-delete-subtitle" class="modal-subtitle">정말 삭제하시겠습니까?</p>
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p id="memo-group-delete-subtitle" class="modal-subtitle">정말 삭제하시겠습니까?</p>
+                        <p data-common-delete="warn">삭제된 그룹과 메모는 복구할 수 없습니다.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-process.svg" alt="삭제 안내" loading="lazy" />
+                    </div>
+                </div>
             </div>
             <div class="server-add-actions align-right">
                 <div class="action-buttons right">
                     <button type="button" class="btn-secondary" id="memo-group-delete-cancel">취소</button>
-                    <button type="button" class="btn-primary" id="memo-group-delete-confirm">확인</button>
+                    <button type="button" class="btn-danger" id="memo-group-delete-confirm">삭제</button>
                 </div>
             </div>
         </div>
@@ -299,6 +312,6 @@
         </div>
     </div>
 
-    <script src="/static/js/authentication/11-1.setting/11-1-3.memo.js?v=20260103-34"></script>
+    <script src="/static/js/authentication/11-1.setting/11-1-3.memo.js?v=20260413-42"></script>
 </body>
 </html>

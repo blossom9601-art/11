@@ -22,11 +22,11 @@
         });
     }
     // Flatpickr (calendar) loader and initializer
-    const FLATPICKR_CSS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+    const FLATPICKR_CSS = '/static/vendor/flatpickr/4.6.13/flatpickr.min.css';
     const FLATPICKR_THEME_NAME = 'airbnb'; // use neutral theme; colors overridden to match accent
-    const FLATPICKR_THEME_HREF = `https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/${FLATPICKR_THEME_NAME}.css`;
-    const FLATPICKR_JS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-    const FLATPICKR_KO = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js';
+    const FLATPICKR_THEME_HREF = `/static/vendor/flatpickr/4.6.13/themes/${FLATPICKR_THEME_NAME}.css`;
+    const FLATPICKR_JS = '/static/vendor/flatpickr/4.6.13/flatpickr.min.js';
+    const FLATPICKR_KO = '/static/vendor/flatpickr/4.6.13/l10n/ko.js';
     function ensureCss(href, id){
         const existing = document.getElementById(id);
         if(existing && existing.tagName.toLowerCase() === 'link'){
@@ -370,11 +370,12 @@
         const emptyEl0 = document.getElementById('system-empty');
         if(emptyEl0) emptyEl0.hidden = true;
         try {
-            const [vendorRes, sanRes] = await Promise.all([
+            const [vendorAllRes, vendorRes, sanRes] = await Promise.all([
+                callApi(`${VENDOR_MANUFACTURER_API}?include_deleted=1`),
                 callApi(`${VENDOR_MANUFACTURER_API}?include_deleted=${includeDeleted}`),
                 callApi(`${HW_API_BASE}?include_deleted=${includeDeleted}`)
             ]);
-            vendorNameByCode = buildVendorMap(vendorRes?.items || []);
+            vendorNameByCode = buildVendorMap(vendorAllRes?.items || []);
             vendorNameOptions = buildVendorNameOptions(vendorRes?.items || []);
             syncVendorSelectsInModals();
             const mapped = (sanRes?.items || []).map(normalizeSanRecord).filter(Boolean);
@@ -400,6 +401,7 @@
         const existingRow = opts?.existingRow;
         const payload = {
             model_name: formData.model || '',
+            san_type: formData.hw_type || '',
             release_date: formData.release_date || '',
             eosl_date: formData.eosl || '',
             remark: formData.note || ''
@@ -442,7 +444,7 @@
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '하드웨어', columns: ['model','vendor','hw_type','release_date','eosl','qty','note'] }
+        { group: '하드웨어', columns: ['model','vendor','hw_type','release_date','eosl','qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
@@ -874,16 +876,19 @@
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.setAttribute('data-fk-ignore', '1');
         form.innerHTML='';
-    const group = { title:'SAN', cols:['model','vendor','release_date','eosl','note'] };
+    const group = { title:'SAN', cols:['model','vendor','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            const wide = (c === 'note');
-            wrap.className = wide ? 'form-row form-row-wide' : 'form-row';
+            wrap.className = 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
-        section.appendChild(grid); form.appendChild(section);
+        section.appendChild(grid);
+        const noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = `<label>비고</label>${generateFieldInput('note', row?.note ?? '')}`;
+        section.appendChild(noteRow); form.appendChild(section);
     }
 
     function generateFieldInput(col,value=''){
@@ -1663,7 +1668,30 @@
             window.__blossom_hw_san_esc_close_wired = true;
             document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ [ADD_MODAL_ID,EDIT_MODAL_ID,COLUMN_MODAL_ID,DISPOSE_MODAL_ID,DELETE_MODAL_ID,BULK_MODAL_ID,UPLOAD_MODAL_ID,'system-download-modal','system-message-modal','system-duplicate-modal'].forEach(closeModal); }});
             // include stats modal in esc close
-            document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(STATS_MODAL_ID); }});
+            
+    // Category-wide duplicate policy override
+    (function(){
+        const policyMessage = '카테고리 정책입니다.\n\n복제는 허용되지 않습니다.';
+        const blockDuplicateAction = function(event){
+            if(event){
+                event.preventDefault();
+                event.stopPropagation();
+                if(typeof event.stopImmediatePropagation === 'function'){
+                    event.stopImmediatePropagation();
+                }
+            }
+            try { closeModal('system-duplicate-modal'); } catch(_e){}
+            showMessage(policyMessage, '오류');
+            return false;
+        };
+
+        const duplicateBtn = document.getElementById('system-duplicate-btn');
+        const duplicateConfirm = document.getElementById('system-duplicate-confirm');
+        if(duplicateBtn){ duplicateBtn.addEventListener('click', blockDuplicateAction, true); }
+        if(duplicateConfirm){ duplicateConfirm.addEventListener('click', blockDuplicateAction, true); }
+    })();
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(STATS_MODAL_ID); }});
         }
 
         // message modal bindings
@@ -1680,7 +1708,7 @@
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'SAN', cols:['model','vendor','eosl','note'] };
+    const GROUP = { title:'SAN', cols:['model','vendor','eosl'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');

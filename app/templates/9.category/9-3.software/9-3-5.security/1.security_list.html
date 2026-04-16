@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/category2.css?v=1.0.5">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260414i">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -79,9 +79,6 @@
                                 <button class="header-btn" id="system-analytics-btn" title="통계 분석" aria-label="통계 분석">
                                     <img src="/static/image/svg/free-icon-font-analytics-magnifying-glass.svg" alt="통계 분석" class="header-icon">
                                 </button>
-                                <button class="header-btn" id="system-duplicate-btn" title="행 복제" aria-label="선택 행 복제">
-                                    <img src="/static/image/svg/list/free-icon-globe.svg" alt="행 복제" class="header-icon">
-                                </button>
                                 <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
                                 <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
                             </div>
@@ -129,11 +126,11 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260406_tab"></script>
+        <script src="/static/js/blossom.js?v=20260415_cat_dup_remove2"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
-    <script src="/static/js/9.category/9-3.software/9-3-5.security/1.security_list.js?v=20260105_4"></script>
+    <script src="/static/js/9.category/9-3.software/9-3-5.security/1.security_list.js?v=20260415_cat_dup_policy1"></script>
     <!-- 보안S/W 상세 기본 URL 주입 (Unix 패턴) -->
     <script>
         window.__SW_SECURITY_DETAIL_URL = "{{ url_for('pages.show', key='cat_sw_security_detail') }}";
@@ -162,8 +159,8 @@
                                 </div>
                                 <div class="form-row"><label>릴리즈 일자</label><input name="release_date" type="text" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
                                 <div class="form-row"><label>EOSL 일자</label><input name="eosl" type="text" class="form-input date-input" placeholder="YYYY-MM-DD"></div>
-                                <div class="form-row form-row-wide"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="6"></textarea></div>
                             </div>
+                            <div class="form-row"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="6"></textarea></div>
                         </div>
                     </form>
                 </div>
@@ -280,38 +277,8 @@
             </div>
         </div>
 
-        <!-- 행 복제 확인 모달 -->
-        <div id="system-duplicate-modal" class="server-add-modal system-duplicate-modal modal-overlay-full" aria-hidden="true">
-            <div class="server-add-content">
-                <div class="server-add-header">
-                    <div class="server-add-title dispose-title">
-                        <h3>행 복제</h3>
-                        <p class="server-add-subtitle" id="duplicate-subtitle">선택된 0개의 행을 복제합니다.</p>
-                    </div>
-                    <button class="close-btn" type="button" id="system-duplicate-close" title="닫기">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                </div>
-                <div class="server-add-body">
-                    <div class="dispose-content">
-                        <div class="dispose-text">
-                            <p>선택된 행의 복제본을 생성합니다.</p>
-                            <p>복제 후 <strong>모델명</strong> 끝에 _COPY가 붙습니다.</p>
-                        </div>
-                        <div class="dispose-illust">
-                            <img src="/static/image/svg/list/free-sticker-programming.svg" alt="Programming Illustration" loading="lazy" />
-                        </div>
-                    </div>
-                </div>
-                <div class="server-add-actions align-right">
-                    <div class="action-buttons right">
-                        <button type="button" class="btn-primary" id="system-duplicate-confirm">복제</button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- CSV 다운로드 확인 모달 -->
+<!-- CSV 다운로드 확인 모달 -->
         {% include 'layouts/_download_modal_range.html' %}
 
 
@@ -416,7 +383,7 @@
             </div>
         </div>
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>
 

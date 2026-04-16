@@ -27,6 +27,7 @@ Requires:       python3 >= 3.6
 Requires:       python3-flask >= 2.0
 Requires:       python3-gunicorn >= 20.0
 Requires:       python3-PyMySQL >= 0.9
+Requires:       python3-paramiko >= 2.0
 Requires:       nginx >= 1.14
 Requires:       openssl >= 1.1.1
 
@@ -59,6 +60,7 @@ install -d -m 0755 %{buildroot}%{_prefix}/web/app/static
 install -m 0644 %{_sourcedir}/web/wsgi.py               %{buildroot}%{_prefix}/web/
 install -m 0644 %{_sourcedir}/web/gunicorn.conf.py       %{buildroot}%{_prefix}/web/
 install -m 0644 %{_sourcedir}/web/app/__init__.py        %{buildroot}%{_prefix}/web/app/
+install -m 0644 %{_sourcedir}/web/app/cli_api.py         %{buildroot}%{_prefix}/web/app/
 
 # ── 설정 파일 ────────────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_confdir}
@@ -99,6 +101,7 @@ TMPEOF
 %{_prefix}/web/gunicorn.conf.py
 %dir %{_prefix}/web/app
 %{_prefix}/web/app/__init__.py
+%{_prefix}/web/app/cli_api.py
 %dir %{_prefix}/web/app/routes
 %dir %{_prefix}/web/app/templates
 %dir %{_prefix}/web/app/static

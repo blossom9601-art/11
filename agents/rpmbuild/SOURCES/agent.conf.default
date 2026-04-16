@@ -24,4 +24,4 @@ interval = 3600
 output_dir = /var/lib/lumina
 
 # 활성화할 수집기 (쉼표 구분)
-collectors = interface, account, package
+collectors = interface, account, authority, firewalld, storage, package

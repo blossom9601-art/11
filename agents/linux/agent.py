@@ -22,12 +22,26 @@ import urllib.error
 _AGENT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _AGENT_ROOT not in sys.path:
     sys.path.insert(0, _AGENT_ROOT)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
 from common.config import AgentConfig
 from common.collector import build_payload, save_payload
-from linux.collectors.interface import InterfaceCollector
-from linux.collectors.account import AccountCollector
-from linux.collectors.package import PackageCollector
+try:
+    from linux.collectors.interface import InterfaceCollector
+    from linux.collectors.account import AccountCollector
+    from linux.collectors.authority import AuthorityCollector
+    from linux.collectors.firewalld import FirewalldCollector
+    from linux.collectors.storage import StorageCollector
+    from linux.collectors.package import PackageCollector
+except ImportError:
+    from collectors.interface import InterfaceCollector
+    from collectors.account import AccountCollector
+    from collectors.authority import AuthorityCollector
+    from collectors.firewalld import FirewalldCollector
+    from collectors.storage import StorageCollector
+    from collectors.package import PackageCollector
 
 logger = logging.getLogger("lumina")
 
@@ -162,6 +176,12 @@ def run_once(config):
         collectors.append(InterfaceCollector())
     if "account" in config.collectors:
         collectors.append(AccountCollector())
+    if "authority" in config.collectors:
+        collectors.append(AuthorityCollector())
+    if "firewalld" in config.collectors:
+        collectors.append(FirewalldCollector())
+    if "storage" in config.collectors:
+        collectors.append(StorageCollector())
     if "package" in config.collectors:
         collectors.append(PackageCollector())
 

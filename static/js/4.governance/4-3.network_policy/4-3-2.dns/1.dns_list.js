@@ -229,7 +229,9 @@
             applyFilter();
         } catch(err){
             console.error(err);
-            showMessage(err.message || 'DNS 정책 데이터를 불러오지 못했습니다.', '오류');
+            state.data = [];
+            state.selected.clear();
+            applyFilter();
         } finally {
             state.isFetching = false;
             toggleSearchLoader(false);

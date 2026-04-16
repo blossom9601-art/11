@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
     <link rel="stylesheet" href="/static/css/system.css?v=4.32">
-    <link rel="stylesheet" href="/static/css/wf_designer.css?v=5.45">
+    <link rel="stylesheet" href="/static/css/wf_designer.css?v=6.34">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -269,10 +269,10 @@
         {% if request.args.get('edit') %}
         <script>window.location.href='/p/wf_designer_editor?id='+new URLSearchParams(window.location.search).get('edit');</script>
         {% elif current_key == 'wf_designer_manage' %}
-        <script src="/static/js/8.project/8-4.designer/8-4-2.manage/1.wf_designer_manage.js?v=20260315b"></script>
+        <script src="/static/js/8.project/8-4.designer/8-4-2.manage/1.wf_designer_manage.js?v=20260413wf2"></script>
         {% else %}
-        <script src="/static/js/8.project/8-4.designer/8-4-1.explore/1.wf_designer_explore.js?v=20260308a"></script>
+        <script src="/static/js/8.project/8-4.designer/8-4-1.explore/1.wf_designer_explore.js?v=20260413wf2"></script>
         {% endif %}
-    <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+    <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

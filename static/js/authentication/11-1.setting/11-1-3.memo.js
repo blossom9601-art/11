@@ -82,6 +82,83 @@
     try { localStorage.setItem(key, value); } catch {}
   }
 
+  function ensureMemoEditorShell(){
+    if (document.getElementById('memo-editor')) return;
+
+    const shell = document.createElement('div');
+    shell.innerHTML = '' +
+      '<div id="memo-editor" class="memo-editor-modal" aria-hidden="true" role="dialog" aria-modal="true">' +
+      '  <div class="editor-backdrop" data-editor-close></div>' +
+      '  <div class="editor-dialog" role="document">' +
+      '    <div class="editor-header">' +
+      '      <div class="left">' +
+      '        <button class="action-btn primary" id="editor-save" title="저장" aria-label="저장">' +
+      '          <img class="action-icon" src="/static/image/svg/save.svg" alt="저장">' +
+      '        </button>' +
+      '      </div>' +
+      '      <div class="center"><span class="editor-location">내 메모</span></div>' +
+      '      <div class="right">' +
+      '        <button class="action-btn" id="editor-delete" title="삭제" aria-label="삭제">' +
+      '          <img class="action-icon" src="/static/image/svg/delete.svg" alt="삭제">' +
+      '        </button>' +
+      '        <button class="action-btn" id="editor-star" title="중요" aria-label="중요">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-star.svg" alt="중요">' +
+      '        </button>' +
+      '        <button class="action-btn close-ghost" id="editor-cancel" title="취소" aria-label="취소">' +
+      '          <img class="action-icon" src="/static/image/svg/cancel.svg" alt="취소">' +
+      '        </button>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="editor-toolbar" role="toolbar" aria-label="편집 도구">' +
+      '      <div class="toolbar-group">' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-bold" title="굵게" aria-label="굵게">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-bold.svg" alt="굵게">' +
+      '        </button>' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-underline" title="밑줄" aria-label="밑줄">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-underline.svg" alt="밑줄">' +
+      '        </button>' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-strike" title="취소선" aria-label="취소선">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-strikethrough.svg" alt="취소선">' +
+      '        </button>' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-highlight" title="형광펜" aria-label="형광펜">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-highlighter.svg" alt="형광펜">' +
+      '        </button>' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-checkbox" title="체크박스" aria-label="체크박스">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-checkbox.svg" alt="체크박스">' +
+      '        </button>' +
+      '        <button type="button" class="action-btn toolbar-btn" id="tb-picture" title="사진첨부" aria-label="사진첨부">' +
+      '          <img class="action-icon" src="/static/image/svg/memo/free-icon-picture.svg" alt="사진첨부">' +
+      '        </button>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="editor-body">' +
+      '      <input id="editor-title" type="text" class="editor-title" placeholder="제목" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">' +
+      '      <div id="editor-rich" class="editor-text rich" contenteditable="true" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-placeholder="메모를 입력하세요."></div>' +
+      '      <textarea id="editor-body-input" class="editor-text" placeholder="메모를 입력하세요." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" hidden></textarea>' +
+      '      <div id="editor-preview" class="editor-preview" aria-live="polite" aria-label="체크리스트 미리보기"></div>' +
+      '    </div>' +
+      '  </div>' +
+      '</div>';
+
+    const root = shell.firstElementChild;
+    if (root) document.body.appendChild(root);
+  }
+
+  function isMemoEditorReady(){
+    ensureMemoEditorShell();
+    const requiredIds = [
+      'memo-editor',
+      'editor-title',
+      'editor-body-input',
+      'editor-rich',
+      'editor-save',
+      'editor-cancel',
+      'editor-delete',
+      'editor-star',
+    ];
+    return !requiredIds.some((id) => !document.getElementById(id));
+  }
+
   // System message modal (same look as /p/cat_business_work)
   let _memoWarningModalBound = false;
   let _memoWarningLastFocused = null;
@@ -2410,6 +2487,41 @@
 
   // Bootstrap group-create modal binding outside the large DOMContentLoaded handler.
   // This prevents other DOMContentLoaded errors from stopping the modal from working.
+  function bindMemoNewButton(){
+    // Replace stale listeners from older SPA script instances.
+    if (window.__memoNewButtonHandlerRef) {
+      try { document.removeEventListener('click', window.__memoNewButtonHandlerRef, true); } catch (_) {}
+    }
+    if (window.__memoNewButtonDirectRef?.el && window.__memoNewButtonDirectRef?.fn) {
+      try { window.__memoNewButtonDirectRef.el.removeEventListener('click', window.__memoNewButtonDirectRef.fn, true); } catch (_) {}
+    }
+
+    const handler = (e) => {
+      const t = e.target;
+      if (!t?.closest?.('#memo-new')) return;
+      e.preventDefault();
+      if (!isMemoEditorReady()) return;
+      try { openModalEditor(null); } catch (_) {}
+    };
+
+    window.__memoNewButtonHandlerRef = handler;
+    document.addEventListener('click', handler, true);
+
+    // Also bind directly to the button element to avoid propagation conflicts.
+    const newBtn = document.getElementById('memo-new');
+    if (newBtn) {
+      const directHandler = (e) => {
+        e.preventDefault();
+        if (!isMemoEditorReady()) return;
+        try { openModalEditor(null); } catch (_) {}
+      };
+      window.__memoNewButtonDirectRef = { el: newBtn, fn: directHandler };
+      newBtn.addEventListener('click', directHandler, true);
+    } else {
+      window.__memoNewButtonDirectRef = null;
+    }
+  }
+
   function bindMemoGroupCreateModal(){
     if (window.__memoGroupCreateModalBound) return;
     const modal = document.getElementById('memo-group-modal');
@@ -2489,6 +2601,7 @@
 
   (function bootstrapMemoGroupCreateModal(){
     const run = () => {
+      try { bindMemoNewButton(); } catch (_) {}
       try { bindMemoViewModeUI(); } catch (_) {}
       try { bindMemoCardMoveUI(); } catch (_) {}
       try { bindMemoGroupCreateModal(); } catch (_) {}

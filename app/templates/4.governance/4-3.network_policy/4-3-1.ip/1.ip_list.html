@@ -9,11 +9,11 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/governance.css?v=1.0.80">
+    <link rel="stylesheet" href="/static/css/governance.css?v=1.0.81">
     <!-- 상세 페이지 글로벌 URL 주입 (unix 패턴) -->
     <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.show', key='gov_ip_policy_detail') }}";</script>
 </head>
-<body>
+<body class="page-gov-ip-policy">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
     {% include 'layouts/_header.html' %}
     {% include 'layouts/_sidebar.html' %}
@@ -131,11 +131,11 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260406_tab"></script>
+        <script src="/static/js/blossom.js?v=20260412_terms"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
-    <script src="/static/js/4.governance/4-3.network_policy/4-3-1.ip/1.ip_list.js?v=1.0.6"></script>
+    <script src="/static/js/4.governance/4-3.network_policy/4-3-1.ip/1.ip_list.js?v=1.0.8"></script>
 
         <!-- IP 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -411,7 +411,7 @@
             </div>
         </div>
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>
 

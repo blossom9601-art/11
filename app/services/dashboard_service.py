@@ -33,9 +33,10 @@ def _resolve_main_db(app=None):
         return None
     if netloc not in ("", "localhost"):
         path = f"//{netloc}{path}"
-    if os.name == 'nt' and path.startswith('/') and not path.startswith('//'):
-        if len(path) >= 4 and path[1].isalpha() and path[2] == ':' and path[3] == '/':
-            path = path[1:]
+    # sqlite:///file.db -> path='/file.db' (single leading / = relative)
+    # sqlite:////abs.db  -> path='//abs.db' (double leading / = absolute)
+    if path.startswith('/') and not path.startswith('//'):
+        path = path.lstrip('/')
     if os.path.isabs(path):
         return os.path.abspath(path)
     relative = path.lstrip("/")
@@ -155,110 +156,120 @@ def compute_dashboard_stats(range_code='1m'):
 
 
 # ---------------------------------------------------------------------------
-# Hardware (카테고리 > 하드웨어 type 테이블)
+# Hardware (시스템 > 하드웨어 자산 테이블)
 # ---------------------------------------------------------------------------
 
-_HW_TYPE_SOURCES = [
-    ('app.services.hw_server_type_service',   'hw_server_type',   'SERVER',   '서버'),
-    ('app.services.hw_storage_type_service',  'hw_storage_type',  'STORAGE',  '스토리지'),
-    ('app.services.hw_san_type_service',      'hw_san_type',      'SAN',      'SAN'),
-    ('app.services.hw_network_type_service',  'hw_network_type',  'NETWORK',  '네트워크'),
-    ('app.services.hw_security_type_service', 'hw_security_type', 'SECURITY', '보안장비'),
-]
+_HW_CATEGORY_LABELS = {
+    'SERVER':   '서버',
+    'STORAGE':  '스토리지',
+    'SAN':      'SAN',
+    'NETWORK':  '네트워크',
+    'SECURITY': '보안장비',
+}
 
 def _get_hardware_stats(cur_start, cur_end, prev_start, prev_end):
-    total = 0
-    current_total = 0
-    prev_total = 0
-    breakdown = []
+    try:
+        from app.services.hardware_asset_service import _get_connection
+        conn = _get_connection()
+    except Exception:
+        logger.exception("hardware_asset DB 연결 실패")
+        return {'kpi': {'total': 0, 'current': 0, 'prev': 0}, 'breakdown': []}
 
-    for mod_path, table, key, label in _HW_TYPE_SOURCES:
-        try:
-            mod = __import__(mod_path, fromlist=['_get_connection'])
-            conn = mod._get_connection()
-        except Exception:
-            continue
-        try:
-            cnt = _safe_count(conn, "SELECT COUNT(1) FROM {} WHERE is_deleted = 0".format(table))
-            cur_cnt = _safe_count(
-                conn,
-                "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
-                (cur_start, cur_end + 'T23:59:59'),
-            )
-            prev_cnt = _safe_count(
-                conn,
-                "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
-                (prev_start, prev_end + 'T23:59:59'),
-            )
-            total += cnt
-            current_total += cur_cnt
-            prev_total += prev_cnt
-            if cnt > 0:
-                breakdown.append({'key': key, 'label': label, 'value': cnt})
-        except Exception:
-            logger.exception("hardware category [%s] 통계 조회 실패", table)
-        finally:
-            conn.close()
+    try:
+        table = 'hardware'
+        # 전체 하드웨어 자산 수
+        total = _safe_count(conn, "SELECT COUNT(1) FROM {} WHERE is_deleted = 0".format(table))
+        # 현재 기간 신규 등록
+        current_total = _safe_count(
+            conn,
+            "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
+            (cur_start, cur_end + 'T23:59:59'),
+        )
+        # 이전 기간 신규 등록
+        prev_total = _safe_count(
+            conn,
+            "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
+            (prev_start, prev_end + 'T23:59:59'),
+        )
+        # asset_category 별 breakdown
+        rows = _safe_rows(
+            conn,
+            "SELECT asset_category, COUNT(1) as cnt FROM {} WHERE is_deleted = 0 GROUP BY asset_category ORDER BY cnt DESC".format(table),
+        )
+        breakdown = []
+        for r in rows:
+            cat = r['asset_category'] or 'ETC'
+            label = _HW_CATEGORY_LABELS.get(cat, cat)
+            breakdown.append({'key': cat, 'label': label, 'value': r['cnt']})
 
-    breakdown.sort(key=lambda x: x['value'], reverse=True)
-    return {
-        'kpi': {'total': total, 'current': current_total, 'prev': prev_total},
-        'breakdown': breakdown,
-    }
+        return {
+            'kpi': {'total': total, 'current': current_total, 'prev': prev_total},
+            'breakdown': breakdown,
+        }
+    except Exception:
+        logger.exception("하드웨어 자산 통계 조회 실패")
+        return {'kpi': {'total': 0, 'current': 0, 'prev': 0}, 'breakdown': []}
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
-# Software (카테고리 > 소프트웨어 type 테이블)
+# Software (시스템 > 소프트웨어 자산 테이블)
 # ---------------------------------------------------------------------------
 
-_SW_TYPE_SOURCES = [
-    ('app.services.sw_os_type_service',                'sw_os_type',          'OS',               '운영체제'),
-    ('app.services.sw_db_type_service',                'sw_db_type',          'DATABASE',          '데이터베이스'),
-    ('app.services.sw_middleware_type_service',         'sw_middleware_type',  'MIDDLEWARE',         '미들웨어'),
-    ('app.services.sw_virtual_type_service',            'sw_virtual_type',     'VIRTUALIZATION',     '가상화'),
-    ('app.services.sw_security_type_service',           'sw_security_sw_type', 'SECURITY',          '보안S/W'),
-    ('app.services.sw_high_availability_type_service',  'sw_ha_type',          'HIGH_AVAILABILITY', '고가용성'),
-]
+_SW_CATEGORY_LABELS = {
+    'OS':                '운영체제',
+    'DATABASE':          '데이터베이스',
+    'MIDDLEWARE':        '미들웨어',
+    'VIRTUALIZATION':    '가상화',
+    'SECURITY':          '보안S/W',
+    'HIGH_AVAILABILITY': '고가용성',
+}
 
 def _get_software_stats(cur_start, cur_end, prev_start, prev_end):
-    total = 0
-    current_total = 0
-    prev_total = 0
-    breakdown = []
+    try:
+        from app.services.software_asset_service import _get_connection
+        conn = _get_connection()
+    except Exception:
+        logger.exception("software_asset DB 연결 실패")
+        return {'kpi': {'total': 0, 'current': 0, 'prev': 0}, 'breakdown': []}
 
-    for mod_path, table, key, label in _SW_TYPE_SOURCES:
-        try:
-            mod = __import__(mod_path, fromlist=['_get_connection'])
-            conn = mod._get_connection()
-        except Exception:
-            continue
-        try:
-            cnt = _safe_count(conn, "SELECT COUNT(1) FROM {} WHERE is_deleted = 0".format(table))
-            cur_cnt = _safe_count(
-                conn,
-                "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
-                (cur_start, cur_end + 'T23:59:59'),
-            )
-            prev_cnt = _safe_count(
-                conn,
-                "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
-                (prev_start, prev_end + 'T23:59:59'),
-            )
-            total += cnt
-            current_total += cur_cnt
-            prev_total += prev_cnt
-            if cnt > 0:
-                breakdown.append({'key': key, 'label': label, 'value': cnt})
-        except Exception:
-            logger.exception("software category [%s] 통계 조회 실패", table)
-        finally:
-            conn.close()
+    try:
+        table = 'software_asset'
+        # 전체 소프트웨어 자산 수
+        total = _safe_count(conn, "SELECT COUNT(1) FROM {} WHERE is_deleted = 0".format(table))
+        # 현재 기간 신규 등록
+        current_total = _safe_count(
+            conn,
+            "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
+            (cur_start, cur_end + 'T23:59:59'),
+        )
+        # 이전 기간 신규 등록
+        prev_total = _safe_count(
+            conn,
+            "SELECT COUNT(1) FROM {} WHERE is_deleted = 0 AND created_at >= ? AND created_at <= ?".format(table),
+            (prev_start, prev_end + 'T23:59:59'),
+        )
+        # asset_category 별 breakdown
+        rows = _safe_rows(
+            conn,
+            "SELECT asset_category, COUNT(1) as cnt FROM {} WHERE is_deleted = 0 GROUP BY asset_category ORDER BY cnt DESC".format(table),
+        )
+        breakdown = []
+        for r in rows:
+            cat = r['asset_category'] or 'ETC'
+            label = _SW_CATEGORY_LABELS.get(cat, cat)
+            breakdown.append({'key': cat, 'label': label, 'value': r['cnt']})
 
-    breakdown.sort(key=lambda x: x['value'], reverse=True)
-    return {
-        'kpi': {'total': total, 'current': current_total, 'prev': prev_total},
-        'breakdown': breakdown,
-    }
+        return {
+            'kpi': {'total': total, 'current': current_total, 'prev': prev_total},
+            'breakdown': breakdown,
+        }
+    except Exception:
+        logger.exception("소프트웨어 자산 통계 조회 실패")
+        return {'kpi': {'total': 0, 'current': 0, 'prev': 0}, 'breakdown': []}
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

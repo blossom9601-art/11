@@ -38,13 +38,15 @@
                 <div id="dynamic-system-tabs"
                      data-page-code="DC_RACK"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="RACK 관리 탭"></div>
+                     data-aria-label="RACK 관리 탭"
+                     data-layout-title-selector="#rack-layout-title"
+                     data-layout-title-suffix=" 배치도"></div>
 
                 <div class="tab-content single-pane">
                     <div class="tab-pane active" id="system-list-pane">
                         <div class="tab-header">
                             <div class="tab-header-left">
-                                <h2>{{ center_name }} 배치도</h2>
+                                <h2 id="rack-layout-title">{{ center_name }} 배치도</h2>
                             </div>
                             <div class="tab-header-right">
                                 <div class="search-container" role="search">
@@ -92,7 +94,7 @@
             </div>
         </main>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260413_dc_tab_silent"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
     <script src="/static/js/6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.js?v=20251206b"></script>
 
@@ -156,6 +158,6 @@
         {% include 'layouts/_message_modal.html' %}
 
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

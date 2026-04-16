@@ -22,7 +22,7 @@
         return;
     }
     var script = document.createElement('script');
-    script.src = '/static/js/6.datacenter/6-6.cctv/system_lab_page.js';
+    script.src = '/static/js/6.datacenter/6-6.cctv/system_lab_page.js?v=20260413a';
     script.async = true;
     script.dataset.systemLabShared = 'true';
     script.onerror = function(err) { console.error('[cctv] shared page script failed to load', err); };

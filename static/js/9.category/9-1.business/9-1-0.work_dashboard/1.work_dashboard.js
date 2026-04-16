@@ -596,6 +596,120 @@ function renderTreemap(containerId, items, onClick, options) {
 
 function initWorkDashboard() {
   disableChartAnimationsGlobally();
+
+  function _waitLinkLoaded(linkEl, timeoutMs) {
+    return new Promise(function(resolve) {
+      if (!linkEl) return resolve();
+      try {
+        if (linkEl.sheet && linkEl.sheet.cssRules != null) return resolve();
+      } catch (_) {
+        // Cross-origin/access timing can throw; still treat as not-ready and wait events.
+      }
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        resolve();
+      }
+      linkEl.addEventListener('load', finish, { once: true });
+      linkEl.addEventListener('error', finish, { once: true });
+      setTimeout(finish, Number(timeoutMs) || 2000);
+    });
+  }
+
+  function _ensureRequiredStyles() {
+    var required = [
+      { base: '/static/css/capex_executive.css', full: '/static/css/capex_executive.css?v=20260316a' },
+      { base: '/static/css/dashboard_add.css', full: '/static/css/dashboard_add.css?v=20251109-1' }
+    ];
+    var waits = [];
+
+    required.forEach(function(item) {
+      var links = Array.prototype.slice.call(document.querySelectorAll('link[rel="stylesheet"][href]'));
+      var found = links.find(function(l) {
+        var h = l.getAttribute('href') || '';
+        return h.indexOf(item.base) >= 0;
+      });
+
+      if (!found) {
+        found = document.createElement('link');
+        found.rel = 'stylesheet';
+        found.href = item.full;
+        document.head.appendChild(found);
+      }
+      waits.push(_waitLinkLoaded(found, 2600));
+    });
+
+    return Promise.all(waits);
+  }
+
+  function _pinGridLayout() {
+    try {
+      var grid = document.getElementById('work-dash-grid') || document.querySelector('#work-dashboard-root .work-dash-grid');
+      if (!grid) return;
+
+      var w = window.innerWidth || document.documentElement.clientWidth || 1920;
+      var isMobile = w <= 1200;
+
+      if (isMobile) {
+        grid.style.setProperty('display', 'grid', 'important');
+        grid.style.setProperty('grid-template-columns', '1fr', 'important');
+        grid.style.setProperty('grid-template-rows', 'none', 'important');
+        grid.style.setProperty('gap', '20px', 'important');
+
+        ['wd-card-classification','wd-card-division','wd-card-group','wd-card-operation','wd-card-status'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.style.setProperty('grid-column', 'auto', 'important');
+          el.style.setProperty('grid-row', 'auto', 'important');
+          el.style.setProperty('min-width', '0', 'important');
+        });
+        return;
+      }
+
+      // Desktop: lock to fixed 3-column composition.
+      grid.style.setProperty('display', 'grid', 'important');
+      grid.style.setProperty('grid-template-columns', 'repeat(3, minmax(0, 1fr))', 'important');
+      grid.style.setProperty('grid-template-rows', 'auto auto', 'important');
+      grid.style.setProperty('gap', '20px', 'important');
+      grid.style.setProperty('align-items', 'stretch', 'important');
+
+      var c1 = document.getElementById('wd-card-classification');
+      var c2 = document.getElementById('wd-card-division');
+      var c3 = document.getElementById('wd-card-group');
+      var c4 = document.getElementById('wd-card-operation');
+      var c5 = document.getElementById('wd-card-status');
+
+      if (c1) {
+        c1.style.setProperty('grid-column', '1', 'important');
+        c1.style.setProperty('grid-row', '1', 'important');
+        c1.style.setProperty('min-width', '0', 'important');
+      }
+      if (c2) {
+        c2.style.setProperty('grid-column', '2', 'important');
+        c2.style.setProperty('grid-row', '1', 'important');
+        c2.style.setProperty('min-width', '0', 'important');
+      }
+      if (c3) {
+        c3.style.setProperty('grid-column', '3', 'important');
+        c3.style.setProperty('grid-row', '1 / 3', 'important');
+        c3.style.setProperty('min-width', '0', 'important');
+      }
+      if (c4) {
+        c4.style.setProperty('grid-column', '1', 'important');
+        c4.style.setProperty('grid-row', '2', 'important');
+        c4.style.setProperty('min-width', '0', 'important');
+      }
+      if (c5) {
+        c5.style.setProperty('grid-column', '2', 'important');
+        c5.style.setProperty('grid-row', '2', 'important');
+        c5.style.setProperty('min-width', '0', 'important');
+      }
+    } catch (_) {}
+  }
+
+  _pinGridLayout();
+  window.addEventListener('resize', _pinGridLayout);
   const API = {
     classification: '/api/work-categories',
     division: '/api/work-divisions',
@@ -714,59 +828,8 @@ function initWorkDashboard() {
     }
     box.innerHTML = html;
   }
-  // Fallback sample datasets (used only if API fetch fails)
-  const fallback = {
-    classification: [
-      { name: '권한', count: 18 },
-      { name: '서비스', count: 15 },
-      { name: '애플리케이션', count: 14 },
-      { name: '프로세스', count: 13 },
-      { name: '요청', count: 11 },
-      { name: '정책', count: 9 }
-    ],
-    division: [
-      { name: '업무 유형', count: 16 },
-      { name: '요청 유형', count: 14 },
-      { name: '연동 시스템', count: 12 },
-      { name: '서비스', count: 10 },
-      { name: '운영 조직', count: 9 },
-      { name: '변경 유형', count: 7 }
-    ],
-    status: [
-      { name: '운영중', count: 28 },
-      { name: '개발', count: 16 },
-      { name: '헬스체크', count: 12 },
-      { name: '대기', count: 10 },
-      { name: '점검중', count: 9 },
-      { name: '승인대기', count: 8 },
-      { name: '릴리즈', count: 6 },
-      { name: 'QA', count: 4 },
-      { name: '장애', count: 3 },
-      { name: '기타', count: 5 }
-    ],
-    operation: [
-      { name: '운영 정책', count: 12 },
-      { name: '운영 절차', count: 18 },
-      { name: '운영 일정', count: 9 },
-      { name: '운영 리포트', count: 6 },
-      { name: '운영 권한', count: 15 },
-      { name: '운영 인력', count: 7 }
-    ],
-    group: [
-      { name: '플랫폼', hw: 20, sw: 12 },
-      { name: '인프라', hw: 30, sw: 10 },
-      { name: '보안', hw: 16, sw: 8 },
-      { name: '업무시스템', hw: 18, sw: 16 },
-      { name: '데이터', hw: 12, sw: 14 },
-      { name: '지원', hw: 10, sw: 6 },
-      { name: 'QA', hw: 8, sw: 5 },
-      { name: '연구', hw: 7, sw: 9 },
-      { name: '운영', hw: 9, sw: 7 },
-      { name: '모니터링', hw: 5, sw: 4 }
-    ]
-  };
-
   async function loadDashboardData() {
+    var empty = { classification: [], division: [], status: [], operation: [], group: [] };
     try {
       const [cat, div, st, op, grp] = await Promise.all([
         fetchJson(API.classification),
@@ -783,74 +846,93 @@ function initWorkDashboard() {
         group: mapToGroupXY(grp.items)
       };
     } catch (e) {
-      console.warn('[work_dashboard] Falling back to sample data:', e);
-      return fallback;
+      console.warn('[work_dashboard] API error:', e);
+      return empty;
     }
   }
 
   const onSegClick = (p)=> showData(p);
 
-  loadDashboardData().then((data) => {
-    // Defer rendering to ensure CSS is applied and layout is computed
-    // (critical for SPA navigation where CSS links load asynchronously)
+  // Wait until dashboard chart containers have measurable size.
+  // This is more reliable than checking stylesheet load events during SPA swaps.
+  function _waitForLayoutReady(timeoutMs) {
+    var timeout = Number(timeoutMs) || 2600;
+    return new Promise(function(resolve) {
+      var t0 = Date.now();
+      function ready() {
+        var box = document.querySelector('.work-dash-grid .chart-wrap-inner');
+        if (!box) return false;
+        return (box.clientWidth || 0) >= 180 && (box.clientHeight || 0) >= 180;
+      }
+      function tick() {
+        if (ready() || (Date.now() - t0) >= timeout) return resolve();
+        requestAnimationFrame(tick);
+      }
+      tick();
+    });
+  }
+
+  Promise.all([loadDashboardData(), _ensureRequiredStyles()])
+  .then(function(results) {
+    var data = results[0];
+    return _waitForLayoutReady(3200).then(function() { return data; });
+  })
+  .then(function(data) {
+    _pinGridLayout();
+
+    function _resizeCharts() {
+      ['chart-classification', 'chart-division', 'chart-operation', 'chart-status'].forEach(function(id) {
+        try {
+          var cv = document.getElementById(id);
+          if (!cv) return;
+          fixCanvasSize(cv);
+          var inst = Chart.getChart(cv);
+          if (inst) { inst.resize(); inst.update('none'); }
+        } catch (_) {}
+      });
+    }
+
     function doRender() {
+      _pinGridLayout();
       // 분류 → 파이 (Top5+기타)
-      renderPie('chart-classification', data.classification || [], onSegClick, { topN: 5 });
+      if ((data.classification || []).length) renderPie('chart-classification', data.classification, onSegClick, { topN: 5 });
       // 구분 → 도넛 (Top5+기타)
-      renderDoughnut('chart-division', data.division || [], onSegClick, { showCenter: false, topN: 5 });
-
-      // 운영 → 세로 막대 (데이터 0이면 카드 숨김)
-      const opItems = (data.operation || []).filter(x => (x.count || 0) > 0);
-      if (opItems.length) {
-        renderBarVertical('chart-operation', opItems, onSegClick);
-      } else {
-        const opCard = document.getElementById('chart-operation');
-        if (opCard) { const c = opCard.closest('.exec-card') || opCard.closest('.card.chart'); if (c) c.style.display = 'none'; }
-      }
-
+      if ((data.division || []).length) renderDoughnut('chart-division', data.division, onSegClick, { showCenter: false, topN: 5 });
+      // 운영 → 세로 막대
+      var opItems = (data.operation || []).filter(x => (x.count || 0) > 0);
+      if (opItems.length) renderBarVertical('chart-operation', opItems, onSegClick);
       // 그룹 → 트리맵 (HW/SW, Top10)
-      renderTreemap('chart-group', data.group || [], onSegClick, { topN: 10 });
+      if ((data.group || []).length) renderTreemap('chart-group', data.group, onSegClick, { topN: 10 });
+      // 상태 → 가로 막대
+      var stItems = (data.status || []).filter(x => (x.count || 0) > 0);
+      if (stItems.length) renderBarHorizontal('chart-status', stItems, onSegClick);
 
-      // 상태 → 가로 막대 (데이터 0이면 카드 숨김)
-      const stItems = (data.status || []).filter(x => (x.count || 0) > 0);
-      if (stItems.length) {
-        renderBarHorizontal('chart-status', stItems, onSegClick);
-      } else {
-        const stCard = document.getElementById('chart-status');
-        if (stCard) { const c = stCard.closest('.exec-card') || stCard.closest('.card.chart'); if (c) c.style.display = 'none'; }
-      }
-
-      // Post-render: re-measure after CSS settles and fix canvas sizes
-      setTimeout(function() {
-        ['chart-classification', 'chart-division', 'chart-operation', 'chart-status'].forEach(function(id) {
-          try {
-            var cv = document.getElementById(id);
-            if (!cv) return;
-            fixCanvasSize(cv);
-            var inst = Chart.getChart(cv);
-            if (inst) { inst.resize(); inst.update('none'); }
-          } catch (_) {}
-        });
-      }, 150);
+      // Staged reflow fix for late CSS/layout settlement during SPA navigation.
+      [60, 180, 420, 900, 1500, 2600, 3600].forEach(function(ms) {
+        setTimeout(function() {
+          _pinGridLayout();
+          _resizeCharts();
+        }, ms);
+      });
     }
 
-    // Wait for layout to stabilize before rendering
-    var inner = document.querySelector('.chart-wrap-inner');
-    if (inner && inner.clientHeight > 100) {
-      doRender();
-    } else {
-      // CSS may not be applied yet (SPA navigation) — poll until ready
-      var _t0 = Date.now();
-      function _waitCss() {
-        inner = document.querySelector('.chart-wrap-inner');
-        if ((inner && inner.clientHeight > 100) || (Date.now() - _t0 > 1500)) {
-          doRender();
-        } else {
-          requestAnimationFrame(_waitCss);
-        }
+    doRender();
+
+    // SPA 전환 직후 사이드바/메인 폭 전환 애니메이션으로 레이아웃이 늦게 확정되는 경우를 보정한다.
+    document.addEventListener('blossom:pageLoaded', function(ev) {
+      try {
+        var href = (ev && ev.detail && ev.detail.href) ? String(ev.detail.href) : '';
+        if (href.indexOf('/p/cat_business_dashboard') < 0) return;
+      } catch (_) {
+        return;
       }
-      requestAnimationFrame(_waitCss);
-    }
+      [40, 160, 360, 760, 1300, 2200].forEach(function(ms) {
+        setTimeout(function() {
+          _pinGridLayout();
+          _resizeCharts();
+        }, ms);
+      });
+    });
   });
 }
 

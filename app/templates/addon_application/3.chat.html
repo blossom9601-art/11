@@ -42,7 +42,7 @@
                         <div class="thread-user">
                             <div id="thread-avatar" class="avatar-group" aria-hidden="true"></div>
                             <div>
-                                <div class="name" id="thread-name">Dominic</div>
+                                    <div class="name" id="thread-name"></div>
                                 <div class="status"><span class="dot online"></span><span id="thread-status">온라인</span></div>
                             </div>
                         </div>
@@ -100,15 +100,15 @@
                     <div class="profile-card">
                         <div class="profile-top">
                             <div id="profile-avatar" class="profile-avatar" aria-hidden="true"></div>
-                            <div class="profile-name" id="profile-name">Dominic</div>
+                            <div class="profile-name" id="profile-name">{{ current_user_name or '' }}</div>
                             <button class="email-btn" id="profile-email-btn">이메일 보내기</button>
-                            <div class="last-interacted">최근 상호작용: <span id="profile-last">몇 시간 전</span></div>
+                            <div class="last-interacted">최근 상호작용: <span id="profile-last"></span></div>
                         </div>
                         <div class="profile-info" id="profile-info">
-                            <div class="info-row"><span class="label">이메일:</span><span id="profile-email">support@blossom.co.kr</span></div>
-                            <div class="info-row"><span class="label">내선전화:</span><span id="profile-ext-phone">010-9595-9594</span></div>
+                            <div class="info-row"><span class="label">이메일:</span><span id="profile-email"></span></div>
+                            <div class="info-row"><span class="label">내선전화:</span><span id="profile-ext-phone"></span></div>
                             <div class="info-row"><span class="label">휴대전화:</span><span id="profile-mobile-phone"></span></div>
-                            <div class="info-row"><span class="label">부서:</span><span id="profile-location">IT인프라운영1팀</span></div>
+                            <div class="info-row"><span class="label">부서:</span><span id="profile-location">{{ current_user_department or current_user_dept or current_dept or '' }}</span></div>
                         </div>
                         <div class="profile-participants" id="profile-members" hidden>
                             <div class="info-row"><span class="label">참여자</span><span></span></div>
@@ -142,6 +142,7 @@
                 data-user-name="{{ current_user_name or '' }}"
                 data-user-emp-no="{{ current_emp_no or '' }}"
                 data-user-dept="{{ current_user_department or current_user_dept or current_dept or '' }}"
+                data-user-image="{{ current_profile_image or '' }}"
                 data-directory-url="{{ chat_directory_url or '/api/chat/directory' }}"></div>
 
     <script src="/static/js/blossom.js"></script>

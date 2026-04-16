@@ -28,6 +28,9 @@ from common.config import AgentConfig
 from common.collector import build_payload, save_payload
 from linux.collectors.interface import InterfaceCollector
 from linux.collectors.account import AccountCollector
+from linux.collectors.authority import AuthorityCollector
+from linux.collectors.firewalld import FirewalldCollector
+from linux.collectors.storage import StorageCollector
 from linux.collectors.package import PackageCollector
 
 logger = logging.getLogger("lumina")
@@ -91,6 +94,12 @@ def run_once(config: AgentConfig):
         collectors.append(InterfaceCollector())
     if "account" in config.collectors:
         collectors.append(AccountCollector())
+    if "authority" in config.collectors:
+        collectors.append(AuthorityCollector())
+    if "firewalld" in config.collectors:
+        collectors.append(FirewalldCollector())
+    if "storage" in config.collectors:
+        collectors.append(StorageCollector())
     if "package" in config.collectors:
         collectors.append(PackageCollector())
 

@@ -136,7 +136,7 @@
         </main>
 
         <script src="/static/js/blossom.js"></script>
-    <script src="/static/js/4.governance/4-5.dedicatedline_policy/4-5-1.member/1.member_list.js?v=1.0.6"></script>
+    <script src="/static/js/4.governance/4-5.dedicatedline_policy/4-5-1.member/1.member_list.js?v=1.1.2"></script>
 
         <!-- 회선 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -160,7 +160,11 @@
                                         <option value="해지">해지</option>
                                     </select>
                                 </div>
-                                <div class="form-row"><label>기관명<span class="required">*</span></label><input name="org_name" class="form-input" placeholder="입력" required></div>
+                                <div class="form-row"><label>기관명<span class="required">*</span></label>
+                                    <select name="org_name" class="form-input search-select" data-searchable="true" data-placeholder="기관명 검색" data-allow-clear="true" required>
+                                        <option value="">선택</option>
+                                    </select>
+                                </div>
                                 <div class="form-row"><label>통신사</label>
                                     <select name="telco" class="form-input search-select fk-select" data-placeholder="통신사 선택">
                                         <option value="">선택</option>
@@ -365,7 +369,7 @@
 
         {% include 'layouts/_stats_modal.html' %}
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
 </body>
 </html>

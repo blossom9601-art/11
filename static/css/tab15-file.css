@@ -412,7 +412,7 @@
    7. 안내 모달 (file-notice) — dispose 레이아웃 사용
    ═══════════════════════════════════ */
 #file-notice-modal .server-add-content {
-    max-width: 660px;
+    max-width: 640px;
 }
 #file-notice-modal .dispose-text p {
     word-break: keep-all;

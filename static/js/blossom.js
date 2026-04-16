@@ -1,3 +1,84 @@
+
+/* §18 ── Session Polling (Cross-Tab Logout Sync) ──────────── */
+/* 세션 폴링: 한 탭에서 로그아웃하면 모든 탭이 동시에 감지하여 로그인 페이지로 리다이렉트 */
+(function initSessionPolling() {
+    try {
+        // 로그인 페이지에서는 폴링 불필요
+        if (window.location.pathname === '/login' || window.location.pathname === '/logout') {
+            return;
+        }
+
+        // 설정
+        const POLL_INTERVAL = 15000;                    // 15초마다 폴링
+        const POLL_URL = '/api/auth/session-check';
+        const LS_LOGOUT_KEY = 'blossom.session.invalidated';
+
+        // 폴링 함수: 서버에 현재 세션이 유효한지 확인
+        function checkSessionValidity() {
+            fetch(POLL_URL, {
+                method: 'GET',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (response) {
+                    // 401 응답 또는 response.ok가 false면 세션 무효 처리
+                    if (!response.ok || response.status === 401) {
+                        // 로그아웃 신호를 localStorage에 저장 (다른 탭에 알림)
+                        try {
+                            localStorage.setItem(LS_LOGOUT_KEY, String(Date.now()));
+                        } catch (_e) {
+                            // localStorage 접근 불가능한 경우
+                        }
+                        // 현재 탭을 로그인 페이지로 리다이렉트
+                        window.location.href = '/login?reason=session-expired';
+                    }
+                })
+                .catch(function (error) {
+                    // 네트워크 오류는 무시 (서버가 일시적으로 응답 불가할 수 있음)
+                    // 로그아웃하지 않고 계속 폴링 유지
+                });
+        }
+
+        // 페이지 로드 후 폴링 시작
+        function startPolling() {
+            // 초기 한 번 확인하지 않고, 첫 폴링은 POLL_INTERVAL 후 실행
+            window.__sessionPollInterval = setInterval(checkSessionValidity, POLL_INTERVAL);
+        }
+
+        // localStorage 다른 탭 로그아웃 감지
+        function listenForCrossTabLogout() {
+            window.addEventListener('storage', function (event) {
+                if (event.key === LS_LOGOUT_KEY && event.newValue) {
+                    // 다른 탭에서 로그아웃했음을 감지 → 즉시 리다이렉트
+                    window.location.href = '/login?reason=multi-tab-logout';
+                }
+            });
+        }
+
+        // 사용자가 페이지를 나갈 때 폴링 정리
+        window.addEventListener('beforeunload', function () {
+            if (window.__sessionPollInterval) {
+                clearInterval(window.__sessionPollInterval);
+            }
+        });
+
+        // SPA 페이지 로드 후에도 폴링 재시작 (기존 인터벌 유지)
+        document.addEventListener('blossom:pageLoaded', function () {
+            // 폴링 상태 확인: 이미 실행 중이면 추가 시작 안 함
+            if (!window.__sessionPollInterval) {
+                startPolling();
+            }
+        });
+
+        // 초기 시작
+        startPolling();
+        listenForCrossTabLogout();
+
+    } catch (error) {
+        // 폴링 시스템 오류는 무시 (기능 실패가 치명적이지 않음)
+    }
+})();
 /**
  * blossom.js — 코어 클라이언트 라이브러리
  * =========================================
@@ -37,6 +118,369 @@
 
 /* Reveal page: all DOM content is parsed before this script, so show immediately */
 try { document.body.classList.add('bls-ready'); } catch(_e){}
+
+// SPA 전환 후 설정 탭(버전관리/페이지관리) 재초기화 강제 훅
+document.addEventListener('blossom:pageLoaded', function () {
+    try {
+        if (typeof window.__blossomInitVersionPage === 'function') {
+            window.__blossomInitVersionPage();
+        }
+    } catch (_e) {}
+    try {
+        if (typeof window.__blossomInitPageTabAdmin === 'function') {
+            window.__blossomInitPageTabAdmin();
+        }
+    } catch (_e) {}
+});
+
+/* §0b ── Category Table PK Dedupe Guard ───────────────────── */
+(function initCategoryTablePkDedupe(){
+    try {
+        function isCategoryPage(){
+            var p = String((window.location && window.location.pathname) || '');
+            return /^\/p\/cat_/i.test(p);
+        }
+
+        function _trim(v){ return String(v == null ? '' : v).trim(); }
+
+        function extractRowPk(tr){
+            if (!tr) return '';
+            var v = _trim(tr.getAttribute('data-id') || (tr.dataset && tr.dataset.id));
+            if (v) return 'id:' + v;
+
+            var withDataId = tr.querySelector('[data-id]');
+            if (withDataId) {
+                v = _trim(withDataId.getAttribute('data-id'));
+                if (v) return 'id:' + v;
+            }
+
+            var hiddenId = tr.querySelector('input[type="hidden"][name="id"], input[type="hidden"][name$="_id"]');
+            if (hiddenId) {
+                v = _trim(hiddenId.value);
+                if (v) return 'id:' + v;
+            }
+            return '';
+        }
+
+        function extractRowSignature(tr){
+            if (!tr) return '';
+            var cells = tr.querySelectorAll('td[data-col], td');
+            if (!cells || !cells.length) return '';
+            var parts = [];
+            Array.prototype.forEach.call(cells, function(td){
+                if (!td) return;
+                if (td.querySelector('input[type="checkbox"]')) return;
+                if (td.classList && td.classList.contains('table-actions')) return;
+                var t = _trim(td.textContent || '').replace(/\s+/g, ' ');
+                if (t) parts.push(t);
+            });
+            if (!parts.length) return '';
+            return 'sig:' + parts.join('\u001f');
+        }
+
+        function dedupeTableByPk(table){
+            if (!table || !table.tBodies || !table.tBodies.length) return;
+            var tbody = table.tBodies[0];
+            if (!tbody) return;
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+            if (!rows.length) return;
+            var seen = Object.create(null);
+            rows.forEach(function(tr){
+                var key = extractRowSignature(tr) || extractRowPk(tr);
+                if (!key) return;
+                if (seen[key]) {
+                    tr.remove();
+                    return;
+                }
+                seen[key] = 1;
+            });
+        }
+
+        function runSweep(){
+            if (!isCategoryPage()) return;
+            try {
+                var tables = document.querySelectorAll('table');
+                Array.prototype.forEach.call(tables, dedupeTableByPk);
+            } catch(_e){}
+        }
+
+        function bindObservers(){
+            if (!isCategoryPage()) return;
+            try {
+                var tbodies = document.querySelectorAll('table tbody');
+                Array.prototype.forEach.call(tbodies, function(tbody){
+                    if (!tbody || tbody.dataset.blsPkDedupeBound === '1') return;
+                    tbody.dataset.blsPkDedupeBound = '1';
+                    var observer = new MutationObserver(function(){ runSweep(); });
+                    observer.observe(tbody, { childList: true });
+                });
+
+                if (document.body && document.body.dataset.blsPkDedupeDocObs !== '1') {
+                    document.body.dataset.blsPkDedupeDocObs = '1';
+                    var docObserver = new MutationObserver(function(){
+                        runSweep();
+                        bindObservers();
+                    });
+                    docObserver.observe(document.body, { childList: true, subtree: true });
+                }
+            } catch(_e){}
+        }
+
+        function runAll(){
+            runSweep();
+            bindObservers();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runAll);
+        } else {
+            runAll();
+        }
+        document.addEventListener('blossom:pageLoaded', function(){
+            setTimeout(runAll, 0);
+            setTimeout(runAll, 120);
+        });
+    } catch(_e){}
+})();
+
+/* §0c ── Category API Dedupe Interceptor ─────────────────── */
+(function initCategoryApiDedupeInterceptor(){
+    try {
+        if (window.__blsCategoryFetchDedupeWrapped === 1) return;
+        window.__blsCategoryFetchDedupeWrapped = 1;
+
+        function isCategoryPage(){
+            var p = String((window.location && window.location.pathname) || '');
+            return /^\/p\/cat_/i.test(p);
+        }
+
+        function _trim(v){ return String(v == null ? '' : v).trim(); }
+
+        function makeItemKey(item){
+            if (!item || typeof item !== 'object') return '';
+            var keys = Object.keys(item).sort();
+            var parts = [];
+            keys.forEach(function(k){
+                var v = item[k];
+                if (v == null) return;
+                if (typeof v === 'object') return;
+                if (/^(id|created_at|updated_at|deleted_at|created_by|updated_by|is_deleted)$/i.test(k)) return;
+                if (/_id$/i.test(k)) return;
+                if (/_code$/i.test(k)) return;
+                var sv = _trim(v);
+                if (!sv) return;
+                parts.push(k + '=' + sv);
+            });
+            if (!parts.length) return '';
+            return 'sig:' + parts.join('\u001f');
+        }
+
+        function dedupeItems(items){
+            var list = Array.isArray(items) ? items : [];
+            var seen = Object.create(null);
+            var out = [];
+            list.forEach(function(it){
+                var key = makeItemKey(it);
+                if (!key) { out.push(it); return; }
+                if (seen[key]) return;
+                seen[key] = 1;
+                out.push(it);
+            });
+            return out;
+        }
+
+        var _origFetch = window.fetch.bind(window);
+        window.fetch = function(input, init){
+            return _origFetch(input, init).then(function(res){
+                try {
+                    if (!isCategoryPage()) return res;
+                    if (!res || !res.headers) return res;
+                    var reqUrl = '';
+                    if (typeof input === 'string') reqUrl = input;
+                    else if (input && typeof input.url === 'string') reqUrl = input.url;
+                    var abs = new URL(reqUrl || '', window.location.origin);
+                    if (abs.pathname.indexOf('/api/') !== 0) return res;
+
+                    var ct = String(res.headers.get('content-type') || '');
+                    if (!/application\/json/i.test(ct)) return res;
+
+                    return res.clone().text().then(function(text){
+                        try {
+                            if (!text) return res;
+                            var data = JSON.parse(text);
+                            if (!data || !Array.isArray(data.items) || data.items.length < 2) return res;
+
+                            var deduped = dedupeItems(data.items);
+                            if (deduped.length === data.items.length) return res;
+
+                            data.items = deduped;
+                            if (typeof data.total === 'number') data.total = deduped.length;
+
+                            var body = JSON.stringify(data);
+                            var headers = new Headers(res.headers);
+                            headers.delete('content-length');
+                            return new Response(body, {
+                                status: res.status,
+                                statusText: res.statusText,
+                                headers: headers
+                            });
+                        } catch(_e){
+                            return res;
+                        }
+                    }).catch(function(){ return res; });
+                } catch(_e){
+                    return res;
+                }
+            });
+        };
+    } catch(_e){}
+})();
+
+/* §0d ── Category Duplicate Feature Removal ──────────────── */
+(function initCategoryDuplicateFeatureRemoval(){
+    try {
+        function isCategoryPage(){
+            var p = String((window.location && window.location.pathname) || '');
+            return /^\/p\/cat_/i.test(p);
+        }
+
+        function showCategoryPolicyError(message){
+            var msg = String(message || '카테고리 정책입니다.\n\n복제 기능은 제거되었습니다.');
+            try {
+                var modal = document.getElementById('system-message-modal');
+                var titleEl = document.getElementById('message-title');
+                var contentEl = document.getElementById('message-content');
+                if (modal && titleEl && contentEl) {
+                    titleEl.textContent = '오류';
+                    contentEl.textContent = msg;
+                    contentEl.style.whiteSpace = 'pre-line';
+                    document.body.classList.add('modal-open');
+                    modal.classList.add('show');
+                    modal.setAttribute('aria-hidden', 'false');
+                    return;
+                }
+            } catch(_e){}
+            try {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(msg.replace(/\n+/g, ' '), 'error');
+                }
+            } catch(_e2){}
+        }
+
+        function removeDuplicateUI(){
+            if (!isCategoryPage()) return;
+            try {
+                var ids = ['system-duplicate-btn', 'system-duplicate-modal'];
+                for (var i = 0; i < ids.length; i++) {
+                    var el = document.getElementById(ids[i]);
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                }
+            } catch(_e){}
+        }
+
+        document.addEventListener('click', function(e){
+            if (!isCategoryPage()) return;
+            var el = e.target && e.target.closest ? e.target.closest('#system-duplicate-btn, #system-duplicate-confirm, #system-duplicate-close') : null;
+            if (!el) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            showCategoryPolicyError('카테고리 정책입니다.\n\n복제 기능은 제거되었습니다.');
+        }, true);
+
+        function normalizeText(v){
+            return String(v || '').trim().toLowerCase();
+        }
+
+        function extractAddFormKey(){
+            var form = document.getElementById('system-add-form');
+            if (!form) return '';
+            var names = ['wc_name','model','dept_name','name','division_name','company_name','vendor_name','manufacturer_name','status_name','operation_name','group_name'];
+            for (var i = 0; i < names.length; i++) {
+                var field = form.querySelector('[name="' + names[i] + '"]');
+                if (!field) continue;
+                var val = normalizeText(field.value);
+                if (val) return val;
+            }
+            return '';
+        }
+
+        function rowKeyFromTable(tr){
+            if (!tr) return '';
+            var cols = ['wc_name','model','dept_name','name','division_name','company_name','vendor_name','manufacturer_name','status_name','operation_name','group_name'];
+            for (var i = 0; i < cols.length; i++) {
+                var td = tr.querySelector('td[data-col="' + cols[i] + '"]');
+                if (!td) continue;
+                var txt = normalizeText(td.textContent);
+                if (txt) return txt;
+            }
+            var fallback = tr.querySelector('td:nth-child(2)');
+            return normalizeText(fallback && fallback.textContent);
+        }
+
+        function hasDuplicateInTable(target){
+            if (!target) return false;
+            var rows = document.querySelectorAll('#system-table-body tr');
+            for (var i = 0; i < rows.length; i++) {
+                if (rowKeyFromTable(rows[i]) === target) return true;
+            }
+            return false;
+        }
+
+        function blockDuplicateCreate(event){
+            if (!isCategoryPage()) return;
+            var btn = event.target && event.target.closest ? event.target.closest('#system-add-save') : null;
+            if (!btn) return;
+            var key = extractAddFormKey();
+            if (!key) return;
+            if (!hasDuplicateInTable(key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            showCategoryPolicyError('이미 존재하는 항목입니다.\n\n중복 등록은 허용되지 않습니다.');
+        }
+
+        document.addEventListener('click', blockDuplicateCreate, true);
+
+        document.addEventListener('submit', function(event){
+            if (!isCategoryPage()) return;
+            var form = event.target;
+            if (!form || form.id !== 'system-add-form') return;
+            var key = extractAddFormKey();
+            if (!key) return;
+            if (!hasDuplicateInTable(key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            showCategoryPolicyError('이미 존재하는 항목입니다.\n\n중복 등록은 허용되지 않습니다.');
+        }, true);
+
+        var duplicateObserver = null;
+        function bindRemovalObserver(){
+            if (!isCategoryPage()) return;
+            try {
+                if (duplicateObserver) return;
+                duplicateObserver = new MutationObserver(function(){ removeDuplicateUI(); });
+                duplicateObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+            } catch(_e){}
+        }
+
+        function runRemoval(){
+            removeDuplicateUI();
+            bindRemovalObserver();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runRemoval);
+        } else {
+            runRemoval();
+        }
+        document.addEventListener('blossom:pageLoaded', function(){
+            setTimeout(runRemoval, 0);
+            setTimeout(runRemoval, 120);
+        });
+    } catch(_e){}
+})();
 
 /* §0 ── FK Session Cache ───────────────────────────────────── */
 /**
@@ -575,6 +1019,142 @@ ensureSecurityModalApi();
         getAll: function(){ return _perms || {}; },
         getExports: function(){ return _exports || {}; }
     };
+})();
+
+/* §29 ── Common Delete Modal Normalizer ───────────────────── */
+(function(){
+    function isSystemPagePath(){
+        try{
+            var p = String(window.location.pathname || '');
+            if (!p) return false;
+            // Keep system pages untouched as requested.
+            return p.indexOf('dc_data_deletion_system') >= 0 || /(^|\/|_)system($|\/|_)/i.test(p);
+        }catch(_e){ return false; }
+    }
+
+    function closeModalElement(modal){
+        if(!modal) return;
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+        if(!document.querySelector('.modal-overlay-full.show')){
+            document.body.classList.remove('modal-open');
+        }
+    }
+
+    function normalizeDeleteModal(modal){
+        if(!modal || modal.dataset.commonDeleteNormalized === '1') return;
+
+        var isInsight = modal.id === 'insight-delete-modal';
+        var closeId = isInsight ? 'insight-delete-close' : 'system-delete-close';
+        var confirmId = isInsight ? 'insight-delete-confirm' : 'system-delete-confirm';
+        var cancelId = isInsight ? 'insight-delete-cancel' : 'system-delete-cancel';
+        var subtitleId = isInsight ? 'insight-delete-subtitle' : 'delete-subtitle';
+        var msgId = isInsight ? 'insight-delete-msg' : 'delete-msg';
+
+        var content = modal.querySelector('.server-add-content');
+        if(content) content.style.maxWidth = '640px';
+
+        var subtitle = document.getElementById(subtitleId) || modal.querySelector('.server-add-subtitle');
+        if(subtitle && !subtitle.id) subtitle.id = subtitleId;
+
+        var disposeText = modal.querySelector('.dispose-text');
+        if(disposeText){
+            var firstP = disposeText.querySelector('p');
+            if(!firstP){
+                firstP = document.createElement('p');
+                disposeText.appendChild(firstP);
+            }
+            if(!firstP.id) firstP.id = msgId;
+            if(!String(firstP.textContent || '').trim()) firstP.textContent = '선택한 기록을 삭제하시겠습니까?';
+
+            // Remove legacy guidance line requested by product.
+            Array.from(disposeText.querySelectorAll('p')).forEach(function(p){
+                var txt = String(p.textContent || '').trim();
+                if(txt.indexOf('실제 삭제 방식은 추후 설정에 따라 결정됩니다') >= 0){
+                    p.remove();
+                    return;
+                }
+                if(txt === '삭제처리는 선택한 서버를 데이터에서 제거하기 위한 사전 확인 단계입니다.' ||
+                   txt === '확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.'){
+                    p.style.fontSize = '13px';
+                    p.style.lineHeight = '1.45';
+                }
+            });
+
+            var warnP = disposeText.querySelector('p[data-common-delete="warn"]');
+            if(!warnP){
+                warnP = document.createElement('p');
+                warnP.setAttribute('data-common-delete', 'warn');
+                disposeText.appendChild(warnP);
+            }
+            warnP.textContent = '삭제된 데이터는 복구할 수 없습니다.';
+            warnP.style.marginTop = '8px';
+            warnP.style.fontSize = '13px';
+            warnP.style.color = '#94a3b8';
+        }
+
+        var illustImg = modal.querySelector('.dispose-illust img');
+        if(illustImg){
+            illustImg.src = '/static/image/svg/list/free-sticker-process.svg';
+            illustImg.alt = 'Delete Illustration';
+        }
+
+        var actions = modal.querySelector('.action-buttons.right') || modal.querySelector('.action-buttons');
+        var confirmBtn = document.getElementById(confirmId) || (actions ? actions.querySelector('button:last-of-type') : null);
+        if(confirmBtn){
+            confirmBtn.id = confirmId;
+            confirmBtn.classList.remove('btn-primary');
+            confirmBtn.classList.add('btn-danger');
+            confirmBtn.textContent = '삭제';
+        }
+
+        if(actions){
+            var cancelBtn = document.getElementById(cancelId) || actions.querySelector('#' + cancelId);
+            if(!cancelBtn){
+                cancelBtn = document.createElement('button');
+                cancelBtn.type = 'button';
+                cancelBtn.id = cancelId;
+                cancelBtn.className = 'btn-secondary';
+                cancelBtn.textContent = '취소';
+                if(confirmBtn && confirmBtn.parentNode === actions) actions.insertBefore(cancelBtn, confirmBtn);
+                else actions.appendChild(cancelBtn);
+            }
+            if(cancelBtn.dataset.commonDeleteBound !== '1'){
+                cancelBtn.addEventListener('click', function(){ closeModalElement(modal); });
+                cancelBtn.dataset.commonDeleteBound = '1';
+            }
+        }
+
+        modal.dataset.commonDeleteNormalized = '1';
+    }
+
+    function applyCommonDeleteModal(){
+        if(isSystemPagePath()) return;
+        var modals = document.querySelectorAll('#system-delete-modal, #insight-delete-modal');
+        if(!modals || !modals.length) return;
+        modals.forEach(normalizeDeleteModal);
+    }
+
+    document.addEventListener('DOMContentLoaded', applyCommonDeleteModal);
+    document.addEventListener('blossom:pageLoaded', applyCommonDeleteModal);
+})();
+
+/* §30 ── Common Alert Modal Normalizer ────────────────────── */
+(function(){
+    function normalizeAlertModal(modal){
+        if(!modal || modal.dataset.commonAlertNormalized === '1') return;
+        var content = modal.querySelector('.server-add-content');
+        if(content) content.style.maxWidth = '640px';
+        modal.dataset.commonAlertNormalized = '1';
+    }
+
+    function applyCommonAlertModal(){
+        document.querySelectorAll('.bls-download-modal--message, .system-message-modal')
+            .forEach(normalizeAlertModal);
+    }
+
+    document.addEventListener('DOMContentLoaded', applyCommonAlertModal);
+    document.addEventListener('blossom:pageLoaded', applyCommonAlertModal);
 })();
 
 // 페이지 로드 시 자동으로 권한 로드
@@ -2016,7 +2596,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wrap = document.createElement('div');
                 wrap.innerHTML = `
         <div id="system-message-modal" class="server-add-modal system-message-modal modal-overlay-full" aria-hidden="true">
-            <div class="server-add-content">
+            <div class="server-add-content" style="max-width:640px">
                 <div class="server-add-header">
                     <div class="server-add-title">
                         <h3 id="message-title">알림</h3>
@@ -2555,16 +3135,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Prevent browser form-history dropdowns (autocomplete) inside standard modals.
-// Note: browsers may not honor autocomplete=off in all cases, but this reduces it significantly.
+// Prevent browser form-history dropdowns and spelling/grammar underlines on text inputs.
+// Note: some browsers/extensions partially ignore attributes, so re-apply them on focus as well.
 document.addEventListener('DOMContentLoaded', () => {
     try {
         const MODAL_SELECTOR = '.server-add-modal, .server-edit-modal, .system-add-modal, .system-edit-modal';
         const CONTROL_SELECTOR = 'input, textarea, select';
+        const TEXT_SELECTOR = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]), textarea, [contenteditable="true"]';
 
         const shouldSkipInputType = (type) => {
             const t = (type || 'text').toLowerCase();
             return ['hidden', 'checkbox', 'radio', 'button', 'submit', 'reset', 'file'].includes(t);
+        };
+
+        const applyTextInputGuards = (el) => {
+            if (!el || el.nodeType !== 1) return;
+
+            try { el.setAttribute('autocomplete', 'off'); } catch (_e) {}
+            try { el.setAttribute('autocapitalize', 'off'); } catch (_e) {}
+            try { el.setAttribute('autocorrect', 'off'); } catch (_e) {}
+            try { el.setAttribute('spellcheck', 'false'); } catch (_e) {}
+            try { el.setAttribute('data-gramm', 'false'); } catch (_e) {}
+            try { el.setAttribute('data-gramm_editor', 'false'); } catch (_e) {}
+            try { el.setAttribute('data-enable-grammarly', 'false'); } catch (_e) {}
+
+            try { if ('spellcheck' in el) el.spellcheck = false; } catch (_e) {}
+            try { if ('autocorrect' in el) el.autocorrect = 'off'; } catch (_e) {}
+            try { if ('autocapitalize' in el) el.autocapitalize = 'off'; } catch (_e) {}
+        };
+
+        const applyTextGuardsInScope = (root, selector) => {
+            const scope = root && root.querySelectorAll ? root : document;
+            scope.querySelectorAll(selector).forEach((el) => {
+                if (el.tagName === 'INPUT' && shouldSkipInputType(el.getAttribute('type'))) return;
+                applyTextInputGuards(el);
+            });
         };
 
         const applyToRoot = (root) => {
@@ -2578,14 +3183,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ensure control-level attributes are disabled
             scope.querySelectorAll(`${MODAL_SELECTOR} ${CONTROL_SELECTOR}`).forEach((el) => {
                 if (el.tagName === 'INPUT' && shouldSkipInputType(el.getAttribute('type'))) return;
-                el.setAttribute('autocomplete', 'off');
-                el.setAttribute('autocapitalize', 'off');
-                el.setAttribute('autocorrect', 'off');
-                el.setAttribute('spellcheck', 'false');
+                applyTextInputGuards(el);
             });
+
+            // Also guard all ordinary text inputs across the app so red spellcheck underlines never appear while typing.
+            applyTextGuardsInScope(scope, TEXT_SELECTOR);
         };
 
         applyToRoot(document);
+
+        document.addEventListener('focusin', (event) => {
+            const target = event && event.target;
+            if (!target || typeof target.matches !== 'function') return;
+            if (!target.matches(TEXT_SELECTOR)) return;
+            if (target.tagName === 'INPUT' && shouldSkipInputType(target.getAttribute('type'))) return;
+            applyTextInputGuards(target);
+        }, true);
 
         // Handle dynamically injected modal forms/inputs (common for edit modals)
         if (document.body && window.MutationObserver) {
@@ -2598,6 +3211,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const hasModal = !!(el && typeof el.querySelector === 'function' && el.querySelector(MODAL_SELECTOR));
                         if (hasMatches || hasModal) {
                             applyToRoot(el);
+                            continue;
+                        }
+                        if (typeof el.matches === 'function' && el.matches(TEXT_SELECTOR)) {
+                            applyTextInputGuards(el);
+                        }
+                        if (typeof el.querySelector === 'function') {
+                            applyTextGuardsInScope(el, TEXT_SELECTOR);
                         }
                     }
                 }
@@ -2780,12 +3400,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 검색 버튼: 모달 비활성화, 기본 이동만 허용
-    const searchBtn = document.getElementById('btn-search');
-    if (searchBtn) {
-        searchBtn.addEventListener('click', (e) => {
-            // 검색 기능은 아직 SPA 전용 라우트가 없으므로 현재 동작 유지
+    // 통합 검색: 헤더 입력창 제출 시 검색 결과 페이지로 이동
+    const headerSearchForm = document.getElementById('header-search-form');
+    const headerSearchInput = document.getElementById('header-search-input');
+    if (headerSearchForm && headerSearchInput) {
+        headerSearchForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            const q = (headerSearchInput.value || '').trim();
+            try {
+                if (q) sessionStorage.setItem('bls_unified_search_q', q);
+                else sessionStorage.removeItem('bls_unified_search_q');
+            } catch (_ignore) {}
+
+            if (window.location && window.location.pathname === '/addon/search') {
+                try {
+                    window.dispatchEvent(new CustomEvent('bls:search-submit', { detail: { q: q } }));
+                } catch (_ignore2) {}
+                return;
+            }
+
+            const target = '/addon/search';
+            if (typeof window.blsSpaNavigate === 'function') {
+                window.blsSpaNavigate(target);
+            } else {
+                window.location.href = target;
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '');
+            const isEditable = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
+
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                headerSearchInput.focus();
+                headerSearchInput.select();
+                return;
+            }
+
+            if (!isEditable && e.key === '/') {
+                e.preventDefault();
+                headerSearchInput.focus();
+            }
         });
     }
 
@@ -2856,6 +3512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dropdown.className = 'account-dropdown';
             dropdown.innerHTML = `
                 <div class="dropdown-item" data-action="profile">프로필</div>
+                <div class="dropdown-item" data-action="terms">약관</div>
                 <div class="dropdown-item" data-action="logout">로그아웃</div>
             `;
 
@@ -2882,6 +3539,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         window.location.href = '/settings/profile';
                     }
+                } else if (action === 'terms') {
+                    window.location.href = '/terms';
                 } else if (action === 'logout') {
                     window.location.href = '/logout';
                 }
@@ -2903,6 +3562,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (function syncAvatarOnLoad(){
         const LS_GLOBAL_IMG = 'blossom.profileImageSrc';
         const LS_EMP = 'blossom.currentEmpNo';
+        const DEFAULT_PROFILE_AVATAR = '/static/image/svg/profil/free-icon-bussiness-man.svg';
 
         // 사용자별(사번별)로 아바타를 저장해야 다른 계정/데모 사용자로
         // 접속했을 때 헤더 아이콘이 바뀌는 문제가 발생하지 않는다.
@@ -2936,7 +3596,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (_e) {}
 
-        function applyAvatar(src){
+        function setAvatarElements(src){
             if (!src) return;
             // 헤더 이미지: 기본 우선(.header-avatar-icon), 없으면 #btn-account 내 img로 대체
             let headerImg = document.querySelector('#btn-account .header-avatar-icon');
@@ -2950,6 +3610,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (profileAvatar) {
                 profileAvatar.style.backgroundImage = `url('${src}')`;
             }
+        }
+
+        function applyAvatar(src, fallbackSrc){
+            const candidate = String(src || '').trim();
+            const fallback = String(fallbackSrc || DEFAULT_PROFILE_AVATAR).trim() || DEFAULT_PROFILE_AVATAR;
+            const finalSrc = candidate || fallback;
+            const probe = new Image();
+            probe.onload = function(){ setAvatarElements(finalSrc); };
+            probe.onerror = function(){
+                setAvatarElements(fallback);
+                try {
+                    localStorage.setItem(LS_IMG, fallback);
+                    localStorage.setItem(LS_GLOBAL_IMG, fallback);
+                } catch (_e) {}
+            };
+            probe.src = finalSrc;
         }
 
         try {
@@ -2967,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const resolved = localStorage.getItem(LS_IMG);
             if (resolved) {
-                applyAvatar(resolved);
+                applyAvatar(resolved, DEFAULT_PROFILE_AVATAR);
                 return;
             }
 
@@ -2976,17 +3652,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!headerImg) headerImg = document.querySelector('#btn-account img');
             const templateSrc = headerImg ? headerImg.getAttribute('src') : null;
             const debugAttr = headerImg ? headerImg.getAttribute('data-debug-avatar') : null;
-            const fallbackSrc = debugAttr || templateSrc;
+            const fallbackSrc = debugAttr || templateSrc || DEFAULT_PROFILE_AVATAR;
             if (fallbackSrc) {
                 try { localStorage.setItem(LS_IMG, fallbackSrc); } catch (_e) {}
-                applyAvatar(fallbackSrc);
+                applyAvatar(fallbackSrc, DEFAULT_PROFILE_AVATAR);
             }
         } catch (_e) {}
 
         // 다른 탭/페이지에서 변경 시 실시간 반영
         window.addEventListener('storage', (e) => {
             if (e && e.key === LS_IMG) {
-                applyAvatar(e.newValue);
+                applyAvatar(e.newValue, DEFAULT_PROFILE_AVATAR);
             }
         });
 
@@ -3010,7 +3686,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 호환을 위해 전역 키도 갱신(단, 현재 사용자에 한함)
                     localStorage.setItem(LS_GLOBAL_IMG, src);
                 } catch (_e) {}
-                applyAvatar(src);
+                applyAvatar(src, DEFAULT_PROFILE_AVATAR);
             }
         });
     })();
@@ -3260,40 +3936,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 서브메뉴 토글 기능
-    const submenuTriggers = document.querySelectorAll('.submenu-trigger');
-    
-    submenuTriggers.forEach(trigger => {
-        trigger.addEventListener('click', (e) => {
+    // 서브메뉴 토글 기능 — 이벤트 위임 방식 (SPA 부팅 타이밍 문제 방지)
+    var _sidebarEl = document.getElementById('sidebar');
+    if (_sidebarEl) {
+        _sidebarEl.addEventListener('click', function (e) {
+            var trigger = e.target.closest('.submenu-trigger');
+            if (!trigger) return;
             e.preventDefault();
             e.stopPropagation();
-            
-            const menuItem = trigger.closest('.menu-item');
-            const submenu = menuItem.querySelector('.submenu');
-            const arrow = trigger.querySelector('.submenu-arrow');
-            
+
+            var menuItem = trigger.closest('.menu-item');
+            if (!menuItem) return;
+            var submenu = menuItem.querySelector('.submenu');
+            if (!submenu) return;
+
             // 다른 열린 서브메뉴 닫기
-            const openSubmenus = document.querySelectorAll('.menu-item.has-submenu.open');
-            openSubmenus.forEach(openItem => {
+            var openSubmenus = document.querySelectorAll('.menu-item.has-submenu.open');
+            openSubmenus.forEach(function (openItem) {
                 if (openItem !== menuItem) {
                     openItem.classList.remove('open');
+                    var openSub = openItem.querySelector('.submenu');
+                    if (openSub) openSub.style.maxHeight = '0';
                 }
             });
-            
+
             // 현재 서브메뉴 토글
             menuItem.classList.toggle('open');
-            
+
             // 애니메이션 효과
             if (menuItem.classList.contains('open')) {
                 submenu.style.maxHeight = submenu.scrollHeight + 'px';
             } else {
                 submenu.style.maxHeight = '0';
             }
-            
+
             // 서브메뉴 상태를 로컬 스토리지에 저장
             saveSubmenuState();
         });
-    });
+    }
+
+    // 사이드바 <a> 링크 클릭 — 이벤트 위임 (개별 바인딩 대신)
+    // 개별 바인딩은 DOMContentLoaded 시점 이후 SPA content swap 등으로
+    // 핸들러가 누락될 수 있으므로 capture 단계에서 위임 방식으로 처리
+    if (_sidebarEl) {
+        _sidebarEl.addEventListener('click', function (e) {
+            var link = e.target.closest('a.menu-link, a.submenu-link');
+            if (!link) return;
+            var href = link.getAttribute('href');
+            if (!href) return;
+            // SPA 인터셉트 불가 → 브라우저 기본 동작 (native navigation)
+            if (typeof __spaCanIntercept !== 'function' || !__spaCanIntercept(href)) return;
+            // modifier 키 → 새 탭 등 허용
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            // 같은 페이지면 무시
+            try {
+                var tu = new URL(href, location.origin);
+                if (tu.pathname === location.pathname && tu.search === location.search) return;
+            } catch (_eu) {}
+            if (typeof __spaNavigate === 'function') {
+                __spaNavigate(href);
+            } else {
+                window.location.href = href;
+            }
+        }, true); // capture: true — 개별 바인딩 핸들러보다 먼저 실행
+
+        // 사이드바 hover prefetch — 이벤트 위임
+        _sidebarEl.addEventListener('mouseenter', function (e) {
+            var link = e.target.closest('a.menu-link, a.submenu-link');
+            if (!link) return;
+            var href = link.getAttribute('href');
+            if (href && typeof __spaPrefetch === 'function') __spaPrefetch(href);
+        }, { capture: true, passive: true });
+    }
     
     // 서브메뉴 상태 저장 함수
     function saveSubmenuState() {
@@ -3379,7 +4095,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sidebar = document.getElementById('sidebar');
             const sidebarToggle = document.getElementById('sidebar-toggle');
             
-            if (sidebar && !sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+            if (sidebar && !sidebar.contains(e.target) && (!sidebarToggle || !sidebarToggle.contains(e.target))) {
                 sidebar.classList.remove('mobile-open');
             }
         }
@@ -3449,6 +4165,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (/^\/(login|logout|signup|register|reset-password|terms)(\?|$)/i.test(href)) return false;
         try {
             var url = new URL(href, location.origin);
+            // 업무 그룹 상세 7개 탭은 SPA 전환 시 간헐적으로 스켈레톤이 고정되는 이슈가 있어
+            // 안정성을 위해 항상 풀 페이지 이동으로 처리한다.
+            if (/^\/p\/cat_business_group_(detail|manager|system|service|task|log|file)$/.test(url.pathname)) return false;
+            // 비즈니스 대시보드는 첫 진입 레이아웃 안정성을 위해 항상 풀 리로드로 진입한다.
+            if (url.pathname === '/p/cat_business_dashboard') return false;
             var ok = false;
             for (var pi = 0; pi < __spaRoutePrefixes.length; pi++) {
                 if (url.pathname.startsWith(__spaRoutePrefixes[pi]) || url.pathname === __spaRoutePrefixes[pi].replace(/\/$/, '')) {
@@ -3567,10 +4288,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
         } catch (_e) {}
 
-        // CSS 동기화 (detail*.css 등 페이지별 CSS)
+        // CSS 동기화 (페이지별 CSS)
         try {
             var wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
-            var haveHrefs = new Set(Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]')).map(function (el) { return el.getAttribute('href') || ''; }));
+            var wantHrefs = new Set(wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+            var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+            var haveHrefs = new Set(haveLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+            var coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
+            haveLinks.forEach(function (el) {
+                var eh = el.getAttribute('href') || '';
+                if (!eh || wantHrefs.has(eh) || coreCssPat.test(eh)) return;
+                try { el.remove(); } catch (_e) {}
+            });
             var refNode = null;
             try {
                 var hlnks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
@@ -3634,7 +4363,10 @@ document.addEventListener('DOMContentLoaded', () => {
             var src = s.getAttribute('src');
             if (src) {
                 var baseSrc = src.split('?')[0];
-                if (window.__blossomLoadedScripts.has(baseSrc)) continue;
+                // _detail/ 스크립트: blossom:pageLoaded 이벤트 위임 패턴 → 캐시 허용 (idempotent guard 있음)
+                // 나머지 페이지별 스크립트: DOM 직접 바인딩 IIFE → SPA 전환마다 재실행
+                var forceReload = !/\/static\/js\/_detail\//.test(baseSrc);
+                if (!forceReload && window.__blossomLoadedScripts.has(baseSrc)) continue;
                 if (/\/static\/js\/blossom\.js/.test(baseSrc)) continue;
                 loads.push((function (origSrc, base) {
                     return function () {
@@ -3652,7 +4384,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 loads.push((function (code) {
                     return function () {
                         return new Promise(function (resolve) {
-                            try { (0, eval)(code); } catch (e) { console.warn('[spa] inline script error', e); }
+                            try {
+                                var tag = document.createElement('script');
+                                tag.textContent = code;
+                                document.head.appendChild(tag);
+                                try { tag.remove(); } catch (_re) {}
+                            } catch (e) { console.warn('[spa] inline script error', e); }
                             resolve();
                         });
                     };
@@ -3679,9 +4416,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.documentElement.classList.add('spa-loading');
 
         __spaFetchPage(href).then(function (html) {
-            // 이전 페이지의 스크립트 캐시 삭제하여 재방문 시 재실행 보장
-            // (blossom.js 자체는 __spaLoadScripts에서 항상 스킵)
-            window.__blossomLoadedScripts = new Set();
             var result = __spaSwapMain(html, href);
             history.pushState({ spa: true, href: href }, '', href);
 
@@ -3762,35 +4496,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 사이드바 링크에 SPA 네비게이션 바인딩
+    // 사이드바 링크에 SPA 네비게이션 바인딩 (이벤트 위임으로 상단에서 처리됨)
     var sidebarLinks = document.querySelectorAll('#sidebar a.menu-link, #sidebar a.submenu-link');
-    sidebarLinks.forEach(function (a) {
-        // Hover prefetch
-        a.addEventListener('mouseenter', function () {
-            var href = a.getAttribute('href');
-            if (href) __spaPrefetch(href);
-        }, { passive: true });
-
-        // Click -> SPA navigation
-        a.addEventListener('click', function (e) {
-            var href = a.getAttribute('href');
-            if (!__spaCanIntercept(href)) return; // native fallback
-            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // 새 탭 등 허용
-            e.preventDefault();
-            e.stopPropagation();
-            // 같은 페이지면 무시
-            try {
-                var tu = new URL(href, location.origin);
-                if (tu.pathname === location.pathname && tu.search === location.search) return;
-            } catch (_e) {}
-            __spaNavigate(href);
-        }, { capture: true });
-    });
 
     // ---- Tab-level SPA Navigation (.system-tab-btn) ----
     // 가로 탭(온프레미스/클라우드/프레임 등) 클릭 시 .tab-content 영역만 교체.
     // page-header, system-tabs 탭 바는 유지하여 최소 렌더링으로 체감 속도 개선.
     function __spaTabNavigate(href, clickedTab) {
+        var nextKey = '';
+        try {
+            var nextUrl = new URL(href, location.origin);
+            var nextPath = nextUrl.pathname || '';
+            var nextMatch = nextPath.match(/^\/p\/([^/?#]+)/);
+            nextKey = nextMatch ? (nextMatch[1] || '') : '';
+        } catch (_e) {}
+        var isDatacenterTab = /^dc_/.test(nextKey);
+
         // 1. 즉시 active 탭 전환 (100ms 이내 시각 반응)
         var tabBar = clickedTab ? clickedTab.closest('.system-tabs') : null;
         if (tabBar) {
@@ -3809,7 +4530,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. tab-content 영역에 skeleton 즉시 표시
         var tabContent = document.querySelector('.tab-content');
-        if (tabContent) {
+        if (tabContent && !isDatacenterTab) {
             tabContent.setAttribute('aria-busy', 'true');
             tabContent.innerHTML = '<div class="spa-skeleton">'
                 + '<div class="spa-skeleton-bar" style="width:60%"></div>'
@@ -3824,7 +4545,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 5. 페이지 fetch (캐시 활용)
         __spaFetchPage(href).then(function (html) {
-            window.__blossomLoadedScripts = new Set();
             var parser = new DOMParser();
             var doc = parser.parseFromString(html, 'text/html');
 
@@ -3832,14 +4552,50 @@ document.addEventListener('DOMContentLoaded', () => {
             var newTabContent = doc.querySelector('.tab-content');
             var currentTabContent = document.querySelector('.tab-content');
             if (!newTabContent || !currentTabContent) {
-                // fallback: 전체 main 교체
-                __spaSwapMain(html, href);
+                // fallback: 전체 main 교체 — __spaNavigate와 동일 패턴
+                var result = __spaSwapMain(html, href);
+                history.pushState({ spa: true, href: href, tab: true }, '', href);
+                return __spaLoadScripts(result.doc).then(function () {
+                    try {
+                        document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
+                            detail: { href: href, title: document.title, timestamp: Date.now() }
+                        }));
+                    } catch (_e) {}
+                    try { document.dispatchEvent(new CustomEvent('blossom:spa:navigated', { detail: { href: href } })); } catch (_e) {}
+                    try { if (typeof applyActiveMenuHighlight === 'function') applyActiveMenuHighlight(); } catch (_e) {}
+                    try { if (typeof updateAllCountBadges === 'function') updateAllCountBadges(); } catch (_e) {}
+                    try { if (typeof initializeToggleBadges === 'function') initializeToggleBadges(); } catch (_e) {}
+                    try { if (typeof normalizeBookSticker === 'function') normalizeBookSticker(); } catch (_e) {}
+                    try { if (typeof runStickerGuard === 'function') runStickerGuard(); } catch (_e) {}
+                    try { if (typeof scheduleInfoDedup === 'function') scheduleInfoDedup(); } catch (_e) {}
+                    setTimeout(function () { try { if (typeof dedupeInfoWidgets === 'function') dedupeInfoWidgets('final'); } catch (_e) {} }, 150);
+                    setTimeout(function () { try { if (typeof normalizeBookSticker === 'function') normalizeBookSticker(); } catch (_e) {} }, 150);
+                    document.documentElement.classList.remove('spa-loading');
+                });
             } else {
                 currentTabContent.replaceWith(newTabContent);
                 newTabContent.classList.add('spa-fade-in');
                 newTabContent.addEventListener('animationend', function () {
                     newTabContent.classList.remove('spa-fade-in');
                 }, { once: true });
+
+                // <main> data 속성 동기화 — 탭 전환 시 init guard·opex-type 등 갱신
+                try {
+                    var newMain = doc.querySelector('main.main-content');
+                    var curMain = document.querySelector('main.main-content');
+                    if (newMain && curMain) {
+                        var oldAttrs = [];
+                        for (var ai = 0; ai < curMain.attributes.length; ai++) {
+                            if (curMain.attributes[ai].name.indexOf('data-') === 0) oldAttrs.push(curMain.attributes[ai].name);
+                        }
+                        oldAttrs.forEach(function (n) { curMain.removeAttribute(n); });
+                        for (var bi = 0; bi < newMain.attributes.length; bi++) {
+                            if (newMain.attributes[bi].name.indexOf('data-') === 0) {
+                                curMain.setAttribute(newMain.attributes[bi].name, newMain.attributes[bi].value);
+                            }
+                        }
+                    }
+                } catch (_e) {}
             }
 
             // 6-b. page-header 교체 (동적 탭 간 이동 시 타이틀/설명 갱신)
@@ -3870,6 +4626,28 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 var newTitle = doc.querySelector('title');
                 if (newTitle) document.title = newTitle.textContent.trim();
+            } catch (_e) {}
+
+            // 8-b. CSS 동기화 — 관리자 설정 탭 전환 시 페이지 전용 CSS 교체
+            try {
+                var _coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
+                var _wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
+                var _wantHrefs = new Set(_wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                var _haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+                _haveLinks.forEach(function (el) {
+                    var h = el.getAttribute('href') || '';
+                    if (!h || _wantHrefs.has(h) || _coreCssPat.test(h)) return;
+                    el.remove();
+                });
+                var _freshHrefs = new Set(Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]')).map(function (el) { return el.getAttribute('href') || ''; }));
+                _wantLinks.forEach(function (wl) {
+                    var wh = wl.getAttribute('href') || '';
+                    if (!wh || _freshHrefs.has(wh)) return;
+                    var nl = document.createElement('link');
+                    nl.rel = 'stylesheet';
+                    nl.href = wh;
+                    document.head.appendChild(nl);
+                });
             } catch (_e) {}
 
             // 9. History push
@@ -3960,7 +4738,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 4. 페이지 fetch (캐시 활용)
         __spaFetchPage(href).then(function (html) {
-            window.__blossomLoadedScripts = new Set();
             var parser = new DOMParser();
             var doc = parser.parseFromString(html, 'text/html');
 
@@ -4024,19 +4801,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 5-c. CSS 동기화 — 새 탭 전용 CSS 추가 + 이전 탭 전용 CSS 제거
             try {
-                var _coreCssPat = /blossom\.css|detail\.css|sidebar|header/;
+                var _coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
                 var wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
                 var wantHrefs = new Set(wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
                 var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
                 var haveHrefs = new Set(haveLinks.map(function (el) { return el.getAttribute('href') || ''; }));
-                // 이전 탭 전용 CSS 제거 (공통 CSS는 유지)
+                // 이전 페이지 전용 CSS 제거 (공통 CSS는 유지)
                 haveLinks.forEach(function (el) {
                     var h = el.getAttribute('href') || '';
                     if (!h || wantHrefs.has(h) || _coreCssPat.test(h)) return;
-                    // tab/detail 전용 CSS만 제거 (공통은 보존)
-                    if (/tab\d|file\.css|bay\.css|zone\.css|opex|capex|assign|basic-storage|log\.css|task\.css|package\.css/.test(h)) {
-                        el.remove();
-                    }
+                    el.remove();
                 });
                 // 새 탭 전용 CSS 추가
                 wantLinks.forEach(function (wl) {
@@ -4067,29 +4841,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 7. 스크립트 로드 (DCL 인터셉트 포함)
             return __spaLoadScripts(doc).then(function () {
-                // 7-a. 탭 모듈 재초기화 — SPA에서 스크립트가 로드되었으나
-                //      readyState 검사로 init()가 즉시 호출되지 않는 경우를 보완.
-                try {
-                    var _tabModules = [
-                        'BlossomTab01Hardware', 'BlossomTab02Software', 'BlossomTab03Backup',
-                        'BlossomTab04Interface', 'BlossomTab05Account', 'BlossomTab06Authority',
-                        'BlossomTab07Activate', 'BlossomTab08Firewalld',
-                        'BlossomTab12Vulnerability', 'BlossomTab13Package'
-                    ];
-                    _tabModules.forEach(function (name) {
-                        try {
-                            var mod = window[name];
-                            if (mod && typeof mod.init === 'function') mod.init();
-                        } catch (_eTab) {}
-                    });
-                    // 함수형 init 패턴 (tab10, tab11)
-                    try { if (typeof window.__blsInitTab10Storage === 'function') window.__blsInitTab10Storage(); } catch (_e) {}
-                    try { if (typeof window.__blsInitTab11Task === 'function') window.__blsInitTab11Task(); } catch (_e) {}
-                    // initFromPage 패턴 (tab14, tab15)
-                    try { var t14 = window.BlossomTab14Log; if (t14 && typeof t14.initFromPage === 'function') t14.initFromPage(); } catch (_e) {}
-                    try { var t15 = window.BlossomTab15File; if (t15 && typeof t15.initFromPage === 'function') t15.initFromPage(); } catch (_e) {}
-                } catch (_eInit) {}
-
                 try {
                     document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
                         detail: { href: href, title: document.title, timestamp: Date.now() }
@@ -4244,32 +4995,25 @@ document.addEventListener('DOMContentLoaded', () => {
         var bootMain = document.querySelector('main.main-content[data-spa-boot]');
         if (!bootMain) return;
         var href = location.pathname + location.search + location.hash;
+        var bootRecovered = false;
         document.documentElement.classList.add('spa-loading');
+
+        // 일부 환경에서 최초 boot fetch 후 스켈레톤이 남는 경우가 있어 1회 자동 복구
+        setTimeout(function () {
+            try {
+                var stillBoot = document.querySelector('main.main-content[data-spa-boot]');
+                if (!stillBoot || bootRecovered) return;
+                bootRecovered = true;
+                console.warn('[spa-boot] skeleton stuck, retry navigate', href);
+                __spaNavigate(href);
+            } catch (_e) {}
+        }, 1800);
+
         __spaFetchPage(href).then(function (html) {
-            window.__blossomLoadedScripts = new Set();
             var result = __spaSwapMain(html, href);
             // replaceState (pushState가 아님 — URL은 이미 올바름)
             history.replaceState({ spa: true, href: href }, '', href);
             return __spaLoadScripts(result.doc).then(function () {
-                // 탭 모듈 재초기화 안전망
-                try {
-                    var _tabModules = [
-                        'BlossomTab01Hardware', 'BlossomTab02Software', 'BlossomTab03Backup',
-                        'BlossomTab04Interface', 'BlossomTab05Account', 'BlossomTab06Authority',
-                        'BlossomTab07Activate', 'BlossomTab08Firewalld',
-                        'BlossomTab12Vulnerability', 'BlossomTab13Package'
-                    ];
-                    _tabModules.forEach(function (name) {
-                        try {
-                            var mod = window[name];
-                            if (mod && typeof mod.init === 'function') mod.init();
-                        } catch (_eTab) {}
-                    });
-                    try { if (typeof window.__blsInitTab10Storage === 'function') window.__blsInitTab10Storage(); } catch (_e) {}
-                    try { if (typeof window.__blsInitTab11Task === 'function') window.__blsInitTab11Task(); } catch (_e) {}
-                    try { var t14 = window.BlossomTab14Log; if (t14 && typeof t14.initFromPage === 'function') t14.initFromPage(); } catch (_e) {}
-                    try { var t15 = window.BlossomTab15File; if (t15 && typeof t15.initFromPage === 'function') t15.initFromPage(); } catch (_e) {}
-                } catch (_eInit) {}
                 try {
                     document.dispatchEvent(new CustomEvent('blossom:pageLoaded', {
                         detail: { href: href, title: document.title, timestamp: Date.now() }
@@ -4645,7 +5389,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const src = s.getAttribute('src');
                     if(src){
                         const baseSrc = src.split('?')[0];
-                        if(window.__blossomLoadedScripts.has(baseSrc)) continue; // 캐시 파라미터 무시 중복 차단
+                        // _detail/ 스크립트만 캐시 허용, 나머지는 DOM 재바인딩 위해 매 전환마다 재실행
+                        const forceReload = !/\/static\/js\/_detail\//.test(baseSrc);
+                        if(!forceReload && window.__blossomLoadedScripts.has(baseSrc)) continue; // 캐시 파라미터 무시 중복 차단
                         if(/\/static\/js\/blossom\.js/.test(baseSrc)) continue; // 핵심 스크립트 제외
                         sequentialLoads.push(() => new Promise((resolve)=>{
                             const tag = document.createElement('script');
@@ -4893,7 +5639,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function isCategoryKey(key) {
         var s = String(key || '');
         if (!/^cat_/.test(s)) return false;
-        return /_(detail|system|manager|service|task|log|file|hardware|software|component|maintenance)$/.test(s);
+        // Vendor list keys (cat_vendor_manufacturer / cat_vendor_maintenance) are list pages,
+        // not detail-tab keys. Treating them as category tab keys causes wrong script injection.
+        if (s === 'cat_vendor_manufacturer' || s === 'cat_vendor_maintenance') return false;
+        return /_(detail|system|manager|service|task|log|file|hardware|software|component)$/.test(s);
     }
 
     function isProjectListKey(key) {
@@ -4917,7 +5666,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isSpaTabKey(key) {
-        return isCostKey(key) || isCategoryKey(key) || isProjectListKey(key) || isGovernanceDetailKey(key);
+        // Cost partial router must stay scoped to cost pages only.
+        // Category/Project/Governance tabs are handled by the global SPA routers above.
+        return isCostKey(key);
     }
 
     function setBusy(busy) {
@@ -5228,8 +5979,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (k === 'proj_participating') return ['/static/js/8.project/8-1.project/8-1-2.participating_project/1.participating_project.js?v=20260306'];
         if (k === 'proj_completed') return ['/static/js/8.project/8-1.project/8-1-3.project_list/1.project_list.js?v=20260216_1'];
         // CAPEX list pages
-        if (/^cost_capex_(hardware|software|etc)$/.test(k)) return ['/static/js/7.cost/7-2.capex/capex_contract_list.js?v=20260214-5'];
-        if (k === 'cost_capex_contract') return ['/static/js/7.cost/7-2.capex/capex_contract_list.js?v=20260214-5'];
+        if (/^cost_capex_(hardware|software|etc)$/.test(k)) return ['/static/js/7.cost/7-2.capex/capex_contract_list.js?v=20260413-spa'];
+        if (k === 'cost_capex_contract') return ['/static/js/7.cost/7-2.capex/capex_contract_list.js?v=20260413-spa'];
         // OPEX detail tabs
         if (/^cost_opex_(hardware|software|etc)_system$/.test(k)) return ['/static/js/_detail/tab41-system.js?v=1.0'];
         if (/^cost_opex_(hardware|software|etc)_contract$/.test(k)) return ['/static/js/7.cost/tab71-opex.js?v=20260209-1'];
@@ -5247,6 +5998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ------------------------------------------------------------------
         var CAT_DETAIL_JS = {
             'cat_business_group': '/static/js/9.category/9-1.business/9-1-5.work_group/2.work_group_detail.js?v=3.10',
+            'cat_customer_client1': '/static/js/9.category/9-6.customer/9-6-1.customer/2.client1_detail.js?v=1.0',
             'cat_hw_server': '/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=3.5',
             'cat_hw_storage': '/static/js/9.category/9-2.hardware/9-2-2.storage/2.storage_detail.js?v=3.5',
             'cat_hw_san': '/static/js/9.category/9-2.hardware/9-2-3.san/2.san_detail.js?v=3.5',
@@ -5345,7 +6097,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (/_component$/.test(k)) return ['/static/js/_detail/maint-vendor-assets.js?v=1.1'];
             }
             /* hw detail – model-based hardware tab */
-            if (/^cat_hw_/.test(catBase) && /_hardware$/.test(k)) return ['/static/js/_detail/tab43-hw-model.js?v=1.3', catDetailJs];
+            if (/^cat_hw_/.test(catBase) && /_hardware$/.test(k)) return ['/static/js/_detail/tab43-hw-model.js?v=1.4', catDetailJs];
             /* sw detail – shared software tab */
             if (/^cat_sw_/.test(catBase) && /_system$/.test(k)) return ['/static/js/_detail/tab94-software.js?v=1.0', catDetailJs];
             /* component detail – model-based component tab */
@@ -5482,13 +6234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (_fe) {}
 
-            var historyState = isCostKey(toKey)
-                ? { costTabs: true, href: finalHref }
-                : isProjectListKey(toKey)
-                ? { projectTabs: true, href: finalHref }
-                : isGovernanceDetailKey(toKey)
-                ? { governanceTabs: true, href: finalHref }
-                : { categoryTabs: true, href: finalHref };
+            var historyState = { costTabs: true, href: finalHref };
             try {
                 if (opts.replace) history.replaceState(historyState, '', finalHref);
                 else history.pushState(historyState, '', finalHref);
@@ -5550,7 +6296,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function popHandler(ev) {
         try {
-            if (ev && ev.state && (ev.state.costTabs || ev.state.vendorTabs || ev.state.categoryTabs || ev.state.projectTabs || ev.state.governanceTabs)) {
+            if (ev && ev.state && ev.state.costTabs) {
                 navigateTo(location.pathname + location.search + location.hash, { replace: true });
             }
         } catch (_e) {}
@@ -5797,6 +6543,147 @@ function openHeaderAvatarPicker() {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
     document.body.appendChild(overlay);
 }
+
+/* Settings avatar picker fallback (profile/memo/password)
+   Ensures picker works even when per-page scripts were loaded after DOMContentLoaded in SPA mode. */
+(function initSettingsAvatarPickerFallback(){
+    if (window.__blossomSettingsAvatarPickerFallbackBound) return;
+    window.__blossomSettingsAvatarPickerFallbackBound = true;
+
+    function isTargetPage(){
+        var p = String(window.location.pathname || '');
+        return /\/settings\/(profile|profil|memo|password)(\/|$)/.test(p);
+    }
+
+    function ensurePickerShell(){
+        if (document.getElementById('profile-picker')) return;
+        var shell = document.createElement('div');
+        shell.innerHTML = '' +
+            '<div id="profile-picker" class="profile-picker" aria-hidden="true" role="dialog" aria-modal="true">' +
+            '  <div class="picker-backdrop" data-picker-close></div>' +
+            '  <div class="picker-dialog" role="document">' +
+            '    <div class="picker-header">' +
+            '      <h3 class="picker-title">프로필 이미지 선택</h3>' +
+            '      <button class="btn-icon" data-picker-close title="닫기">×</button>' +
+            '    </div>' +
+            '    <div class="picker-body">' +
+            '      <div class="picker-grid" aria-label="프로필 이미지 목록" role="list"></div>' +
+            '    </div>' +
+            '  </div>' +
+            '</div>';
+        var root = shell.firstElementChild;
+        if (root) document.body.appendChild(root);
+    }
+
+    function applyProfileImage(src){
+        if (!src) return;
+        var avatar = document.querySelector('.admin-page .avatar');
+        if (avatar) avatar.style.backgroundImage = "url('" + src + "')";
+        var headerIcon = document.querySelector('#btn-account .header-avatar-icon') || document.querySelector('#btn-account .header-icon') || document.querySelector('#btn-account img');
+        if (headerIcon) {
+            headerIcon.src = src;
+            headerIcon.classList.add('header-avatar-icon');
+        }
+    }
+
+    function updateMeProfile(payload){
+        return fetch('/api/me/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(payload || {}),
+            credentials: 'same-origin'
+        })
+            .then(function(res){
+                return res.json().catch(function(){ return null; }).then(function(data){
+                    if (!res.ok || !data || data.success !== true) {
+                        var msg = data && data.message ? data.message : '저장에 실패했습니다.';
+                        throw new Error(msg);
+                    }
+                    return data.item || {};
+                });
+            });
+    }
+
+    function openPicker(){
+        if (!isTargetPage()) return;
+        ensurePickerShell();
+        var picker = document.getElementById('profile-picker');
+        var grid = picker ? picker.querySelector('.picker-grid') : null;
+        if (!picker || !grid) return;
+
+        if (!grid.hasChildNodes()) {
+            var names = [
+                '001-boy','002-girl','003-boy','004-girl','005-man','006-girl','007-boy','008-girl','009-boy','010-girl',
+                '011-man','012-girl','013-man','014-girl','015-boy','016-girl','017-boy','018-girl','019-boy','020-girl'
+            ];
+            var empNo = (document.querySelector('#btn-account') && document.querySelector('#btn-account').getAttribute('data-emp-no') || '').trim();
+            var LS_GLOBAL = 'blossom.profileImageSrc';
+            var LS_KEY = empNo ? ('blossom.profileImageSrc.' + empNo) : LS_GLOBAL;
+
+            names.forEach(function(name){
+                var src = '/static/image/svg/profil/' + name + '.svg';
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'picker-item';
+                btn.setAttribute('role', 'listitem');
+                var img = document.createElement('img');
+                img.src = src;
+                img.alt = '프로필 이미지';
+                btn.appendChild(img);
+                btn.addEventListener('click', function(){
+                    applyProfileImage(src);
+                    try {
+                        localStorage.setItem(LS_GLOBAL, src);
+                        if (empNo) localStorage.setItem(LS_KEY, src);
+                    } catch (_e) {}
+                    updateMeProfile({ profile_image: src })
+                        .then(function(){
+                            try {
+                                window.dispatchEvent(new CustomEvent('blossom:avatarChanged', { detail: { src: src, empNo: empNo } }));
+                            } catch (_e) {}
+                        })
+                        .catch(function(err){ alert((err && err.message) || '이미지 저장에 실패했습니다.'); });
+                    picker.classList.remove('open');
+                    picker.setAttribute('aria-hidden', 'true');
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        picker.classList.add('open');
+        picker.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePicker(){
+        var picker = document.getElementById('profile-picker');
+        if (!picker) return;
+        picker.classList.remove('open');
+        picker.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('click', function(e){
+        if (!isTargetPage()) return;
+        var t = e.target;
+        if (t && typeof t.closest === 'function' && t.closest('.admin-page .avatar')) {
+            e.preventDefault();
+            openPicker();
+            return;
+        }
+        if (t && typeof t.hasAttribute === 'function' && t.hasAttribute('data-picker-close')) {
+            e.preventDefault();
+            closePicker();
+        }
+    }, true);
+
+    document.addEventListener('keydown', function(e){
+        if (!isTargetPage()) return;
+        if (e.key === 'Escape') closePicker();
+        if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('avatar')) {
+            e.preventDefault();
+            openPicker();
+        }
+    });
+})();
 
 /* §16 ── Session Exit ──────────────────────────────────────── */
 function exitProcess(id) {

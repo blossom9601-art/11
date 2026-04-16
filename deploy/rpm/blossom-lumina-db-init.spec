@@ -49,6 +49,11 @@ rm -rf %{buildroot}
 install -d -m 0755 %{buildroot}%{_prefix}/sql
 install -m 0640 %{_sourcedir}/sql/init.sql      %{buildroot}%{_prefix}/sql/init.sql
 
+# ── systemd unit (MariaDB 래퍼) ──────────────────────────
+install -d -m 0755 %{buildroot}%{_unitdir}
+install -m 0644 %{_sourcedir}/systemd/lumina-db.service \
+    %{buildroot}%{_unitdir}/lumina-db.service
+
 # ── MariaDB 보안 설정 ────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_sysconfdir}/my.cnf.d
 cat > %{buildroot}%{_sysconfdir}/my.cnf.d/lumina-security.cnf << 'DBCNF'
@@ -155,6 +160,9 @@ install -d -m 0755 %{buildroot}%{_confdir}
 %dir %{_prefix}/sql
 %attr(0640,root,root) %{_prefix}/sql/init.sql
 
+# systemd
+%{_unitdir}/lumina-db.service
+
 # MariaDB 설정
 %config(noreplace) %{_sysconfdir}/my.cnf.d/lumina-security.cnf
 
@@ -178,6 +186,13 @@ echo ""
 echo " 3. 초기화 SQL을 실행하세요:"
 echo "    mysql -u root -p < %{_prefix}/sql/init.sql"
 echo ""
+echo " 5. lumina-db 서비스 활성화:"
+echo "    systemctl enable --now lumina-db"
+echo ""
+
+# ── 서비스 자동 활성화 ──────────────────────────────────
+systemctl daemon-reload
+systemctl enable lumina-db.service 2>/dev/null || true
 echo " ★ init.sql 실행 전 반드시 비밀번호를 변경하세요!"
 echo "   파일 내 IDENTIFIED BY 'CHANGE_ME_...' 부분을"
 echo "   실제 강력한 비밀번호로 교체한 후 실행하세요."

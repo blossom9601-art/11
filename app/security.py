@@ -49,7 +49,7 @@ def apply_security_headers(response: Response) -> Response:
     # Content-Security-Policy
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
@@ -75,7 +75,7 @@ def apply_hsts_header(response: Response) -> Response:
 # ═══════════════════════════════════════════════════════════
 
 CSRF_SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
-CSRF_EXEMPT_PATHS = frozenset({'/login', '/logout', '/api/auth/mfa-verify'})
+CSRF_EXEMPT_PATHS = frozenset({'/login', '/logout', '/api/mfa/status', '/api/mfa/send-code', '/api/mfa/verify'})
 
 
 def generate_csrf_token() -> str:
@@ -424,7 +424,7 @@ def _init_audit_log_table(app: Flask):
         with app.app_context():
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS security_audit_log (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     event_type VARCHAR(50) NOT NULL,
                     emp_no VARCHAR(30) NOT NULL DEFAULT '',
                     ip_address VARCHAR(45) NOT NULL DEFAULT '',

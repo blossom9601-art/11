@@ -355,6 +355,37 @@
 	filter:brightness(0) invert(1) contrast(1); opacity:1; transform:scale(1.08);
 }
 
+/* 관리 탭 버튼 컬러 규칙
+   - 삭제 버튼: hover 시 #6366F1
+   - 추가 버튼: 상시 #6366F1 */
+.tab-header-right #wfm-create-btn,
+.tab-header-right #wfm-create-btn:hover,
+.tab-header-right #wfm-create-btn:focus-visible,
+.tab-header-right #wfm-create-btn:active{
+    background:#6366f1 !important;
+    border-color:#6366f1 !important;
+    box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+.tab-header-right #wfm-create-btn .header-icon,
+.tab-header-right #wfm-create-btn:hover .header-icon,
+.tab-header-right #wfm-create-btn:focus-visible .header-icon,
+.tab-header-right #wfm-create-btn:active .header-icon{
+    filter:brightness(0) invert(1) contrast(1);
+    opacity:1;
+}
+
+.tab-header-right #wfm-delete-btn:hover,
+.tab-header-right #wfm-delete-btn:focus-visible{
+    background:#6366f1 !important;
+    border-color:#6366f1 !important;
+    box-shadow:0 2px 8px rgba(99,102,241,.28);
+}
+.tab-header-right #wfm-delete-btn:hover .header-icon,
+.tab-header-right #wfm-delete-btn:focus-visible .header-icon{
+    filter:brightness(0) invert(1) contrast(1);
+    opacity:1;
+}
+
 /* FAB */
 .wfd-fab {
     position: fixed;

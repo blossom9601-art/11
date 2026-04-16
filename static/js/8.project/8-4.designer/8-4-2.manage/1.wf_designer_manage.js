@@ -9,6 +9,8 @@
     'use strict';
 
     var API = '/api/wf-designs';
+    var DELETE_MODAL_ID = 'system-delete-modal';
+    var MESSAGE_MODAL_ID = 'system-message-modal';
     var page = 1;
     var perPage = 20;
     var selectedIds = [];
@@ -43,11 +45,16 @@
     var cancelBtn  = document.getElementById('wfm-create-cancel');
     var closeBtn   = document.getElementById('wfm-create-close');
 
-    // 삭제 모달
-    var delModal   = document.getElementById('wfm-delete-modal');
-    var delConfirm = document.getElementById('wfm-delete-confirm');
-    var delCancel  = document.getElementById('wfm-delete-cancel');
-    var delClose   = document.getElementById('wfm-delete-close');
+    // 삭제 모달 (공통)
+    var delModal   = document.getElementById(DELETE_MODAL_ID);
+    var delConfirm = document.getElementById('system-delete-confirm');
+    var delCancel  = document.getElementById('system-delete-cancel');
+    var delClose   = document.getElementById('system-delete-close');
+
+    // 알림 모달 (공통)
+    var msgModal   = document.getElementById(MESSAGE_MODAL_ID);
+    var msgClose   = document.getElementById('system-message-close');
+    var msgOk      = document.getElementById('system-message-ok');
 
     function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
     function statusLabel(s, shared){
@@ -61,6 +68,28 @@
     }
     function fmtDate(d){ return d ? d.substring(0,16).replace('T',' ') : '-'; }
 
+    function openModal(modalId){
+        var modal = document.getElementById(modalId);
+        if(!modal) return;
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeModal(modalId){
+        var modal = document.getElementById(modalId);
+        if(!modal) return;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function showMessageModal(title, message){
+        var titleEl = document.getElementById('message-title');
+        var contentEl = document.getElementById('message-content');
+        if(titleEl) titleEl.textContent = title || '안내';
+        if(contentEl) contentEl.textContent = message || '';
+        openModal(MESSAGE_MODAL_ID);
+    }
+
     // ── 로드 ──
     function load(){
         var search = (searchEl.value||'').trim();
@@ -70,7 +99,18 @@
         fetch(API+qs, {credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(data){
-            if(!data.success){ console.error(data); return; }
+            if(!data.success){
+                console.error(data);
+                if(countEl){ countEl.textContent = '0'; countEl.setAttribute('data-count', '0'); }
+                var tw = document.getElementById('wfm-table-wrap');
+                if(tw) tw.style.display='none';
+                if(tbody) tbody.innerHTML='';
+                if(emptyEl) emptyEl.style.display='';
+                if(pagInfoEl) pagInfoEl.textContent = '0개 항목';
+                if(pagNumbers) pagNumbers.innerHTML = '';
+                if(bulkBar) bulkBar.style.display = 'none';
+                return;
+            }
             var rows = data.rows||[];
             var total = data.total||0;
             var prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
@@ -87,6 +127,7 @@
 
             if(!rows.length){
                 document.getElementById('wfm-table-wrap').style.display='none';
+                tbody.innerHTML='';
                 emptyEl.style.display='';
                 pagEl.innerHTML='';
                 return;
@@ -148,7 +189,17 @@
 
             renderPagination(total);
         })
-        .catch(function(e){ console.error(e); });
+        .catch(function(e){
+            console.error(e);
+            if(countEl){ countEl.textContent = '0'; countEl.setAttribute('data-count', '0'); }
+            var tw = document.getElementById('wfm-table-wrap');
+            if(tw) tw.style.display='none';
+            if(tbody) tbody.innerHTML='';
+            if(emptyEl) emptyEl.style.display='';
+            if(pagInfoEl) pagInfoEl.textContent = '0개 항목';
+            if(pagNumbers) pagNumbers.innerHTML = '';
+            if(bulkBar) bulkBar.style.display = 'none';
+        });
     }
 
     function renderPagination(total){
@@ -206,13 +257,16 @@
 
     // ── 모달 (삭제) ──
     function openDelete(){
-        if(!selectedIds.length) return;
+        if(!selectedIds.length){
+            showMessageModal('안내', '삭제할 워크플로우를 먼저 선택하세요.');
+            return;
+        }
         if(!delModal) return;
-        var sub = document.getElementById('wfm-delete-subtitle');
+        var sub = document.getElementById('delete-subtitle');
         if(sub) sub.textContent = '선택한 '+selectedIds.length+'개 워크플로우를 삭제하시겠습니까?';
-        delModal.style.display='flex';
+        openModal(DELETE_MODAL_ID);
     }
-    function closeDelete(){ if(delModal) delModal.style.display='none'; }
+    function closeDelete(){ closeModal(DELETE_MODAL_ID); }
     function doDelete(){
         if(!selectedIds.length) return;
         fetch(API+'/bulk-delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
@@ -220,7 +274,9 @@
         }).then(function(r){return r.json();}).then(function(d){
             closeDelete();
             load();
-        }).catch(function(e){alert('네트워크 오류');});
+        }).catch(function(e){
+            showMessageModal('오류', '네트워크 오류가 발생했습니다.');
+        });
     }
 
     // ── 이벤트 ──
@@ -238,6 +294,14 @@
     if(delConfirm) delConfirm.addEventListener('click', doDelete);
     if(delCancel) delCancel.addEventListener('click', closeDelete);
     if(delClose) delClose.addEventListener('click', closeDelete);
+    if(msgClose) msgClose.addEventListener('click', function(){ closeModal(MESSAGE_MODAL_ID); });
+    if(msgOk) msgOk.addEventListener('click', function(){ closeModal(MESSAGE_MODAL_ID); });
+    if(msgModal) msgModal.addEventListener('click', function(ev){
+        if(ev.target === msgModal) closeModal(MESSAGE_MODAL_ID);
+    });
+    if(delModal) delModal.addEventListener('click', function(ev){
+        if(ev.target === delModal) closeDelete();
+    });
     if(pageSizeEl) pageSizeEl.addEventListener('change', function(){ perPage=parseInt(this.value); page=1; load(); });
     if(pagFirst) pagFirst.addEventListener('click', function(){ page=1; load(); });
     if(pagPrev) pagPrev.addEventListener('click', function(){ if(page>1){ page--; load(); } });

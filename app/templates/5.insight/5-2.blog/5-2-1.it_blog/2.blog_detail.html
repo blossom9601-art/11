@@ -10,10 +10,13 @@
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
 	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/insight.css?v=20260107_1">
+	<link rel="stylesheet" href="/static/css/insight.css?v=20260413_7">
 </head>
 
-<body class="blog-page blog-detail-page">
+<body class="blog-page blog-detail-page insight-page"
+	data-current-user-name="{{ current_user_name or '' }}"
+	data-current-emp-no="{{ current_emp_no or '' }}"
+	data-current-user-role="{{ current_user_role or '' }}">
 	{% include 'layouts/_header.html' %}
 	{% include 'layouts/_sidebar.html' %}
 
@@ -38,6 +41,14 @@
 										</div>
 										<div class="blog-author-sub" id="blog-post-department"></div>
 									</div>
+								</div>
+								<div class="blog-post-header-actions" id="blog-post-actions" hidden>
+									<button type="button" class="blog-action-btn" id="blog-post-edit-btn" aria-label="수정" title="수정" hidden>
+										<img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정" class="blog-action-btn-icon" aria-hidden="true">
+									</button>
+									<button type="button" class="blog-action-btn danger" id="blog-post-delete-btn" aria-label="삭제" title="삭제" hidden>
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="blog-action-btn-icon" aria-hidden="true">
+									</button>
 								</div>
 							</header>
 
@@ -83,7 +94,68 @@
 		</div>
 	</main>
 
+	<div id="blog-edit-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title dispose-title">
+					<h3>수정 안내</h3>
+					<p class="server-add-subtitle">수정 화면으로 이동하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" id="blog-edit-close" title="닫기" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p>블로그 수정은 목록 페이지 모달에서 진행됩니다.</p>
+						<p>확인을 누르면 목록 페이지로 이동합니다.</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="blog-edit-confirm">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="insight-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title dispose-title">
+					<h3>삭제처리</h3>
+					<p class="server-add-subtitle" id="insight-delete-subtitle">선택한 게시글을 정말 삭제하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" id="insight-delete-close" title="닫기" aria-label="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="dispose-content">
+					<div class="dispose-text">
+						<p>삭제처리는 선택한 게시글을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+						<p>확인 후에는 선택한 게시글의 삭제 프로세스를 진행합니다.</p>
+						<p>댓글과 좋아요도 함께 제거됩니다.</p>
+					</div>
+					<div class="dispose-illust">
+						<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+					</div>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-primary" id="insight-delete-confirm">확인</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
 	<script src="/static/js/blossom.js"></script>
-	<script src="/static/js/5.insight/5-2.blog/5-2-1.it_blog/2.blog_detail.js?v=1.1.5"></script>
+	<script src="/static/js/5.insight/5-2.blog/5-2-1.it_blog/2.blog_detail.js?v=1.2.7"></script>
 </body>
 </html>

@@ -229,34 +229,6 @@ def init_work_division_table(app=None) -> None:
             conn.execute(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{TABLE_NAME}_code ON {TABLE_NAME}(division_code)"
             )
-            # Always ensure safe default divisions exist for FK-backed forms.
-            timestamp = _now()
-            actor = 'system'
-            defaults = [
-                ('내부', '내부', None),
-                ('대외', '대외', None),
-                ('기타', '기타', None),
-            ]
-            for code, name, desc in defaults:
-                conn.execute(
-                    f"""
-                    INSERT OR IGNORE INTO {TABLE_NAME}
-                        (division_code, division_name, description, hw_count, sw_count, remark, created_at, created_by, updated_at, updated_by, is_deleted)
-                    VALUES (?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, 0)
-                    """,
-                    (code, name, desc, timestamp, actor, timestamp, actor),
-                )
-
-            # If the instance DB has only default/diag rows (historical split DB paths),
-            # backfill from the project-root dev_blossom.db.
-            project_db = os.path.abspath(os.path.join(_project_root(app), 'dev_blossom.db'))
-            target_db = _resolve_db_path(app)
-            if os.path.exists(project_db) and os.path.abspath(project_db) != os.path.abspath(target_db):
-                _copy_table_if_effectively_empty(
-                    source_db=project_db,
-                    target_conn=conn,
-                    table_name=TABLE_NAME,
-                )
             conn.commit()
             logger.info("%s table ready", TABLE_NAME)
     except Exception:
@@ -383,12 +355,10 @@ def soft_delete_work_divisions(ids: Sequence[Any], actor: str, app=None) -> int:
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
-    timestamp = _now()
     with _get_connection(app) as conn:
-        params: List[Any] = [timestamp, actor, *safe_ids]
         cur = conn.execute(
-            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders}) AND is_deleted = 0",
-            params
+            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
+            safe_ids,
         )
         conn.commit()
         return cur.rowcount

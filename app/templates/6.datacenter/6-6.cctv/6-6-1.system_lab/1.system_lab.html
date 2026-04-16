@@ -36,14 +36,16 @@
                 <div id="dynamic-system-tabs"
                      data-page-code="DC_CCTV"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="CCTV 관리 탭"></div>
+                     data-aria-label="CCTV 관리 탭"
+                     data-layout-title-selector="#cctv-layout-title"
+                     data-layout-title-suffix=" 배치도"></div>
 
 
                 <div class="tab-content single-pane">
                     <div class="tab-pane active" id="system-list-pane">
                         <div class="tab-header">
                             <div class="tab-header-left">
-                                <h2>{{ center_name }} 배치도</h2>
+                                <h2 id="cctv-layout-title">{{ center_name }} 배치도</h2>
                             </div>
                             <div class="tab-header-right">
                                 <div class="search-container" role="search">
@@ -92,10 +94,10 @@
             </div>
         </main>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260413_dc_tab_silent"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
     <script src="/static/js/6.datacenter/6-6.cctv/cctv_status.js"></script>
-    <script src="/static/js/6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.js"></script>
+    <script src="/static/js/6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.js?v=20260413a"></script>
 
         <!-- CCTV 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -157,6 +159,6 @@
         {% include 'layouts/_message_modal.html' %}
 
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

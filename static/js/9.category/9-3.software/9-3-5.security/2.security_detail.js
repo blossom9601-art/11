@@ -513,10 +513,10 @@
       var EDIT_SAVE_ID = 'system-edit-save';
 
       // Flatpickr (calendar) loader
-      var FLATPICKR_CSS='https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
-      var FLATPICKR_THEME='https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css';
-      var FLATPICKR_JS='https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-      var FLATPICKR_KO='https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js';
+      var FLATPICKR_CSS='/static/vendor/flatpickr/4.6.13/flatpickr.min.css';
+      var FLATPICKR_THEME='/static/vendor/flatpickr/4.6.13/themes/airbnb.css';
+      var FLATPICKR_JS='/static/vendor/flatpickr/4.6.13/flatpickr.min.js';
+      var FLATPICKR_KO='/static/vendor/flatpickr/4.6.13/l10n/ko.js';
       function _ensureCss(href,id){var e=document.getElementById(id);if(e&&e.tagName.toLowerCase()==='link'){if(e.getAttribute('href')!==href)e.setAttribute('href',href);return;}var l=document.createElement('link');l.rel='stylesheet';l.href=href;l.id=id;document.head.appendChild(l);}
       function _loadScript(src){return new Promise(function(ok,fail){var s=document.createElement('script');s.src=src;s.async=true;s.onload=ok;s.onerror=function(){fail(new Error('load:'+src));};document.head.appendChild(s);});}
       function _ensureFlatpickr(){_ensureCss(FLATPICKR_CSS,'flatpickr-css');_ensureCss(FLATPICKR_THEME,'flatpickr-theme-css');if(window.flatpickr)return Promise.resolve();return _loadScript(FLATPICKR_JS).then(function(){return _loadScript(FLATPICKR_KO).catch(function(){});});}

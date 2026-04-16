@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 70 1200 710" width="1200" height="710">
+  <defs>
+    <style>
+      .floor { fill: #f0f2f5; stroke: #333; stroke-width: 2; }
+      .wall { fill: none; stroke: #333; stroke-width: 3; }
+      .rack { fill: #4a6fa5; stroke: #2c4a7c; stroke-width: 1.5; rx: 3; ry: 3; }
+      .rack-label { fill: #fff; font-size: 11px; text-anchor: middle; dominant-baseline: central; }
+      .room-label { fill: #333; font-size: 16px; font-weight: bold; text-anchor: middle; }
+      .zone-label { fill: #666; font-size: 13px; text-anchor: middle; }
+      .door { fill: #f0f2f5; stroke: #999; stroke-width: 2; }
+      .raised-floor { fill: #e8ecf1; stroke: #ccc; stroke-width: 0.5; }
+      .cooling { fill: #7ecfc0; stroke: #4a9e8e; stroke-width: 1.5; rx: 4; ry: 4; }
+      .cooling-label { fill: #fff; font-size: 10px; text-anchor: middle; dominant-baseline: central; }
+      .ups { fill: #e8a838; stroke: #c08820; stroke-width: 1.5; rx: 4; ry: 4; }
+      .ups-label { fill: #fff; font-size: 10px; text-anchor: middle; dominant-baseline: central; }
+      .title { fill: #222; font-size: 22px; font-weight: bold; text-anchor: middle; }
+      .subtitle { fill: #888; font-size: 14px; text-anchor: middle; }
+      .grid { stroke: #ddd; stroke-width: 0.5; }
+      .aisle { fill: #e0e4ea; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#fafbfc"/>
+
+  <!-- Floor outline -->
+  <rect x="50" y="85" width="1100" height="680" class="floor" rx="5" ry="5"/>
+
+  <!-- Grid lines -->
+  <g opacity="0.3">
+    <line x1="50" y1="235" x2="1150" y2="235" class="grid"/>
+    <line x1="50" y1="385" x2="1150" y2="385" class="grid"/>
+    <line x1="50" y1="535" x2="1150" y2="535" class="grid"/>
+    <line x1="300" y1="85" x2="300" y2="765" class="grid"/>
+    <line x1="550" y1="85" x2="550" y2="765" class="grid"/>
+    <line x1="800" y1="85" x2="800" y2="765" class="grid"/>
+    <line x1="1000" y1="85" x2="1000" y2="765" class="grid"/>
+  </g>
+
+  <!-- Zone A: Server Room -->
+  <rect x="70" y="100" width="560" height="360" fill="none" stroke="#4a6fa5" stroke-width="1" stroke-dasharray="5,3" rx="3"/>
+  <text x="350" y="125" class="room-label">Server Room</text>
+
+  <!-- Aisles -->
+  <rect x="194" y="145" width="36" height="300" class="aisle" rx="2"/>
+  <rect x="368" y="145" width="36" height="300" class="aisle" rx="2"/>
+  <rect x="542" y="145" width="36" height="300" class="aisle" rx="2"/>
+
+  <!-- Rack Row A -->
+  <g>
+    <text x="140" y="155" class="zone-label">Row A</text>
+    <rect x="90" y="170" width="40" height="55" class="rack"/><text x="110" y="198" class="rack-label">A-01</text>
+    <rect x="90" y="230" width="40" height="55" class="rack"/><text x="110" y="258" class="rack-label">A-02</text>
+    <rect x="90" y="290" width="40" height="55" class="rack"/><text x="110" y="318" class="rack-label">A-03</text>
+    <rect x="90" y="350" width="40" height="55" class="rack"/><text x="110" y="378" class="rack-label">A-04</text>
+    <rect x="148" y="170" width="40" height="55" class="rack"/><text x="168" y="198" class="rack-label">A-05</text>
+    <rect x="148" y="230" width="40" height="55" class="rack"/><text x="168" y="258" class="rack-label">A-06</text>
+    <rect x="148" y="290" width="40" height="55" class="rack"/><text x="168" y="318" class="rack-label">A-07</text>
+    <rect x="148" y="350" width="40" height="55" class="rack"/><text x="168" y="378" class="rack-label">A-08</text>
+  </g>
+
+  <!-- Rack Row B -->
+  <g>
+    <text x="310" y="155" class="zone-label">Row B</text>
+    <rect x="236" y="170" width="40" height="55" class="rack"/><text x="256" y="198" class="rack-label">B-01</text>
+    <rect x="236" y="230" width="40" height="55" class="rack"/><text x="256" y="258" class="rack-label">B-02</text>
+    <rect x="236" y="290" width="40" height="55" class="rack"/><text x="256" y="318" class="rack-label">B-03</text>
+    <rect x="236" y="350" width="40" height="55" class="rack"/><text x="256" y="378" class="rack-label">B-04</text>
+    <rect x="322" y="170" width="40" height="55" class="rack"/><text x="342" y="198" class="rack-label">B-05</text>
+    <rect x="322" y="230" width="40" height="55" class="rack"/><text x="342" y="258" class="rack-label">B-06</text>
+    <rect x="322" y="290" width="40" height="55" class="rack"/><text x="342" y="318" class="rack-label">B-07</text>
+    <rect x="322" y="350" width="40" height="55" class="rack"/><text x="342" y="378" class="rack-label">B-08</text>
+  </g>
+
+  <!-- Rack Row C -->
+  <g>
+    <text x="485" y="155" class="zone-label">Row C</text>
+    <rect x="410" y="170" width="40" height="55" class="rack"/><text x="430" y="198" class="rack-label">C-01</text>
+    <rect x="410" y="230" width="40" height="55" class="rack"/><text x="430" y="258" class="rack-label">C-02</text>
+    <rect x="410" y="290" width="40" height="55" class="rack"/><text x="430" y="318" class="rack-label">C-03</text>
+    <rect x="410" y="350" width="40" height="55" class="rack"/><text x="430" y="378" class="rack-label">C-04</text>
+    <rect x="496" y="170" width="40" height="55" class="rack"/><text x="516" y="198" class="rack-label">C-05</text>
+    <rect x="496" y="230" width="40" height="55" class="rack"/><text x="516" y="258" class="rack-label">C-06</text>
+    <rect x="496" y="290" width="40" height="55" class="rack"/><text x="516" y="318" class="rack-label">C-07</text>
+    <rect x="496" y="350" width="40" height="55" class="rack"/><text x="516" y="378" class="rack-label">C-08</text>
+  </g>
+
+  <!-- Zone B: Network Room -->
+  <rect x="660" y="100" width="480" height="210" fill="none" stroke="#4a6fa5" stroke-width="1" stroke-dasharray="5,3" rx="3"/>
+  <text x="900" y="125" class="room-label">Network Room</text>
+
+  <!-- Network Racks -->
+  <g>
+    <text x="750" y="155" class="zone-label">Row N</text>
+    <rect x="690" y="170" width="40" height="55" class="rack" style="fill:#5b8c5a;stroke:#3d6b3c"/><text x="710" y="198" class="rack-label">N-01</text>
+    <rect x="690" y="240" width="40" height="55" class="rack" style="fill:#5b8c5a;stroke:#3d6b3c"/><text x="710" y="268" class="rack-label">N-02</text>
+    <rect x="750" y="170" width="40" height="55" class="rack" style="fill:#5b8c5a;stroke:#3d6b3c"/><text x="770" y="198" class="rack-label">N-03</text>
+    <rect x="750" y="240" width="40" height="55" class="rack" style="fill:#5b8c5a;stroke:#3d6b3c"/><text x="770" y="268" class="rack-label">N-04</text>
+  </g>
+
+  <!-- Storage Racks -->
+  <g>
+    <text x="920" y="155" class="zone-label">Row S</text>
+    <rect x="860" y="170" width="40" height="55" class="rack" style="fill:#8b6fad;stroke:#6b4f8d"/><text x="880" y="198" class="rack-label">S-01</text>
+    <rect x="860" y="240" width="40" height="55" class="rack" style="fill:#8b6fad;stroke:#6b4f8d"/><text x="880" y="268" class="rack-label">S-02</text>
+    <rect x="920" y="170" width="40" height="55" class="rack" style="fill:#8b6fad;stroke:#6b4f8d"/><text x="940" y="198" class="rack-label">S-03</text>
+    <rect x="920" y="240" width="40" height="55" class="rack" style="fill:#8b6fad;stroke:#6b4f8d"/><text x="940" y="268" class="rack-label">S-04</text>
+  </g>
+
+  <!-- Firewall/Security -->
+  <g>
+    <text x="1080" y="155" class="zone-label">FW</text>
+    <rect x="1050" y="170" width="40" height="55" class="rack" style="fill:#c75050;stroke:#a03030"/><text x="1070" y="198" class="rack-label">FW-1</text>
+    <rect x="1050" y="240" width="40" height="55" class="rack" style="fill:#c75050;stroke:#a03030"/><text x="1070" y="268" class="rack-label">FW-2</text>
+  </g>
+
+  <!-- Zone C: Cooling & Power -->
+  <rect x="660" y="340" width="480" height="120" fill="none" stroke="#4a9e8e" stroke-width="1" stroke-dasharray="5,3" rx="3"/>
+  <text x="900" y="365" class="room-label">Cooling &amp; Power</text>
+
+  <!-- Cooling Units -->
+  <rect x="690" y="380" width="70" height="55" class="cooling"/><text x="725" y="408" class="cooling-label">CRAC-1</text>
+  <rect x="780" y="380" width="70" height="55" class="cooling"/><text x="815" y="408" class="cooling-label">CRAC-2</text>
+  <rect x="870" y="380" width="70" height="55" class="cooling"/><text x="905" y="408" class="cooling-label">CRAC-3</text>
+
+  <!-- UPS -->
+  <rect x="970" y="380" width="70" height="55" class="ups"/><text x="1005" y="408" class="ups-label">UPS-A</text>
+  <rect x="1060" y="380" width="70" height="55" class="ups"/><text x="1095" y="408" class="ups-label">UPS-B</text>
+
+  <!-- Zone D: Monitoring -->
+  <rect x="70" y="490" width="320" height="250" fill="none" stroke="#666" stroke-width="1" stroke-dasharray="5,3" rx="3"/>
+  <text x="230" y="520" class="room-label">NOC</text>
+
+  <!-- Monitoring desks -->
+  <rect x="100" y="545" width="120" height="40" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="160" y="568" style="fill:#555;font-size:11px;text-anchor:middle">Monitoring Desk</text>
+  <rect x="100" y="605" width="120" height="40" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="160" y="628" style="fill:#555;font-size:11px;text-anchor:middle">Operations Desk</text>
+  <rect x="250" y="545" width="120" height="100" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="310" y="598" style="fill:#555;font-size:11px;text-anchor:middle">Video Wall</text>
+
+  <!-- Zone E: Storage / Staging -->
+  <rect x="420" y="490" width="300" height="250" fill="none" stroke="#666" stroke-width="1" stroke-dasharray="5,3" rx="3"/>
+  <text x="570" y="520" class="room-label">Staging</text>
+
+  <rect x="450" y="545" width="100" height="60" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="500" y="578" style="fill:#555;font-size:11px;text-anchor:middle">Workbench</text>
+  <rect x="580" y="545" width="100" height="60" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="630" y="578" style="fill:#555;font-size:11px;text-anchor:middle">Storage</text>
+  <rect x="450" y="635" width="230" height="50" fill="#d4dae3" stroke="#999" rx="5"/>
+  <text x="565" y="663" style="fill:#555;font-size:11px;text-anchor:middle">Equipment Loading Area</text>
+
+  <!-- CCTV indicators -->
+  <g>
+    <circle cx="60" cy="95" r="8" fill="#c75050" opacity="0.7"/><text x="60" y="99" style="fill:#fff;font-size:8px;text-anchor:middle">C1</text>
+    <circle cx="1140" cy="95" r="8" fill="#c75050" opacity="0.7"/><text x="1140" y="99" style="fill:#fff;font-size:8px;text-anchor:middle">C2</text>
+    <circle cx="60" cy="755" r="8" fill="#c75050" opacity="0.7"/><text x="60" y="759" style="fill:#fff;font-size:8px;text-anchor:middle">C3</text>
+    <circle cx="1140" cy="755" r="8" fill="#c75050" opacity="0.7"/><text x="1140" y="759" style="fill:#fff;font-size:8px;text-anchor:middle">C4</text>
+    <circle cx="640" cy="95" r="8" fill="#c75050" opacity="0.7"/><text x="640" y="99" style="fill:#fff;font-size:8px;text-anchor:middle">C5</text>
+    <circle cx="640" cy="755" r="8" fill="#c75050" opacity="0.7"/><text x="640" y="759" style="fill:#fff;font-size:8px;text-anchor:middle">C6</text>
+  </g>
+
+  <!-- Temperature/Humidity sensors -->
+  <g>
+    <rect x="576" y="165" width="18" height="18" fill="#4a9e8e" rx="3" opacity="0.7"/><text x="585" y="178" style="fill:#fff;font-size:8px;text-anchor:middle">T1</text>
+    <rect x="576" y="355" width="18" height="18" fill="#4a9e8e" rx="3" opacity="0.7"/><text x="585" y="368" style="fill:#fff;font-size:8px;text-anchor:middle">T2</text>
+    <rect x="235" y="415" width="18" height="18" fill="#4a9e8e" rx="3" opacity="0.7"/><text x="244" y="428" style="fill:#fff;font-size:8px;text-anchor:middle">T3</text>
+    <rect x="1100" y="165" width="18" height="18" fill="#4a9e8e" rx="3" opacity="0.7"/><text x="1109" y="178" style="fill:#fff;font-size:8px;text-anchor:middle">T4</text>
+  </g>
+
+  <!-- Door -->
+  <rect x="50" y="425" width="5" height="50" class="door"/>
+  <text x="35" y="450" style="fill:#999;font-size:10px;text-anchor:middle;writing-mode:tb">Entry</text>
+
+  <!-- Legend -->
+  <g transform="translate(760, 490)">
+    <text x="0" y="15" style="fill:#333;font-size:13px;font-weight:bold">Legend</text>
+    <rect x="0" y="30" width="20" height="14" class="rack"/><text x="28" y="42" style="fill:#555;font-size:11px">Server Rack</text>
+    <rect x="0" y="52" width="20" height="14" style="fill:#5b8c5a;stroke:#3d6b3c;stroke-width:1"/><text x="28" y="64" style="fill:#555;font-size:11px">Network</text>
+    <rect x="0" y="74" width="20" height="14" style="fill:#8b6fad;stroke:#6b4f8d;stroke-width:1"/><text x="28" y="86" style="fill:#555;font-size:11px">Storage</text>
+    <rect x="0" y="96" width="20" height="14" style="fill:#c75050;stroke:#a03030;stroke-width:1"/><text x="28" y="108" style="fill:#555;font-size:11px">Security</text>
+
+    <rect x="200" y="30" width="20" height="14" class="cooling"/><text x="228" y="42" style="fill:#555;font-size:11px">Cooling</text>
+    <rect x="200" y="52" width="20" height="14" class="ups"/><text x="228" y="64" style="fill:#555;font-size:11px">UPS</text>
+    <circle cx="210" cy="87" r="7" fill="#c75050" opacity="0.7"/><text x="228" y="91" style="fill:#555;font-size:11px">CCTV</text>
+    <rect x="200" y="96" width="20" height="14" fill="#4a9e8e" rx="3" opacity="0.7"/><text x="228" y="108" style="fill:#555;font-size:11px">Temp/Humidity</text>
+  </g>
+</svg>

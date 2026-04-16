@@ -1,11 +1,7 @@
 (function () {
   'use strict';
 
-  if (window.BlossomOpexContracts && typeof window.BlossomOpexContracts.initFromPage === 'function') {
-    // already loaded
-  } else {
-    window.BlossomOpexContracts = { initFromPage };
-  }
+  window.BlossomOpexContracts = { initFromPage };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initFromPage);
@@ -16,23 +12,34 @@
     try { initFromPage(); } catch (_e) {}
   });
 
+  function _detectOpexTypeFromUrl() {
+    var p = window.location.pathname || '';
+    if (p.indexOf('cost_opex_hardware') >= 0) return 'HW';
+    if (p.indexOf('cost_opex_software') >= 0) return 'SW';
+    if (p.indexOf('cost_opex_etc') >= 0) return 'ETC';
+    return null;
+  }
+
   function initFromPage() {
-    const root = document.querySelector('main[data-opex-type]');
+    var urlType = _detectOpexTypeFromUrl();
+    var root = document.querySelector('main[data-opex-type]') || (urlType ? document.querySelector('main.main-content') : null);
     if (!root) {
       return;
     }
 
+    var resolvedType = urlType || (root.dataset.opexType || '').toUpperCase() || 'HW';
     try {
-      if (root.dataset && root.dataset.opexContractsInit === '1') return;
-      root.dataset.opexContractsInit = '1';
+      if (root.dataset && root.dataset.opexContractsInit === resolvedType) return;
+      root.dataset.opexContractsInit = resolvedType;
     } catch (_e) {}
 
     const TYPE_LABELS = { HW: '하드웨어', SW: '소프트웨어', ETC: '기타' };
-    const OPEX_TYPE = (root.dataset.opexType || 'HW').toUpperCase();
+    const OPEX_TYPE = resolvedType;
     const TYPE_LABEL = TYPE_LABELS[OPEX_TYPE] || 'OPEX';
     // Under partial navigation, inline <script> tags in swapped HTML won't execute.
-    // Prefer the detail URL stored on the swapped <main> element.
-    const DETAIL_URL = (root.dataset.detailUrl || window.__MODULE_DETAIL_URL || null);
+    // Prefer the detail URL stored on the swapped <main> element; fallback to URL-based.
+    var _DETAIL_URLS = { HW: '/p/cost_opex_hardware_detail', SW: '/p/cost_opex_software_detail', ETC: '/p/cost_opex_etc_detail' };
+    const DETAIL_URL = (root.dataset.detailUrl || window.__MODULE_DETAIL_URL || _DETAIL_URLS[OPEX_TYPE] || null);
     const API_BASE = '/api/opex-contracts';
     const VENDOR_API = '/api/vendor-maintenance';
     const FLATPICKR_CSS = '/static/vendor/flatpickr/4.6.13/flatpickr.min.css';

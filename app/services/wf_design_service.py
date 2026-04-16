@@ -5,6 +5,7 @@ Tables: wf_design, wf_design_version (SQLAlchemy ORM)
 import json
 import uuid
 from datetime import datetime
+from sqlalchemy import func as sa_func
 
 from app.models import db, WfDesign, WfDesignVersion
 
@@ -40,7 +41,8 @@ def _validate_definition(definition_json: dict) -> list[str]:
 
 def list_workflows(*, status=None, owner_user_id=None, page=1, per_page=20, search=None, shared=None):
     """워크플로우 목록 조회. 페이징 지원."""
-    q = WfDesign.query.filter(WfDesign.is_deleted == 0)
+    # 저장(버전 생성) 전 임시 드래프트(latest_version=0)는 목록에서 숨긴다.
+    q = WfDesign.query.filter(WfDesign.is_deleted == 0, WfDesign.latest_version > 0)
     if status:
         q = q.filter(WfDesign.status == status)
     if owner_user_id:
@@ -49,7 +51,8 @@ def list_workflows(*, status=None, owner_user_id=None, page=1, per_page=20, sear
         q = q.filter(WfDesign.shared == int(shared))
     if search:
         q = q.filter(WfDesign.name.ilike(f'%{search}%'))
-    q = q.order_by(WfDesign.updated_at.desc().nullslast(), WfDesign.created_at.desc())
+    # SQLite는 NULLS LAST 문법을 지원하지 않으므로 coalesce로 정렬 키를 통일한다.
+    q = q.order_by(sa_func.coalesce(WfDesign.updated_at, WfDesign.created_at).desc(), WfDesign.created_at.desc())
     total = q.count()
     items = q.offset((page - 1) * per_page).limit(per_page).all()
     return items, total

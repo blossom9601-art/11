@@ -17,11 +17,11 @@
     } catch(_){ }
     function __detailInit(){
       // Flatpickr (calendar) loader and initializer
-      var FLATPICKR_CSS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+      var FLATPICKR_CSS = '/static/vendor/flatpickr/4.6.13/flatpickr.min.css';
       var FLATPICKR_THEME_NAME = 'airbnb';
-      var FLATPICKR_THEME_HREF = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/' + FLATPICKR_THEME_NAME + '.css';
-      var FLATPICKR_JS = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js';
-      var FLATPICKR_KO = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js';
+      var FLATPICKR_THEME_HREF = '/static/vendor/flatpickr/4.6.13/themes/' + FLATPICKR_THEME_NAME + '.css';
+      var FLATPICKR_JS = '/static/vendor/flatpickr/4.6.13/flatpickr.min.js';
+      var FLATPICKR_KO = '/static/vendor/flatpickr/4.6.13/l10n/ko.js';
       function ensureCss(href, id){
         var existing = document.getElementById(id);
         if(existing && existing.tagName.toLowerCase() === 'link'){ if(existing.getAttribute('href') !== href){ existing.setAttribute('href', href); } return; }

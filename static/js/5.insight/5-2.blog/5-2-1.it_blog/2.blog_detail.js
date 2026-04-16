@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
 	const postCommentsWrapEl = document.getElementById('blog-comments-wrap');
 	const postAttachmentsWrapEl = document.getElementById('blog-post-attachments');
 	const postAttachmentsListEl = document.getElementById('blog-post-attachments-list');
+	const bodyEl = document.body;
+	const currentUserName = String(bodyEl?.dataset?.currentUserName || '').trim();
+	const currentEmpNo = String(bodyEl?.dataset?.currentEmpNo || '').trim();
+	const currentUserRole = String(bodyEl?.dataset?.currentUserRole || '').trim().toUpperCase();
 
 	const postId = new URLSearchParams(window.location.search).get('post') || '';
 	const postIdNum = /^[0-9]+$/.test(String(postId)) ? parseInt(String(postId), 10) : null;
@@ -651,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
 						ensureImageEditButton();
 						if (postTimeEl) postTimeEl.textContent = formatTimeLabelFromIso(item.createdAt);
 						renderAttachments(item.attachments || []);
-						revealContent();
+						revealContentWithActions();
 						return;
 					}
 				} catch (e) {
@@ -675,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				ensureImageEditButton();
 				if (postTimeEl) postTimeEl.textContent = '방금 전';
 				renderAttachments(post.attachments || []);
-				revealContent();
+				revealContentWithActions();
 			}
 		})();
 	}
@@ -953,4 +957,146 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 		})();
 	}
+
+	// --- Delete / Edit buttons ---
+	const editBtnEl = document.getElementById('blog-post-edit-btn');
+	const deleteBtnEl = document.getElementById('blog-post-delete-btn');
+	const actionWrapEl = document.getElementById('blog-post-actions');
+	const editModalEl = document.getElementById('blog-edit-modal');
+	const editModalCloseEl = document.getElementById('blog-edit-close');
+	const editModalConfirmEl = document.getElementById('blog-edit-confirm');
+	const deleteModalEl = document.getElementById('insight-delete-modal');
+	const deleteModalCloseEl = document.getElementById('insight-delete-close');
+	const deleteModalConfirmEl = document.getElementById('insight-delete-confirm');
+	const deleteSubtitleEl = document.getElementById('insight-delete-subtitle');
+	let pendingDeletePostId = null;
+
+	const isAdminUser = () => {
+		return currentUserRole === 'ADMIN' || currentUserRole === 'ADMINISTRATOR' || currentUserRole === '관리자';
+	};
+
+	const setModalOpen = (modalId, open) => {
+		if (!modalId) return;
+		const el = document.getElementById(modalId);
+		if (!el) return;
+		if (open) {
+			el.classList.add('show');
+			el.setAttribute('aria-hidden', 'false');
+			document.body.classList.add('modal-open');
+		} else {
+			el.classList.remove('show');
+			el.setAttribute('aria-hidden', 'true');
+			if (!document.querySelector('.modal-overlay-full.show'))
+				document.body.classList.remove('modal-open');
+		}
+	};
+
+	const canModifyPost = (author) => {
+		const currentName = currentUserName || getHeaderUserName() || '나';
+		const a = String(author || '').trim();
+		if (!a) return false;
+		if (a === '나' || a === currentName) return true;
+		if (currentEmpNo && a === currentEmpNo) return true;
+		return isAdminUser();
+	};
+
+	const deletePost = async (pId) => {
+		if (!pId) return;
+		try {
+			// DB-backed
+			if (postIdNum) {
+				const res = await fetchJson(`${API_BASE}/${postIdNum}`, { method: 'DELETE' });
+				if (res.ok && res.data?.success) {
+					alert('삭제되었습니다.');
+					// Redirect to list
+					if (typeof blsSpaNavigate === 'function') {
+						blsSpaNavigate('/p/insight_blog_it');
+					} else {
+						window.location.href = '/p/insight_blog_it';
+					}
+				} else {
+					alert(res.data?.message || '삭제에 실패했습니다.');
+				}
+				return;
+			}
+
+			// localStorage-backed
+			const posts = loadPosts();
+			const idx = posts.findIndex((p) => String(p?.id) === String(pId));
+			if (idx >= 0) {
+				posts.splice(idx, 1);
+				savePosts(posts);
+				alert('삭제되었습니다.');
+				if (typeof blsSpaNavigate === 'function') {
+					blsSpaNavigate('/p/insight_blog_it');
+				} else {
+					window.location.href = '/p/insight_blog_it';
+				}
+			} else {
+				alert('게시글을 찾을 수 없습니다.');
+			}
+		} catch (e) {
+			console.warn(e);
+			alert('삭제 중 오류가 발생했습니다.');
+		}
+	};
+
+	// Initialize action buttons after post is loaded
+	function revealContentWithActions() {
+		const originalRevealContent = revealContent;
+		originalRevealContent();
+		// Show action buttons if user can modify
+		const author = postAuthorEl?.textContent || '';
+		if (canModifyPost(author) && actionWrapEl) {
+			actionWrapEl.hidden = false;
+			if (editBtnEl) editBtnEl.hidden = false;
+			if (deleteBtnEl) deleteBtnEl.hidden = false;
+		}
+	}
+
+	const openEditModal = () => setModalOpen('blog-edit-modal', true);
+	const closeEditModal = () => setModalOpen('blog-edit-modal', false);
+	const openDeleteModal = (pId) => {
+		pendingDeletePostId = pId;
+		if (deleteSubtitleEl) deleteSubtitleEl.textContent = '선택한 게시글을 정말 삭제하시겠습니까?';
+		setModalOpen('insight-delete-modal', true);
+	};
+	const closeDeleteModal = () => {
+		pendingDeletePostId = null;
+		setModalOpen('insight-delete-modal', false);
+	};
+
+	if (deleteBtnEl) {
+		deleteBtnEl.addEventListener('click', () => {
+			openDeleteModal(postId);
+		});
+	}
+
+	if (editBtnEl) {
+		editBtnEl.addEventListener('click', () => {
+			const author = postAuthorEl?.textContent || '';
+			try {
+				sessionStorage.setItem('blossom:blog:pending_edit_v1', JSON.stringify({ postId, author }));
+			} catch (_e) { /* ignore */ }
+			if (typeof blsSpaNavigate === 'function') {
+				blsSpaNavigate('/p/insight_blog_it');
+			} else {
+				window.location.href = '/p/insight_blog_it';
+			}
+		});
+	}
+
+	deleteModalCloseEl?.addEventListener('click', closeDeleteModal);
+	deleteModalEl?.addEventListener('click', (e) => {
+		if (e.target === deleteModalEl) closeDeleteModal();
+	});
+	deleteModalConfirmEl?.addEventListener('click', async () => {
+		if (!pendingDeletePostId) {
+			closeDeleteModal();
+			return;
+		}
+		const targetId = pendingDeletePostId;
+		closeDeleteModal();
+		await deletePost(targetId);
+	});
 });

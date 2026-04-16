@@ -71,8 +71,8 @@
 			var r = _rows[i];
 			var isCurrent = r.is_current;
 			var statusBadge = isCurrent
-				? '<span class="sess-badge sess-badge-current"><span class="sess-badge-dot"></span>현재 세션</span>'
-				: '<span class="sess-badge sess-badge-active"><span class="sess-badge-dot"></span>활성</span>';
+				? '<span class="status-pill"><span class="status-dot" style="background:#6366F1"></span>현재 세션</span>'
+				: '<span class="status-pill"><span class="status-dot" style="background:#10b981"></span>활성</span>';
 			var checkBox = isCurrent
 				? '<input type="checkbox" disabled>'
 				: '<input type="checkbox" class="sess-row-cb" data-id="' + r.id + '">';

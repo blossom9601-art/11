@@ -6,6 +6,7 @@ DB 직접 접근은 이 서비스 레이어에서만 수행한다.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -33,9 +34,90 @@ _SENSITIVE_FIELDS = {
     "system_owner_emp_no", "service_owner_emp_no",
 }
 
+_SECTION_ALIASES = {
+    "hw": "hardware",
+    "hardware": "hardware",
+    "if": "interface",
+    "iface": "interface",
+    "interface": "interface",
+    "interfaces": "interface",
+    "account": "account",
+    "accounts": "account",
+    "authority": "authority",
+    "authorities": "authority",
+    "firewalld": "firewalld",
+    "firewall": "firewalld",
+    "storage": "storage",
+    "package": "package",
+    "packages": "package",
+}
+
+_PAYLOAD_SECTION_KEYS = {
+    "interface": "interfaces",
+    "account": "accounts",
+    "authority": "authorities",
+    "firewalld": "firewalld",
+    "storage": "storage",
+    "package": "packages",
+}
+
 
 def _now() -> str:
     return datetime.now(_KST).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def normalize_agent_section(section: str) -> Optional[str]:
+    if not section:
+        return None
+    return _SECTION_ALIASES.get(str(section).strip().lower())
+
+
+def _load_agent_payload(raw_payload: Any) -> Dict[str, Any]:
+    if not raw_payload:
+        return {}
+    if isinstance(raw_payload, dict):
+        return raw_payload
+    try:
+        payload = json.loads(raw_payload)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _build_hardware_section(agent_row: Dict[str, Any], app=None) -> Dict[str, Any]:
+    section = {
+        "hostname": agent_row.get("hostname") or "",
+        "fqdn": agent_row.get("fqdn") or "",
+        "ip_address": agent_row.get("ip_address") or "",
+        "os_type": agent_row.get("os_type") or "",
+        "os_version": agent_row.get("os_version") or "",
+        "linked_asset_id": agent_row.get("linked_asset_id") or "",
+        "linked": bool(agent_row.get("is_linked")),
+        "status": agent_row.get("status") or compute_agent_status(agent_row),
+        "last_heartbeat": agent_row.get("last_heartbeat") or "",
+    }
+
+    inventory_result = get_agent_inventory(int(agent_row["id"]), app=app)
+    inventory = (inventory_result or {}).get("inventory") or {}
+    meta = inventory.get("meta") or {}
+    business = inventory.get("business") or {}
+    system = inventory.get("system") or {}
+
+    section.update({
+        "asset_name": meta.get("Name") or "",
+        "asset_category": meta.get("Category") or "",
+        "asset_type": meta.get("Type") or "",
+        "asset_code": meta.get("Code") or "",
+        "system_name": business.get("System Name") or "",
+        "system_ip": business.get("System IP") or "",
+        "mgmt_ip": business.get("Mgmt IP") or "",
+        "manufacturer": system.get("Manufacturer") or "",
+        "model": system.get("Model") or "",
+        "serial_number": system.get("Serial Number") or "",
+        "rack": system.get("Rack") or "",
+        "slot": system.get("Slot") or "",
+    })
+    return section
 
 
 # ── 스키마 마이그레이션 ──────────────────────────────────
@@ -151,6 +233,59 @@ def get_agent_detail(agent_id: int, app=None) -> Optional[Dict[str, Any]]:
         return d
     finally:
         conn.close()
+
+
+def get_agent_section(agent_id: int, section: str, app=None) -> Optional[Dict[str, Any]]:
+    """에이전트 상세의 섹션별 조회"""
+    normalized = normalize_agent_section(section)
+    if not normalized:
+        return None
+
+    agent = get_agent_detail(agent_id, app=app)
+    if not agent:
+        return None
+
+    payload = _load_agent_payload(agent.get("payload"))
+    result: Dict[str, Any] = {
+        "agent": {
+            "id": agent.get("id"),
+            "hostname": agent.get("hostname"),
+            "ip_address": agent.get("ip_address"),
+            "os_type": agent.get("os_type"),
+            "status": agent.get("status"),
+            "linked_asset_id": agent.get("linked_asset_id"),
+        },
+        "section": normalized,
+        "available_sections": [
+            "hardware",
+            "interface",
+            "account",
+            "authority",
+            "firewalld",
+            "storage",
+            "package",
+        ],
+    }
+
+    if normalized == "hardware":
+        result["item"] = _build_hardware_section(agent, app=app)
+        result["total"] = 1
+        return result
+
+    payload_key = _PAYLOAD_SECTION_KEYS.get(normalized)
+    if payload_key:
+        rows = payload.get(payload_key)
+        if not isinstance(rows, list):
+            rows = []
+        result["rows"] = rows
+        result["total"] = len(rows)
+        return result
+
+    # 향후 collector 확장을 위한 빈 섹션 응답
+    result["rows"] = []
+    result["total"] = 0
+    result["message"] = "수집된 데이터가 없습니다."
+    return result
 
 
 def get_agent_status(agent_id: int, app=None) -> Optional[Dict[str, Any]]:

@@ -806,7 +806,6 @@
             state.locations = [];
             state.data = [];
             applyFilter();
-            showMessage(err.message || '백업 테이프 목록을 불러오지 못했습니다.', '오류');
         }
     }
 

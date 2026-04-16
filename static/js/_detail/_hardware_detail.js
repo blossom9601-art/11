@@ -750,6 +750,200 @@
 		});
 	}
 
+	var _COLLECTED_MODAL_ID = 'lumina-collected-modal';
+	var _SECTION_LABELS = {
+		hardware: '하드웨어',
+		interface: '인터페이스',
+		account: '계정',
+		authority: '권한',
+		firewalld: '방화벽',
+		storage: '스토리지',
+		package: '패키지'
+	};
+
+	function _ensureCollectedModal(){
+		var existing = document.getElementById(_COLLECTED_MODAL_ID);
+		if(existing) return existing;
+		var overlay = document.createElement('div');
+		overlay.id = _COLLECTED_MODAL_ID;
+		overlay.className = 'modal-overlay-full';
+		overlay.setAttribute('aria-hidden', 'true');
+		overlay.style.cssText = 'position:fixed;inset:0;z-index:10120;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.42);backdrop-filter:blur(6px);padding:24px;';
+		overlay.innerHTML = '' +
+			'<div style="width:min(1120px,96vw);max-height:88vh;display:flex;flex-direction:column;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 28px 80px rgba(15,23,42,.24);">' +
+				'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px 28px 18px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);">' +
+					'<div>' +
+						'<div id="lumina-collected-title" style="font-size:20px;font-weight:700;color:#0f172a;">에이전트 수집 정보</div>' +
+						'<div id="lumina-collected-subtitle" style="margin-top:6px;font-size:13px;color:#475569;line-height:1.6;">수집 정보는 읽기 전용입니다. 수동 탭과 비교하면서 직접 등록하거나 수정하세요.</div>' +
+					'</div>' +
+					'<button id="lumina-collected-close" type="button" aria-label="닫기" style="border:none;background:transparent;color:#475569;font-size:24px;line-height:1;cursor:pointer;">&times;</button>' +
+				'</div>' +
+				'<div id="lumina-collected-body" style="padding:24px 28px;overflow:auto;background:#f8fafc;"></div>' +
+			'</div>';
+		document.body.appendChild(overlay);
+		overlay.addEventListener('click', function(ev){ if(ev.target === overlay) closeCollectedDataModal(); });
+		var closeBtn = document.getElementById('lumina-collected-close');
+		if(closeBtn) closeBtn.addEventListener('click', closeCollectedDataModal);
+		document.addEventListener('keydown', function(ev){
+			try{
+				if(ev.key === 'Escape') closeCollectedDataModal();
+			}catch(_){ }
+		});
+		return overlay;
+	}
+
+	function closeCollectedDataModal(){
+		var modal = document.getElementById(_COLLECTED_MODAL_ID);
+		if(!modal) return;
+		modal.style.display = 'none';
+		modal.setAttribute('aria-hidden', 'true');
+		if(!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
+	}
+
+	function _showCollectedModal(){
+		var modal = _ensureCollectedModal();
+		document.body.classList.add('modal-open');
+		modal.style.display = 'flex';
+		modal.setAttribute('aria-hidden', 'false');
+	}
+
+	function _escHtml(v){
+		return String(v == null ? '' : v)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	function _collectedValueHtml(value){
+		if(value == null || value === '') return '<span style="color:#94a3b8;">-</span>';
+		if(Array.isArray(value)) return _escHtml(value.join(', '));
+		if(typeof value === 'object') return '<pre style="margin:0;white-space:pre-wrap;font:inherit;color:#334155;">' + _escHtml(JSON.stringify(value, null, 2)) + '</pre>';
+		return _escHtml(value);
+	}
+
+	function _renderCollectedRows(rows){
+		if(!rows || !rows.length) return '<div style="padding:24px;background:#fff;border:1px dashed #cbd5e1;border-radius:18px;color:#64748b;">수집된 데이터가 없습니다.</div>';
+		var columns = [];
+		rows.forEach(function(row){
+			if(!row || typeof row !== 'object') return;
+			Object.keys(row).forEach(function(key){ if(columns.indexOf(key) === -1) columns.push(key); });
+		});
+		return '' +
+			'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:auto;">' +
+				'<table style="width:100%;border-collapse:collapse;min-width:760px;">' +
+					'<thead><tr>' + columns.map(function(key){
+						return '<th style="position:sticky;top:0;background:#eff6ff;padding:12px 14px;border-bottom:1px solid #dbeafe;text-align:left;font-size:12px;color:#334155;white-space:nowrap;">' + _escHtml(key) + '</th>';
+					}).join('') + '</tr></thead>' +
+					'<tbody>' + rows.map(function(row, idx){
+						return '<tr style="background:' + (idx % 2 ? '#fcfdff' : '#fff') + ';">' + columns.map(function(key){
+							return '<td style="padding:12px 14px;border-bottom:1px solid #eef2f7;vertical-align:top;font-size:13px;color:#334155;">' + _collectedValueHtml(row ? row[key] : '') + '</td>';
+						}).join('') + '</tr>';
+					}).join('') + '</tbody>' +
+				'</table>' +
+			'</div>';
+	}
+
+	function _renderCollectedItem(item){
+		if(!item || typeof item !== 'object') return '<div style="padding:24px;background:#fff;border:1px dashed #cbd5e1;border-radius:18px;color:#64748b;">수집된 데이터가 없습니다.</div>';
+		var keys = Object.keys(item);
+		if(!keys.length) return '<div style="padding:24px;background:#fff;border:1px dashed #cbd5e1;border-radius:18px;color:#64748b;">수집된 데이터가 없습니다.</div>';
+		return '' +
+			'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">' +
+				'<table style="width:100%;border-collapse:collapse;">' +
+				keys.map(function(key, idx){
+					return '<tr style="background:' + (idx % 2 ? '#fcfdff' : '#fff') + ';">' +
+						'<th style="width:220px;padding:14px 16px;text-align:left;font-size:13px;color:#0f172a;background:#f8fafc;border-bottom:1px solid #eef2f7;">' + _escHtml(key) + '</th>' +
+						'<td style="padding:14px 16px;font-size:13px;color:#334155;border-bottom:1px solid #eef2f7;">' + _collectedValueHtml(item[key]) + '</td>' +
+					'</tr>';
+				}).join('') +
+				'</table>' +
+			'</div>';
+	}
+
+	function openCollectedDataModal(options){
+		var opts = options || {};
+		var assetId = opts.assetId || resolveAssetId(opts.storagePrefix);
+		var section = String(opts.section || '').trim().toLowerCase();
+		if(!section){ window.alert('에이전트 비교 섹션이 지정되지 않았습니다.'); return; }
+		if(!assetId){ window.alert('선택된 자산 정보가 없습니다.'); return; }
+
+		_showCollectedModal();
+		var titleEl = document.getElementById('lumina-collected-title');
+		var subtitleEl = document.getElementById('lumina-collected-subtitle');
+		var bodyEl = document.getElementById('lumina-collected-body');
+		var sectionLabel = _SECTION_LABELS[section] || section;
+		if(titleEl) titleEl.textContent = '에이전트 수집 정보 - ' + sectionLabel;
+		if(subtitleEl) subtitleEl.textContent = '수집 정보는 읽기 전용입니다. ' + sectionLabel + ' 탭과 비교하면서 직접 등록하거나 수정하세요.';
+		if(bodyEl) bodyEl.innerHTML = '<div style="padding:32px;background:#fff;border:1px dashed #cbd5e1;border-radius:18px;color:#475569;">불러오는 중...</div>';
+
+		fetchJSON('/api/agent/linked/' + encodeURIComponent(String(assetId)) + '/collected?section=' + encodeURIComponent(section))
+			.then(function(data){
+				var item = data && data.item ? data.item : {};
+				var agent = item.agent || {};
+				var header = '' +
+					'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;">' +
+						'<div style="padding:14px 16px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;"><div style="font-size:12px;color:#64748b;">호스트</div><div style="margin-top:6px;font-size:15px;font-weight:600;color:#0f172a;">' + _escHtml(agent.hostname || '-') + '</div></div>' +
+						'<div style="padding:14px 16px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;"><div style="font-size:12px;color:#64748b;">IP</div><div style="margin-top:6px;font-size:15px;font-weight:600;color:#0f172a;">' + _escHtml(agent.ip_address || '-') + '</div></div>' +
+						'<div style="padding:14px 16px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;"><div style="font-size:12px;color:#64748b;">상태</div><div style="margin-top:6px;font-size:15px;font-weight:600;color:#0f172a;">' + _escHtml(agent.status || '-') + '</div></div>' +
+						'<div style="padding:14px 16px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;"><div style="font-size:12px;color:#64748b;">연동 자산</div><div style="margin-top:6px;font-size:15px;font-weight:600;color:#0f172a;">' + _escHtml(agent.linked_asset_id || '-') + '</div></div>' +
+					'</div>';
+				var content = item.item ? _renderCollectedItem(item.item) : _renderCollectedRows(item.rows || []);
+				var message = item.message ? '<div style="margin:0 0 16px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;font-size:13px;color:#9a3412;">' + _escHtml(item.message) + '</div>' : '';
+				if(bodyEl) bodyEl.innerHTML = header + message + content;
+			})
+			.catch(function(err){
+				if(bodyEl){
+					bodyEl.innerHTML = '<div style="padding:24px;background:#fff;border:1px solid #fecaca;border-radius:18px;color:#b91c1c;">' + _escHtml((err && err.message) || '에이전트 수집 정보를 불러오지 못했습니다.') + '</div>';
+				}
+			});
+	}
+
+	function initCollectedDataButton(options){
+		var opts = options || {};
+		var section = String(opts.section || '').trim().toLowerCase();
+		if(!section) return;
+		var btnId = opts.buttonId || ('lumina-agent-compare-open-' + section);
+		if(document.getElementById(btnId)) return;
+		var pane = document.querySelector('.server-detail-pane.active') || document.querySelector('.server-detail-content') || document.querySelector('.content-wrapper');
+		if(!pane) return;
+		var anchor = pane.querySelector('.detail-section') || pane.firstElementChild;
+		if(!anchor) return;
+
+		var btn = document.createElement('button');
+		btn.className = 'add-btn-icon';
+		btn.id = btnId;
+		btn.type = 'button';
+		btn.title = '에이전트 비교';
+		btn.setAttribute('aria-label', '에이전트 비교');
+		btn.innerHTML = '<img src="/static/image/svg/free-icon-font-robotic-arm.svg" alt="에이전트">';
+		pane.insertBefore(btn, anchor);
+
+		btn.addEventListener('click', function(){
+			openCollectedDataModal({
+				assetId: opts.assetId || resolveAssetId(opts.storagePrefix),
+				storagePrefix: opts.storagePrefix,
+				section: section
+			});
+		});
+	}
+
+	function _detectCollectedSection(){
+		try{
+			var m = String(location.pathname || '').match(/\/p\/([^\/\?#]+)/);
+			var key = m && m[1] ? decodeURIComponent(m[1]) : '';
+			if(/_hw$/.test(key)) return 'hardware';
+			if(/_if$/.test(key)) return 'interface';
+			if(/_account$/.test(key)) return 'account';
+			if(/_authority$/.test(key)) return 'authority';
+			if(/_firewalld$/.test(key)) return 'firewalld';
+			if(/_storage$/.test(key)) return 'storage';
+			if(/_package$/.test(key)) return 'package';
+		}catch(_){ }
+		return '';
+	}
+
 	window.BlossomHardwareDetail = {
 		getStored: getStored,
 		setStored: setStored,
@@ -762,6 +956,9 @@
 		normalizeBusinessKeys: normalizeBusinessKeys,
 		updateAgentIcon: updateAgentIcon,
 		initLinkButton: initLinkButton,
+		initCollectedDataButton: initCollectedDataButton,
+		openCollectedDataModal: openCollectedDataModal,
+		closeCollectedDataModal: closeCollectedDataModal,
 		openLinkModal: openLinkModal,
 		closeLinkModal: closeLinkModal
 	};
@@ -773,9 +970,18 @@
 		var aid = resolveAssetId();
 		initLinkButton(aid);
 	}
+
+	function _autoInitCollected(){
+		if(!window.BlossomHardwareDetail) return;
+		var section = _detectCollectedSection();
+		if(!section) return;
+		initCollectedDataButton({ section: section });
+	}
 	if(document.readyState === 'loading'){
 		document.addEventListener('DOMContentLoaded', _autoInit);
+		document.addEventListener('DOMContentLoaded', _autoInitCollected);
 	} else {
 		setTimeout(_autoInit, 0);
+		setTimeout(_autoInitCollected, 0);
 	}
 })();

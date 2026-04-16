@@ -11,9 +11,9 @@
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
     <!-- 버전 파라미터 bump (캐시 강제 무효화) -->
     <!-- v1.0.13: 메시지 모달 레이아웃/텍스트 색상 온프레미스 완전 동기화 + 스티커 축소 유지 -->
-    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.20">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.33">
     <script src="/static/js/blossom.js"></script>
-    <script src="/static/js/authentication/11-3.admin/11-3-1.user/1.user_list.js?v=20260228d"></script>
+    <script src="/static/js/authentication/11-3.admin/11-3-1.user/1.user_list.js?v=20260413g"></script>
 </head>
 <body>
     <span id="debug-users-count" style="display:none">0</span>
@@ -175,8 +175,12 @@
                                 <div class="form-row"><label>사번<span class="required">*</span></label><input class="form-input" type="text" name="emp_no" required placeholder="사번" maxlength="32" id="edit-emp-no"></div>
                                 <div class="form-row"><label>이름<span class="required">*</span></label><input class="form-input" type="text" name="name" required placeholder="이름" maxlength="64" id="edit-name"></div>
                                 <div class="form-row"><label>별명</label><input class="form-input" type="text" name="nickname" placeholder="별명" maxlength="64" id="edit-nickname"></div>
-                                <div class="form-row"><label>회사</label><input class="form-input" type="text" name="company" placeholder="회사" maxlength="128" id="edit-company"></div>
-                                <div class="form-row"><label>소속</label><input class="form-input" type="text" name="department" placeholder="소속" maxlength="128" id="edit-department"></div>
+                                <div class="form-row"><label>회사</label><select class="form-input" name="company" id="edit-company">
+                                        <option value="">회사 선택</option>
+                                    </select></div>
+                                <div class="form-row"><label>소속</label><select class="form-input" name="department" id="edit-department">
+                                        <option value="">소속 선택</option>
+                                    </select></div>
                                 <div class="form-row"><label>재직</label><select class="form-input" name="employment_status" id="edit-employment-status">
                                         <option value="재직">재직</option>
                                         <option value="휴직">휴직</option>
@@ -298,16 +302,17 @@
                         <div class="dispose-text">
                             <p>삭제처리는 선택한 사용자를 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
                             <p>확인 후에는 선택된 사용자에 대해 삭제 프로세스를 진행합니다.</p>
-                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                            <p data-common-delete="warn">삭제된 데이터는 복구할 수 없습니다.</p>
                         </div>
                         <div class="dispose-illust">
-                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                            <img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
                         </div>
                     </div>
                 </div>
                 <div class="server-add-actions align-right">
                     <div class="action-buttons right">
-                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+                        <button type="button" class="btn-secondary" id="system-delete-cancel">취소</button>
+                        <button type="button" class="btn-danger" id="system-delete-confirm">삭제</button>
                     </div>
                 </div>
             </div>
@@ -346,8 +351,12 @@
                                 <div class="form-row"><label>사번<span class="required">*</span></label><input class="form-input" type="text" name="emp_no" required placeholder="사번" maxlength="32"></div>
                                 <div class="form-row"><label>이름<span class="required">*</span></label><input class="form-input" type="text" name="name" required placeholder="이름" maxlength="64"></div>
                                 <div class="form-row"><label>별명</label><input class="form-input" type="text" name="nickname" placeholder="별명" maxlength="64"></div>
-                                <div class="form-row"><label>회사</label><input class="form-input" type="text" name="company" placeholder="회사" maxlength="128"></div>
-                                <div class="form-row"><label>소속</label><input class="form-input" type="text" name="department" placeholder="소속" maxlength="128"></div>
+                                <div class="form-row"><label>회사</label><select class="form-input" name="company" id="add-company">
+                                        <option value="">회사 선택</option>
+                                    </select></div>
+                                <div class="form-row"><label>소속</label><select class="form-input" name="department" id="add-department">
+                                        <option value="">소속 선택</option>
+                                    </select></div>
                                 <div class="form-row"><label>재직</label><select class="form-input" name="employment_status">
                                         <option value="재직" selected>재직</option>
                                         <option value="휴직">휴직</option>

@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/category2.css">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260414">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -75,9 +75,6 @@
                                 <button class="header-btn" id="system-stats-btn" title="통계" aria-label="현재 결과 통계 보기">
                                     <img src="/static/image/svg/list/free-icon-chart.svg" alt="통계" class="header-icon">
                                 </button>
-                                <button class="header-btn" id="system-duplicate-btn" title="행 복제" aria-label="선택 행 복제">
-                                    <img src="/static/image/svg/list/free-icon-globe.svg" alt="행 복제" class="header-icon">
-                                </button>
                                 <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
                                 <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
                             </div>
@@ -123,8 +120,8 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js"></script>
-    <script src="/static/js/9.category/9-1.business/9-1-1.work_classification/1.work_classification_list.js"></script>
+        <script src="/static/js/blossom.js?v=20260415_cat_dup_remove2"></script>
+    <script src="/static/js/9.category/9-1.business/9-1-1.work_classification/1.work_classification_list.js?v=20260415_dup_error2"></script>
 
         <!-- 업무 분류 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -139,13 +136,13 @@
                     <form id="system-add-form">
                         <div class="form-section">
                             <div class="section-header"><h4>업무 분류</h4></div>
+                            <input type="hidden" name="hw_count" value="0">
+                            <input type="hidden" name="sw_count" value="0">
                             <div class="form-grid">
                                 <div class="form-row"><label>업무 분류<span class="required">*</span></label><input name="wc_name" class="form-input" placeholder="업무 분류명" required></div>
                                 <div class="form-row"><label>설명</label><input name="wc_desc" class="form-input" placeholder="설명"></div>
-                                <input type="hidden" name="hw_count" value="0">
-                                <input type="hidden" name="sw_count" value="0">
-                                <div class="form-row form-row-wide"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="6" placeholder="비고"></textarea></div>
                             </div>
+                            <div class="form-row"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="6" placeholder="비고"></textarea></div>
                         </div>
                     </form>
                 </div>
@@ -203,38 +200,8 @@
             </div>
         </div>
 
-        <!-- 행 복제 확인 모달 -->
-        <div id="system-duplicate-modal" class="server-add-modal system-duplicate-modal modal-overlay-full" aria-hidden="true">
-            <div class="server-add-content">
-                <div class="server-add-header">
-                    <div class="server-add-title dispose-title">
-                        <h3>행 복제</h3>
-                        <p class="server-add-subtitle" id="duplicate-subtitle">선택된 0개의 행을 복제합니다.</p>
-                    </div>
-                    <button class="close-btn" type="button" id="system-duplicate-close" title="닫기">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                </div>
-                <div class="server-add-body">
-                    <div class="dispose-content">
-                        <div class="dispose-text">
-                            <p>선택된 행의 복제본을 생성합니다.</p>
-                                <p>복제 후 <strong>업무 분류</strong> 끝에 _COPY가 붙습니다.</p>
-                        </div>
-                        <div class="dispose-illust">
-                            <img src="/static/image/svg/list/free-sticker-programming.svg" alt="Programming Illustration" loading="lazy" />
-                        </div>
-                    </div>
-                </div>
-                <div class="server-add-actions align-right">
-                    <div class="action-buttons right">
-                        <button type="button" class="btn-primary" id="system-duplicate-confirm">복제</button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- CSV 다운로드 확인 모달 -->
+<!-- CSV 다운로드 확인 모달 -->
         {% include 'layouts/_download_modal_range.html' %}
 
 
@@ -267,7 +234,7 @@
 
         {% include 'layouts/_stats_modal.html' %}
 
-        <script src="/static/js/common/info-message.js?v=1.0.0"></script>
+        <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>
 

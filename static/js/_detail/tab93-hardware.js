@@ -533,7 +533,10 @@
     ready(initTab93);
 
     /* SPA 재진입 — initTab93 바깥에 등록하여 항상 활성 */
-    document.addEventListener('blossom:pageLoaded', function () {
-        initTab93();
-    });
+    if (!window.__blsTab93PageLoadedBound) {
+        window.__blsTab93PageLoadedBound = true;
+        document.addEventListener('blossom:pageLoaded', function () {
+            initTab93();
+        });
+    }
 })();

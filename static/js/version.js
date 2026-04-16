@@ -124,7 +124,11 @@
 
   function updateCount(total) {
     var el = $('vr-count');
-    if (el) el.textContent = total;
+    if (!el) return;
+    el.textContent = total;
+    el.classList.remove('large-number', 'very-large-number');
+    if (total >= 1000) el.classList.add('very-large-number');
+    else if (total >= 100) el.classList.add('large-number');
   }
 
   function updateEmptyState(total) {
@@ -464,9 +468,23 @@
     bindEvents();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  function safeInit() {
+    // 이 페이지의 DOM이 없으면 무시 (다른 페이지 SPA 이동 시)
+    var marker = $('vr-tbody') || $('ver-version');
+    if (!marker) return;
+    // 같은 DOM 인스턴스에서 중복 실행 방지 (blossom:pageLoaded 이중 발화 대응)
+    if (marker.dataset.blsInit) return;
+    marker.dataset.blsInit = '1';
     init();
   }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', safeInit);
+  } else {
+    safeInit();
+  }
+  // blossom.js가 SPA 스왑 직후 직접 호출할 수 있는 훅
+  window.__blossomInitVersionPage = safeInit;
+  // SPA 재방문 시 재초기화
+  document.addEventListener('blossom:pageLoaded', safeInit);
 })();
