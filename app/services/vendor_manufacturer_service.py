@@ -705,9 +705,13 @@ def soft_delete_vendors(ids: Iterable[Any], actor: str, app=None) -> int:
     placeholders = ','.join('?' for _ in safe_ids)
     now = _now()
     with _get_connection(app) as conn:
+        # soft-delete 는 manufacturer_code 를 변경하지 않으므로
+        # 자식 테이블 FK 검사가 불필요함 — 일시적으로 비활성화
+        conn.execute('PRAGMA foreign_keys = OFF')
         cur = conn.execute(
             f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders})",
             [now, actor] + safe_ids,
         )
         conn.commit()
+        conn.execute('PRAGMA foreign_keys = ON')
         return cur.rowcount

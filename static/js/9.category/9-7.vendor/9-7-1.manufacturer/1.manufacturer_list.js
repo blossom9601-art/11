@@ -411,7 +411,18 @@
         if(!Array.isArray(ids) || !ids.length){
             throw new Error('삭제할 항목을 선택하세요.');
         }
-        await apiRequest(`${VENDOR_API_BASE}/bulk-delete`, { method: 'POST', body: { ids } });
+        const safeIds = ids
+            .map(id => parseInt(id, 10))
+            .filter(id => Number.isFinite(id) && id > 0);
+        if(!safeIds.length){
+            throw new Error('삭제할 항목의 식별자(id)가 올바르지 않습니다.');
+        }
+        const data = await apiRequest(`${VENDOR_API_BASE}/bulk-delete`, { method: 'POST', body: { ids: safeIds } });
+        const deleted = parseInt(data?.deleted ?? 0, 10) || 0;
+        if(deleted <= 0){
+            throw new Error(data?.message || '삭제 처리된 항목이 없습니다. 새로고침 후 다시 시도하세요.');
+        }
+        return deleted;
     }
 
     // Optional demo: override the visible counter via URL param without changing data/pagination
@@ -1558,11 +1569,11 @@
             const btn = document.getElementById(DELETE_CONFIRM_ID);
             if(btn) btn.disabled = true;
             try{
-                await deleteVendorRecords(ids);
+                const deleted = await deleteVendorRecords(ids);
                 state.selected.clear();
                 await loadVendors({ silent: true });
                 closeModal(DELETE_MODAL_ID);
-                showMessage(`${ids.length}개 항목이 삭제되었습니다.`, '완료');
+                showMessage(`${deleted}개 항목이 삭제되었습니다.`, '완료');
             }catch(err){
                 console.error(err);
                 showMessage(err.message || '삭제 처리 중 오류가 발생했습니다.', '오류');

@@ -3994,15 +3994,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { capture: true, passive: true });
     }
     
+    function closeOtherSubmenus(exceptMenuItem) {
+        var openSubmenus = document.querySelectorAll('.menu-item.has-submenu.open');
+        openSubmenus.forEach(function (openItem) {
+            if (openItem !== exceptMenuItem) {
+                openItem.classList.remove('open');
+                var openSub = openItem.querySelector('.submenu');
+                if (openSub) openSub.style.maxHeight = '0';
+            }
+        });
+    }
+
     // 서브메뉴 상태 저장 함수
     function saveSubmenuState() {
         const openSubmenus = document.querySelectorAll('.menu-item.has-submenu.open');
-        const openMenuIds = Array.from(openSubmenus).map(item => {
-            const menuText = item.querySelector('.menu-text');
-            return menuText ? menuText.textContent.trim() : '';
-        }).filter(id => id);
-        
-        localStorage.setItem('openSubmenus', JSON.stringify(openMenuIds));
+        const firstOpen = openSubmenus.length > 0 ? openSubmenus[0] : null;
+        const menuText = firstOpen ? firstOpen.querySelector('.menu-text') : null;
+        const openMenuId = menuText ? menuText.textContent.trim() : '';
+
+        if (openMenuId) {
+            localStorage.setItem('openSubmenus', JSON.stringify([openMenuId]));
+        } else {
+            localStorage.removeItem('openSubmenus');
+        }
     }
     
     // 저장된 서브메뉴 상태 복원
@@ -4010,19 +4024,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedOpenMenus = localStorage.getItem('openSubmenus');
         if (savedOpenMenus) {
             try {
-                const openMenuIds = JSON.parse(savedOpenMenus);
-                openMenuIds.forEach(menuId => {
-                    const menuItems = document.querySelectorAll('.menu-item.has-submenu');
-                    menuItems.forEach(item => {
-                        const menuText = item.querySelector('.menu-text');
-                        if (menuText && menuText.textContent.trim() === menuId) {
-                            item.classList.add('open');
-                            const submenu = item.querySelector('.submenu');
-                            if (submenu) {
-                                submenu.style.maxHeight = submenu.scrollHeight + 'px';
-                            }
+                const parsed = JSON.parse(savedOpenMenus);
+                const openMenuIds = Array.isArray(parsed) ? parsed : [parsed];
+                const menuId = (openMenuIds[0] || '').trim();
+                if (!menuId) return;
+
+                const menuItems = document.querySelectorAll('.menu-item.has-submenu');
+                menuItems.forEach(item => {
+                    const menuText = item.querySelector('.menu-text');
+                    if (menuText && menuText.textContent.trim() === menuId) {
+                        closeOtherSubmenus(item);
+                        item.classList.add('open');
+                        const submenu = item.querySelector('.submenu');
+                        if (submenu) {
+                            submenu.style.maxHeight = submenu.scrollHeight + 'px';
                         }
-                    });
+                    }
                 });
             } catch (e) {
                 console.error('서브메뉴 상태 복원 중 오류:', e);
@@ -4063,7 +4080,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parentSubmenu = link.closest('.submenu');
                 if (parentSubmenu) {
                     const parentMenuItem = parentSubmenu.closest('.menu-item');
-                    if (parentMenuItem) parentMenuItem.classList.add('open');
+                    if (parentMenuItem) {
+                        closeOtherSubmenus(parentMenuItem);
+                        parentMenuItem.classList.add('open');
+                    }
                     parentSubmenu.style.maxHeight = parentSubmenu.scrollHeight + 'px';
                     setTimeout(() => { saveSubmenuState(); }, 100);
                 }

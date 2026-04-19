@@ -5,32 +5,136 @@
  */
 (function(){
     // External dependencies
+    var LOTTIE_LOCAL = '/static/js/vendor/lottie.min.js';
     var LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
     var NODATA_LOTTIE_PATH = '/static/image/svg/free-animated-no-data.json';
+    var _lottieLoading = false;
+    var _lottieReady = false;
+    var _lottieCallbacks = [];
 
     function ensureLottie(cb){
-        if(window.lottie){ cb(); return; }
-        var s = document.createElement('script'); s.src = LOTTIE_CDN; s.async = true; s.onload = function(){ cb(); }; document.head.appendChild(s);
+        if(window.lottie || window.bodymovin){
+            window.lottie = window.lottie || window.bodymovin;
+            _lottieReady = true;
+            cb();
+            return;
+        }
+
+        _lottieCallbacks.push(cb);
+
+        if(_lottieLoading){ return; }
+        _lottieLoading = true;
+
+        var sources = [LOTTIE_LOCAL, LOTTIE_CDN];
+        var idx = 0;
+
+        function done(){
+            _lottieLoading = false;
+            window.lottie = window.lottie || window.bodymovin;
+            _lottieReady = !!window.lottie;
+            if(_lottieReady){
+                var pending = _lottieCallbacks.slice();
+                _lottieCallbacks.length = 0;
+                pending.forEach(function(fn){
+                    try { fn(); } catch(_e){}
+                });
+            } else {
+                _lottieCallbacks.length = 0;
+            }
+        }
+
+        function loadNext(){
+            window.lottie = window.lottie || window.bodymovin;
+            if(window.lottie){ done(); return; }
+            if(idx >= sources.length){ done(); return; }
+            var s = document.createElement('script');
+            s.src = sources[idx++];
+            s.async = true;
+            s.onload = function(){
+                window.lottie = window.lottie || window.bodymovin;
+                if(window.lottie){ done(); }
+                else { loadNext(); }
+            };
+            s.onerror = function(){ loadNext(); };
+            document.head.appendChild(s);
+        }
+
+        loadNext();
+    }
+
+    function buildNoDataFallbackSvg(){
+        return '' +
+            '<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+                '<defs>' +
+                    '<linearGradient id="dashboardNoDataBg" x1="20" y1="18" x2="95" y2="102" gradientUnits="userSpaceOnUse">' +
+                        '<stop stop-color="#F8FBFF"/>' +
+                        '<stop offset="1" stop-color="#EEF4FB"/>' +
+                    '</linearGradient>' +
+                '</defs>' +
+                '<rect x="18" y="20" width="84" height="80" rx="20" fill="url(#dashboardNoDataBg)" stroke="#D8E3F0"/>' +
+                '<rect x="32" y="36" width="56" height="8" rx="4" fill="#C2D1E2"/>' +
+                '<rect x="32" y="50" width="40" height="8" rx="4" fill="#D3DEEA"/>' +
+                '<rect x="32" y="68" width="12" height="18" rx="4" fill="#A8BDD3"/>' +
+                '<rect x="50" y="60" width="12" height="26" rx="4" fill="#8FA9C6"/>' +
+                '<rect x="68" y="72" width="12" height="14" rx="4" fill="#C7D5E5"/>' +
+                '<circle cx="85" cy="84" r="12" fill="#FFFFFF" stroke="#D8E3F0"/>' +
+                '<path d="M85 78V85L89.5 88.5" stroke="#7B93AE" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
+    }
+
+    function toNum(v){
+        var n = Number(v);
+        return isFinite(n) ? n : 0;
+    }
+
+    function hasPositiveValueDeep(obj){
+        if(obj == null) return false;
+        if(Array.isArray(obj)){
+            for(var i = 0; i < obj.length; i++){
+                if(hasPositiveValueDeep(obj[i])) return true;
+            }
+            return false;
+        }
+        if(typeof obj === 'object'){
+            var keys = Object.keys(obj);
+            for(var k = 0; k < keys.length; k++){
+                if(hasPositiveValueDeep(obj[keys[k]])) return true;
+            }
+            return false;
+        }
+        return toNum(obj) > 0;
     }
 
     /** 데이터가 없을 때 Lottie 애니메이션을 노출 */
     function showNoData(containerId, legendId){
         var el = document.getElementById(containerId);
         if(!el) return;
-        el.innerHTML = '<div class="no-data-lottie" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;flex-direction:column;">' +
-            '<div id="lottie-' + containerId + '" style="width:140px;height:140px;"></div>' +
-            '<span style="color:#94a3b8;font-size:13px;margin-top:4px;">데이터 없음</span></div>';
+        el.innerHTML = '<div class="no-data-lottie" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;flex-direction:column;position:relative;">' +
+            '<div id="lottie-' + containerId + '" style="width:240px;max-width:100%;height:180px;display:flex;align-items:center;justify-content:center;"></div>' +
+            '<span style="color:#64748b;font-size:13px;font-weight:600;margin-top:6px;">데이터 없음</span></div>';
         ensureLottie(function(){
-            try {
-                window.lottie.loadAnimation({
-                    container: document.getElementById('lottie-' + containerId),
-                    renderer: 'svg',
-                    loop: true,
-                    autoplay: true,
-                    path: NODATA_LOTTIE_PATH,
-                    rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
+            var lottieEl = document.getElementById('lottie-' + containerId);
+            if(!lottieEl){ return; }
+
+            // JSON 직접 fetch 후 animationData로 주입해 path 기반 fetch 이슈를 우회한다.
+            fetch(NODATA_LOTTIE_PATH, { cache: 'no-store', credentials: 'same-origin' })
+                .then(function(r){
+                    if(!r.ok) throw new Error('json ' + r.status);
+                    return r.json();
+                })
+                .then(function(json){
+                    window.lottie.loadAnimation({
+                        container: lottieEl,
+                        renderer: 'svg',
+                        loop: true,
+                        autoplay: true,
+                        animationData: json,
+                        rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
+                    });
+                })
+                .catch(function(){
+                    lottieEl.innerHTML = '<span style="font-size:12px;color:#94a3b8;">애니메이션 로드 실패</span>';
                 });
-            } catch(_e){}
         });
         var legend = document.getElementById(legendId);
         if(legend) legend.innerHTML = '';
@@ -93,7 +197,7 @@
 
         var data = dataset && dataset.length ? dataset : [];
         var total = 0;
-        data.forEach(function(d){ total += (d.val || 0); });
+        data.forEach(function(d){ total += toNum(d.val); });
 
         if(!data.length || total === 0){
             showNoData(targetId, legendId);
@@ -105,9 +209,10 @@
 
         var acc = 0; var parts = [];
         data.forEach(function(d){
-            var ratio = total ? (d.val/total) : 0;
+            var val = toNum(d.val);
+            var ratio = total ? (val/total) : 0;
             var dPath;
-            if(d.val >= total){
+            if(val >= total){
                 // 100% 단일 아이템: SVG arc는 시작점=끝점이면 렌더링 불가 → 두 반원으로 분할
                 dPath = 'M ' + cx + ' ' + cy +
                     ' L ' + cx + ' ' + (cy - r) +
@@ -115,16 +220,16 @@
                     ' A ' + r + ' ' + r + ' 0 0 1 ' + cx + ' ' + (cy - r) + ' Z';
             } else {
                 var start = (acc/total) * Math.PI*2 - Math.PI/2;
-                acc += d.val;
+                acc += val;
                 var end = (acc/total) * Math.PI*2 - Math.PI/2;
                 var x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
                 var x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
                 var large = (end - start) > Math.PI ? 1 : 0;
                 dPath = 'M ' + cx + ' ' + cy + ' L ' + x1 + ' ' + y1 + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2 + ' ' + y2 + ' Z';
             }
-            if(d.val < total) acc = acc; // acc already updated in else branch
+            if(val < total) acc = acc; // acc already updated in else branch
             else acc = total;
-            parts.push('<path d="' + dPath + '" fill="' + d.color + '" fill-opacity="0.9" stroke="#fff" stroke-width="1" data-label="' + d.label + '" data-val="' + d.val + '" data-total="' + total + '" data-color="' + d.color + '" aria-label="' + d.label + ' ' + d.val + ' (' + Math.round(ratio*100) + '%)"/>');
+            parts.push('<path d="' + dPath + '" fill="' + d.color + '" fill-opacity="0.9" stroke="#fff" stroke-width="1" data-label="' + d.label + '" data-val="' + val + '" data-total="' + total + '" data-color="' + d.color + '" aria-label="' + d.label + ' ' + val + ' (' + Math.round(ratio*100) + '%)"/>');
         });
 
         var hole = options && typeof options.holeRatio === 'number' ? Math.max(0, Math.min(0.9, options.holeRatio)) : null;
@@ -376,7 +481,20 @@
     function fetchDashboard(range){
         return fetch('/api/dashboard/stats?range=' + encodeURIComponent(range || '1m'), {
             credentials: 'same-origin'
-        }).then(function(r){ return r.json(); });
+        }).then(function(r){
+            var contentType = (r.headers.get('content-type') || '').toLowerCase();
+            if(!r.ok || contentType.indexOf('application/json') === -1){
+                throw new Error('dashboard_api_unavailable:' + r.status);
+            }
+            return r.json();
+        });
+    }
+
+    function renderDashboardEmpty(){
+        ['chart-hw', 'chart-sw', 'chart-prj', 'chart-mtce', 'chart-task'].forEach(function(chartId){
+            var legendId = chartId.replace('chart-', 'legend-');
+            showNoData(chartId, legendId);
+        });
     }
 
     // ──── KPI 업데이트 ────
@@ -485,10 +603,15 @@
         var labels = MTCE_TYPE_KEYS.map(function(k){ return MTCE_TYPE_LABELS[k]; });
         var costData = MTCE_TYPE_KEYS.map(function(k){
             for(var i=0; i<byType.length; i++){
-                if(byType[i].key === k) return byType[i].cost || 0;
+                if(byType[i].key === k) return toNum(byType[i].cost);
             }
             return 0;
         });
+
+        if(!hasPositiveValueDeep(costData)){
+            showNoData('chart-mtce', 'legend-mtce');
+            return;
+        }
 
         renderGroupedBarsWithLine('chart-mtce', labels, [costData], ['비용'], null, null);
 
@@ -505,7 +628,7 @@
     /** 3m/1y: 누적 막대(비용) */
     function renderMtceMultiChart(monthly){
         var months = Object.keys(monthly).sort();
-        if(months.length === 0){
+        if(months.length === 0 || !hasPositiveValueDeep(monthly)){
             showNoData('chart-mtce', 'legend-mtce');
             return;
         }
@@ -536,7 +659,7 @@
     /** 작업: 1m → 당월 상태별 막대, 3m/1y → 월별 누적 막대 */
     function renderTaskChartFromAPI(monthly, range){
         var months = Object.keys(monthly).sort();
-        if(months.length === 0){
+        if(months.length === 0 || !hasPositiveValueDeep(monthly)){
             showNoData('chart-task', 'legend-task');
             return;
         }
@@ -558,7 +681,12 @@
             }
             var keys = Object.keys(entry);
             var labels = keys.map(function(k){ return statusLabels[k] || k; });
-            var vals = keys.map(function(k){ return entry[k] || 0; });
+            var vals = keys.map(function(k){ return toNum(entry[k]); });
+
+            if(!hasPositiveValueDeep(vals)){
+                showNoData('chart-task', 'legend-task');
+                return;
+            }
 
             renderGroupedBarsWithLine('chart-task', labels, [vals], ['건수'], null, null);
 
@@ -589,9 +717,14 @@
             return months.map(function(m){
                 var entry = monthly[m];
                 if(!entry || typeof entry !== 'object') return 0;
-                return entry[k] || 0;
+                return toNum(entry[k]);
             });
         });
+
+        if(!hasPositiveValueDeep(seriesList)){
+            showNoData('chart-task', 'legend-task');
+            return;
+        }
         var seriesNames = statusKeys.map(function(k){ return statusLabels[k] || k; });
 
         renderStackedBars('chart-task', labels, seriesList, seriesNames);
@@ -608,6 +741,7 @@
     function applyData(data){
         if(!data || !data.success){
             console.warn('[dashboard] API error', data);
+            renderDashboardEmpty();
             return;
         }
         populateKPIs(data);
@@ -634,6 +768,7 @@
         function loadData(range){
             fetchDashboard(range).then(applyData).catch(function(err){
                 console.error('[dashboard] fetch error', err);
+                renderDashboardEmpty();
             });
         }
 

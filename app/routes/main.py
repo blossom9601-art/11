@@ -57,16 +57,13 @@ def dashboard():
         session['pending_terms_user_id'] = user.id
         return redirect(url_for('auth.terms'))
 
-    # SPA: 직접 방문 → 셸 반환, JS fetch → 풀 템플릿
-    if not _is_spa_fetch():
-        return render_template('layouts/spa_shell.html', current_key='dashboard', menu_code='dashboard')
-
     user_info = {
         'emp_no': session.get('emp_no'),
         'role': session.get('role')
     }
 
-    # 첫 화면으로 요구된 템플릿을 직접 렌더링
+    # /dashboard 직접 접근에서도 대시보드 템플릿을 즉시 렌더링한다.
+    # SPA 셸/추가 fetch 단계에 의존하지 않도록 하여 빈 데이터 스티커를 확실히 노출한다.
     return render_template('1.dashboard/1.dashboard.html', user=user_info)
 
 

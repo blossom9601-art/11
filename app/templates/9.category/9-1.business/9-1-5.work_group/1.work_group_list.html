@@ -136,7 +136,7 @@
             window.__CAT_BUSINESS_GROUP_DETAIL_URL = "{{ url_for('pages.show', key='cat_business_group_detail') }}";
         </script>
         <script src="/static/js/blossom.js?v=20260415_cat_dup_remove2"></script>
-    <script src="/static/js/9.category/9-1.business/9-1-5.work_group/1.work_group_list.js?v=20260415_dup_error2"></script>
+    <script src="/static/js/9.category/9-1.business/9-1-5.work_group/1.work_group_list.js?v=20260419_wg_status_plain5"></script>
 
     <!-- 업무 그룹 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -153,11 +153,11 @@
                             <div class="section-header"><h4>업무 그룹</h4></div>
                             <div class="form-grid">
                                 <div class="form-row"><label>업무 상태<span class="required">*</span></label>
-                                    <select name="work_status" class="form-input search-select" data-placeholder="업무 상태 선택" required>
+                                    <select name="work_status" class="form-input" required>
                                         <option value="">선택</option>
-                                        <option value="가동">가동</option>
-                                        <option value="예비">예비</option>
-                                        <option value="종료">종료</option>
+                                        <option value="정상">정상</option>
+                                        <option value="보류">보류</option>
+                                        <option value="폐기">폐기</option>
                                     </select>
                                 </div>
                                 <div class="form-row"><label>업무 그룹<span class="required">*</span></label><input name="wc_name" class="form-input" placeholder="업무 그룹명" required></div>

@@ -187,7 +187,11 @@
     const ENUM_SETS = { };
     const API_ENDPOINT = '/api/work-groups';
     const ORG_DEPARTMENTS_ENDPOINT = '/api/org-departments';
-    const WORK_STATUSES_ENDPOINT = '/api/work-statuses';
+    const FIXED_WORK_STATUSES = [
+        { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
+        { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
+        { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+    ];
     const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' };
     // Ensure the searchable-select helper is available before opening modals.
     // Some users can click very quickly before blossom.js finishes injecting the helper.
@@ -293,39 +297,16 @@
         return mapped;
     }
 
-    async function fetchWorkStatuses(){
-        const response = await fetch(`${WORK_STATUSES_ENDPOINT}?_=${Date.now()}`, {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin'
-        });
-        const json = await response.json().catch(()=> ({}));
-        if(!response.ok || json.success === false){
-            throw new Error(json?.message || '업무 상태 목록을 불러오지 못했습니다.');
-        }
-        const items = Array.isArray(json.items) ? json.items : [];
-        const mapped = items.map((r)=>(
-            {
-                status_code: String(r.status_code ?? r.code ?? '').trim(),
-                status_name: String(r.status_name ?? r.wc_name ?? r.name ?? '').trim(),
-                // status tab stores wc_color as a CSS class (e.g. ws-run, ws-c3)
-                wc_color: String(r.wc_color ?? r.status_level ?? '').trim()
-            }
-        )).filter(r=> r.status_code && r.status_name);
-        mapped.sort((a,b)=> a.status_name.localeCompare(b.status_name,'ko-KR'));
-        return mapped;
-    }
-
     function ensureLookupsLoaded(){
         if(LOOKUPS.departments && LOOKUPS.statuses){
             return Promise.resolve({ departments: LOOKUPS.departments, statuses: LOOKUPS.statuses });
         }
         if(LOOKUPS.loadPromise) return LOOKUPS.loadPromise;
         LOOKUPS.loadPromise = (async()=>{
-            const [departments, statuses] = await Promise.all([
-                fetchOrgDepartments().catch((e)=>{ console.warn(e); return []; }),
-                fetchWorkStatuses().catch((e)=>{ console.warn(e); return []; })
+            const [departments] = await Promise.all([
+                fetchOrgDepartments().catch((e)=>{ console.warn(e); return []; })
             ]);
+            const statuses = FIXED_WORK_STATUSES.slice();
             LOOKUPS.departments = departments;
             LOOKUPS.statuses = statuses;
             rebuildLookupMaps();
@@ -358,15 +339,58 @@
         const form = document.getElementById(ADD_FORM_ID);
         if(!form) return;
         const deptSel = form.querySelector('select[name="sys_dept"]');
-        const statusSel = form.querySelector('select[name="work_status"]');
         // Only overwrite existing options when the lookup list is non-empty.
         // This prevents wiping the fallback static options in templates when an API returns non-JSON/empty payload.
         if((LOOKUPS.departments || []).length){
             setSelectOptions(deptSel, LOOKUPS.departments || [], (r)=>r.dept_code, (r)=>r.dept_name);
         }
-        if((LOOKUPS.statuses || []).length){
-            setSelectOptions(statusSel, LOOKUPS.statuses || [], (r)=>r.status_code, (r)=>r.status_name);
+        ensureNativeWorkStatusSelect(form);
+    }
+
+    function ensureNativeWorkStatusSelect(root){
+        const scope = root && typeof root.querySelector === 'function' ? root : document;
+        const statusSel = scope.querySelector('select[name="work_status"]');
+        if(!statusSel) return;
+
+        statusSel.classList.remove('search-select', 'fk-search-native-hidden');
+        statusSel.removeAttribute('data-placeholder');
+        statusSel.removeAttribute('data-searchable');
+        statusSel.removeAttribute('data-search-enhanced');
+        if(statusSel.dataset){
+            delete statusSel.dataset.searchEnhanced;
+            delete statusSel.dataset.placeholder;
+            delete statusSel.dataset.searchable;
         }
+
+        const wrapper = statusSel.parentElement;
+        if(wrapper && wrapper.classList && wrapper.classList.contains('fk-searchable-control') && wrapper.parentNode){
+            wrapper.parentNode.insertBefore(statusSel, wrapper);
+            wrapper.parentNode.removeChild(wrapper);
+        }
+    }
+
+    function resyncAddModalSearchSelects(){
+        const modal = document.getElementById(ADD_MODAL_ID);
+        if(!modal) return;
+        ensureNativeWorkStatusSelect(modal);
+        const statusSel = modal.querySelector('select[name="work_status"]');
+        const deptSel = modal.querySelector('select[name="sys_dept"]');
+        try {
+            if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.close === 'function'){
+                window.BlossomSearchableSelect.close(statusSel);
+                window.BlossomSearchableSelect.close(deptSel);
+            }
+        } catch(_e){}
+        try {
+            if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function'){
+                if(deptSel) window.BlossomSearchableSelect.syncAll(deptSel);
+                return;
+            }
+            if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.enhance === 'function'){
+                if(deptSel) window.BlossomSearchableSelect.enhance(deptSel);
+            }
+        } catch(_e){}
+        ensureNativeWorkStatusSelect(modal);
     }
 
     function getDisplayValue(row, col){
@@ -680,6 +704,9 @@
         }
         function statusDotClass(name){
             const v = String(name||'').trim();
+            if(v==='정상') return 'ws-run';
+            if(v==='보류') return 'ws-wait';
+            if(v==='폐기') return 'ws-idle';
             if(v==='가동') return 'ws-run';
             if(v==='유휴') return 'ws-idle';
             if(v==='대기') return 'ws-wait';
@@ -991,6 +1018,8 @@
         sw.name = 'sw_count';
         sw.value = (row && row.sw_count != null) ? String(row.sw_count) : '';
         form.appendChild(sw);
+
+        ensureNativeWorkStatusSelect(form);
     }
 
     function generateFieldInput(col,value=''){
@@ -1021,14 +1050,14 @@
         }
         if(col==='work_status'){
             const selected = String(value ?? '').trim();
-            const options = (LOOKUPS.statuses || []).map(r=>{
+            const options = FIXED_WORK_STATUSES.map(r=>{
                 const v = String(r.status_code ?? '').trim();
                 const t = String(r.status_name ?? '').trim();
                 if(!v || !t) return '';
                 const sel = (v === selected) ? ' selected' : '';
                 return `<option value="${escapeHTML(v)}"${sel}>${escapeHTML(t)}</option>`;
             }).join('');
-            return `<select name="work_status" class="form-input search-select" data-placeholder="업무 상태 선택" required>`+
+            return `<select name="work_status" class="form-input" required>`+
                 `<option value="">선택</option>`+
                 `${options}`+
                 `</select>`;
@@ -1409,6 +1438,7 @@
                     fillEditForm(row);
                     openModal(EDIT_MODAL_ID);
                     try { window.BlossomSearchableSelect?.enhance(document.getElementById(EDIT_MODAL_ID) || document); } catch(_e){}
+                    ensureNativeWorkStatusSelect(document.getElementById(EDIT_MODAL_ID));
                     // live-sync for license fields within edit form
                     attachLicenseLiveSync(EDIT_FORM_ID);
                     // enhance date inputs with Flatpickr
@@ -1509,19 +1539,30 @@
         });
         // add modal
         document.getElementById(ADD_BTN_ID)?.addEventListener('click', async ()=> {
+            const addModal = document.getElementById(ADD_MODAL_ID);
+            const statusSel = addModal?.querySelector('select[name="work_status"]');
+            const deptSel = addModal?.querySelector('select[name="sys_dept"]');
+            if(statusSel) statusSel.disabled = false;
+            if(deptSel) deptSel.disabled = true;
             // Show the modal immediately so the button never feels "dead".
             openModal(ADD_MODAL_ID);
             try { window.BlossomSearchableSelect?.enhance(document.getElementById(ADD_MODAL_ID) || document); } catch(_e){}
+            ensureNativeWorkStatusSelect(addModal);
 
             // Then load lookups / searchable-select enhancements.
             try {
                 await ensureSearchableSelectLoaded();
                 await ensureLookupsLoaded();
                 populateAddModalSelects();
-                try { window.BlossomSearchableSelect?.syncAll?.(document.getElementById(ADD_MODAL_ID) || document); } catch(_e){}
+                if(statusSel) statusSel.disabled = false;
+                if(deptSel) deptSel.disabled = false;
+                resyncAddModalSearchSelects();
+                ensureNativeWorkStatusSelect(addModal);
             } catch(err){
+                if(statusSel) statusSel.disabled = false;
+                if(deptSel) deptSel.disabled = false;
                 console.error(err);
-                showMessage(err?.message || '부서/업무 상태 목록을 불러오지 못했습니다.', '오류');
+                showMessage(err?.message || '부서 목록을 불러오지 못했습니다.', '오류');
             }
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
@@ -1944,7 +1985,13 @@
                 return `<input class="form-input" data-bulk-field="${col}" placeholder="담당 부서">`;
             }
             if(col === 'work_status'){
-                return `<input class="form-input" data-bulk-field="${col}" placeholder="업무 상태">`;
+                const options = FIXED_WORK_STATUSES.map((r)=>
+                    `<option value="${escapeHTML(r.status_code)}">${escapeHTML(r.status_name)}</option>`
+                ).join('');
+                return `<select class="form-input" data-bulk-field="${col}">`+
+                    `<option value="">선택</option>`+
+                    `${options}`+
+                    `</select>`;
             }
             if(col === 'work_priority'){
                 return `<input type="number" min="0" step="1" class="form-input" data-bulk-field="${col}" placeholder="업무 우선순위(숫자)">`;

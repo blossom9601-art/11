@@ -343,6 +343,9 @@
 
         function _fallbackStatusColorByName(name){
           var v = safeTrim(name);
+          if(v === '정상') return 'ws-run';
+          if(v === '보류') return 'ws-wait';
+          if(v === '폐기') return 'ws-idle';
           if(v === '가동') return 'ws-run';
           if(v === '유휴') return 'ws-idle';
           if(v === '대기') return 'ws-wait';
@@ -354,14 +357,15 @@
 
         function getWorkStatusMeta(){
           if(_statusMetaPromise) return _statusMetaPromise;
-          _statusMetaPromise = fetchJson('/api/work-statuses?_=' + Date.now())
-            .then(function(r){
-              var json = (r && r.json) || {};
-              var items = (json && json.items) || [];
-              // Initial render
-              renderFromStorage();
-              return items;
-            });
+          _statusMetaPromise = Promise.resolve([
+            { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
+            { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
+            { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+          ]).then(function(items){
+            // Initial render
+            renderFromStorage();
+            return items;
+          });
           return _statusMetaPromise;
         }
 
@@ -809,7 +813,11 @@
         }
 
         var WORK_DEPTS_ENDPOINT = '/api/org-departments';
-        var WORK_STATUSES_ENDPOINT = '/api/work-statuses';
+        var FIXED_WORK_STATUSES = [
+          { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
+          { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
+          { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+        ];
 
         var LOOKUPS = {
           loadPromise: null,
@@ -868,11 +876,10 @@
         function ensureLookupsLoaded(){
           if(LOOKUPS.loadPromise) return LOOKUPS.loadPromise;
           LOOKUPS.loadPromise = Promise.all([
-            fetchList(WORK_DEPTS_ENDPOINT),
-            fetchList(WORK_STATUSES_ENDPOINT)
+            fetchList(WORK_DEPTS_ENDPOINT)
           ]).then(function(arr){
             LOOKUPS.departments = arr[0] || [];
-            LOOKUPS.statuses = arr[1] || [];
+            LOOKUPS.statuses = FIXED_WORK_STATUSES.slice();
             rebuildLookupMaps();
             return LOOKUPS;
           });
@@ -1743,7 +1750,7 @@
                 var td = tr.querySelector('[data-col="work_status"]');
                 if(!td) return;
                 var current = (td.textContent||'').trim();
-                var cls = (current==='가동') ? 'ws-run' : (current==='유휴' ? 'ws-idle' : 'ws-wait');
+                var cls = (current==='정상' || current==='가동') ? 'ws-run' : ((current==='폐기' || current==='유휴') ? 'ws-idle' : 'ws-wait');
                 td.innerHTML = '<span class="status-pill"><span class="status-dot '+cls+'" aria-hidden="true"></span><span class="status-text">'+current+'</span></span>';
               });
             }catch(_){ }

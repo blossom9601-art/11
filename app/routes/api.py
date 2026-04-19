@@ -17255,6 +17255,8 @@ def delete_vendor_manufacturers():
     try:
         old_rows = [svc_get_vendor(int(i)) for i in ids if i]
         deleted = svc_soft_delete_vendors(ids, _resolve_actor())
+        if deleted <= 0:
+            return jsonify({'success': False, 'message': '삭제할 유효한 제조사를 찾지 못했습니다.'}), 404
         for row in old_rows:
             if row:
                 _try_record_change(
@@ -24986,7 +24988,7 @@ def unified_search_pages():
                     'type': '블로그',
                     'title': row.title or f"게시글 {row.id}",
                     'subtitle': ' · '.join([p for p in subtitle_parts if p]),
-                    'route': f"/p/insight_blog_it_detail?id={row.id}",
+                    'route': f"/p/insight_blog_it_detail?post={row.id}",
                     'score': round(_compute_score(row.title or '', ' '.join([p for p in subtitle_parts if p]), 0.90), 4),
                 })
         except Exception:
