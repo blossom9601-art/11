@@ -281,6 +281,16 @@
      EVENTS
   ══════════════════════════════════════════════ */
   function bindEvents() {
+    /* 상태 필터 */
+    var statusSel = $('vr-status-filter');
+    if (statusSel) {
+      statusSel.addEventListener('change', function () {
+        _statusFilter = statusSel.value;
+        _page = 1;
+        applyFilter();
+      });
+    }
+
     /* 추가 */
     var addBtn = $('vr-add-btn');
     if (addBtn) addBtn.addEventListener('click', openAddRelease);

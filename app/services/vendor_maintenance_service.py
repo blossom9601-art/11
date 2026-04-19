@@ -696,10 +696,11 @@ def soft_delete_maintenance_vendors(ids: Iterable[Any], actor: str, app=None) ->
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
+    now = _now()
     with _get_connection(app) as conn:
         cur = conn.execute(
-            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
-            safe_ids,
+            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders})",
+            [now, actor] + safe_ids,
         )
         conn.commit()
         return cur.rowcount

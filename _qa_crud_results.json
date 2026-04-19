@@ -1,0 +1,1397 @@
+{
+  "generated_at": "2026-04-18T21:54:35.956081",
+  "summary": {
+    "total": 198,
+    "ok": 137,
+    "fail": 59,
+    "warn": 2
+  },
+  "results": [
+    {
+      "menu": "대시보드",
+      "api": "/p/dashboard",
+      "action": "페이지진입",
+      "status": "WARN",
+      "note": "Redirect→/login"
+    },
+    {
+      "menu": "대시보드",
+      "api": "/api/dashboard",
+      "action": "목록조회",
+      "status": "WARN",
+      "note": "엔드포인트 없음(별도 API 없을 수 있음)"
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/p/hw_server_onpremise",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/api/hardware/onpremise/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/api/hardware/onpremise/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 기본 서버"
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/p/hw_server_onpremise_account",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/p/hw_server_onpremise_sw",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/p/hw_server_onpremise_backup",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(온프레미스)",
+      "api": "/p/hw_server_onpremise_vulnerability",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(클라우드)",
+      "api": "/p/hw_server_cloud",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>서버(클라우드)",
+      "api": "/api/hardware/cloud/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>서버(클라우드)",
+      "api": "/api/hardware/cloud/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>스토리지",
+      "api": "/p/hw_storage_san",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>스토리지",
+      "api": "/api/hardware/storage/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>스토리지",
+      "api": "/api/hardware/storage/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>SAN(Director)",
+      "api": "/p/hw_san_director",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>SAN(Director)",
+      "api": "/api/hardware/san/director/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>SAN(Director)",
+      "api": "/api/hardware/san/director/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>네트워크(L2)",
+      "api": "/p/hw_network_l2",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>네트워크(L2)",
+      "api": "/api/hardware/network/l2/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>네트워크(L2)",
+      "api": "/api/hardware/network/l2/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>네트워크(L4)",
+      "api": "/p/hw_network_l4",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>네트워크(L4)",
+      "api": "/api/hardware/network/l4/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>네트워크(L4)",
+      "api": "/api/hardware/network/l4/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>네트워크(L7)",
+      "api": "/p/hw_network_l7",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>네트워크(L7)",
+      "api": "/api/hardware/network/l7/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>네트워크(L7)",
+      "api": "/api/hardware/network/l7/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>네트워크(AP)",
+      "api": "/p/hw_network_ap",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>네트워크(AP)",
+      "api": "/api/hardware/network/ap/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>네트워크(AP)",
+      "api": "/api/hardware/network/ap/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>네트워크(CIRCUIT)",
+      "api": "/p/hw_network_dedicateline",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>네트워크(CIRCUIT)",
+      "api": "/api/hardware/network/circuit/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>네트워크(CIRCUIT)",
+      "api": "/api/hardware/network/circuit/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(FIREWALL)",
+      "api": "/p/hw_security_firewall",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(FIREWALL)",
+      "api": "/api/hardware/security/firewall/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(FIREWALL)",
+      "api": "/api/hardware/security/firewall/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(VPN)",
+      "api": "/p/hw_security_vpn",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(VPN)",
+      "api": "/api/hardware/security/vpn/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(VPN)",
+      "api": "/api/hardware/security/vpn/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(IDS)",
+      "api": "/p/hw_security_ids",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(IDS)",
+      "api": "/api/hardware/security/ids/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(IDS)",
+      "api": "/api/hardware/security/ids/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(IPS)",
+      "api": "/p/hw_security_ips",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(IPS)",
+      "api": "/api/hardware/security/ips/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(IPS)",
+      "api": "/api/hardware/security/ips/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(HSM)",
+      "api": "/p/hw_security_hsm",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(HSM)",
+      "api": "/api/hardware/security/hsm/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(HSM)",
+      "api": "/api/hardware/security/hsm/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(KMS)",
+      "api": "/p/hw_security_kms",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(KMS)",
+      "api": "/api/hardware/security/kms/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(KMS)",
+      "api": "/api/hardware/security/kms/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "시스템>보안장비(WIPS)",
+      "api": "/p/hw_security_wips",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "시스템>보안장비(WIPS)",
+      "api": "/api/hardware/security/wips/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "시스템>보안장비(WIPS)",
+      "api": "/api/hardware/security/wips/assets",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/p/gov_backup_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/p/gov_backup_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/api/governance/backup/storage-pools",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/api/governance/backup/storage-pools",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/api/governance/backup/target-policies",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "거버넌스>백업정책",
+      "api": "/api/governance/backup/target-policies",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "거버넌스>패키지관리",
+      "api": "/p/gov_package_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>패키지관리",
+      "api": "/p/gov_package_list",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>패키지관리",
+      "api": "/api/governance/packages",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "거버넌스>패키지관리",
+      "api": "/api/governance/package-dashboard",
+      "action": "대시보드조회",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>취약점분석",
+      "api": "/p/gov_vulnerability_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>취약점분석",
+      "api": "/p/gov_vulnerability_guide",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>취약점분석",
+      "api": "/api/governance/vulnerability-guides",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "거버넌스>취약점분석",
+      "api": "/api/governance/vulnerability-guides",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "거버넌스>IP정책",
+      "api": "/p/gov_ip_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>IP정책",
+      "api": "/api/network/ip-policies",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "거버넌스>IP정책",
+      "api": "/api/network/ip-policies",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "거버넌스>VPN정책",
+      "api": "/p/gov_vpn_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>VPN정책",
+      "api": "/api/governance/vpn-lines",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "거버넌스>VPN정책",
+      "api": "/api/governance/vpn-lines",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "거버넌스>불용자산",
+      "api": "/p/gov_unused_server",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "거버넌스>불용자산",
+      "api": "/api/gov-unused/assets",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "데이터센터>출입관리",
+      "api": "/p/dc_access_control",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "데이터센터>출입관리",
+      "api": "/api/datacenter/access/permissions",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "데이터센터>출입관리",
+      "api": "/api/datacenter/access/permissions",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "데이터센터>데이터삭제관리",
+      "api": "/p/dc_data_deletion",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "데이터센터>데이터삭제관리",
+      "api": "/api/datacenter/data-deletion/records",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "데이터센터>데이터삭제관리",
+      "api": "/api/datacenter/data-deletion/records",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 405 "
+    },
+    {
+      "menu": "데이터센터>RACK관리",
+      "api": "/p/dc_rack_lab1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "데이터센터>RACK관리",
+      "api": "/api/datacenter/rack/list",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "비용관리>OPEX",
+      "api": "/p/cost_opex_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "비용관리>OPEX",
+      "api": "/api/opex-dashboard",
+      "action": "대시보드조회",
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "menu": "비용관리>OPEX",
+      "api": "/api/cost/opex/items",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "비용관리>CAPEX",
+      "api": "/p/cost_capex_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "비용관리>CAPEX",
+      "api": "/api/capex-dashboard",
+      "action": "대시보드조회",
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "menu": "비용관리>CAPEX",
+      "api": "/api/cost/capex/contracts",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "비용관리>CAPEX",
+      "api": "/api/cost/capex/contracts",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "프로젝트>프로젝트현황",
+      "api": "/p/proj_status",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "프로젝트>프로젝트현황",
+      "api": "/api/prj/projects",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 401"
+    },
+    {
+      "menu": "프로젝트>프로젝트현황",
+      "api": "/api/prj/projects",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "프로젝트>작업현황",
+      "api": "/p/task_status",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "프로젝트>작업현황",
+      "api": "/api/wrk/reports",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 401"
+    },
+    {
+      "menu": "프로젝트>작업현황",
+      "api": "/api/wrk/reports",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "프로젝트>티켓현황",
+      "api": "/p/workflow_progress",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "프로젝트>티켓현황",
+      "api": "/api/workflow/tickets",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "프로젝트>워크플로우",
+      "api": "/p/wf_designer_explore",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "프로젝트>워크플로우",
+      "api": "/api/workflow/templates",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "프로젝트>워크플로우",
+      "api": "/api/workflow/templates",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "인사이트>기술자료",
+      "api": "/p/insight_trend",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "인사이트>기술자료",
+      "api": "/p/insight_security",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "인사이트>기술자료",
+      "api": "/p/insight_report",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "인사이트>기술자료",
+      "api": "/api/insight/info-items",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "인사이트>기술자료",
+      "api": "/api/insight/info-items",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "인사이트>블로그",
+      "api": "/p/insight_blog_it",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "인사이트>블로그",
+      "api": "/api/insight/blog/posts",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "인사이트>블로그",
+      "api": "/api/insight/blog/posts",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 401 "
+    },
+    {
+      "menu": "카테고리>비즈니스",
+      "api": "/p/cat_business_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>비즈니스",
+      "api": "/api/category/business/divisions",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>비즈니스",
+      "api": "/api/category/business/divisions",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>하드웨어",
+      "api": "/p/cat_hw_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>하드웨어",
+      "api": "/api/category/hw/network-types",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>하드웨어",
+      "api": "/api/category/hw/network-types",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>소프트웨어",
+      "api": "/p/cat_sw_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>소프트웨어",
+      "api": "/api/category/sw/os-types",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>소프트웨어",
+      "api": "/api/category/sw/os-types",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>컴포넌트",
+      "api": "/p/cat_component_cpu",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>컴포넌트",
+      "api": "/api/category/components/cpu-types",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>컴포넌트",
+      "api": "/api/category/components/cpu-types",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>회사",
+      "api": "/p/cat_company_center",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>회사",
+      "api": "/api/org/centers",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>회사",
+      "api": "/api/org/centers",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>고객",
+      "api": "/p/cat_customer_client1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>고객",
+      "api": "/api/category/customers",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 404"
+    },
+    {
+      "menu": "카테고리>고객",
+      "api": "/api/category/customers",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 404 "
+    },
+    {
+      "menu": "카테고리>벤더(제조사)",
+      "api": "/p/cat_vendor_manufacturer",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>벤더(제조사)",
+      "api": "/api/vendor-manufacturers",
+      "action": "목록조회",
+      "status": "OK",
+      "note": "rows=0, total=0"
+    },
+    {
+      "menu": "카테고리>벤더(제조사)",
+      "api": "/api/vendor-manufacturers",
+      "action": "등록",
+      "status": "OK",
+      "note": "id=1"
+    },
+    {
+      "menu": "카테고리>벤더(제조사)",
+      "api": "mfr/1",
+      "action": "수정",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>벤더(제조사)",
+      "api": "mfr bulk-delete",
+      "action": "삭제",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "카테고리>벤더(유지보수)",
+      "api": "/api/vendor-maintenance",
+      "action": "목록조회",
+      "status": "FAIL",
+      "note": "HTTP 500"
+    },
+    {
+      "menu": "카테고리>벤더(유지보수)",
+      "api": "/api/vendor-maintenance",
+      "action": "등록",
+      "status": "FAIL",
+      "note": "HTTP 400 "
+    },
+    {
+      "menu": "설정>권한/세션",
+      "api": "/api/session/me",
+      "action": "세션조회",
+      "status": "FAIL",
+      "note": "HTTP 401"
+    },
+    {
+      "menu": "설정>권한/세션",
+      "api": "/api/session/permissions",
+      "action": "권한조회",
+      "status": "FAIL",
+      "note": "HTTP 401"
+    },
+    {
+      "menu": "설정>권한/세션",
+      "api": "/api/menus",
+      "action": "메뉴조회",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "설정>권한/세션",
+      "api": "/api/users",
+      "action": "사용자목록",
+      "status": "FAIL",
+      "note": "HTTP 401"
+    },
+    {
+      "menu": "보안>비인증차단",
+      "api": "/api/hardware/onpremise/assets",
+      "action": "비인증차단",
+      "status": "FAIL",
+      "note": "HTTP 200 반환 → 비인증 접근 허용됨!"
+    },
+    {
+      "menu": "보안>비인증차단",
+      "api": "/api/prj/projects",
+      "action": "비인증차단",
+      "status": "OK",
+      "note": "HTTP 401 (정상 차단)"
+    },
+    {
+      "menu": "보안>비인증차단",
+      "api": "/api/wrk/reports",
+      "action": "비인증차단",
+      "status": "OK",
+      "note": "HTTP 401 (정상 차단)"
+    },
+    {
+      "menu": "보안>비인증차단",
+      "api": "/api/governance/vulnerability-guides",
+      "action": "비인증차단",
+      "status": "FAIL",
+      "note": "HTTP 200 반환 → 비인증 접근 허용됨!"
+    },
+    {
+      "menu": "페이지>대시보드",
+      "api": "/p/dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>서버온프레미스",
+      "api": "/p/hw_server_onpremise",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>서버클라우드",
+      "api": "/p/hw_server_cloud",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>서버프레임",
+      "api": "/p/hw_server_frame",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>워크스테이션",
+      "api": "/p/hw_server_workstation",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>스토리지SAN",
+      "api": "/p/hw_storage_san",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>스토리지백업",
+      "api": "/p/hw_storage_backup",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>SAN Director",
+      "api": "/p/hw_san_director",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>SAN Switch",
+      "api": "/p/hw_san_switch",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>네트워크L2",
+      "api": "/p/hw_network_l2",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>네트워크L4",
+      "api": "/p/hw_network_l4",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>네트워크L7",
+      "api": "/p/hw_network_l7",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>네트워크AP",
+      "api": "/p/hw_network_ap",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>네트워크전용회선",
+      "api": "/p/hw_network_dedicateline",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>방화벽",
+      "api": "/p/hw_security_firewall",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>VPN장비",
+      "api": "/p/hw_security_vpn",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>IDS",
+      "api": "/p/hw_security_ids",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>IPS",
+      "api": "/p/hw_security_ips",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>HSM",
+      "api": "/p/hw_security_hsm",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>KMS",
+      "api": "/p/hw_security_kms",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>WIPS",
+      "api": "/p/hw_security_wips",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>백업대시보드",
+      "api": "/p/gov_backup_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>백업정책",
+      "api": "/p/gov_backup_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>백업테이프",
+      "api": "/p/gov_backup_tape",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>패키지대시보드",
+      "api": "/p/gov_package_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>패키지목록",
+      "api": "/p/gov_package_list",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>취약점대시보드",
+      "api": "/p/gov_vulnerability_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>취약점분석",
+      "api": "/p/gov_vulnerability_analysis",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>취약점가이드",
+      "api": "/p/gov_vulnerability_guide",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>IP정책",
+      "api": "/p/gov_ip_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>DNS정책",
+      "api": "/p/gov_dns_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>AD정책",
+      "api": "/p/gov_ad_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>VPN정책",
+      "api": "/p/gov_vpn_policy",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>전용회선정책",
+      "api": "/p/gov_dedicatedline_member",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>불용서버",
+      "api": "/p/gov_unused_server",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>출입관리",
+      "api": "/p/dc_access_control",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>데이터삭제",
+      "api": "/p/dc_data_deletion",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>RACK Lab1",
+      "api": "/p/dc_rack_lab1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>온습도",
+      "api": "/p/dc_thermo_lab1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>CCTV",
+      "api": "/p/dc_cctv_lab1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>OPEX대시보드",
+      "api": "/p/cost_opex_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>CAPEX대시보드",
+      "api": "/p/cost_capex_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>프로젝트현황",
+      "api": "/p/proj_status",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>작업현황",
+      "api": "/p/task_status",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>티켓현황",
+      "api": "/p/workflow_progress",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>워크플로우",
+      "api": "/p/wf_designer_explore",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>기술트렌드",
+      "api": "/p/insight_trend",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>블로그",
+      "api": "/p/insight_blog_it",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>비즈니스카테고리",
+      "api": "/p/cat_business_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>하드웨어카테고리",
+      "api": "/p/cat_hw_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>소프트웨어카테고리",
+      "api": "/p/cat_sw_dashboard",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>CPU컴포넌트",
+      "api": "/p/cat_component_cpu",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>회사",
+      "api": "/p/cat_company_center",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>고객",
+      "api": "/p/cat_customer_client1",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    },
+    {
+      "menu": "페이지>벤더제조사",
+      "api": "/p/cat_vendor_manufacturer",
+      "action": "페이지진입",
+      "status": "OK",
+      "note": ""
+    }
+  ]
+}

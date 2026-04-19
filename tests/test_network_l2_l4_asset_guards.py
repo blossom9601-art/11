@@ -18,23 +18,9 @@ L2_L4_TEMPLATES = [
     # L2
     Path('app/templates/2.hardware/2-4.network/2-4-1.l2/1.l2_list.html'),
     Path('app/templates/2.hardware/2-4.network/2-4-1.l2/2.l2_detail.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab01-hardware.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab04-interface.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab05-account.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab09-maintenance.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab11-task.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab14-log.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-1.l2/tab15-file.html'),
     # L4
     Path('app/templates/2.hardware/2-4.network/2-4-2.l4/1.l4_list.html'),
     Path('app/templates/2.hardware/2-4.network/2-4-2.l4/2.l4_detail.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab01-hardware.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab04-interface.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab05-account.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab09-maintenance.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab11-task.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab14-log.html'),
-    Path('app/templates/2.hardware/2-4.network/2-4-2.l4/tab15-file.html'),
 ]
 
 

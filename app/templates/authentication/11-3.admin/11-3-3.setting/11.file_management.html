@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.27">
+	<link rel="stylesheet" href="/static/css/file_management_settings.css?v=20260419b">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/11.file_management.js?v=20260418f" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper file-policy-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>파일관리</h1>
+					<p>첨부파일 정책을 중앙 관리하고 업로드/다운로드 정책을 시스템에서 강제합니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<div class="file-policy-grid">
+				<section class="setting-card" aria-labelledby="fp-base-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="fp-base-title">기본 정책</h2>
+							<p>최대 크기, 확장자, 파일명 규칙 등 공통 업로드 기준을 정의합니다.</p>
+						</div>
+					</div>
+					<div class="setting-form">
+						<div class="form-grid single-col">
+							<div class="form-row">
+								<label for="fp-max-size">최대 파일 크기(MB)</label>
+								<input class="form-input" id="fp-max-size" type="number" min="1" max="2048">
+							</div>
+							<div class="form-row">
+								<label for="fp-allowed-ext">허용 확장자 (쉼표 구분)</label>
+								<textarea class="form-input" id="fp-allowed-ext" rows="2"></textarea>
+							</div>
+							<div class="form-row">
+								<label for="fp-blocked-ext">금지 확장자 (쉼표 구분)</label>
+								<textarea class="form-input" id="fp-blocked-ext" rows="2"></textarea>
+							</div>
+							<div class="form-row">
+								<label for="fp-name-rule">파일명 규칙 (정규식)</label>
+								<input class="form-input" id="fp-name-rule" type="text">
+							</div>
+							<label class="checkbox"><input id="fp-allow-duplicate" type="checkbox"><span>중복 업로드 허용</span></label>
+						</div>
+					</div>
+					<div class="setting-card-footer">
+						<button type="button" class="btn-save" data-fp-save>
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
+						</button>
+					</div>
+				</section>
+
+				<section class="setting-card" aria-labelledby="fp-security-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="fp-security-title">보안 정책</h2>
+							<p>파일 위장/실행 파일/형식 위반 업로드를 차단합니다.</p>
+						</div>
+					</div>
+					<div class="setting-form sec-check-grid">
+						<label class="checkbox"><input id="fp-block-exec" type="checkbox"><span>실행파일 업로드 차단</span></label>
+						<label class="checkbox"><input id="fp-validate-mime" type="checkbox"><span>MIME 타입 검증</span></label>
+						<label class="checkbox"><input id="fp-validate-magic" type="checkbox"><span>매직바이트 검사</span></label>
+						<label class="checkbox"><input id="fp-detect-spoof" type="checkbox"><span>확장자 위장 탐지</span></label>
+						<label class="checkbox"><input id="fp-virus" type="checkbox"><span>바이러스 검사 연동</span></label>
+					</div>
+					<div class="setting-card-footer">
+						<button type="button" class="btn-save" data-fp-save>
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
+						</button>
+					</div>
+				</section>
+
+				<section class="setting-card" aria-labelledby="fp-access-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="fp-access-title">접근 정책</h2>
+							<p>파일 접근은 레코드 권한을 상속하고 모든 다운로드를 추적합니다.</p>
+						</div>
+					</div>
+					<div class="setting-form sec-check-grid">
+						<label class="checkbox"><input id="fp-inherit" type="checkbox"><span>레코드 권한 상속</span></label>
+						<label class="checkbox"><input id="fp-download-log" type="checkbox"><span>다운로드 로그 기록</span></label>
+						<label class="checkbox"><input id="fp-share" type="checkbox"><span>외부 공유 허용</span></label>
+						<label class="checkbox"><input id="fp-admin-force" type="checkbox"><span>관리자 강제 접근 허용</span></label>
+					</div>
+					<div class="setting-card-footer">
+						<button type="button" class="btn-save" data-fp-save>
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
+						</button>
+					</div>
+				</section>
+
+				<section class="setting-card" aria-labelledby="fp-retention-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="fp-retention-title">보관 정책</h2>
+							<p>종료 후 보관/아카이브/알림 정책을 주기적으로 적용합니다.</p>
+						</div>
+					</div>
+					<div class="setting-form">
+						<div class="form-grid single-col">
+							<div class="form-row">
+								<label for="fp-retention-days">티켓 종료 후 자동 삭제 기간(일)</label>
+								<input class="form-input" id="fp-retention-days" type="number" min="0" max="3650">
+							</div>
+							<div class="form-row">
+								<label for="fp-archive-days">미접근 파일 아카이빙 기간(일)</label>
+								<input class="form-input" id="fp-archive-days" type="number" min="0" max="3650">
+							</div>
+							<label class="checkbox"><input id="fp-retention-exclude" type="checkbox"><span>중요 파일 보관 제외</span></label>
+							<label class="checkbox"><input id="fp-retention-notify" type="checkbox"><span>파일 만료 알림</span></label>
+						</div>
+					</div>
+					<div class="setting-card-footer">
+						<button type="button" class="btn-save" data-fp-save>
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
+						</button>
+					</div>
+				</section>
+
+				<section class="setting-card fp-ops" aria-labelledby="fp-ops-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="fp-ops-title">운영 현황</h2>
+							<p>시스템 파일 저장소 현황을 한눈에 확인합니다.</p>
+						</div>
+					</div>
+					<div class="setting-form">
+						<div class="fp-gauge-row">
+							<div class="fp-gauge-card">
+								<div class="fp-gauge-wrap">
+									<svg class="fp-gauge-svg" viewBox="0 0 200 130">
+										<defs>
+											<linearGradient id="grd-blue" x1="0" y1="0" x2="1" y2="0">
+												<stop offset="0%" stop-color="#818cf8"/>
+												<stop offset="100%" stop-color="#4f46e5"/>
+											</linearGradient>
+											<filter id="glow-blue"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+										</defs>
+										<path class="fp-gauge-track" d="M20 115 A80 80 0 0 1 180 115"/>
+										<path class="fp-gauge-fill" id="fp-gauge-files" d="M20 115 A80 80 0 0 1 180 115" stroke="url(#grd-blue)" filter="url(#glow-blue)"/>
+										<line class="fp-gauge-needle" id="fp-needle-files" x1="100" y1="115" x2="100" y2="42" transform="rotate(-90,100,115)"/>
+										<circle class="fp-gauge-hub" cx="100" cy="115" r="6"/>
+										<g class="fp-gauge-ticks" id="fp-ticks-files"></g>
+									</svg>
+									<div class="fp-gauge-value">
+										<strong id="fp-total-files">0</strong>
+										<span>총 파일</span>
+									</div>
+								</div>
+							</div>
+							<div class="fp-gauge-card">
+								<div class="fp-gauge-wrap">
+									<svg class="fp-gauge-svg" viewBox="0 0 200 130">
+										<defs>
+											<linearGradient id="grd-green" x1="0" y1="0" x2="1" y2="0">
+												<stop offset="0%" stop-color="#4ade80"/>
+												<stop offset="100%" stop-color="#16a34a"/>
+											</linearGradient>
+											<filter id="glow-green"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+										</defs>
+										<path class="fp-gauge-track" d="M20 115 A80 80 0 0 1 180 115"/>
+										<path class="fp-gauge-fill" id="fp-gauge-size" d="M20 115 A80 80 0 0 1 180 115" stroke="url(#grd-green)" filter="url(#glow-green)"/>
+										<line class="fp-gauge-needle" id="fp-needle-size" x1="100" y1="115" x2="100" y2="42" transform="rotate(-90,100,115)"/>
+										<circle class="fp-gauge-hub" cx="100" cy="115" r="6"/>
+										<g class="fp-gauge-ticks" id="fp-ticks-size"></g>
+									</svg>
+									<div class="fp-gauge-value">
+										<strong id="fp-total-size">0 MB</strong>
+										<span>총 용량</span>
+									</div>
+								</div>
+							</div>
+							<div class="fp-gauge-card">
+								<div class="fp-gauge-wrap">
+									<svg class="fp-gauge-svg" viewBox="0 0 200 130">
+										<defs>
+											<linearGradient id="grd-amber" x1="0" y1="0" x2="1" y2="0">
+												<stop offset="0%" stop-color="#fbbf24"/>
+												<stop offset="100%" stop-color="#ea580c"/>
+											</linearGradient>
+											<filter id="glow-amber"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+										</defs>
+										<path class="fp-gauge-track" d="M20 115 A80 80 0 0 1 180 115"/>
+										<path class="fp-gauge-fill" id="fp-gauge-today" d="M20 115 A80 80 0 0 1 180 115" stroke="url(#grd-amber)" filter="url(#glow-amber)"/>
+										<line class="fp-gauge-needle" id="fp-needle-today" x1="100" y1="115" x2="100" y2="42" transform="rotate(-90,100,115)"/>
+										<circle class="fp-gauge-hub" cx="100" cy="115" r="6"/>
+										<g class="fp-gauge-ticks" id="fp-ticks-today"></g>
+									</svg>
+									<div class="fp-gauge-value">
+										<strong id="fp-today-uploads">0</strong>
+										<span>오늘 업로드</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<div class="setting-actions">
+				<p class="setting-status" id="fp-status"></p>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

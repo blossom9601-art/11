@@ -10,9 +10,11 @@
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
 	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.23">
-	<link rel="stylesheet" href="/static/css/version.css?v=4.2.7">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+	<link rel="stylesheet" href="/static/css/version.css?v=4.2.8">
 	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/ui/searchable_select.js?v=1.2.0" defer></script>
+	<script src="/static/js/version.js?v=4.2.7" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -30,6 +32,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
@@ -48,6 +51,13 @@
 							<h2>Release Note <span class="count-badge" id="vr-count">0</span></h2>
 						</div>
 						<div class="tab-header-right">
+							<div class="page-size-selector compact">
+								<select id="vr-status-filter" class="page-size-select" aria-label="상태 필터">
+									<option value="">전체</option>
+									<option value="current">현재</option>
+									<option value="previous">이전</option>
+								</select>
+							</div>
 							<div class="search-container" role="search">
 								<div class="search-input-wrapper" id="vr-search-wrapper">
 									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
@@ -132,7 +142,7 @@
 						<div class="section-header"><h4>릴리즈 정보</h4></div>
 						<div class="form-grid">
 							<div class="form-row"><label>버전<span class="required">*</span></label><input type="text" class="form-input" id="edit-rn-version" placeholder="예: v1.3.0"></div>
-							<div class="form-row"><label>상태</label><select class="form-input" id="edit-rn-status"><option value="published">Published</option><option value="draft">Draft</option><option value="deprecated">Deprecated</option></select></div>
+							<div class="form-row"><label>상태</label><select class="form-input search-select" id="edit-rn-status" data-placeholder="상태"><option value="published">Published</option><option value="draft">Draft</option><option value="deprecated">Deprecated</option></select></div>
 						</div>
 						<div class="form-row" id="rn-items-row" style="margin-top:10px">
 							<label>릴리즈 내용<span class="required">*</span></label>
@@ -178,6 +188,5 @@
 		</div>
 	</div>
 
-	<script src="/static/js/version.js?v=4.2.5" defer></script>
 </body>
 </html>

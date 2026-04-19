@@ -2998,6 +2998,11 @@ class MfaConfig(db.Model):
     allow_user_choice    = db.Column(db.Boolean, nullable=False, server_default=db.text('1'))    # 로그인 시 사용자가 인증 방식 선택 허용
     code_length          = db.Column(db.Integer, nullable=False, server_default=db.text('6'))    # 인증 코드 자릿수
     code_ttl_seconds     = db.Column(db.Integer, nullable=False, server_default=db.text('300'))  # 코드 유효 시간(초)
+    resend_wait_seconds  = db.Column(db.Integer, nullable=False, server_default=db.text('60'))   # 재발송 대기 시간(초)
+    max_daily_attempts   = db.Column(db.Integer, nullable=False, server_default=db.text('10'))   # 일일 최대 발송 횟수
+    max_fail_count       = db.Column(db.Integer, nullable=False, server_default=db.text('5'))    # 코드 입력 실패 허용 횟수
+    session_timeout_hours  = db.Column(db.Integer, nullable=False, server_default=db.text('8'))  # 로그인 세션 유효 시간(시간)
+    idle_timeout_minutes   = db.Column(db.Integer, nullable=False, server_default=db.text('60')) # 비활성 자동 로그아웃(분)
     updated_at           = db.Column(db.Text)
 
 

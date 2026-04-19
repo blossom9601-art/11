@@ -1276,9 +1276,20 @@ def create_app(config_name='default'):
                     allow_user_choice    INTEGER NOT NULL DEFAULT 1,
                     code_length          INTEGER NOT NULL DEFAULT 6,
                     code_ttl_seconds     INTEGER NOT NULL DEFAULT 300,
+                    resend_wait_seconds  INTEGER NOT NULL DEFAULT 60,
+                    max_daily_attempts   INTEGER NOT NULL DEFAULT 10,
+                    max_fail_count       INTEGER NOT NULL DEFAULT 5,
+                    session_timeout_hours  INTEGER NOT NULL DEFAULT 8,
+                    idle_timeout_minutes   INTEGER NOT NULL DEFAULT 60,
                     updated_at           TEXT
                 )
             """))
+            # 기존 mfa_config 테이블에 새 컬럼 추가 (이미 있으면 무시)
+            for _col, _def in [('resend_wait_seconds', '60'), ('max_daily_attempts', '10'), ('max_fail_count', '5'), ('session_timeout_hours', '8'), ('idle_timeout_minutes', '60')]:
+                try:
+                    db.session.execute(db.text("ALTER TABLE mfa_config ADD COLUMN {} INTEGER NOT NULL DEFAULT {}".format(_col, _def)))
+                except Exception:
+                    pass
             db.session.execute(db.text("""
                 CREATE TABLE IF NOT EXISTS sms_config (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,

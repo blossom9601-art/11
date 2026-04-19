@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, current_app, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, current_app, make_response, Response
 import os
 import re
+import time
 import ipaddress
 from app.models import db, AuthUser, AuthLoginHistory, AuthPasswordHistory, UserProfile, OrgDepartment
 from app.models import AuthRole, Role, RoleUser, SmtpConfig, SmsConfig, MfaConfig, MfaPendingCode, CompanyOtpConfig
@@ -10,8 +11,11 @@ import json
 import random
 import string
 import sqlalchemy as sa
+from app.services.brand_setting_service import get_brand_setting
 
 auth_bp = Blueprint('auth', __name__)
+
+_DEFAULT_LOGIN_BACKGROUND_IMAGE = '/static/image/login/bada.png'
 
 ROLE_PERMISSION_FIELDS = (
     'dashboard', 'hardware', 'software', 'governance',
@@ -384,6 +388,25 @@ def role_to_dict(role_row, user_count=None, include_users=False, user_ids=None):
         payload['user_ids'] = user_ids
     return payload
 
+
+def _get_login_background_image():
+    try:
+        row = get_brand_setting('login.backgroundImage') or {}
+        value = (row.get('value') or '').strip()
+        return value or _DEFAULT_LOGIN_BACKGROUND_IMAGE
+    except Exception:
+        return _DEFAULT_LOGIN_BACKGROUND_IMAGE
+
+
+def _render_sign_in(**context):
+    context.setdefault('login_background_image', _get_login_background_image())
+    return render_template('authentication/11-2.basic/sign-in.html', **context)
+
+
+def _render_terms(**context):
+    context.setdefault('login_background_image', _get_login_background_image())
+    return render_template('authentication/11-2.basic/terms.html', **context)
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     # 진단: 실제 로드된 auth.py 파일 경로 출력 (서버가 어떤 버전 사용하는지 확인)
@@ -423,7 +446,7 @@ def login():
                 except Exception:
                     pass
 
-        return render_template('authentication/11-2.basic/sign-in.html')
+        return _render_sign_in()
 
     if request.method == 'POST':
         emp_no = request.form.get('employee_id')
@@ -431,7 +454,7 @@ def login():
         
         if not emp_no or not password:
             flash('사번과 비밀번호를 모두 입력해주세요.', 'error')
-            return render_template('authentication/11-2.basic/sign-in.html')
+            return _render_sign_in()
         
         # 사용자 조회
         user = AuthUser.query.filter_by(emp_no=emp_no).first()
@@ -449,14 +472,14 @@ def login():
             flash('존재하지 않는 사번입니다.', 'error')
             db.session.add(login_history)
             db.session.commit()
-            return render_template('authentication/11-2.basic/sign-in.html')
+            return _render_sign_in()
         
         # 계정 상태 확인
         if user.status != 'active':
             flash('비활성화된 계정입니다.', 'error')
             db.session.add(login_history)
             db.session.commit()
-            return render_template('authentication/11-2.basic/sign-in.html')
+            return _render_sign_in()
         
         # 계정 잠금 확인
         if user.is_locked():
@@ -471,7 +494,7 @@ def login():
             flash(msg, 'error')
             db.session.add(login_history)
             db.session.commit()
-            return render_template('authentication/11-2.basic/sign-in.html')
+            return _render_sign_in()
         
         # 허용 IP 검사 (프로필에 설정된 경우만 적용) - SENTINEL v2
         try:
@@ -540,7 +563,7 @@ def login():
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
                     db.session.commit()
-                    return render_template('authentication/11-2.basic/sign-in.html')
+                    return _render_sign_in()
                 # '*' 혼합 사용 시 의미가 모호해지므로 경고 및 차단 (강화 정책)
                 if '*' in norm_tokens and len(norm_tokens) > 1:
                     current_app.logger.warning(f"[login] IP 차단(혼합 *) emp_no={emp_no} remote_ip={remote_ip}")
@@ -548,7 +571,7 @@ def login():
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
                     db.session.commit()
-                    return render_template('authentication/11-2.basic/sign-in.html')
+                    return _render_sign_in()
 
                 # 단순화된 1차 매칭 (정확 일치만) - 실패 시 곧바로 차단 후 반환
                 if remote_ip not in norm_tokens:
@@ -557,7 +580,7 @@ def login():
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
                     db.session.commit()
-                    return render_template('authentication/11-2.basic/sign-in.html')
+                    return _render_sign_in()
 
                 def token_match(tok, ip):
                     if tok == '*':
@@ -599,7 +622,7 @@ def login():
                     flash('허용되지 않은 IP입니다.', 'error')
                     db.session.add(login_history)
                     db.session.commit()
-                    return render_template('authentication/11-2.basic/sign-in.html')
+                    return _render_sign_in()
                 else:
                     current_app.logger.info(f"[login] IP 허용 emp_no={emp_no} remote_ip={remote_ip} matched=yes")
                     print('[login_debug] ALLOW_v2 remote_ip', remote_ip, 'matched_token', matched_token, flush=True)
@@ -640,7 +663,7 @@ def login():
             flash(msg, 'error')
             db.session.add(login_history)
             db.session.commit()
-            return render_template('authentication/11-2.basic/sign-in.html')
+            return _render_sign_in()
 
         # 비밀번호 찾기로 발급된 임시 비밀번호 만료 확인
         if profile and profile.password_expires_at:
@@ -649,7 +672,7 @@ def login():
                 flash('임시 비밀번호가 만료되었습니다. 비밀번호 찾기를 다시 진행해주세요.', 'error')
                 db.session.add(login_history)
                 db.session.commit()
-                return render_template('authentication/11-2.basic/sign-in.html')
+                return _render_sign_in()
         
         # 로그인 성공
         user.last_login_at = datetime.utcnow()
@@ -695,7 +718,7 @@ def login():
                 # AJAX 로그인이면 JSON 응답, 일반 폼 제출이면 MFA 페이지 렌더
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
                     return jsonify({'mfa_required': True, 'emp_no': user.emp_no})
-                return render_template('authentication/11-2.basic/sign-in.html', mfa_required=True, mfa_emp_no=user.emp_no)
+                return _render_sign_in(mfa_required=True, mfa_emp_no=user.emp_no)
 
         # ── MFA 미사용: 기존 로직 그대로 ──────────────────────────
         # 세션에 사용자 정보 저장 및 ADMIN 불변 강제
@@ -767,7 +790,7 @@ def login():
         # 첫 화면: 지정된 대시보드 템플릿으로 리다이렉트
         return redirect(url_for('main.dashboard'))
 
-    return render_template('authentication/11-2.basic/sign-in.html')
+    return _render_sign_in()
 
 @auth_bp.route('/logout')
 def logout():
@@ -1332,7 +1355,7 @@ def terms():
         agree = request.form.get('terms_agree')
         if not agree:
             flash('약관에 동의해야 계속 진행할 수 있습니다.', 'error')
-            return render_template('authentication/11-2.basic/terms.html', can_agree=True)
+            return _render_terms(can_agree=True)
         # 동의 처리: 현재 시각 기록 (UTC)
         user.last_terms_accepted_at = datetime.utcnow()
         db.session.commit()
@@ -1341,7 +1364,7 @@ def terms():
         return redirect(url_for('main.dashboard'))
 
     view_only = bool(session.get('user_id')) and not session.get('pending_terms_user_id')
-    return render_template('authentication/11-2.basic/terms.html', can_agree=bool(user), view_only=view_only)
+    return _render_terms(can_agree=bool(user), view_only=view_only)
 
 @auth_bp.route('/admin/auth/locked', methods=['GET', 'POST'])
 def admin_locked_users():
@@ -1653,6 +1676,11 @@ def admin_create_user():
         'updated_at': user.updated_at.strftime('%Y-%m-%d %H:%M:%S') if user.updated_at else '-',
     }
 
+    # 로깅: [사용자] 생성
+    _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+    _settings_log('사용자', f'{emp_no} 생성', '-', f'name={name}, role={role_val}, email={email}', changed_by=_by, changed_at=_now)
+
     resp = {
         'status': 'ok',
         'emp_no': emp_no,
@@ -1829,6 +1857,16 @@ def admin_update_user():
         db.session.rollback()
         return jsonify({'error':'db_commit_failed','message':str(e)}), 500
 
+    # 로깅: [사용자] 수정
+    _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+    if email:
+        _settings_log('사용자', f'{emp_no} 이메일', user.email or '-', email, changed_by=_by, changed_at=_now)
+    if role_val and role_val != (user.role or ''):
+        _settings_log('사용자', f'{emp_no} 역할', user.role or '-', role_val, changed_by=_by, changed_at=_now)
+    if profile.name:
+        _settings_log('사용자', f'{emp_no} 이름', '-', profile.name, changed_by=_by, changed_at=_now)
+
     merged = {
         'emp_no': user.emp_no,
         'email': profile.email or user.email,
@@ -1945,6 +1983,14 @@ def admin_bulk_update_users():
         db.session.rollback()
         return jsonify({'error':'db_commit_failed','message':str(e)}), 500
 
+    # 로깅: [사용자] 일괄 수정
+    if updated and fields:
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        field_changes = ', '.join(f'{k}={v}' for k, v in fields.items() if k not in ['role'])
+        if field_changes:
+            _settings_log('사용자', f'{len(updated)}명 일괄수정', '-', field_changes, changed_by=_by, changed_at=_now)
+
     return jsonify({'status':'ok','updated':updated,'applied_fields':list(fields.keys())})
 
 @auth_bp.route('/admin/auth/delete', methods=['POST'])
@@ -1996,6 +2042,13 @@ def admin_delete_users():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error':'db_commit_failed','message':str(e),'partial_deleted':deleted}), 500
+
+    # 로깅: [사용자] 삭제
+    if deleted:
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        _settings_log('사용자', f'{len(deleted)}명 삭제', ','.join(deleted), '-', changed_by=_by, changed_at=_now)
+
     return jsonify({'status':'ok','deleted':deleted,'count':len(deleted)})
 
 @auth_bp.route('/admin/auth/groups', methods=['GET'])
@@ -2501,10 +2554,7 @@ def admin_security_policy_put():
                 new_val = str(val)
                 if old_val != new_val:
                     label = FIELD_LABELS.get(fname, fname)
-                    db.session.execute(db.text(
-                        "INSERT INTO security_policy_log (field_name, old_value, new_value, changed_by, changed_at) "
-                        "VALUES (:f, :o, :n, :b, :t)"
-                    ), {'f': label, 'o': old_val, 'n': new_val, 'b': _by, 't': _now})
+                    _settings_log('보안관리', label, old_val, new_val, changed_by=_by, changed_at=_now)
 
         if sets:
             sets.append("updated_at = :now")
@@ -2553,10 +2603,7 @@ def admin_security_policy_defaults():
             "session_reissue_minutes=30, concurrent_policy='kill_oldest', "
             "updated_at=:now, updated_by=:by WHERE id=1"
         ), {'now': _now, 'by': _by})
-        db.session.execute(db.text(
-            "INSERT INTO security_policy_log (field_name, old_value, new_value, changed_by, changed_at) "
-            "VALUES (:f, :o, :n, :b, :t)"
-        ), {'f': '전체 정책', 'o': '-', 'n': '기본값 복원', 'b': _by, 't': _now})
+        _settings_log('보안관리', '전체 정책', '-', '기본값 복원', changed_by=_by, changed_at=_now)
         db.session.commit()
         return jsonify({'success': True, 'message': '기본값으로 복원되었습니다.'})
     except Exception as e:
@@ -2607,20 +2654,168 @@ def admin_security_change_log():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         offset = (page - 1) * per_page
-        total = db.session.execute(db.text("SELECT COUNT(*) FROM security_policy_log")).fetchone()[0]
-        rows = db.session.execute(db.text(
+
+        def _fmt_at(v):
+            if v is None:
+                return ''
+            if isinstance(v, datetime):
+                return v.strftime('%Y-%m-%d %H:%M:%S')
+            return str(v)
+
+        sec_total = db.session.execute(db.text("SELECT COUNT(*) FROM security_policy_log")).fetchone()[0]
+        sec_rows = db.session.execute(db.text(
             "SELECT field_name, old_value, new_value, changed_by, changed_at "
-            "FROM security_policy_log ORDER BY id DESC LIMIT :lim OFFSET :off"
-        ), {'lim': per_page, 'off': offset}).fetchall()
+            "FROM security_policy_log ORDER BY id DESC LIMIT :lim"
+        ), {'lim': max(per_page * 5, 100)}).fetchall()
+
+        perm_total = db.session.query(sa.func.count(PermissionAuditLog.id)).scalar() or 0
+        perm_rows = db.session.query(PermissionAuditLog).order_by(
+            PermissionAuditLog.changed_at.desc()
+        ).limit(max(per_page * 5, 100)).all()
+
+        merged = []
+        for r in sec_rows:
+            at = _fmt_at(r[4])
+            merged.append({
+                'field': r[0], 'old': r[1], 'new': r[2], 'by': r[3], 'at': at,
+                '_sort': at,
+            })
+        for r in perm_rows:
+            at = _fmt_at(r.changed_at)
+            target = r.role_name or f'role:{r.role_id}'
+            merged.append({
+                'field': f'[화면권한] {r.menu_code}',
+                'old': f'{target} {r.before_permission or "-"}',
+                'new': f'{target} {r.after_permission or "-"}',
+                'by': r.changed_by,
+                'at': at,
+                '_sort': at,
+            })
+
+        merged.sort(key=lambda x: x.get('_sort', ''), reverse=True)
+        rows = merged[offset:offset + per_page]
         return jsonify({
-            'total': total,
+            'total': sec_total + perm_total,
             'rows': [
-                {'field': r[0], 'old': r[1], 'new': r[2], 'by': r[3], 'at': r[4]}
+                {'field': r['field'], 'old': r['old'], 'new': r['new'], 'by': r['by'], 'at': r['at']}
                 for r in rows
             ]
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/admin/auth/security-log/stream', methods=['GET'])
+def security_log_stream():
+    """SSE: 보안정책 변경 로그를 실시간 스트리밍한다."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+
+    app = current_app._get_current_object()
+
+    def generate():
+        last_id = 0
+        try:
+            with app.app_context():
+                row = db.session.execute(db.text(
+                    "SELECT COALESCE(MAX(id), 0) FROM security_policy_log"
+                )).fetchone()
+                last_id = row[0]
+                db.session.remove()
+        except Exception:
+            pass
+
+        try:
+            with app.app_context():
+                rows = db.session.execute(db.text(
+                    "SELECT id, field_name, old_value, new_value, changed_by, changed_at "
+                    "FROM security_policy_log ORDER BY id DESC LIMIT 12"
+                )).fetchall()
+                db.session.remove()
+                data = json.dumps([
+                    {'field': r[1], 'old': r[2], 'new': r[3], 'by': r[4], 'at': str(r[5])}
+                    for r in reversed(rows)
+                ])
+                yield "data: " + data + "\n\n"
+        except Exception:
+            yield "data: []\n\n"
+
+        while True:
+            time.sleep(5)
+            try:
+                with app.app_context():
+                    rows = db.session.execute(db.text(
+                        "SELECT id, field_name, old_value, new_value, changed_by, changed_at "
+                        "FROM security_policy_log WHERE id > :lid ORDER BY id ASC LIMIT 20"
+                    ), {'lid': last_id}).fetchall()
+                    db.session.remove()
+                if rows:
+                    last_id = rows[-1][0]
+                    data = json.dumps([
+                        {'field': r[1], 'old': r[2], 'new': r[3], 'by': r[4], 'at': str(r[5])}
+                        for r in rows
+                    ])
+                    yield "data: " + data + "\n\n"
+                else:
+                    yield ": keep-alive\n\n"
+            except Exception:
+                yield ": keep-alive\n\n"
+
+    resp = Response(generate(), mimetype='text/event-stream')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['X-Accel-Buffering'] = 'no'
+    resp.headers['Connection'] = 'keep-alive'
+    return resp
+
+
+@auth_bp.route('/admin/auth/login-attempt-stats', methods=['GET'])
+def admin_login_attempt_stats():
+    """최근 7일 시간대별 로그인 시도 통계를 반환한다."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+    try:
+        hours = [str(i).zfill(2) for i in range(24)]
+        ok_map = {h: 0 for h in hours}
+        fail_map = {h: 0 for h in hours}
+
+        since = datetime.utcnow() - timedelta(days=7)
+        rows = db.session.query(
+            AuthLoginHistory.logged_at,
+            AuthLoginHistory.success
+        ).filter(
+            AuthLoginHistory.logged_at >= since
+        ).all()
+
+        for logged_at, success in rows:
+            if not logged_at:
+                continue
+            hour = str(logged_at.hour).zfill(2)
+            if hour not in ok_map:
+                continue
+            if bool(success):
+                ok_map[hour] += 1
+            else:
+                fail_map[hour] += 1
+
+        return jsonify({
+            'labels': hours,
+            'success': [ok_map.get(h, 0) for h in hours],
+            'fail': [fail_map.get(h, 0) for h in hours],
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/admin/auth/file-management', methods=['GET'])
+def admin_file_management_settings():
+    """파일관리 설정 페이지를 렌더링한다."""
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_file_management', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/11.file_management.html')
 
 
 # ── 활성 세션 관리 ────────────────────────────────────────────────────
@@ -2714,6 +2909,10 @@ def admin_terminate_session(session_row_id):
             return jsonify({'success': False, 'message': '현재 사용 중인 세션은 종료할 수 없습니다.'}), 400
         db.session.execute(db.text("DELETE FROM active_sessions WHERE id = :sid"), {'sid': session_row_id})
         db.session.commit()
+        # 로깅: [세션관리] 세션 종료
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        _settings_log('세션관리', f'{row[1]} 세션 종료', row[0], 'terminated', changed_by=_by, changed_at=_now)
         return jsonify({'success': True, 'message': f'{row[1]}의 세션을 종료했습니다.'})
     except Exception as e:
         db.session.rollback()
@@ -2746,6 +2945,10 @@ def admin_bulk_terminate_sessions():
         msg = f'{terminated}개 세션을 종료했습니다.'
         if skipped:
             msg += f' ({skipped}개 건너뜀)'
+        # 로깅: [세션관리] 일괄 세션 종료
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        _settings_log('세션관리', f'{terminated}개 세션 일괄 종료', '-', f'terminated={terminated}, skipped={skipped}', changed_by=_by, changed_at=_now)
         return jsonify({'success': True, 'message': msg, 'terminated': terminated, 'skipped': skipped})
     except Exception as e:
         db.session.rollback()
@@ -2764,6 +2967,10 @@ def admin_terminate_all_sessions():
         ), {'sid': current_sid})
         count = result.rowcount
         db.session.commit()
+        # 로깅: [세션관리] 모든 세션 종료 (자신 제외)
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        _settings_log('세션관리', '모든 세션 종료 (자신 제외)', '-', f'count={count}', changed_by=_by, changed_at=_now)
         return jsonify({'success': True, 'message': f'{count}개 세션을 종료했습니다.', 'terminated': count})
     except Exception as e:
         db.session.rollback()
@@ -2797,6 +3004,31 @@ def _ensure_admin_session():
     except Exception:
         pass
     return 'role' in session and session.get('role') in ADMIN_SESSION_ROLES
+
+
+def _settings_actor():
+    """설정 변경 주체 식별자(emp_no 우선)를 반환한다."""
+    return session.get('emp_no', '') or session.get('user_id', '') or session.get('role', '') or 'admin'
+
+
+def _settings_log(category, field_label, old_value, new_value, changed_by=None, changed_at=None):
+    """공통 설정 변경 로그를 security_policy_log에 기록한다."""
+    old_text = '' if old_value is None else str(old_value)
+    new_text = '' if new_value is None else str(new_value)
+    if old_text == new_text:
+        return
+    by = changed_by or _settings_actor()
+    at = changed_at or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    db.session.execute(db.text(
+        "INSERT INTO security_policy_log (field_name, old_value, new_value, changed_by, changed_at) "
+        "VALUES (:f, :o, :n, :b, :t)"
+    ), {
+        'f': f'[{category}] {field_label}',
+        'o': old_text,
+        'n': new_text,
+        'b': by,
+        't': at,
+    })
 
 
 @auth_bp.route('/admin/auth/mail', methods=['GET'])
@@ -2931,6 +3163,18 @@ def admin_mail_config_put():
     if not row:
         row = SmtpConfig(id=1)
         db.session.add(row)
+    old_vals = {
+        'host': row.host or '',
+        'port': row.port,
+        'encryption': row.encryption or 'STARTTLS',
+        'username': row.username or '',
+        'password': '********' if row.password else '',
+        'from_name': row.from_name or 'Blossom',
+        'from_email': row.from_email or '',
+        'use_auth': bool(getattr(row, 'use_auth', True)),
+        'verify_cert': bool(getattr(row, 'verify_cert', True)),
+        'reply_to': getattr(row, 'reply_to', '') or '',
+    }
     if 'host' in payload:
         row.host = (payload['host'] or '').strip()
     if 'port' in payload:
@@ -2952,6 +3196,18 @@ def admin_mail_config_put():
     if 'reply_to' in payload:
         row.reply_to = (payload['reply_to'] or '').strip()
     row.updated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    changed_by = _settings_actor()
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _settings_log('메일관리', 'SMTP 호스트', old_vals['host'], row.host or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', 'SMTP 포트', old_vals['port'], row.port, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', '암호화', old_vals['encryption'], row.encryption or 'STARTTLS', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', 'SMTP 계정', old_vals['username'], row.username or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', 'SMTP 비밀번호', old_vals['password'], '********' if row.password else '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', '발신자 이름', old_vals['from_name'], row.from_name or 'Blossom', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', '발신 메일', old_vals['from_email'], row.from_email or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', 'SMTP 인증 사용', old_vals['use_auth'], bool(getattr(row, 'use_auth', True)), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', '인증서 검증', old_vals['verify_cert'], bool(getattr(row, 'verify_cert', True)), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('메일관리', '답장 주소', old_vals['reply_to'], getattr(row, 'reply_to', '') or '', changed_by=changed_by, changed_at=changed_at)
     try:
         db.session.commit()
     except Exception as e:
@@ -3344,6 +3600,11 @@ def _get_mfa_config():
         'allow_user_choice': True,
         'code_length': 6,
         'code_ttl_seconds': 300,
+        'resend_wait_seconds': 60,
+        'max_daily_attempts': 10,
+        'max_fail_count': 5,
+        'session_timeout_hours': 8,
+        'idle_timeout_minutes': 60,
     }
     try:
         row = MfaConfig.query.filter_by(id=1).first()
@@ -3367,6 +3628,11 @@ def _get_mfa_config():
         'allow_user_choice': bool(row.allow_user_choice) if row.allow_user_choice is not None else True,
         'code_length': row.code_length if row.code_length else 6,
         'code_ttl_seconds': row.code_ttl_seconds if row.code_ttl_seconds else 300,
+        'resend_wait_seconds': getattr(row, 'resend_wait_seconds', 60) or 60,
+        'max_daily_attempts': getattr(row, 'max_daily_attempts', 10) or 10,
+        'max_fail_count': getattr(row, 'max_fail_count', 5) or 5,
+        'session_timeout_hours': getattr(row, 'session_timeout_hours', 8) or 8,
+        'idle_timeout_minutes': getattr(row, 'idle_timeout_minutes', 60) or 60,
     }
 
 
@@ -3389,6 +3655,25 @@ def admin_mfa_config_put():
     if not row:
         row = MfaConfig(id=1)
         db.session.add(row)
+    old_vals = {
+        'enabled': bool(row.enabled),
+        'default_type': row.default_type or 'totp',
+        'totp_enabled': bool(row.totp_enabled),
+        'sms_enabled': bool(row.sms_enabled),
+        'email_enabled': bool(row.email_enabled),
+        'company_otp_enabled': bool(row.company_otp_enabled),
+        'grace_period_days': row.grace_period_days,
+        'remember_device_days': row.remember_device_days,
+        'totp_secret': '********' if row.totp_secret else '',
+        'allow_user_choice': bool(row.allow_user_choice),
+        'code_length': row.code_length,
+        'code_ttl_seconds': row.code_ttl_seconds,
+        'resend_wait_seconds': row.resend_wait_seconds,
+        'max_daily_attempts': row.max_daily_attempts,
+        'max_fail_count': row.max_fail_count,
+        'session_timeout_hours': row.session_timeout_hours,
+        'idle_timeout_minutes': row.idle_timeout_minutes,
+    }
     if 'enabled' in payload:
         row.enabled = bool(payload['enabled'])
     if 'default_type' in payload:
@@ -3419,7 +3704,36 @@ def admin_mfa_config_put():
         row.code_length = max(4, min(10, int(payload['code_length'] or 6)))
     if 'code_ttl_seconds' in payload:
         row.code_ttl_seconds = max(60, int(payload['code_ttl_seconds'] or 300))
+    if 'resend_wait_seconds' in payload:
+        row.resend_wait_seconds = max(10, min(300, int(payload['resend_wait_seconds'] or 60)))
+    if 'max_daily_attempts' in payload:
+        row.max_daily_attempts = max(1, min(100, int(payload['max_daily_attempts'] or 10)))
+    if 'max_fail_count' in payload:
+        row.max_fail_count = max(1, min(20, int(payload['max_fail_count'] or 5)))
+    if 'session_timeout_hours' in payload:
+        row.session_timeout_hours = max(1, min(720, int(payload['session_timeout_hours'] or 8)))
+    if 'idle_timeout_minutes' in payload:
+        row.idle_timeout_minutes = max(5, min(480, int(payload['idle_timeout_minutes'] or 60)))
     row.updated_at = datetime.utcnow().isoformat()
+    changed_by = _settings_actor()
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _settings_log('인증관리', 'MFA 사용', old_vals['enabled'], bool(row.enabled), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '기본 인증 방식', old_vals['default_type'], row.default_type or 'totp', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'TOTP 사용', old_vals['totp_enabled'], bool(row.totp_enabled), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'SMS 사용', old_vals['sms_enabled'], bool(row.sms_enabled), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '이메일 사용', old_vals['email_enabled'], bool(row.email_enabled), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP 사용', old_vals['company_otp_enabled'], bool(row.company_otp_enabled), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '유예기간(일)', old_vals['grace_period_days'], row.grace_period_days, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '기기 기억 기간(일)', old_vals['remember_device_days'], row.remember_device_days, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'TOTP 시크릿', old_vals['totp_secret'], '********' if row.totp_secret else '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사용자 방식 선택 허용', old_vals['allow_user_choice'], bool(row.allow_user_choice), changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '인증코드 길이', old_vals['code_length'], row.code_length, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '코드 유효시간(초)', old_vals['code_ttl_seconds'], row.code_ttl_seconds, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '재발송 대기(초)', old_vals['resend_wait_seconds'], row.resend_wait_seconds, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '일 최대 시도 횟수', old_vals['max_daily_attempts'], row.max_daily_attempts, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '최대 실패 횟수', old_vals['max_fail_count'], row.max_fail_count, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '세션 만료(시간)', old_vals['session_timeout_hours'], row.session_timeout_hours, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '유휴 타임아웃(분)', old_vals['idle_timeout_minutes'], row.idle_timeout_minutes, changed_by=changed_by, changed_at=changed_at)
     try:
         db.session.commit()
     except Exception as e:
@@ -3801,6 +4115,13 @@ def admin_sms_config_put():
     if not row:
         row = SmsConfig(id=1)
         db.session.add(row)
+    old_vals = {
+        'provider': row.provider or 'coolsms',
+        'api_key': row.api_key or '',
+        'api_secret': '********' if row.api_secret else '',
+        'sender_number': row.sender_number or '',
+        'enabled': bool(row.enabled),
+    }
     if 'provider' in payload:
         row.provider = (payload['provider'] or 'coolsms').strip()
     if 'api_key' in payload:
@@ -3812,6 +4133,13 @@ def admin_sms_config_put():
     if 'enabled' in payload:
         row.enabled = bool(payload['enabled'])
     row.updated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    changed_by = _settings_actor()
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _settings_log('인증관리', 'SMS 공급자', old_vals['provider'], row.provider or 'coolsms', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'SMS API Key', old_vals['api_key'], row.api_key or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'SMS API Secret', old_vals['api_secret'], '********' if row.api_secret else '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'SMS 발신번호', old_vals['sender_number'], row.sender_number or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', 'SMS 사용', old_vals['enabled'], bool(row.enabled), changed_by=changed_by, changed_at=changed_at)
     try:
         db.session.commit()
     except Exception as e:
@@ -3970,6 +4298,15 @@ def admin_company_otp_config_put():
     if not row:
         row = CompanyOtpConfig(id=1)
         db.session.add(row)
+    old_vals = {
+        'provider': row.provider or 'initech',
+        'api_endpoint': row.api_endpoint or '',
+        'api_key': row.api_key or '',
+        'api_secret': '********' if row.api_secret else '',
+        'server_code': row.server_code or '',
+        'timeout': row.timeout or 5,
+        'enabled': bool(row.enabled),
+    }
     if 'provider' in payload:
         row.provider = (payload['provider'] or 'initech').strip().lower()
     if 'api_endpoint' in payload:
@@ -3985,6 +4322,15 @@ def admin_company_otp_config_put():
     if 'enabled' in payload:
         row.enabled = bool(payload['enabled'])
     row.updated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    changed_by = _settings_actor()
+    changed_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _settings_log('인증관리', '사내OTP 공급자', old_vals['provider'], row.provider or 'initech', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP 엔드포인트', old_vals['api_endpoint'], row.api_endpoint or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP API Key', old_vals['api_key'], row.api_key or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP API Secret', old_vals['api_secret'], '********' if row.api_secret else '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP 서버코드', old_vals['server_code'], row.server_code or '', changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP 타임아웃', old_vals['timeout'], row.timeout or 5, changed_by=changed_by, changed_at=changed_at)
+    _settings_log('인증관리', '사내OTP 사용', old_vals['enabled'], bool(row.enabled), changed_by=changed_by, changed_at=changed_at)
     try:
         db.session.commit()
     except Exception as e:

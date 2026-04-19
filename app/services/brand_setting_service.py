@@ -17,6 +17,9 @@ _SEED_ROWS = [
      'value': 'blossom', 'value_type': 'text'},
     {'category': 'header', 'key': 'brand.subtitle',
      'value': '', 'value_type': 'text'},
+    # 로그인 배경
+    {'category': 'login', 'key': 'login.backgroundImage',
+     'value': '/static/image/login/bada.png', 'value_type': 'image'},
     # 대시보드 카드 로고
     {'category': 'dashboard', 'key': 'dashboard.cardLogos.maintenance_cost_card',
      'value': '/static/image/logo/bccard_logo.jpg', 'value_type': 'image'},

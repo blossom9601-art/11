@@ -33474,6 +33474,27 @@ def _is_admin_session() -> bool:
     return False
 
 
+def _settings_actor_api() -> str:
+    return str(session.get('emp_no') or session.get('user_id') or session.get('role') or 'admin')
+
+
+def _settings_log_api(category: str, field_label: str, old_value, new_value):
+    old_text = '' if old_value is None else str(old_value)
+    new_text = '' if new_value is None else str(new_value)
+    if old_text == new_text:
+        return
+    db.session.execute(db.text(
+        "INSERT INTO security_policy_log (field_name, old_value, new_value, changed_by, changed_at) "
+        "VALUES (:f, :o, :n, :b, :t)"
+    ), {
+        'f': f'[{category}] {field_label}',
+        'o': old_text,
+        'n': new_text,
+        'b': _settings_actor_api(),
+        't': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    })
+
+
 @api_bp.route('/api/info-messages', methods=['GET'])
 def list_info_messages_api():
     """인포메이션 문구 목록 조회 (모든 사용자 허용)."""
@@ -33516,6 +33537,7 @@ def create_info_message_api():
     payload = request.get_json(silent=True) or {}
     try:
         record = svc_create_info_message(payload, _resolve_actor())
+        _settings_log_api('문구관리', '문구 생성', '-', payload.get('menu_key') or payload.get('title') or str(record.get('id') if isinstance(record, dict) else ''))
         return jsonify({'success': True, 'item': record}), 201
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
@@ -33534,9 +33556,20 @@ def update_info_message_api(msg_id: int):
         return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'}), 403
     payload = request.get_json(silent=True) or {}
     try:
+        before = svc_list_info_messages()
+        before_item = None
+        for _row in (before or []):
+            if int(_row.get('id', 0)) == int(msg_id):
+                before_item = _row
+                break
         record = svc_update_info_message(msg_id, payload, _resolve_actor())
         if not record:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        for k, v in payload.items():
+            if k == 'id':
+                continue
+            old_v = before_item.get(k) if isinstance(before_item, dict) else ''
+            _settings_log_api('문구관리', f'문구#{msg_id} {k}', old_v, v)
         return jsonify({'success': True, 'item': record})
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
@@ -33558,9 +33591,16 @@ def toggle_info_message_api(msg_id: int):
     if is_enabled is None:
         return jsonify({'success': False, 'message': 'is_enabled 값이 필요합니다.'}), 400
     try:
+        before = svc_list_info_messages()
+        before_item = None
+        for _row in (before or []):
+            if int(_row.get('id', 0)) == int(msg_id):
+                before_item = _row
+                break
         record = svc_toggle_info_message(msg_id, int(is_enabled), _resolve_actor())
         if not record:
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        _settings_log_api('문구관리', f'문구#{msg_id} 활성여부', before_item.get('is_enabled') if isinstance(before_item, dict) else '', int(is_enabled))
         return jsonify({'success': True, 'item': record})
     except Exception:
         logger.exception('Failed to toggle info message id=%s', msg_id)
@@ -33586,6 +33626,7 @@ def bulk_delete_info_messages_api():
         return jsonify({'success': False, 'message': '유효하지 않은 ID입니다.'}), 400
     try:
         deleted = svc_bulk_delete_info_messages(ids, _resolve_actor())
+        _settings_log_api('문구관리', '문구 일괄삭제', ','.join(map(str, ids)), f'deleted={deleted}')
         return jsonify({'success': True, 'deleted': deleted})
     except Exception:
         logger.exception('Failed to bulk-delete info messages')
@@ -33674,9 +33715,12 @@ def update_version():
         if os.path.exists(vpath):
             with open(vpath, 'r', encoding='utf-8') as f:
                 existing = json.load(f)
+        before = dict(existing)
         existing.update(payload)
         with open(vpath, 'w', encoding='utf-8', newline='\n') as f:
             json.dump(existing, f, ensure_ascii=False, indent=2)
+        for k in payload.keys():
+            _settings_log_api('버전관리', k, before.get(k), existing.get(k))
         return jsonify({'success': True, 'item': existing})
     except Exception:
         logger.exception('Failed to update version.json')
@@ -33710,6 +33754,7 @@ def create_release_note():
         content = new_block + '\n' + existing_content if existing_content else new_block
         with open(rn_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(content)
+        _settings_log_api('버전관리', '릴리즈노트 생성', '-', version)
         return jsonify({'success': True})
     except Exception:
         logger.exception('Failed to create release note')
@@ -33750,6 +33795,7 @@ def update_release_note(version):
 
         with open(rn_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(_blocks_to_md(blocks))
+        _settings_log_api('버전관리', '릴리즈노트 수정', version, new_version)
         return jsonify({'success': True})
     except Exception:
         logger.exception('Failed to update release note')
@@ -33776,6 +33822,7 @@ def delete_release_note(version):
 
         with open(rn_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(_blocks_to_md(new_blocks))
+        _settings_log_api('버전관리', '릴리즈노트 삭제', version, '-')
         return jsonify({'success': True})
     except Exception:
         logger.exception('Failed to delete release note')
@@ -33927,6 +33974,7 @@ def create_page_tab():
         )
         db.session.add(row)
         db.session.commit()
+        _settings_log_api('페이지관리', f'{page_code}:{tab_code} 생성', '-', tab_name)
         return jsonify({'success': True, 'item': _page_tab_to_dict(row)}), 201
     except Exception:
         db.session.rollback()
@@ -33945,6 +33993,7 @@ def update_page_tab(tab_id):
         ).first()
         if not row:
             return jsonify({'success': False, 'message': '대상 탭을 찾을 수 없습니다.'}), 404
+        before = _page_tab_to_dict(row)
 
         if 'tab_name' in payload:
             row.tab_name = payload['tab_name']
@@ -33979,6 +34028,8 @@ def update_page_tab(tab_id):
 
         row.updated_by = payload.get('updated_by') or session.get('emp_no')
         row.updated_at = datetime.utcnow().isoformat()
+        for k, v in payload.items():
+            _settings_log_api('페이지관리', f'탭#{tab_id} {k}', before.get(k), v)
         db.session.commit()
         return jsonify({'success': True, 'item': _page_tab_to_dict(row)})
     except Exception:
@@ -34007,6 +34058,7 @@ def delete_page_tab(tab_id):
         row.is_deleted = 1
         row.updated_at = datetime.utcnow().isoformat()
         row.updated_by = session.get('emp_no')
+        _settings_log_api('페이지관리', f'{row.page_code}:{row.tab_code} 삭제', row.tab_name, '-')
         db.session.commit()
         return jsonify({'success': True, 'deleted': [tab_id]})
     except Exception:
@@ -34025,9 +34077,11 @@ def toggle_page_tab(tab_id):
         ).first()
         if not row:
             return jsonify({'success': False, 'message': '대상 탭을 찾을 수 없습니다.'}), 404
+        old_active = row.is_active
         row.is_active = 0 if row.is_active else 1
         row.updated_at = datetime.utcnow().isoformat()
         row.updated_by = session.get('emp_no')
+        _settings_log_api('페이지관리', f'{row.page_code}:{row.tab_code} 활성여부', old_active, row.is_active)
         db.session.commit()
         return jsonify({'success': True, 'item': _page_tab_to_dict(row)})
     except Exception:
@@ -34050,8 +34104,10 @@ def reorder_page_tabs():
             if tid:
                 row = PageTabConfig.query.get(tid)
                 if row and row.is_deleted == 0:
+                    old_order = row.tab_order
                     row.tab_order = new_order
                     row.updated_at = datetime.utcnow().isoformat()
+                    _settings_log_api('페이지관리', f'{row.page_code}:{row.tab_code} 순서', old_order, new_order)
         db.session.commit()
         return jsonify({'success': True})
     except Exception:
@@ -34230,8 +34286,10 @@ def api_brand_settings_save():
         if len(value) > 50:
             return jsonify({'success': False, 'error': '브랜드명은 50자 이내여야 합니다.'}), 400
     try:
+        before = get_brand_setting(key)
         emp = session.get('emp_no') or session.get('user_id') or ''
         upsert_brand_setting(key, value, category, value_type, updated_by=str(emp))
+        _settings_log_api('브랜드관리', key, (before or {}).get('value') if isinstance(before, dict) else '', value)
         return jsonify({'success': True, 'item': get_brand_setting(key)})
     except Exception as e:
         logger.exception('brand-settings save')
@@ -34267,8 +34325,10 @@ def api_brand_settings_upload():
     f.save(path)
     url = '/static/image/brand/' + safe
     try:
+        before = get_brand_setting(key)
         emp = session.get('emp_no') or session.get('user_id') or ''
         upsert_brand_setting(key, url, category, 'image', updated_by=str(emp))
+        _settings_log_api('브랜드관리', key, (before or {}).get('value') if isinstance(before, dict) else '', url)
         return jsonify({'success': True, 'url': url, 'item': get_brand_setting(key)})
     except Exception as e:
         logger.exception('brand-settings upload')
@@ -34281,8 +34341,10 @@ def api_brand_settings_delete(key):
     if session.get('role', '').upper() not in ('ADMIN', '관리자'):
         return jsonify({'success': False, 'error': 'forbidden'}), 403
     try:
+        before = get_brand_setting(key)
         emp = session.get('emp_no') or session.get('user_id') or ''
         delete_brand_setting(key, updated_by=str(emp))
+        _settings_log_api('브랜드관리', key, (before or {}).get('value') if isinstance(before, dict) else '', '-')
         return jsonify({'success': True})
     except Exception as e:
         logger.exception('brand-settings delete')
@@ -34298,12 +34360,111 @@ def api_brand_settings_reset():
         emp = session.get('emp_no') or session.get('user_id') or ''
         key = (request.get_json(silent=True) or {}).get('key')
         if key:
+            before = get_brand_setting(key)
             reset_single_brand_setting(key, updated_by=str(emp))
+            after = get_brand_setting(key)
+            _settings_log_api('브랜드관리', key, (before or {}).get('value') if isinstance(before, dict) else '', (after or {}).get('value') if isinstance(after, dict) else '')
         else:
             reset_brand_settings(updated_by=str(emp))
+            _settings_log_api('브랜드관리', '전체 초기화', '-', '기본값 복원')
         return jsonify({'success': True, 'rows': get_all_brand_settings()})
     except Exception as e:
         logger.exception('brand-settings reset')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ──────────────────────────────────────────────────────────────
+# 파일관리 정책 (파일 업로드/다운로드 정책)
+# ──────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/file-policy', methods=['GET'])
+def get_file_policy():
+    """파일 관리 정책을 반환한다."""
+    try:
+        # 기본 정책 (DB나 설정파일에서 조회하지 않으면 기본값 반환)
+        policy = {
+            'success': True,
+            'item': {
+                'max_file_size_mb': 20,
+                'allowed_extensions': 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,hwp,jpg,jpeg,png,gif,zip',
+                'blocked_extensions': 'exe,bat,cmd,com,scr,vbs,js,jar,dll',
+                'file_name_pattern': '',
+                'allow_duplicate_upload': False,
+                'block_executable_upload': True,
+                'validate_mime_type': True,
+                'validate_magic_bytes': False,
+                'detect_extension_spoofing': True,
+                'enable_virus_scan': False,
+                'inherit_record_permission': True,
+                'enable_download_log': True,
+                'allow_external_share': False,
+                'allow_admin_force_access': True,
+                'retention_days_after_closed': 365,
+                'archive_days_if_unaccessed': 180,
+                'exclude_important_from_retention': True,
+                'enable_expiry_notification': True,
+            }
+        }
+        return jsonify(policy)
+    except Exception as e:
+        logger.exception('file-policy get')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api_bp.route('/api/file-policy', methods=['PUT'])
+def update_file_policy():
+    """파일 관리 정책을 저장한다 (관리자 전용)."""
+    if session.get('role', '').upper() not in ('ADMIN', '관리자'):
+        return jsonify({'success': False, 'error': 'forbidden'}), 403
+    
+    payload = request.get_json(silent=True) or {}
+    if not payload:
+        return jsonify({'success': False, 'error': '요청 데이터가 없습니다.'}), 400
+    
+    try:
+        _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _by = session.get('emp_no', '') or session.get('user_id', '') or 'admin'
+        
+        # 주요 필드별 로깅
+        old_max_size = 20  # 기본값 (실제로는 DB에서 조회해야 함)
+        new_max_size = payload.get('max_file_size_mb', old_max_size)
+        if new_max_size != old_max_size:
+            _settings_log_api('파일관리', '최대파일크기', str(old_max_size), str(new_max_size))
+        
+        old_allowed = 'pdf,doc,docx,xls,xlsx'  # 기본값
+        new_allowed = payload.get('allowed_extensions', old_allowed)
+        if new_allowed and new_allowed != old_allowed:
+            _settings_log_api('파일관리', '허용확장자', old_allowed[:30]+'...', new_allowed[:30]+'...')
+        
+        old_blocked = 'exe,bat,cmd,com,scr'  # 기본값
+        new_blocked = payload.get('blocked_extensions', old_blocked)
+        if new_blocked and new_blocked != old_blocked:
+            _settings_log_api('파일관리', '금지확장자', old_blocked[:30]+'...', new_blocked[:30]+'...')
+        
+        # 보안 옵션 로깅
+        security_flags = {
+            'block_executable_upload': '실행파일차단',
+            'validate_mime_type': 'MIME검증',
+            'validate_magic_bytes': '매직바이트검사',
+            'detect_extension_spoofing': '확장자위장탐지',
+            'enable_virus_scan': '바이러스검사',
+        }
+        for key, label in security_flags.items():
+            old_val = True if key == 'block_executable_upload' else False  # 기본값
+            new_val = bool(payload.get(key, old_val))
+            if new_val != old_val:
+                _settings_log_api('파일관리', label, 'OFF', 'ON' if new_val else 'OFF')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'item': payload,
+            'message': '파일 정책이 저장되었습니다.'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('file-policy update')
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

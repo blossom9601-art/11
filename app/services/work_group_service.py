@@ -1453,8 +1453,8 @@ def soft_delete_work_groups(ids: Sequence[Any], actor: str, app=None) -> int:
         except Exception:
             rows = []
         cur = conn.execute(
-            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
-            safe_ids,
+            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders})",
+            [timestamp, actor] + safe_ids,
         )
         for r in rows or []:
             try:

@@ -1,0 +1,136 @@
+.file-policy-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.file-policy-grid .setting-card {
+	min-height: 260px;
+	display: flex;
+	flex-direction: column;
+}
+
+.file-policy-grid .setting-card .setting-form {
+	flex: 1;
+}
+
+.setting-card-footer {
+	display: flex;
+	justify-content: flex-end;
+	padding: 12px 0 0;
+	margin-top: auto;
+}
+
+.file-policy-grid .fp-ops {
+	grid-column: 1 / -1;
+}
+
+.fp-gauge-row {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.fp-gauge-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 24px 12px 18px;
+	border: 1px solid rgba(148, 163, 184, 0.18);
+	border-radius: 16px;
+	background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.fp-gauge-wrap {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.fp-gauge-svg {
+	width: 180px;
+	height: 118px;
+}
+
+.fp-gauge-track {
+	fill: none;
+	stroke: #e2e8f0;
+	stroke-width: 14;
+	stroke-linecap: round;
+}
+
+.fp-gauge-fill {
+	fill: none;
+	stroke-width: 14;
+	stroke-linecap: round;
+	stroke-dasharray: 251.33;
+	stroke-dashoffset: 251.33;
+	transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);
+}
+
+.fp-gauge-needle {
+	stroke: #334155;
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	transition: transform 1s cubic-bezier(.4,0,.2,1);
+	transform-origin: 100px 115px;
+}
+
+.fp-gauge-hub {
+	fill: #475569;
+}
+
+.fp-gauge-ticks line {
+	stroke: #94a3b8;
+	stroke-width: 1.5;
+}
+.fp-gauge-ticks line.fp-tick-major {
+	stroke: #64748b;
+	stroke-width: 2;
+}
+.fp-gauge-ticks text {
+	fill: #94a3b8;
+	font-size: 9px;
+	text-anchor: middle;
+}
+
+.fp-gauge-value {
+	text-align: center;
+	margin-top: -10px;
+}
+
+.fp-gauge-value strong {
+	display: block;
+	font-size: 24px;
+	font-weight: 800;
+	line-height: 1.1;
+	color: #1e293b;
+}
+
+.fp-gauge-value span {
+	font-size: 12px;
+	color: #64748b;
+	letter-spacing: .3px;
+}
+
+#fp-allowed-ext,
+#fp-blocked-ext {
+	font-family: inherit;
+}
+
+@media (max-width: 1200px) {
+	.file-policy-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.fp-gauge-row {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+@media (max-width: 720px) {
+	.fp-gauge-row {
+		grid-template-columns: 1fr;
+	}
+}

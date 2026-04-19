@@ -3808,25 +3808,8 @@ function toggleFullscreen() {
             const req = el.requestFullscreen || el.mozRequestFullScreen || el.webkitRequestFullScreen || el.msRequestFullscreen;
             if (req) {
                 req.call(el).catch(() => {
-                    // Fallback: show unobtrusive restore hint button if blocked
-                    try {
-                        if (!document.getElementById('fullscreen-restore-hint')) {
-                            const hint = document.createElement('button');
-                            hint.id = 'fullscreen-restore-hint';
-                            hint.textContent = '전체화면 다시 켜기';
-                            hint.style.position = 'fixed';
-                            hint.style.bottom = '16px';
-                            hint.style.right = '16px';
-                            hint.style.zIndex = '1200';
-                            hint.style.padding = '8px 14px';
-                            hint.style.borderRadius = '8px';
-                            hint.style.border = '1px solid #e5e7eb';
-                            hint.style.background = '#ffffff';
-                            hint.style.cursor = 'pointer';
-                            hint.onclick = () => { toggleFullscreen(); hint.remove(); };
-                            document.body.appendChild(hint);
-                        }
-                    } catch (_e) {}
+                    // 브라우저가 자동 전체화면을 차단한 경우 조용히 해제 상태 유지
+                    try { localStorage.setItem('blossom.fullscreen','0'); } catch (_e) {}
                 });
             }
         }
@@ -4410,9 +4393,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function __spaNavigate(href) {
-        // 즉시 active 반영 + skeleton 표시 + progress bar
+        // 즉시 active 반영 + progress bar
         try { __spaSetActiveLink(href); } catch (_e) {}
-        __spaShowSkeleton();
+        // 캐시 히트 시 스켈레톤 표시 생략 → 즉시 교체 (체감 속도 대폭 개선)
+        var hasCached = __spaNavCache[href] && (Date.now() - __spaNavCache[href].ts < SPA_CACHE_TTL);
+        if (!hasCached) __spaShowSkeleton();
         document.documentElement.classList.add('spa-loading');
 
         __spaFetchPage(href).then(function (html) {
@@ -5052,17 +5037,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try { return localStorage.getItem('blossom.fullscreen') === '1'; } catch (_e) { return false; }
         }
         function canIntercept(href){
+            // 일반 SPA 라우터의 유효성 검사를 재활용 (경로 프리픽스, 인증 경로 제외 등)
+            if(typeof __spaCanIntercept === 'function') return __spaCanIntercept(href);
+            // fallback: 최소 검증
             if(!href) return false;
             if(href.startsWith('#')) return false;
-            // 동일 출처 상대/절대 경로만 허용
             if(/^https?:/i.test(href) && !href.startsWith(location.origin)) return false;
-            // Safety: hardware category pages are sensitive and have shown "UI hangs".
-            // Force native navigation (full load) instead of SPA swap.
-            try {
-                const url = new URL(href, location.origin);
-                if(url.pathname === '/p/cat_hw_server' || /^\/p\/cat_hw_/.test(url.pathname)) return false;
-            } catch(_e) {}
-            // 정적 파일(.css/.js/.png 등) 요청 제외
             if(/\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|json)$/i.test(href)) return false;
             return true;
         }
@@ -5298,21 +5278,34 @@ document.addEventListener('DOMContentLoaded', () => {
             try { if(typeof applyActiveMenuHighlight === 'function'){ applyActiveMenuHighlight(); } } catch(_e){}
         }
         async function fetchAndSwap(href){
-            // 로딩 스피너 표시
-            let spinner = document.getElementById('spa-loading-spinner');
-            if(!spinner){
-                spinner = document.createElement('div');
-                spinner.id = 'spa-loading-spinner';
-                spinner.style.position='fixed';spinner.style.top='12px';spinner.style.right='12px';
-                spinner.style.zIndex='1400';spinner.style.padding='6px 12px';spinner.style.background='#111827';spinner.style.color='#f9fafb';spinner.style.fontSize='12px';spinner.style.borderRadius='6px';spinner.style.boxShadow='0 2px 8px rgba(0,0,0,.2)';
-                spinner.textContent='Loading...';
-                document.body.appendChild(spinner);
+            // 캐시 히트 시 스피너 생략
+            const hasCached = __spaNavCache[href] && (Date.now() - __spaNavCache[href].ts < SPA_CACHE_TTL);
+            let spinner = null;
+            if(!hasCached){
+                spinner = document.getElementById('spa-loading-spinner');
+                if(!spinner){
+                    spinner = document.createElement('div');
+                    spinner.id = 'spa-loading-spinner';
+                    spinner.style.position='fixed';spinner.style.top='12px';spinner.style.right='12px';
+                    spinner.style.zIndex='1400';spinner.style.padding='6px 12px';spinner.style.background='#111827';spinner.style.color='#f9fafb';spinner.style.fontSize='12px';spinner.style.borderRadius='6px';spinner.style.boxShadow='0 2px 8px rgba(0,0,0,.2)';
+                    spinner.textContent='Loading...';
+                    document.body.appendChild(spinner);
+                }
             }
             try {
-                const resp = await fetch(href, {credentials:'same-origin', cache:'no-store'});
-                if(!resp.ok) throw new Error('HTTP '+resp.status);
-                const finalHref = (resp && resp.url) ? resp.url : href;
-                const text = await resp.text();
+                // 공유 SPA 캐시 활용 (hover prefetch 결과 포함)
+                let text;
+                let finalHref = href;
+                const cached = __spaNavCache[href];
+                if(cached && (Date.now() - cached.ts < SPA_CACHE_TTL)){
+                    text = cached.html;
+                } else {
+                    const resp = await fetch(href, {credentials:'same-origin', cache:'no-store', headers:{'X-Requested-With':'blossom-spa'}});
+                    if(!resp.ok) throw new Error('HTTP '+resp.status);
+                    finalHref = (resp && resp.url) ? resp.url : href;
+                    text = await resp.text();
+                    __spaNavCache[href] = { html: text, ts: Date.now() };
+                }
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
                 const newMain = doc.querySelector('main.main-content');
@@ -5327,13 +5320,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const currentMain = existingMains[0] || document.querySelector('main.main-content');
                 if(!currentMain) throw new Error('current main missing');
                 currentMain.replaceWith(newMain);
-                // Ensure ALL page-specific stylesheets are loaded (fullscreen SPA).
+                // FOUC 방지: _header.html의 .main-content{opacity:0} 규칙 상쇄
+                newMain.style.opacity = '1';
+                // CSS 동기화 — 이전 페이지 전용 CSS 제거 + 새 페이지 CSS 추가
                 try {
                     var _fsCss = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
-                    var _fsHaveBase = new Set(
-                        Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'))
-                            .map(function(el) { return (el.getAttribute('href') || '').split('?')[0]; })
-                    );
+                    var _fsWantHrefs = new Set(_fsCss.map(function(el){ return el.getAttribute('href')||''; }));
+                    var _fsHaveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+                    var _fsHaveHrefs = new Set(_fsHaveLinks.map(function(el){ return el.getAttribute('href')||''; }));
+                    var _fsCorePat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
+                    // 이전 페이지 전용 CSS 제거 (코어 CSS는 유지)
+                    _fsHaveLinks.forEach(function(el){
+                        var eh = el.getAttribute('href')||'';
+                        if(!eh || _fsWantHrefs.has(eh) || _fsCorePat.test(eh)) return;
+                        try { el.remove(); } catch(_e){}
+                    });
+                    // 새 페이지 CSS 추가
                     var _fsRef = null;
                     try {
                         var _fsLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
@@ -5341,9 +5343,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (_e2) {}
                     _fsCss.forEach(function(wl) {
                         var wh = wl.getAttribute('href') || '';
-                        if (!wh) return;
-                        var wbase = wh.split('?')[0];
-                        if (_fsHaveBase.has(wbase)) return;
+                        if (!wh || _fsHaveHrefs.has(wh)) return;
+                        if (wh.indexOf('blossom.css') >= 0) return;
                         var nl = document.createElement('link');
                         nl.rel = 'stylesheet';
                         nl.href = wh;
@@ -5353,7 +5354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             document.head.appendChild(nl);
                         }
-                        _fsHaveBase.add(wbase);
+                        _fsHaveHrefs.add(wh);
                     });
                 } catch (_e) {}
                 // 사이드바 상태 복원 (SPA 교체 시 클래스 유실 방지)
@@ -5375,45 +5376,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.body.classList.remove('modal-open');
                     }
                 } catch (_e) {}
+                // body class 동기화 (페이지별 body class 반영)
+                try {
+                    const nextBody = doc.body;
+                    if (nextBody && typeof nextBody.className === 'string') {
+                        const keepModal = document.body.classList.contains('modal-open');
+                        document.body.className = nextBody.className;
+                        if (keepModal) document.body.classList.add('modal-open');
+                    }
+                    const nba = nextBody.attributes;
+                    for (let ai = 0; ai < nba.length; ai++) {
+                        if (/^data-/.test(nba[ai].name)) document.body.setAttribute(nba[ai].name, nba[ai].value);
+                    }
+                } catch (_e) {}
                 updateActiveMenuAfterSwap();
                 // 제목 갱신
                 const newTitle = doc.querySelector('title');
                 if(newTitle) document.title = newTitle.textContent.trim();
                 // History push
                 history.pushState({spa: true, href: finalHref}, '', finalHref);
-                // 스크립트 로드 처리
-                window.__blossomLoadedScripts = window.__blossomLoadedScripts || new Set();
-                const scripts = Array.from(doc.querySelectorAll('script'));
-                const sequentialLoads = [];
-                for(const s of scripts){
-                    const src = s.getAttribute('src');
-                    if(src){
-                        const baseSrc = src.split('?')[0];
-                        // _detail/ 스크립트만 캐시 허용, 나머지는 DOM 재바인딩 위해 매 전환마다 재실행
-                        const forceReload = !/\/static\/js\/_detail\//.test(baseSrc);
-                        if(!forceReload && window.__blossomLoadedScripts.has(baseSrc)) continue; // 캐시 파라미터 무시 중복 차단
-                        if(/\/static\/js\/blossom\.js/.test(baseSrc)) continue; // 핵심 스크립트 제외
-                        sequentialLoads.push(() => new Promise((resolve)=>{
-                            const tag = document.createElement('script');
-                            tag.src = baseSrc + (src.includes('?') ? src.substring(src.indexOf('?')) + '&' : '?') + '_ts=' + Date.now();
-                            tag.async = false;
-                            tag.onload = () => { window.__blossomLoadedScripts.add(baseSrc); resolve(); };
-                            tag.onerror = () => { console.warn('[spa] script load error', src); resolve(); };
-                            document.head.appendChild(tag);
-                        }));
-                    } else if(s.textContent.trim()) {
-                        sequentialLoads.push(() => new Promise((resolve)=>{
-                            try { (0,eval)(s.textContent); } catch(e){ console.warn('[spa] inline script error', e); }
-                            resolve();
-                        }));
-                    }
-                }
-                // 순차 실행
-                for(const loader of sequentialLoads){ await loader(); }
-                // NOTE: Do NOT dispatch synthetic DOMContentLoaded here.
-                // It can re-trigger many legacy handlers and cause re-init storms / page freezes.
-                // Page scripts loaded during swap should self-init on load, and SPA-aware code
-                // can use the custom 'blossom:pageLoaded' event below.
+                // 스크립트 로드 처리 — __spaLoadScripts 재사용 (DOMContentLoaded 인터셉트 포함)
+                await __spaLoadScripts(doc);
                 // 커스텀 페이지 로드 이벤트 (SPA) - 개별 페이지 스크립트가 선택적으로 이 이벤트에 반응하도록 유도
                 try {
                     const detail = { href: finalHref, title: document.title, timestamp: Date.now() };
@@ -5444,10 +5427,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const href = a.getAttribute('href');
             if(wantsPersistentFullscreen() && isFullscreenActive() && canIntercept(href)){
                 e.preventDefault();
+                e.stopPropagation();
                 fetchAndSwap(href);
             }
         }
         sidebarLinks.forEach(a => a.addEventListener('click', interceptHandler));
+        // Hover prefetch: 전체화면에서도 마우스를 올리면 미리 fetch
+        sidebarLinks.forEach(a => a.addEventListener('mouseenter', function(){
+            if(!wantsPersistentFullscreen()) return;
+            const href = a.getAttribute('href');
+            if(href && canIntercept(href)) __spaPrefetch(href);
+        }, {passive:true}));
         window.addEventListener('popstate', (ev) => {
             if(ev.state && ev.state.spa && wantsPersistentFullscreen() && isFullscreenActive()){
                 fetchAndSwap(location.pathname + location.search + location.hash);
@@ -5471,6 +5461,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const href = el.getAttribute('href');
             if(!canIntercept(href)) return;
             e.preventDefault();
+            e.stopPropagation();
             fetchAndSwap(href);
         }, true); // capture to beat other handlers
 

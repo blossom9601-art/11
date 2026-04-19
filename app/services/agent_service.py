@@ -821,7 +821,20 @@ def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=N
         page_prefix = _page_key_prefix(asset.get("asset_category", ""), asset.get("asset_type", ""))
         system_name = asset.get("system_name") or asset.get("asset_name") or hostname
 
-        results = _summarize_payload(payload)
+        # 실제 upsert 수행
+        iface_items = payload.get("interfaces") or []
+        acct_items = payload.get("accounts") or []
+        pkg_items = payload.get("packages") or []
+
+        iface_stats = _upsert_interfaces(conn, asset_id, page_prefix, system_name, iface_items) if iface_items else {"inserted": 0, "deleted": 0}
+        acct_stats = _upsert_accounts(conn, asset_id, scope, acct_items, system_key=page_prefix) if acct_items else {"inserted": 0, "updated": 0}
+        pkg_stats = _upsert_packages(conn, asset_id, scope, pkg_items) if pkg_items else {"inserted": 0, "updated": 0}
+
+        results = {
+            "interfaces": iface_stats,
+            "accounts": acct_stats,
+            "packages": pkg_stats,
+        }
 
         # 연동된 에이전트의 received_at도 갱신 (active 판정에 사용)
         conn.execute(

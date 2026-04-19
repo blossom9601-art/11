@@ -5,13 +5,18 @@
 .settings-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; }
 .security-two-col { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px; align-items:start; }
 @media (max-width:960px) { .security-two-col { grid-template-columns:1fr; } }
-.settings-columns { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; align-items:start; }
+.settings-columns { display:grid; grid-template-columns:repeat(2, 1fr); gap:20px; align-items:stretch; }
+.settings-col-stack { display:flex; flex-direction:column; gap:20px; height:100%; }
+.settings-col-stack > section:last-child { flex:1; }
+.cp-policy-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px 18px; }
+.cp-policy-grid .cp-full { grid-column:1 / -1; }
+
 @media (max-width:1200px) { .settings-columns { grid-template-columns:1fr; } }
 .setting-card { background:#fff; border:1px solid #e5e7eb; border-radius:18px; padding:20px 22px; box-shadow:0 8px 30px rgba(15,23,42,0.05); display:flex; flex-direction:column; gap:18px; }
 .setting-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .setting-card-header h2 { margin:0; font-size:20px; color:#111827; }
 .setting-card-header p { margin:6px 0 0; color:#6b7280; font-size:13px; line-height:1.4; }
-.setting-form { display:flex; flex-direction:column; gap:18px; }
+.setting-form { display:flex; flex-direction:column; gap:18px; flex:1; }
 .setting-form.is-disabled { opacity:0.55; pointer-events:none; }
 .chip-link { border:1px solid rgba(99,102,241,.18); background:linear-gradient(135deg,#f5f3ff 0%,#eef2ff 100%); color:#4338ca; font-size:11.5px; padding:6px 16px; border-radius:999px; font-weight:600; cursor:pointer; transition:all .25s cubic-bezier(.4,0,.2,1); white-space:nowrap; letter-spacing:.01em; backdrop-filter:blur(4px); box-shadow:0 1px 3px rgba(99,102,241,.08); }
 .chip-link:hover { background:linear-gradient(135deg,#e0e7ff 0%,#c7d2fe 100%); color:#312e81; box-shadow:0 2px 8px rgba(99,102,241,.15); transform:translateY(-1px); }
@@ -41,7 +46,7 @@
 .totp-qr-area { display:flex; flex-direction:column; align-items:center; margin-top:12px; padding:16px; background:#f8fafc; border:1px dashed #e2e8f0; border-radius:12px; }
 .totp-qr-box { width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
 .totp-qr-box img { width:100%; height:100%; object-fit:contain; border-radius:8px; }
-.helper-text { margin:0; font-size:12px; color:#94a3b8; }
+.helper-text { display:block; text-align:left; margin:0; font-size:12px; color:#94a3b8; }
 .mfa-panels { border:1px dashed #e5e7eb; border-radius:14px; padding:14px; background:#f9fafb; }
 .mfa-panel { display:none; flex-direction:column; gap:8px; }
 .mfa-panel.is-active { display:flex; }
@@ -157,7 +162,7 @@
     .mfa-code-input { width:180px; font-size:24px; letter-spacing:8px; }
 }
 
-.setting-actions { display:flex; flex-direction:column; gap:6px; }
+.setting-actions { display:flex; flex-direction:column; gap:6px; margin-top:auto; padding-top:8px; }
 .setting-actions .action-buttons { display:flex; gap:10px; flex-wrap:wrap; }
 .setting-actions .action-buttons.stretch { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
 .setting-actions .action-buttons.stretch .btn-primary,
@@ -231,6 +236,22 @@
 .sec-session-table .sec-empty { text-align:center; color:#94a3b8; padding:20px; }
 .sec-session-kill-btn { background:none; border:1px solid #fecaca; color:#dc2626; font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; cursor:pointer; transition:all .15s; }
 .sec-session-kill-btn:hover { background:#fef2f2; border-color:#f87171; }
+
+/* 실시간 감시 로그 패널 */
+.sec-live-log { border:1px solid #e2e8f0; border-radius:10px; background:#fafcff; padding:10px 12px; display:flex; flex-direction:column; }
+.sec-live-log-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; max-height:210px; overflow:auto; flex:1; }
+#session-live-log-card { flex:1; min-height:0; display:flex; flex-direction:column; margin-top:0; }
+#session-live-log-card .setting-card-header { flex-shrink:0; }
+#session-live-log-card .sec-live-log { flex:1; min-height:0; max-height:none; }
+#session-live-log-card .sec-live-log-list { max-height:none; overflow:auto; flex:1; }
+.sec-live-log-item { font-size:12.5px; color:#334155; line-height:1.45; padding-bottom:6px; border-bottom:1px dashed #e2e8f0; }
+.sec-live-log-item:last-child { border-bottom:none; padding-bottom:0; }
+.sec-live-log-empty { font-size:12px; color:#94a3b8; }
+.sec-live-log-meta { margin:8px 0 0; font-size:11px; color:#94a3b8; text-align:right; }
+
+/* 로그인 시도 패턴 그래프 */
+.sec-attempt-chart-wrap { border:1px solid #e2e8f0; border-radius:10px; background:#fafcff; padding:12px; flex:1; min-height:0; display:flex; flex-direction:column; }
+.sec-attempt-chart-wrap canvas { flex:1; width:100%; min-height:140px; display:block; }
 
 /* 적용 범위 안내 모달 */
 .sec-apply-modal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.5); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
@@ -494,8 +515,9 @@
 .server-add-actions .action-buttons, .server-edit-actions .action-buttons { display:flex; gap:12px; }
 .form-grid{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; }
 .form-grid.single-col{ grid-template-columns:1fr; }
-.btn-primary { background:#6366f1 !important; color:#fff; border:1px solid #6366f1; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:.25s; }
+.btn-primary { background:#6366f1 !important; color:#fff; border:1px solid #6366f1; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:.25s; outline:none; }
 .btn-primary:hover { background:#4f46e5 !important; border-color:#4f46e5; }
+.btn-primary:focus, .btn-primary:focus-visible { outline:none; box-shadow:none; }
 /* Edit modal save button hover accent (match add button color) */
 #user-edit-save:hover:not(:disabled),
 .server-edit-actions .btn-primary:hover:not(:disabled){
@@ -957,12 +979,29 @@ table#group-table th[data-col], table#group-table td[data-col] { white-space:now
 .btn-save {
    display:inline-flex; align-items:center; gap:6px;
    padding:8px 18px; border-radius:8px; font-size:13px; font-weight:700;
-   color:#fff; background:#64748b; border:1px solid #64748b;
+   color:#fff; background:#6366F1; border:1px solid #6366F1;
    cursor:pointer; transition:all .2s ease; white-space:nowrap;
 }
 .btn-save svg { flex-shrink:0; }
-.btn-save:hover { background:#475569; border-color:#475569; box-shadow:0 2px 8px rgba(71,85,105,.25); }
+.btn-save:hover { background:#4f46e5; border-color:#4f46e5; box-shadow:0 2px 8px rgba(99,102,241,.30); }
 .btn-save:active { transform:translateY(1px); }
+
+/* Match test action buttons with save button height and icon layout */
+.btn-test-action {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+   height: 35px;
+   padding: 0 18px;
+   font-size: 13px;
+   font-weight: 700;
+   line-height: 1;
+}
+.btn-test-action img {
+   width: 14px;
+   height: 14px;
+   flex-shrink: 0;
+}
 /* Small secondary variant */
 .btn-sm { padding:8px 16px; font-size:13px; }
 

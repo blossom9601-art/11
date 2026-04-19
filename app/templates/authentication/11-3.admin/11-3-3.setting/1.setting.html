@@ -9,9 +9,9 @@
 	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.35">
 	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
-	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20260413b" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/1.setting.js?v=20260419e" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -31,6 +31,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
@@ -180,19 +181,37 @@
 								</div>
 							</div>
 						</div>
+						<!-- ── 세션 보안 정책 ── -->
+						<h3 class="mfa-methods-title">세션 보안 정책</h3>
+						<div class="cp-policy-grid">
+							<div class="form-row">
+								<label for="mfa-session-timeout">로그인 세션 유효 시간 (시간)</label>
+								<input type="number" id="mfa-session-timeout" name="session_timeout_hours" class="form-input" min="1" max="720" value="8">
+								<span class="helper-text">로그인 후 세션이 유지되는 시간</span>
+							</div>
+							<div class="form-row">
+								<label for="mfa-idle-timeout">비활성 자동 로그아웃 (분)</label>
+								<input type="number" id="mfa-idle-timeout" name="idle_timeout_minutes" class="form-input" min="5" max="480" value="60">
+								<span class="helper-text">입력 없을 때 자동 로그아웃 대기 시간</span>
+							</div>
+						</div>
 						<div class="setting-actions">
 							<div class="action-buttons">
 								<button type="submit" class="btn-save" id="mfa-save-btn">
 									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 									저장
 								</button>
-								<button type="button" class="btn-secondary btn-sm" id="mfa-test-login">테스트 로그인</button>
+								<button type="button" class="btn-secondary btn-sm btn-test-action" id="mfa-test-login">
+									<img src="/static/image/svg/free-icon-font-website-speed.svg" alt="" aria-hidden="true">
+									테스트 로그인
+								</button>
 							</div>
 							<p class="setting-status" id="mfa-settings-status">MFA가 비활성화되어 있습니다.</p>
 						</div>
 					</form>
 				</section>
 
+								<div class="settings-col-stack">
 				<section class="setting-card" id="sms-settings-card" aria-labelledby="sms-settings-title">
 					<div class="setting-card-header">
 						<div>
@@ -222,14 +241,17 @@
 									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 									저장
 								</button>
-								<button type="button" class="btn-secondary btn-sm" id="sms-test-btn">테스트 발송</button>
+								<button type="button" class="btn-secondary btn-sm btn-test-action" id="sms-test-btn">
+									<img src="/static/image/svg/free-icon-font-website-speed.svg" alt="" aria-hidden="true">
+									테스트 발송
+								</button>
 							</div>
 							<p class="setting-status" id="sms-settings-status">SMS 발송이 설정되지 않았습니다.</p>
 						</div>
 					</form>
 				</section>
 
-			<section class="setting-card" id="company-otp-settings-card" aria-labelledby="company-otp-settings-title">
+				<section class="setting-card" id="company-otp-settings-card" aria-labelledby="company-otp-settings-title">
 					<div class="setting-card-header">
 						<div>
 							<h2 id="company-otp-settings-title">사내 OTP 서버 설정</h2>
@@ -238,8 +260,8 @@
 						<span class="smtp-status-badge" id="company-otp-status-badge">미설정</span>
 					</div>
 					<form id="company-otp-config-form" class="setting-form" autocomplete="off">
-						<div class="form-grid single-col">
-							<div class="form-row">
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
 								<label for="cotp-provider">OTP 솔루션<span class="required">*</span></label>
 								<select id="cotp-provider" name="provider" class="form-input">
 									<option value="initech">이니텍 (INISAFE OTP)</option>
@@ -247,7 +269,7 @@
 									<option value="miraetech">미래테크 (SafeOTP)</option>
 								</select>
 							</div>
-							<div class="form-row">
+							<div class="form-row cp-full">
 								<label for="cotp-endpoint">API Endpoint<span class="required">*</span></label>
 								<input type="url" id="cotp-endpoint" name="api_endpoint" class="form-input" placeholder="https://otp.company.co.kr" required>
 							</div>
@@ -260,12 +282,9 @@
 								<input type="password" id="cotp-api-secret" name="api_secret" class="form-input" placeholder="API Secret (선택)">
 							</div>
 							<div class="form-row">
-								<label for="cotp-server-code">서버 식별 코드 (CP Code)</label>
-								<input type="text" id="cotp-server-code" name="server_code" class="form-input" placeholder="OTP 서버 CP 코드">
-							</div>
-							<div class="form-row">
 								<label for="cotp-timeout">타임아웃 (초)</label>
 								<input type="number" id="cotp-timeout" name="timeout" class="form-input" min="1" max="30" value="5">
+								<span class="helper-text">OTP 서버 응답 대기 시간</span>
 							</div>
 						</div>
 						<div class="setting-actions">
@@ -274,12 +293,66 @@
 									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 									저장
 								</button>
-								<button type="button" class="btn-secondary btn-sm" id="cotp-test-btn">테스트 인증</button>
+								<button type="button" class="btn-secondary btn-sm btn-test-action" id="cotp-test-btn">
+									<img src="/static/image/svg/free-icon-font-website-speed.svg" alt="" aria-hidden="true">
+									테스트 인증
+								</button>
 							</div>
 							<p class="setting-status" id="company-otp-settings-status">사내 OTP 서버가 설정되지 않았습니다.</p>
 						</div>
 					</form>
 				</section>
+
+				<section class="setting-card" id="code-policy-card" aria-labelledby="code-policy-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="code-policy-title">인증 코드 정책</h2>
+							<p>SMS·이메일·OTP 인증 시 발급되는 코드의 길이, 유효 시간, 재발송 제한 등을 설정합니다.</p>
+						</div>
+					</div>
+					<form id="code-policy-form" class="setting-form" autocomplete="off">
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label for="cp-code-length">코드 길이 (자릿수)</label>
+								<select id="cp-code-length" name="code_length" class="form-input">
+									<option value="4">4자리</option>
+									<option value="6" selected>6자리</option>
+									<option value="8">8자리</option>
+								</select>
+							</div>
+							<div class="form-row">
+								<label for="cp-code-ttl">코드 유효 시간 (초)</label>
+								<input type="number" id="cp-code-ttl" name="code_ttl_seconds" class="form-input" min="60" max="600" value="300">
+								<span class="helper-text">기본 300초 (5분)</span>
+							</div>
+							<div class="form-row">
+								<label for="cp-resend-wait">재발송 대기 시간 (초)</label>
+								<input type="number" id="cp-resend-wait" name="resend_wait_seconds" class="form-input" min="10" max="300" value="60">
+								<span class="helper-text">재발송까지 최소 대기 시간</span>
+							</div>
+							<div class="form-row">
+								<label for="cp-max-daily">일일 최대 발송 횟수</label>
+								<input type="number" id="cp-max-daily" name="max_daily_attempts" class="form-input" min="1" max="100" value="10">
+								<span class="helper-text">하루 최대 코드 발송 수</span>
+							</div>
+							<div class="form-row">
+								<label for="cp-max-fail">입력 실패 허용 횟수</label>
+								<input type="number" id="cp-max-fail" name="max_fail_count" class="form-input" min="1" max="20" value="5">
+								<span class="helper-text">초과 시 해당 코드 무효화</span>
+							</div>
+						</div>
+						<div class="setting-actions">
+							<div class="action-buttons">
+								<button type="submit" class="btn-save">
+									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+									저장
+								</button>
+							</div>
+							<p class="setting-status" id="code-policy-status">기본 정책이 적용되어 있습니다.</p>
+						</div>
+					</form>
+				</section>
+				</div>
 
 			</div>
 		</div>

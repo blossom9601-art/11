@@ -24,7 +24,7 @@
         <main class="main-content">
             <div class="content-wrapper">
                 <div class="page-header">
-                    <h1>설정</h1>
+                    <h1>사용자 관리</h1>
                     <p>시스템 설정 중 사용자를 관리합니다.</p>
                 </div>
                 <!-- ADMIN 사용자 관리 탭 -->
@@ -33,6 +33,7 @@
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
                     <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>

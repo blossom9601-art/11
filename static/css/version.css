@@ -69,7 +69,10 @@
 	transition:filter .22s ease, opacity .22s ease, transform .22s ease;
 }
 #vr-delete-btn:hover .header-icon {
-	filter:grayscale(.05) brightness(1.15) contrast(.9); opacity:.85;
+	filter:brightness(0) invert(1) contrast(1); opacity:1;
+}
+#vr-delete-btn:hover {
+	background:#6366f1; border-color:#6366f1; border-radius:8px; box-shadow:0 2px 8px rgba(99,102,241,.28);
 }
 
 /* Edit/Delete hover — purple fill + white icon (match onpremise) */

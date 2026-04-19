@@ -32,7 +32,6 @@ export default class AdminBrandPage {
       <div class="spa-page">
         <div class="spa-page-header">
           <h2 class="spa-page__title">브랜드 설정</h2>
-          <button class="spa-btn" id="adm-brand-reset">기본값 복원</button>
         </div>
         <form id="adm-brand-form" class="spa-admin-form">
           <div class="spa-form-grid">
@@ -53,7 +52,6 @@ export default class AdminBrandPage {
       </div>`;
 
     this._el.querySelector('#adm-brand-form').addEventListener('submit', (e) => this._save(e));
-    this._el.querySelector('#adm-brand-reset').addEventListener('click', () => this._reset());
   }
 
   async _save(e) {
@@ -67,9 +65,4 @@ export default class AdminBrandPage {
     await this._load();
   }
 
-  async _reset() {
-    if (!confirm('브랜드 설정을 기본값으로 복원하시겠습니까?')) return;
-    await api.post('/api/brand-settings/reset');
-    await this._load();
-  }
 }

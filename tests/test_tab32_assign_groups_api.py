@@ -72,7 +72,7 @@ def test_tab32_assign_groups_children_crud(client):
     # Hosts: create/list/update/delete
     r = client.post(
         f'/api/tab32-assign-groups/{group_id}/hosts',
-        json={'system_name': 'HOST-1', 'os_type': 'Linux', 'wwid_ip': 'w1', 'port_alloc': 'p1'},
+        json={'work_name': 'WRK-1', 'system_name': 'HOST-1', 'host_type': 'Linux', 'identifiers_text': 'w1', 'port_alloc': 'p1'},
     )
     assert r.status_code == 201
     host_id = r.get_json()['id']
@@ -83,7 +83,7 @@ def test_tab32_assign_groups_children_crud(client):
 
     r = client.put(
         f'/api/tab32-assign-groups/hosts/{host_id}',
-        json={'system_name': 'HOST-1b', 'os_type': 'Windows', 'wwid_ip': 'w2', 'port_alloc': 'p2'},
+        json={'work_name': 'WRK-1b', 'system_name': 'HOST-1b', 'host_type': 'Windows', 'identifiers_text': 'w2', 'port_alloc': 'p2'},
     )
     assert r.status_code == 200
     assert r.get_json()['system_name'] == 'HOST-1b'
@@ -167,7 +167,7 @@ def test_tab32_assign_groups_children_crud(client):
     # Cascade delete sanity: create one child again then delete group
     r = client.post(
         f'/api/tab32-assign-groups/{group_id}/hosts',
-        json={'system_name': 'HOST-X', 'os_type': '', 'wwid_ip': '', 'port_alloc': ''},
+        json={'work_name': 'WRK-X', 'system_name': 'HOST-X', 'host_type': '', 'identifiers_text': '', 'port_alloc': ''},
     )
     assert r.status_code == 201
 

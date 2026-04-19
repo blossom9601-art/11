@@ -9,7 +9,7 @@
 	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.28">
 	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
 	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/2.mail.js?v=20250226a" defer></script>
 </head>
@@ -31,6 +31,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
 				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
@@ -135,7 +136,10 @@
 									저장
 								</button>
 								<button type="button" class="btn-secondary btn-sm" id="smtp-connect-btn">연결 테스트</button>
-								<button type="button" class="btn-secondary btn-sm" id="smtp-test-btn">테스트 발송</button>
+								<button type="button" class="btn-secondary btn-sm btn-test-action" id="smtp-test-btn">
+									<img src="/static/image/svg/free-icon-font-website-speed.svg" alt="" aria-hidden="true">
+									테스트 발송
+								</button>
 							</div>
 							<p class="setting-status" id="smtp-config-status"></p>
 						</div>

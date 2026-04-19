@@ -123,7 +123,11 @@
 	   서버 보안정책 로드/저장
 	   ══════════════════════════════════════════════════ */
 	function loadSecurityPolicy() {
-		return fetch('/admin/auth/security-policy').then(function(r) { return r.json(); }).then(function(data) {
+		return fetch('/admin/auth/security-policy').then(function(r) {
+			if (!r.ok) return null;
+			return r.json().catch(function() { return null; });
+		}).then(function(data) {
+			if (!data) return null;
 			state.serverPolicy = data;
 			if (data && data.loaded) {
 				var p = state.settings.password;
@@ -498,7 +502,7 @@
 	   MFA 관련 기존 함수 (유지)
 	   ══════════════════════════════════════════════════ */
 	function toggleMfaPanels() {
-		['totp', 'sms', 'email'].forEach(function(m) {
+		['totp', 'sms', 'email', 'company-otp'].forEach(function(m) {
 			var chk = document.getElementById('mfa-' + m + '-enabled');
 			var body = document.getElementById('mfa-' + m + '-body');
 			if (chk && body) body.style.display = chk.checked ? '' : 'none';
@@ -530,6 +534,7 @@
 	function handleMfaForm() {
 		var form = document.getElementById('mfa-settings-form');
 		var enableToggle = document.getElementById('mfa-enabled');
+		var secretInput = document.getElementById('mfa-secret');
 		if (!form || !enableToggle) return;
 
 		function loadFromServer() {
@@ -552,7 +557,11 @@
 			if (cotpChk) cotpChk.checked = !!mfa.company_otp_enabled;
 			form.grace_period.value = mfa.grace_period_days != null ? mfa.grace_period_days : (mfa.gracePeriod || 0);
 			form.remember_device_days.value = mfa.remember_device_days != null ? mfa.remember_device_days : (mfa.rememberDeviceDays || 7);
-			form.secret.value = mfa.totp_secret || mfa.secret || generateSecret();
+			if (secretInput) secretInput.value = mfa.totp_secret || mfa.secret || generateSecret();
+			var sessionEl = document.getElementById('mfa-session-timeout');
+			var idleEl = document.getElementById('mfa-idle-timeout');
+			if (sessionEl) sessionEl.value = mfa.session_timeout_hours != null ? mfa.session_timeout_hours : 8;
+			if (idleEl) idleEl.value = mfa.idle_timeout_minutes != null ? mfa.idle_timeout_minutes : 60;
 			toggleMfaPanels();
 			setMfaFormDisabled(!enableToggle.checked);
 		};
@@ -570,9 +579,10 @@
 				persistSettings();
 				updateOverviewChips();
 			} else { fill(); }
+			if (secretInput && !secretInput.value) secretInput.value = generateSecret();
 			// 페이지 로드 완료 후 TOTP 활성 상태면 QR 즉시 생성
 			var totpEl = document.getElementById('mfa-totp-enabled');
-			if (totpEl && totpEl.checked) { updateTotpQr(form.secret.value); }
+			if (totpEl && totpEl.checked && secretInput && secretInput.value) { updateTotpQr(secretInput.value); }
 		});
 
 		['totp', 'sms', 'email', 'company-otp'].forEach(function(m) {
@@ -580,7 +590,10 @@
 			if (chk) chk.addEventListener('change', function() {
 				toggleMfaPanels();
 				// TOTP 활성화 시 QR 즉시 생성
-				if (m === 'totp' && chk.checked) { updateTotpQr(form.secret.value); }
+				if (m === 'totp' && chk.checked) {
+					if (secretInput && !secretInput.value) secretInput.value = generateSecret();
+					if (secretInput && secretInput.value) updateTotpQr(secretInput.value);
+				}
 			});
 		});
 		form.addEventListener('submit', function(event) {
@@ -595,8 +608,11 @@
 				totp_enabled: totpOn, sms_enabled: smsOn, email_enabled: emailOn, company_otp_enabled: cotpOn,
 				grace_period_days: Number(form.grace_period.value) || 0,
 				remember_device_days: Number(form.remember_device_days.value) || 0,
-				totp_secret: form.secret.value || generateSecret()
+				totp_secret: (secretInput && secretInput.value) || generateSecret(),
+				session_timeout_hours: Number(document.getElementById('mfa-session-timeout') && document.getElementById('mfa-session-timeout').value) || 8,
+				idle_timeout_minutes: Number(document.getElementById('mfa-idle-timeout') && document.getElementById('mfa-idle-timeout').value) || 60
 			};
+			if (secretInput && !secretInput.value) secretInput.value = payload.totp_secret;
 			saveToServer(payload).then(function(result) {
 				if (result && result.status === 'ok') {
 					state.settings.mfa = Object.assign({}, state.settings.mfa, {
@@ -623,8 +639,9 @@
 		var regenBtn = form.querySelector('[data-action="regen-secret"]');
 		if (regenBtn) {
 			regenBtn.addEventListener('click', function() {
-				form.secret.value = generateSecret();
-				updateTotpQr(form.secret.value);
+				if (!secretInput) return;
+				secretInput.value = generateSecret();
+				updateTotpQr(secretInput.value);
 			});
 		}
 
@@ -751,7 +768,6 @@
 			form.api_endpoint.value = cfg.api_endpoint || '';
 			form.api_key.value = cfg.api_key || '';
 			form.api_secret.value = cfg.api_secret || '';
-			form.server_code.value = cfg.server_code || '';
 			form.timeout.value = cfg.timeout || 5;
 			setBadge(cfg.configured, cfg.provider);
 			if (statusEl) statusEl.textContent = cfg.configured ? '연동 서버: ' + (cfg.api_endpoint || '-') : '사내 OTP 서버가 설정되지 않았습니다.';
@@ -762,7 +778,7 @@
 			var payload = {
 				provider: form.provider.value, api_endpoint: form.api_endpoint.value.trim(),
 				api_key: form.api_key.value.trim(), api_secret: form.api_secret.value.trim(),
-				server_code: form.server_code.value.trim(), timeout: Number(form.timeout.value) || 5, enabled: true
+				timeout: Number(form.timeout.value) || 5, enabled: true
 			};
 			fetch('/admin/auth/company-otp/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
 				.then(function(r) { return r.json(); }).then(function(result) {
@@ -878,6 +894,182 @@
 		}
 	}
 
+	function initRealtimeSecurityLogs() {
+		var list = document.getElementById('session-live-log-list');
+		var meta = document.getElementById('session-live-log-meta');
+		if (!list) return;
+
+		function esc(s) {
+			var d = document.createElement('div');
+			d.textContent = s == null ? '' : String(s);
+			return d.innerHTML;
+		}
+
+		function renderRows(rows) {
+			if (!rows || !rows.length) {
+				list.innerHTML = '<li class="sec-live-log-empty">표시할 로그가 없습니다.</li>';
+				return;
+			}
+			list.innerHTML = rows.map(function(r) {
+				var at = r.at || '-';
+				var by = r.by || '-';
+				var field = r.field || '정책';
+				var nextVal = (r.new == null || r.new === '') ? '-' : r.new;
+				return '<li class="sec-live-log-item"><strong>' + esc(field) + '</strong> → ' + esc(nextVal) + ' <span style="color:#64748b;">(' + esc(by) + ' · ' + esc(at) + ')</span></li>';
+			}).join('');
+		}
+
+		function stamp() {
+			if (!meta) return;
+			var now = new Date();
+			meta.textContent = '최근 갱신: ' + now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+		}
+
+		function refresh() {
+			fetch('/admin/auth/security-policy/change-log?per_page=12').then(function(r) {
+				return r.ok ? r.json() : null;
+			}).then(function(data) {
+				var rows = (data && data.rows) ? data.rows : [];
+				renderRows(rows);
+				stamp();
+			}).catch(function() {
+				renderRows([]);
+				stamp();
+			});
+		}
+
+		refresh();
+		window.setInterval(refresh, 10000);
+	}
+
+	function initLoginAttemptChart() {
+		var canvas = document.getElementById('login-attempt-chart');
+		var meta = document.getElementById('login-attempt-chart-meta');
+		if (!canvas) return;
+
+		function drawChart(labels, success, fail) {
+			var dpr = window.devicePixelRatio || 1;
+			var wrap = canvas.parentElement;
+			var W = wrap.clientWidth - 24;
+			var H = Math.max(140, wrap.clientHeight - 60);
+			canvas.width = W * dpr;
+			canvas.height = H * dpr;
+			canvas.style.width = W + 'px';
+			canvas.style.height = H + 'px';
+
+			var ctx = canvas.getContext('2d');
+			ctx.scale(dpr, dpr);
+
+			var padL = 28, padR = 8, padT = 12, padB = 34;
+			var chartW = W - padL - padR;
+			var chartH = H - padT - padB;
+			var n = labels.length;
+			var barW = Math.floor(chartW / n * 0.55);
+			var gap = Math.floor(chartW / n);
+			var maxVal = Math.max.apply(null, success.concat(fail).concat([1]));
+
+			ctx.fillStyle = '#fafcff';
+			ctx.fillRect(0, 0, W, H);
+
+			ctx.strokeStyle = '#e2e8f0';
+			ctx.lineWidth = 1;
+			for (var g = 0; g <= 4; g++) {
+				var gy = padT + chartH - Math.round(chartH * g / 4);
+				ctx.beginPath();
+				ctx.moveTo(padL, gy);
+				ctx.lineTo(padL + chartW, gy);
+				ctx.stroke();
+				ctx.fillStyle = '#94a3b8';
+				ctx.font = '10px sans-serif';
+				ctx.textAlign = 'right';
+				ctx.fillText(Math.round(maxVal * g / 4), padL - 2, gy + 3);
+			}
+
+			for (var i = 0; i < n; i++) {
+				var x = padL + i * gap + Math.max(0, Math.floor((gap - barW) / 2));
+				var sw = Math.max(2, Math.floor((barW - 2) / 2));
+				var fw = Math.max(2, barW - 2 - sw);
+				var sh = Math.round((success[i] || 0) / maxVal * chartH);
+				var fh = Math.round((fail[i] || 0) / maxVal * chartH);
+
+				ctx.fillStyle = 'rgba(99,102,241,0.75)';
+				ctx.fillRect(x, padT + chartH - sh, sw, sh);
+				ctx.fillStyle = 'rgba(239,68,68,0.65)';
+				ctx.fillRect(x + sw, padT + chartH - fh, fw, fh);
+
+				// x축 레이블 (짝수만)
+				if (i % 2 === 0) {
+					ctx.fillStyle = '#94a3b8';
+					ctx.font = '9px sans-serif';
+					ctx.textAlign = 'center';
+					ctx.fillText(labels[i] + 'h', padL + i * gap + gap / 2, padT + chartH + 14);
+				}
+			}
+
+			// 범례
+			ctx.fillStyle = 'rgba(99,102,241,0.75)';
+			ctx.fillRect(padL, padT + chartH + 22, 10, 8);
+			ctx.fillStyle = '#334155'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+			ctx.fillText('성공', padL + 13, padT + chartH + 30);
+			ctx.fillStyle = 'rgba(239,68,68,0.65)';
+			ctx.fillRect(padL + 44, padT + chartH + 22, 10, 8);
+			ctx.fillStyle = '#334155';
+			ctx.fillText('실패', padL + 57, padT + chartH + 30);
+		}
+
+		function load() {
+			fetch('/admin/auth/login-attempt-stats').then(function(r) {
+				return r.ok ? r.json() : null;
+			}).then(function(data) {
+				if (!data || data.error) { if (meta) meta.textContent = '데이터 없음'; return; }
+				drawChart(data.labels, data.success, data.fail);
+				var total = data.success.reduce(function(a,b){return a+b;},0) + data.fail.reduce(function(a,b){return a+b;},0);
+				if (meta) meta.textContent = '총 ' + total + '회 시도 · 최근 7일';
+			}).catch(function() {
+				if (meta) meta.textContent = '불러오기 실패';
+			});
+		}
+
+		load();
+		window.setInterval(load, 60000);
+		window.addEventListener('resize', load);
+	}
+
+	/* ── 인증 코드 정책 ── */
+	function handleCodePolicyForm() {
+		var form = document.getElementById('code-policy-form');
+		if (!form) return;
+		var statusEl = document.getElementById('code-policy-status');
+
+		fetch('/admin/auth/mfa/config').then(function(r) { return r.ok ? r.json() : null; }).then(function(cfg) {
+			if (!cfg) return;
+			form.code_length.value = String(cfg.code_length || 6);
+			form.code_ttl_seconds.value = cfg.code_ttl_seconds || 300;
+			form.resend_wait_seconds.value = cfg.resend_wait_seconds || 60;
+			form.max_daily_attempts.value = cfg.max_daily_attempts || 10;
+			form.max_fail_count.value = cfg.max_fail_count || 5;
+			if (statusEl) statusEl.textContent = '코드 ' + (cfg.code_length || 6) + '자리 · 유효 ' + (cfg.code_ttl_seconds || 300) + '초 · 재발송 대기 ' + (cfg.resend_wait_seconds || 60) + '초';
+		}).catch(function() {});
+
+		form.addEventListener('submit', function(e) {
+			e.preventDefault();
+			var payload = {
+				code_length: Number(form.code_length.value) || 6,
+				code_ttl_seconds: Number(form.code_ttl_seconds.value) || 300,
+				resend_wait_seconds: Number(form.resend_wait_seconds.value) || 60,
+				max_daily_attempts: Number(form.max_daily_attempts.value) || 10,
+				max_fail_count: Number(form.max_fail_count.value) || 5
+			};
+			fetch('/admin/auth/mfa/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+				.then(function(r) { return r.json(); }).then(function(result) {
+					if (result.status === 'ok') {
+						if (statusEl) statusEl.textContent = '코드 ' + payload.code_length + '자리 · 유효 ' + payload.code_ttl_seconds + '초 · 재발송 대기 ' + payload.resend_wait_seconds + '초';
+						if (window.showToast) window.showToast('인증 코드 정책을 저장했습니다.', 'success', form);
+					} else { if (window.showToast) window.showToast(result.message || '저장 실패', 'error', form); }
+				}).catch(function() { if (window.showToast) window.showToast('인증 코드 정책 저장 중 오류가 발생했습니다.', 'error', form); });
+		});
+	}
+
 	/* ══════════════════════════════════════════════════
 	   초기화
 	   ══════════════════════════════════════════════════ */
@@ -892,18 +1084,25 @@
 		});
 		if (window.BlossomSecurityModal && window.BlossomSecurityModal.ensure) window.BlossomSecurityModal.ensure();
 
-		// 서버에서 보안정책 로드
-		loadSecurityPolicy().then(function() {
+		function initializeSettingsForms() {
 			handlePasswordForm();
 			handleMfaForm();
 			handleSmsForm();
 			handleCompanyOtpForm();
+			handleCodePolicyForm();
 			handleSessionForm();
+			initRealtimeSecurityLogs();
+			initLoginAttemptChart();
 			initBannedWordsTagInput();
 			initStrengthMeter();
 			initBrowserCloseInfo();
 			updateOverviewChips();
 			updateSecurityWarnings();
+		}
+
+		// 서버에서 보안정책 로드
+		loadSecurityPolicy().then(function() {
+			initializeSettingsForms();
 		});
 	}
 

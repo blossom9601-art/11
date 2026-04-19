@@ -13,9 +13,9 @@
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
 	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
-	<link rel="stylesheet" href="/static/css/brand_admin.css?v=3.4.1">
+	<link rel="stylesheet" href="/static/css/brand_admin.css?v=3.4.2">
 	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
-	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/10.brand.js?v=20260315f" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/10.brand.js?v=20260419a" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -36,6 +36,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
@@ -96,7 +97,10 @@
 					</div>
 				</div>
 				<div class="brand-section-actions" style="margin-top:auto;">
-					<button type="button" class="brand-save-btn" id="btn-save-header">헤더 설정 저장</button>
+					<button type="button" class="btn-save" id="btn-save-header">
+						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+						저장
+					</button>
 					<p class="setting-status" id="header-status"></p>
 				</div>
 			</section>
@@ -134,28 +138,44 @@
 					<span class="brand-hint">카드 로고는 이미지 변경 시 자동 저장됩니다. 초기화 버튼으로 기본 로고로 되돌릴 수 있습니다.</span>
 				</div>
 				<div class="brand-section-actions">
-					<button type="button" class="brand-save-btn" id="btn-save-cards">카드 로고 저장</button>
+					<button type="button" class="btn-save" id="btn-save-cards">
+						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+						저장
+					</button>
 					<p class="setting-status" id="cards-status"></p>
 				</div>
 			</section>
 
-			<!-- ── 섹션 3: 기본값 복원 ── -->
-			<section class="setting-card brand-section brand-reset-section" id="brand-reset-section">
+
+			<!-- ── 섹션 3: 로그인 배경 이미지 ── -->
+			<section class="setting-card brand-section brand-login-bg-section" id="brand-login-bg-section">
 				<div class="brand-section-header">
-					<h2>기본값 복원</h2>
-					<p>모든 브랜드 설정을 초기 기본값으로 되돌립니다.</p>
+					<h2>로그인 배경 이미지</h2>
+					<p>로그인 페이지 좌측에 표시되는 배경 이미지를 변경합니다.</p>
 				</div>
 				<div class="brand-section-body">
-					<div class="brand-reset-warning">
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="currentColor" stroke-width="1.5"/><path d="M10 8v4M10 14v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-						<span>전체 초기화 시 헤더 아이콘, 브랜드명, 카드 로고가 모두 기본값으로 복원됩니다.</span>
+					<div class="brand-login-bg-preview" id="login-bg-preview">
+						<img src="/static/image/login/bada.png" alt="로그인 배경 미리보기" id="login-bg-img">
 					</div>
-				</div>
-				<div class="brand-section-actions">
-					<button type="button" class="brand-danger-btn" id="btn-reset-all">전체 초기화</button>
-					<p class="setting-status" id="reset-status"></p>
-				</div>
-			</section>
+					<div class="brand-upload-box" id="login-bg-upload" data-key="login.backgroundImage" data-category="login">
+						<div class="brand-upload-actions">
+							<label class="brand-upload-btn">
+								<input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" hidden>
+								<img src="/static/image/svg/free-icon-font-wallet-change.svg" alt="이미지 선택" class="btn-icon" title="이미지 선택">
+							</label>
+							<button type="button" class="brand-reset-btn" data-key="login.backgroundImage" title="초기화"><img src="/static/image/svg/free-icon-font-hourglass-start.svg" alt="초기화" class="btn-icon"></button>
+						</div>
+					</div>
+						<span class="brand-hint">PNG, JPG, SVG, WebP / 최대 2MB / 로그인 화면 좌측 영역에 표시됩니다.</span>
+					</div>
+					<div class="brand-section-actions">
+						<button type="button" class="btn-save" id="btn-save-login-bg">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
+						</button>
+						<p class="setting-status" id="login-bg-status"></p>
+					</div>
+				</section>
 			</div><!-- /우측 컨테이너 -->
 
 			</div><!-- /.settings-columns -->

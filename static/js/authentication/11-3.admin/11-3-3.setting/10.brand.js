@@ -10,7 +10,8 @@
 		'brand.headerIcon': '/static/image/logo/blossom_logo.png',
 		'brand.name':       'blossom',
 		'brand.subtitle':   '',
-		'dashboard.cardLogos.maintenance_cost_card': '/static/image/logo/bccard_logo.jpg'
+		'dashboard.cardLogos.maintenance_cost_card': '/static/image/logo/bccard_logo.jpg',
+		'login.backgroundImage': '/static/image/login/bada.png'
 	};
 	var CARD_LABELS = {
 		'maintenance_cost_card': '유지보수 비용 카드'
@@ -103,13 +104,14 @@
 	}
 
 	function uploadImage(file, key, category, cb) {
-		var statusId = (category === 'dashboard') ? 'cards-status' : 'header-status';
+		var statusId = (category === 'dashboard') ? 'cards-status' : (category === 'login') ? 'login-bg-status' : 'header-status';
 		var fd = new FormData();
 		fd.append('file', file);
 		fd.append('key', key);
 		fd.append('category', category || 'header');
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', API_BASE + '/upload');
+		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xhr.onload = function () {
 			try {
 				var res = JSON.parse(xhr.responseText);
@@ -388,17 +390,48 @@
 				showStatus('cards-status', '카드 로고는 업로드/변경 시 자동 저장됩니다.', true);
 			});
 		}
-		// 전체 초기화
-		var resetAllBtn = document.getElementById('btn-reset-all');
-		if (resetAllBtn) {
-			resetAllBtn.addEventListener('click', function () {
-				showConfirm('모든 브랜드 설정을 기본값으로 초기화하시겠습니까?', function () {
-					resetSetting(null, function () {
-						renderHeader();
-						renderCards();
-						applyToPage();
-					});
+	}
+
+	/* ── 로그인 배경 이미지 렌더링 ────────── */
+	function renderLoginBg() {
+		var img = document.getElementById('login-bg-img');
+		if (!img) return;
+		var url = val('login.backgroundImage');
+		img.src = url;
+		img.onerror = function () { this.src = fallback('login.backgroundImage'); };
+	}
+
+	function bindLoginBgEvents() {
+		var uploadBox = document.getElementById('login-bg-upload');
+		if (!uploadBox) return;
+		var fileInput = uploadBox.querySelector('input[type="file"]');
+		if (fileInput) {
+			fileInput.addEventListener('change', function () {
+				if (!this.files || !this.files[0]) return;
+				var file = this.files[0];
+				var previewImg = document.getElementById('login-bg-img');
+				if (previewImg) previewImg.src = URL.createObjectURL(file);
+				uploadImage(file, 'login.backgroundImage', 'login', function () {
+					renderLoginBg();
+					showStatus('login-bg-status', '배경 이미지가 변경되었습니다.', true);
 				});
+			});
+		}
+		var resetBtn = uploadBox.querySelector('.brand-reset-btn');
+		if (resetBtn) {
+			resetBtn.addEventListener('click', function () {
+				resetSetting('login.backgroundImage', function () {
+					renderLoginBg();
+					showStatus('login-bg-status', '기본 배경으로 복원되었습니다.', true);
+				});
+			});
+		}
+		// 로그인 배경 저장 버튼
+		var saveLoginBgBtn = document.getElementById('btn-save-login-bg');
+		if (saveLoginBgBtn) {
+			saveLoginBgBtn.addEventListener('click', function () {
+				var url = val('login.backgroundImage');
+				showStatus('login-bg-status', '로그인 배경이 저장되었습니다: ' + (url || '기본 이미지'), true);
 			});
 		}
 	}
@@ -434,7 +467,9 @@
 		fetchSettings(function () {
 			renderHeader();
 			renderCards();
+			renderLoginBg();
 			bindHeaderEvents();
+			bindLoginBgEvents();
 			bindGlobalEvents();
 			applyToPage();
 		});

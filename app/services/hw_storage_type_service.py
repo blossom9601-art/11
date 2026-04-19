@@ -558,16 +558,17 @@ def soft_delete_hw_storage_types(ids: Iterable[Any], actor: str, app=None) -> in
     if not safe_ids:
         return 0
     placeholders = ','.join('?' for _ in safe_ids)
+    now = _now()
     with _get_connection(app) as conn:
         codes = [r['storage_code'] for r in conn.execute(
             f"SELECT storage_code FROM {TABLE_NAME} WHERE id IN ({placeholders})", safe_ids
         ).fetchall() if r['storage_code']]
         cur = conn.execute(
-            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
-            safe_ids,
+            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders})",
+            [now, actor] + safe_ids,
         )
         if codes:
             code_ph = ','.join('?' for _ in codes)
-            conn.execute(f"DELETE FROM hw_server_type WHERE server_code IN ({code_ph})", codes)
+            conn.execute(f"UPDATE hw_server_type SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE server_code IN ({code_ph})", [now, actor] + codes)
         conn.commit()
         return cur.rowcount

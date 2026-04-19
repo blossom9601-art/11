@@ -233,14 +233,16 @@ def update_org_company(company_id: int, payload: Dict[str, Any], actor: str, app
 
 def soft_delete_org_companies(ids: Sequence[int], actor: str, app=None) -> int:
     app = app or current_app
+    actor = (actor or 'system').strip() or 'system'
     valid_ids = [int(v) for v in ids if str(v).strip()]
     if not valid_ids:
         return 0
     placeholders = ','.join('?' for _ in valid_ids)
+    now = _now()
     with _get_connection(app) as conn:
         cursor = conn.execute(
-            f"DELETE FROM {TABLE_NAME} WHERE id IN ({placeholders})",
-            valid_ids,
+            f"UPDATE {TABLE_NAME} SET is_deleted = 1, updated_at = ?, updated_by = ? WHERE id IN ({placeholders})",
+            [now, actor] + valid_ids,
         )
         conn.commit()
         return int(cursor.rowcount or 0)
