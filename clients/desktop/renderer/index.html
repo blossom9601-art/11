@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blossom Chat</title>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' https: http: ws: wss:;">
+  <link rel="icon" href="assets/app-icon.png" />
+  <link rel="stylesheet" href="styles/app.css" />
+  <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
+</head>
+<body>
+  <!-- 커스텀 타이틀 바 (Windows 오버레이 영역) -->
+  <header class="titlebar" id="titlebar">
+    <img class="titlebar-logo" src="assets/app-icon.png" alt="Blossom Chat" />
+    <span class="titlebar-name">Blossom Chat <span id="titlebarVersion" style="opacity:.65;font-weight:500;margin-left:6px;"></span></span>
+    <span class="titlebar-spacer"></span>
+  </header>
+
+  <!-- 메인 셸 -->
+  <div class="app-shell" id="appShell" hidden>
+    <!-- 좌측 워크스페이스 레일 -->
+    <nav class="rail" aria-label="워크스페이스">
+      <button class="rail-btn rail-logo" id="railLogo" title="Blossom" aria-label="Blossom">
+        <img src="assets/app-icon.png" alt="Blossom" />
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" data-tab="chat" id="navChat" title="채팅" aria-label="채팅">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2zm2 4v2h12V8H6zm0 4v2h9v-2H6z"/></svg>
+      </button>
+      <button class="rail-btn rail-icon-img" data-tab="people" id="navPeople" title="동료" aria-label="동료">
+        <img src="assets/svg/chat/free-icon-font-following.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-icon-img" id="btnCalendar" data-tab="calendar" title="달력" aria-label="달력">
+        <img src="assets/svg/chat/free-icon-font-calendar-clock.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-icon-img" id="btnMemo" data-tab="memo" title="메모" aria-label="메모">
+        <img src="assets/svg/chat/free-icon-font-edit.svg" alt="" />
+      </button>
+      <div class="rail-grow"></div>
+      <button class="rail-btn rail-icon-img" id="btnLock" title="잠금" aria-label="잠금">
+        <img src="assets/svg/chat/free-icon-font-unlock.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-icon-img" id="btnTrayHide" title="트레이로 숨기기" aria-label="트레이로 숨기기">
+        <img src="assets/svg/chat/free-icon-font-holding-hand-dinner.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-icon-img" id="btnQuit" title="종료" aria-label="종료">
+        <img src="assets/svg/chat/free-icon-font-exit-alt.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-icon-img" id="btnSettings" title="설정" aria-label="설정">
+        <img src="assets/svg/chat/free-icon-font-settings.svg" alt="" />
+      </button>
+      <button class="rail-btn rail-me" id="btnProfile" title="내 프로필" aria-label="내 프로필">
+        <span class="avatar avatar-sm" id="meAvatar"></span>
+        <img class="rail-profile-fallback" src="assets/svg/chat/free-icon-font-circle-user.svg" alt="" hidden />
+      </button>
+    </nav>
+
+    <!-- 채널 사이드바 -->
+    <aside class="sidebar" id="sidebar" data-tab="chat">
+      <header class="ws-header">
+        <h1 class="ws-title" id="wsTitle">채팅</h1>
+        <button class="icon-btn" id="btnNewChannel" title="채널 만들기" aria-label="채널 만들기">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+        </button>
+      </header>
+
+      <!-- 채팅 탭 -->
+      <div class="sidebar-pane" data-pane="chat">
+        <div class="side-search side-search-chat">
+          <input id="chatSearch" type="text" placeholder="채널·메시지 검색" autocomplete="off" />
+        </div>
+        <section class="side-section">
+          <div class="side-section-head">
+            <button class="section-toggle" data-target="channelList" aria-expanded="true">
+              <img class="section-icon" src="assets/svg/chat/free-icon-font-channel.svg" alt="" aria-hidden="true" />
+              Channel
+            </button>
+            <button class="icon-btn-tiny" id="btnAddChannel" title="채널 추가" aria-label="채널 추가">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+            </button>
+          </div>
+          <ul id="channelList" class="conv-list"></ul>
+        </section>
+        <section class="side-section">
+          <div class="side-section-head">
+            <button class="section-toggle" data-target="dmList" aria-expanded="true">
+              <img class="section-icon" src="assets/svg/chat/free-icon-font-comment.svg" alt="" aria-hidden="true" />
+              Direct Message
+            </button>
+            <button class="icon-btn-tiny" id="btnAddDm" title="새 메시지" aria-label="새 메시지">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+            </button>
+          </div>
+          <ul id="dmList" class="conv-list"></ul>
+        </section>
+      </div>
+
+      <!-- 동료 탭 -->
+      <div class="sidebar-pane" data-pane="people" hidden>
+        <div class="side-search">
+          <input id="peopleSearch" type="text" placeholder="이름·사번·부서 검색" />
+        </div>
+        <ul id="peopleList" class="people-list"></ul>
+      </div>
+
+    </aside>
+
+    <!-- 메인 콘텐츠 -->
+    <section class="main-pane">
+      <header class="conv-header" id="convHeader">
+        <div class="conv-titlebar">
+          <span class="conv-icon" id="convIcon">#</span>
+          <h2 class="conv-title" id="convTitle">대화를 선택하세요</h2>
+        </div>
+        <div class="conv-meta" id="convMeta"></div>
+        <div class="conv-actions">
+          <button class="icon-btn" id="btnConvSearch" title="대화 내 검색 (Ctrl+F)" aria-label="대화 내 검색">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+          </button>
+          <button class="icon-btn" id="btnConvMenu" title="더 보기" aria-label="더 보기">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+          </button>
+        </div>
+      </header>
+      <!-- 대화 내 검색 바 -->
+      <div class="conv-search-bar" id="convSearchBar" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="csb-icon"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+        <input id="convSearchInput" type="text" placeholder="이 대화에서 검색…" autocomplete="off" />
+        <span class="csb-count" id="convSearchCount">0/0</span>
+        <button class="icon-btn csb-btn" id="convSearchPrev" title="이전 (Shift+Enter)" aria-label="이전">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 14l5-5 5 5z"/></svg>
+        </button>
+        <button class="icon-btn csb-btn" id="convSearchNext" title="다음 (Enter)" aria-label="다음">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <button class="icon-btn csb-btn" id="convSearchClose" title="닫기 (Esc)" aria-label="닫기">×</button>
+      </div>
+      <!-- v0.4.40: 고정 메시지 배너 -->
+      <div class="pinned-bar" id="pinnedBar" hidden>
+        <span class="pinned-icon" aria-hidden="true"><img src="assets/svg/chat/free-icon-font-thumbtack2.svg" alt="" /></span>
+        <span class="pinned-text" id="pinnedBarText">고정된 메시지</span>
+        <button class="icon-btn pinned-more" id="pinnedBarMore" title="고정 메시지 모두 보기" aria-label="고정 메시지 모두 보기">›</button>
+      </div>
+      <!-- v0.4.41: 채팅방 내부 탭 (대화/파일/아이디어/업무리스트) -->
+      <nav class="room-tabs" id="roomTabs" role="tablist">
+        <button class="room-tab active" data-room-tab="chat" role="tab" aria-selected="true">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-meeting.svg" alt="" /></span><span class="rt-main">대화</span>
+        </button>
+        <button class="room-tab" data-room-tab="files" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-folder.svg" alt="" /></span><span class="rt-main">파일</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab" data-room-tab="ideas" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-box-idea.svg" alt="" /></span><span class="rt-main">아이디어</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab" data-room-tab="tasks" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-business-time.svg" alt="" /></span><span class="rt-main">업무공유</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab room-tab-channel-only" data-room-tab="members" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-user-add.svg" alt="" /></span><span class="rt-main">참여자 정보</span><span class="rt-dot" hidden></span>
+        </button>
+      </nav>
+      <div class="room-body" id="roomBody">
+        <div class="message-area room-pane room-pane-chat is-active" id="messageArea" data-room-pane="chat">
+          <div class="empty-hint" id="emptyHint">
+            <img class="empty-art" src="assets/app-icon.png" alt="" />
+            <div class="empty-title">대화를 시작하세요</div>
+            <div class="empty-sub">왼쪽에서 채널이나 동료를 선택하거나, 새 채널을 만들어 보세요.</div>
+          </div>
+        </div>
+        <div class="room-pane room-pane-files" id="roomPaneFiles" data-room-pane="files" hidden>
+          <div class="rp-head">
+            <h3 class="rp-title">공유된 파일</h3>
+            <span class="rp-meta" id="filesCount"></span>
+          </div>
+          <div class="rp-toolbar">
+            <input id="filesSearchInput" class="form-input rp-search" type="search" placeholder="파일명·업로드 사용자 검색" autocomplete="off" />
+            <div class="rp-filter-pills" id="filesTypeFilter" role="group" aria-label="파일 유형 필터">
+              <button type="button" class="rp-filter-pill active" data-file-type="all">전체</button>
+              <button type="button" class="rp-filter-pill" data-file-type="image">이미지</button>
+              <button type="button" class="rp-filter-pill" data-file-type="doc">문서</button>
+              <button type="button" class="rp-filter-pill" data-file-type="archive">압축</button>
+              <button type="button" class="rp-filter-pill" data-file-type="etc">기타</button>
+            </div>
+            <button type="button" class="btn-danger-ghost rp-delete-selected" id="filesDeleteSelected" disabled>선택 삭제</button>
+          </div>
+          <div class="rp-list" id="filesList"></div>
+          <div class="rp-empty" id="filesEmpty" hidden>아직 공유된 파일이 없습니다.</div>
+        </div>
+        <div class="room-pane room-pane-ideas" id="roomPaneIdeas" data-room-pane="ideas" hidden>
+          <div class="rp-head">
+            <h3 class="rp-title">아이디어 보드</h3>
+            <button class="btn-primary rp-add" id="btnIdeaAdd">＋ 아이디어 추가</button>
+          </div>
+          <div class="rp-list" id="ideasList"></div>
+          <div class="rp-empty" id="ideasEmpty" hidden>등록된 아이디어가 없습니다.</div>
+        </div>
+        <div class="room-pane room-pane-tasks" id="roomPaneTasks" data-room-pane="tasks" hidden>
+          <div class="rp-head">
+            <h3 class="rp-title">업무리스트</h3>
+            <button class="btn-primary rp-add" id="btnTaskAdd">＋ 업무 추가</button>
+          </div>
+          <div class="rp-list" id="tasksList"></div>
+          <div class="rp-empty" id="tasksEmpty" hidden>등록된 업무가 없습니다.</div>
+        </div>
+        <div class="room-pane room-pane-members" id="roomPaneMembers" data-room-pane="members" hidden>
+          <div class="rp-head">
+            <h3 class="rp-title">참여자 <span class="rp-meta" id="membersCount"></span></h3>
+            <button class="btn-secondary rp-add" id="btnRoomRename">이름 변경</button>
+            <button class="btn-primary rp-add" id="btnMemberInvite">＋ 사용자 추가</button>
+          </div>
+          <div class="rp-list" id="membersList"></div>
+          <div class="rp-empty" id="membersEmpty" hidden>참여자 정보를 불러올 수 없습니다.</div>
+        </div>
+      </div>
+      <footer class="composer" id="composer">
+        <!-- v0.4.40: 답장 미리보기 -->
+        <div class="reply-preview" id="replyPreview" hidden>
+          <span class="reply-pre-icon" aria-hidden="true"><img src="assets/svg/chat/free-icon-font-hand-back-point-left.svg" alt="" /></span>
+          <div class="reply-pre-body">
+            <div class="reply-pre-name" id="replyPreName"></div>
+            <div class="reply-pre-text" id="replyPreText"></div>
+          </div>
+          <button class="icon-btn reply-pre-cancel" id="replyPreCancel" title="답장 취소" aria-label="답장 취소">×</button>
+        </div>
+        <!-- 서식 툴바 -->
+        <div class="composer-toolbar" role="toolbar" aria-label="서식">
+          <button class="fmt-btn" data-fmt="bold" title="굵게 (Ctrl+B)" aria-label="굵게">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M15.6 11.8a3.5 3.5 0 0 0 1.9-3.1c0-2.3-1.8-4-4-4H7v14h7c2.2 0 4-1.8 4-4 0-1.5-.9-2.8-2.4-2.9zM10 6.5h3a1.5 1.5 0 0 1 0 3h-3v-3zm3.5 9H10v-3h3.5a1.5 1.5 0 0 1 0 3z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="italic" title="기울임 (Ctrl+I)" aria-label="기울임">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M10 4v3h2.2l-3.4 10H6v3h8v-3h-2.2l3.4-10H18V4z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="underline" title="밑줄 (Ctrl+U)" aria-label="밑줄">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 17a5 5 0 0 0 5-5V4h-2.5v8a2.5 2.5 0 0 1-5 0V4H7v8a5 5 0 0 0 5 5zm-7 2v2h14v-2z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="strike" title="취소선" aria-label="취소선">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 12h18v2H3z"/><path fill="currentColor" d="M16 6.4A4.7 4.7 0 0 0 12 5C9.5 5 7 6.5 7 9c0 .7.2 1.4.6 2h2.5C9.6 10.5 9 9.9 9 9c0-1.4 1.5-2 3-2 1.2 0 2.6.4 3.4 1.4zM7.7 16c.3 1.5 1.7 3 4.3 3 2.4 0 4-1.4 4-3 0-.3-.1-.7-.2-1h-2.4c.4.3.6.6.6 1 0 .8-.9 1-2 1-1.4 0-2-.5-2-1z"/></svg>
+          </button>
+          <span class="fmt-sep"></span>
+          <button class="fmt-btn fmt-color-btn" id="btnFmtColor" title="글자색" aria-label="글자색">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M5 19h14v3H5zM12 3 5.5 17h2.4l1.4-3.4h5.4L16.1 17h2.4L12 3zm-1.8 8.7L12 7.4l1.8 4.3h-3.6z"/></svg>
+            <span class="fmt-color-bar" id="fmtColorBar"></span>
+          </button>
+          <div class="color-popover" id="colorPopover" hidden></div>
+          <span class="fmt-sep"></span>
+          <button class="fmt-btn" data-fmt="code" title="인라인 코드" aria-label="코드">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6zM14.6 16.6l4.6-4.6-4.6-4.6L16 6l6 6-6 6z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="quote" title="인용" aria-label="인용">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="ul" title="글머리 기호 목록" aria-label="목록">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 7a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 4 7zm0 6.5A1.5 1.5 0 1 1 5.5 12 1.5 1.5 0 0 1 4 13.5zm0 6.5a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 4 20zM8 5h13v1.5H8zm0 6.5h13V13H8zm0 6.5h13v1.5H8z"/></svg>
+          </button>
+          <button class="fmt-btn" data-fmt="link" title="링크" aria-label="링크">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.9 12a3.1 3.1 0 0 1 3.1-3.1H11V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z"/></svg>
+          </button>
+          <span class="fmt-grow"></span>
+          <button class="fmt-btn fmt-img-btn" id="btnPoll" title="투표하기" aria-label="투표하기">
+            <img src="assets/svg/chat/free-icon-font-vote-yea.svg" alt="" />
+          </button>
+          <button class="fmt-btn" id="btnEmoji" title="이모지" aria-label="이모지">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-3.5-9a1.5 1.5 0 1 0-1.5-1.5A1.5 1.5 0 0 0 8.5 11zm7 0A1.5 1.5 0 1 0 14 9.5a1.5 1.5 0 0 0 1.5 1.5zm-3.5 6a5 5 0 0 0 4.6-3H7.4a5 5 0 0 0 4.6 3z"/></svg>
+          </button>
+          <div class="emoji-popover" id="emojiPopover" hidden></div>
+        </div>
+        <div class="composer-inner">
+          <button class="composer-btn" id="btnAttach" title="파일 첨부" aria-label="파일 첨부">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M16.5 6.5L8 15a3.5 3.5 0 0 0 5 5l9-9a5.5 5.5 0 0 0-7.8-7.8L4.6 12.8a7.5 7.5 0 0 0 10.6 10.6l8.3-8.3-1.4-1.4-8.3 8.3a5.5 5.5 0 0 1-7.8-7.8L15.6 4.6a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 1 1-2.1-2.1L17.9 8z"/></svg>
+          </button>
+          <input type="file" id="fileInput" multiple hidden />
+          <textarea id="composerInput" rows="1" placeholder="메시지 보내기"></textarea>
+          <!-- v0.4.40: 멘션 자동완성 팝오버 -->
+          <div class="mention-popover" id="mentionPopover" hidden></div>
+          <button id="btnSend" class="composer-send" title="보내기 (Enter)" aria-label="보내기">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- v0.4.16: 달력 메인 뷰 -->
+    <section class="full-pane" id="calendarPane" hidden>
+      <header class="full-pane-head">
+        <div class="fp-title">달력</div>
+        <div class="fp-actions">
+          <button class="icon-btn" id="calNavPrev" title="이전 달">‹</button>
+          <button class="btn-secondary" id="calNavToday">오늘</button>
+          <button class="icon-btn" id="calNavNext" title="다음 달">›</button>
+          <span class="cal-current" id="calCurrentLabel"></span>
+          <span class="fp-grow"></span>
+          <button class="btn-secondary cal-refresh-icon-btn" id="calRefreshBtn" title="동기화" aria-label="동기화">
+            <img src="assets/svg/chat/free-icon-font-cloud-stairs.svg" alt="" />
+          </button>
+          <button class="btn-primary" id="calNewBtn">＋ 일정 추가</button>
+        </div>
+      </header>
+      <div class="cal-month-grid" id="calMonthGrid"></div>
+    </section>
+
+    <!-- v0.4.16: 메모 메인 뷰 -->
+    <section class="full-pane" id="memoPane" hidden>
+      <header class="full-pane-head">
+        <div class="fp-title">메모</div>
+        <div class="fp-actions">
+          <select class="memo-sort-select" id="memoSortSelect" title="메모 정렬">
+            <option value="custom">직접 정렬</option>
+            <option value="updated-desc">최근 수정순</option>
+            <option value="updated-asc">오래된 수정순</option>
+            <option value="created-desc">최근 생성순</option>
+            <option value="created-asc">오래된 생성순</option>
+          </select>
+          <select class="memo-sort-select" id="memoGroupSortSelect" title="그룹 정렬">
+            <option value="custom">그룹 직접 정렬</option>
+            <option value="name">그룹 이름순</option>
+          </select>
+          <span class="fp-grow"></span>
+          <button class="btn-primary" id="memoNewBtn">＋ 새 메모</button>
+        </div>
+      </header>
+      <div class="memo-layout">
+        <aside class="memo-groups">
+          <div class="memo-groups-head">
+            <span>그룹</span>
+            <button class="icon-btn-tiny" id="memoNewGroupBtn" title="새 그룹">＋</button>
+          </div>
+          <ul id="memoGroupList" class="memo-group-list"></ul>
+        </aside>
+        <ul class="memo-list" id="memoList"></ul>
+        <section class="memo-editor">
+          <input class="memo-title-input" id="memoTitle" type="text" placeholder="제목" />
+          <div class="memo-toolbar" id="memoToolbar" aria-label="메모 편집 도구">
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="bold" title="굵게"><img src="assets/svg/chat/free-icon-font-b.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="underline" title="밑줄"><img src="assets/svg/chat/free-icon-font-highlighter-line.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="strikeThrough" title="취소선"><img src="assets/svg/chat/free-icon-font-strikethrough.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn memo-tool-highlight" data-action="highlight" title="형광펜"><img src="assets/svg/chat/free-icon-font-highlighter.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="checkbox" title="체크박스"><img src="assets/svg/chat/free-icon-font-checkbox.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="image" title="이미지 첨부"><img src="assets/svg/chat/free-icon-font-add-image.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn memo-color-trigger" id="memoColorBtn" data-action="color" title="글자색">
+              <img src="assets/svg/chat/free-icon-font-palette.svg" alt="" />
+              <span class="memo-color-dot" id="memoColorDot"></span>
+            </button>
+            <div class="memo-color-menu" id="memoColorMenu" hidden></div>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="box" title="네모 박스"><img src="assets/svg/chat/free-icon-font-box-heart.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-tool-star" id="memoStarBtn" data-action="star" title="즐겨찾기" aria-pressed="false">
+              <img src="assets/svg/chat/free-icon-font-star.svg" alt="" />
+            </button>
+            <select class="memo-tool-select" id="memoFontSize" title="글자 크기">
+              <option value="">크기</option>
+              <option value="12px">12</option>
+              <option value="14px">14</option>
+              <option value="16px">16</option>
+              <option value="18px">18</option>
+              <option value="22px">22</option>
+              <option value="28px">28</option>
+            </select>
+            <select class="memo-tool-select" id="memoFontFamily" title="글꼴">
+              <option value="">글꼴</option>
+              <option value="Malgun Gothic">맑은 고딕</option>
+              <option value="Noto Sans KR">Noto Sans KR</option>
+              <option value="Segoe UI">Segoe UI</option>
+              <option value="Consolas, Console, monospace">Console</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+            <input id="memoImageInput" type="file" accept="image/*" hidden />
+          </div>
+          <textarea class="memo-body-input" id="memoBody" placeholder="여기에 내용을 작성하세요…"></textarea>
+          <div class="memo-editor-foot">
+            <span class="memo-status" id="memoStatus"></span>
+            <button class="btn-secondary" id="memoDeleteBtn" hidden>삭제</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- v0.4.16: 일정 추가/수정 모달 -->
+    <div class="modal" id="calEditModal" hidden>
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2 id="calEditTitle">일정</h2>
+          <button class="icon-btn" data-close="calEditModal" aria-label="닫기">×</button>
+        </div>
+        <label>제목
+          <div class="cal-title-row">
+            <input id="calFTitle" type="text" maxlength="200" />
+            <button class="cal-pill-toggle" id="calFImportant" type="button" aria-pressed="false">중요</button>
+          </div>
+        </label>
+        <div class="cal-form-row cal-form-row-time">
+          <label>시작 <input id="calFStart" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly /></label>
+          <label>종료 <input id="calFEnd" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly /></label>
+          <label class="cal-inline-check"><input id="calFAllDay" type="checkbox" /> 종일</label>
+        </div>
+        <div class="cal-form-row cal-form-row-2">
+          <label>일정 유형
+            <select id="calFType">
+              <option value="작업">작업</option>
+              <option value="미팅">미팅</option>
+              <option value="교육">교육</option>
+              <option value="휴가">휴가</option>
+              <option value="점검">점검</option>
+              <option value="기타">기타</option>
+            </select>
+          </label>
+          <label>일정 공유
+            <select id="calFShare">
+              <option value="PRIVATE">기본</option>
+              <option value="ALL">전체공유</option>
+              <option value="DEPARTMENT">부서공유</option>
+              <option value="SELECT">선택공유</option>
+            </select>
+          </label>
+        </div>
+        <label>참석자
+          <div class="cal-token-field">
+            <div class="cal-token-row">
+              <input id="calFAttendeeInput" type="text" placeholder="추가 버튼으로 동료를 선택하세요" autocomplete="off" readonly />
+              <button class="btn-secondary" id="calFAttendeeAdd" type="button">추가</button>
+            </div>
+            <div class="cal-token-list" id="calFAttendeeList"></div>
+          </div>
+        </label>
+        <label>알림
+          <select id="calFReminder">
+            <option value="">알림 없음</option>
+            <option value="10분 전">10분 전</option>
+            <option value="30분 전">30분 전</option>
+            <option value="1시간 전">1시간 전</option>
+            <option value="1일 전">1일 전</option>
+          </select>
+        </label>
+        <label>일정 색상
+          <input id="calFColor" class="cal-hidden-select" type="color" value="#6366f1" aria-hidden="true" tabindex="-1" />
+          <div class="cal-dropdown">
+            <button type="button" class="cal-dropdown-trigger" id="calFColorTrigger" aria-expanded="false">
+              <span class="cal-color-preview" id="calFColorPreview"></span>
+              <span id="calFColorLabel">#6366f1</span>
+              <span class="cal-dropdown-arrow"></span>
+            </button>
+            <div class="cal-dropdown-panel cal-color-menu" id="calFColorMenu" hidden></div>
+          </div>
+        </label>
+        <label>장소 <input id="calFLocation" type="text" maxlength="200" /></label>
+        <label>설명 <textarea id="calFDesc" rows="3"></textarea></label>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="calFDelete" hidden>삭제</button>
+          <button class="btn-primary" id="calFSave">저장</button>
+        </div>
+        <div id="calFError" class="error" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 로그인 모달 -->
+  <div class="modal" id="loginModal">
+    <div class="modal-card login-card">
+      <div class="brand-large">
+        <img class="brand-logo" src="assets/app-icon.png" alt="Blossom" />
+        <div class="brand-text">
+          <div class="brand-name">Blossom Chat</div>
+          <div class="brand-sub">사내 메신저</div>
+        </div>
+      </div>
+      <!-- 잠금 전용: 로그인 모드에서는 숨김 (JS로 표시) -->
+      <div class="lock-screen" id="lockScreenBlock" hidden>
+        <div class="lock-screen-hero" aria-hidden="true">
+          <img src="assets/svg/chat/free-icon-font-unlock.svg" alt="" />
+        </div>
+        <h2 class="lock-screen-title">채팅 잠금됨</h2>
+        <p class="lock-screen-lead">보안을 위해 채팅 화면이 잠겼습니다.<br />비밀번호를 입력하여 다시 접근하세요.</p>
+        <p class="lock-screen-reason" id="lockReasonText" role="status"></p>
+        <div class="lock-user-row">
+          <span class="avatar avatar-lg" id="lockAvatar"></span>
+          <div class="lock-user-meta">
+            <div class="lock-user-name" id="lockName">-</div>
+          </div>
+        </div>
+      </div>
+      <label id="loginEmpNoLabel">사번
+        <input id="loginEmpNo" type="text" autocomplete="username" autofocus />
+      </label>
+      <label class="login-password-label" id="loginPasswordLabel">비밀번호
+        <input id="loginPassword" type="password" autocomplete="current-password" />
+      </label>
+      <div id="loginError" class="error" role="alert" hidden></div>
+      <label class="check">
+        <input id="loginRemember" type="checkbox" />
+        다음에 자동으로 로그인
+      </label>
+      <div class="modal-actions">
+        <button id="btnLogin" class="btn-primary btn-block">로그인</button>
+      </div>
+      <div class="modal-actions" id="lockActions" hidden>
+        <button type="button" id="btnUnlock" class="btn-primary btn-block btn-unlock" aria-live="polite">
+          <span class="btn-unlock-default" aria-hidden="false">
+            <span class="btn-unlock-text">잠금 해제</span>
+          </span>
+          <span class="btn-unlock-working" id="btnUnlockWorking" hidden>
+            <span class="btn-unlock-spinner" aria-hidden="true"></span>
+            <span>잠금 해제 중...</span>
+          </span>
+        </button>
+        <button type="button" id="btnLockSwitch" class="btn-block btn-ghost lock-switch-account">다른 계정으로 로그인</button>
+      </div>
+      <div class="login-reset-row">
+        <button type="button" id="btnLoginConnSettings" class="btn-ghost-link" title="서버 주소 및 저장된 접속 정보 관리">서버 설정·접속 정보 관리</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.4.36: 로그인 화면에서 서버 주소·초기화를 다루는 별도 다이얼로그 -->
+  <div class="modal" id="connSettingsModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>서버 설정</h2>
+        <button class="icon-btn" data-close="connSettingsModal" aria-label="닫기">×</button>
+      </div>
+      <label>서버 주소
+        <input id="connServer" type="url" placeholder="https://chat.example.com" autocomplete="off" spellcheck="false" />
+      </label>
+      <p class="muted small">시스템 관리자가 안내한 주소를 입력하세요.</p>
+      <div class="conn-msg-slot">
+        <div id="connSettingsError" class="error" hidden></div>
+        <div id="connSettingsOk" class="hint-ok" hidden></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnConnTest">연결 테스트</button>
+        <button class="btn-secondary" data-close="connSettingsModal">취소</button>
+        <button class="btn-primary" id="btnConnSettingsSave">저장</button>
+      </div>
+      <div class="login-reset-row">
+        <button type="button" id="btnConnReset" class="btn-ghost-link" title="저장된 서버 주소·자격증명·쿠키·캐시 전체를 지웁니다">저장된 접속 정보 전체 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 채널 만들기 모달 -->
+  <div class="modal" id="channelModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>채널 만들기</h2>
+        <button class="icon-btn" data-close="channelModal" aria-label="닫기">×</button>
+      </div>
+      <label>채널 이름
+        <input id="newChannelName" type="text" placeholder="예: 마케팅, 일반" maxlength="80" />
+      </label>
+      <label>설명 (선택)
+        <input id="newChannelDesc" type="text" placeholder="이 채널의 목적" maxlength="200" />
+      </label>
+      <fieldset class="radio-group seg-group">
+        <legend>공개 범위</legend>
+        <label class="seg-card">
+          <input type="radio" name="newChannelType" value="public" checked />
+          <span class="seg-card-body">
+            <span class="seg-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.93 9h-3.02a15.6 15.6 0 00-1.18-5.32A8.03 8.03 0 0118.93 11zM12 4c.86 0 2.16 2.06 2.66 7H9.34C9.84 6.06 11.14 4 12 4zM4.07 13h3.02c.13 1.93.55 3.74 1.18 5.32A8.03 8.03 0 014.07 13zm0-2A8.03 8.03 0 019.27 5.68 15.6 15.6 0 008.09 11H4.07zM12 20c-.86 0-2.16-2.06-2.66-7h5.32C14.16 17.94 12.86 20 12 20zm2.73-.68c.63-1.58 1.05-3.39 1.18-5.32h3.02a8.03 8.03 0 01-4.2 5.32z"/></svg>
+            </span>
+            <span class="seg-card-text">
+              <span class="seg-card-title">공개</span>
+              <span class="seg-card-desc">누구나 참여 가능</span>
+            </span>
+          </span>
+        </label>
+        <label class="seg-card">
+          <input type="radio" name="newChannelType" value="private" />
+          <span class="seg-card-body">
+            <span class="seg-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M18 8h-1V6a5 5 0 10-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zM9 6a3 3 0 016 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
+            </span>
+            <span class="seg-card-text">
+              <span class="seg-card-title">비공개</span>
+              <span class="seg-card-desc">초대된 사람만</span>
+            </span>
+          </span>
+        </label>
+      </fieldset>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close="channelModal">취소</button>
+        <button class="btn-primary" id="btnCreateChannel">만들기</button>
+      </div>
+      <div class="error" id="channelError" hidden></div>
+    </div>
+  </div>
+
+  <!-- 새 DM 모달 -->
+  <div class="modal" id="dmModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>새 메시지</h2>
+        <button class="icon-btn" data-close="dmModal" aria-label="닫기">×</button>
+      </div>
+      <label>받는 사람
+        <input id="dmSearchInput" type="text" placeholder="이름·사번·부서 검색" autocomplete="off" />
+      </label>
+      <ul id="dmSearchResults" class="people-list small"></ul>
+      <div class="error" id="dmError" hidden></div>
+    </div>
+  </div>
+
+  <!-- 파일 미리보기 모달 -->
+  <div class="modal" id="filePreviewModal" hidden>
+    <div class="modal-card file-preview-card">
+      <div class="modal-head">
+        <h2 id="filePreviewTitle">파일 미리보기</h2>
+        <button class="icon-btn" data-close="filePreviewModal" aria-label="닫기">×</button>
+      </div>
+      <div class="file-preview-toolbar" id="filePreviewToolbar" hidden></div>
+      <div class="file-preview-body" id="filePreviewBody"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="filePreviewOpen">새 창으로 열기</button>
+        <button class="btn-secondary" id="filePreviewDownload">다운로드</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 투표 만들기 모달 -->
+  <div class="modal" id="pollModal" hidden>
+    <div class="modal-card poll-modal-card">
+      <div class="modal-head">
+        <h2>투표 만들기</h2>
+        <button class="icon-btn" data-close="pollModal" aria-label="닫기">×</button>
+      </div>
+      <label>질문
+        <input id="pollQuestion" type="text" placeholder="투표 질문을 입력하세요" maxlength="120" />
+      </label>
+      <label>항목
+        <textarea id="pollOptions" rows="5" placeholder="항목을 줄마다 하나씩 입력하세요&#10;예: 찬성&#10;예: 반대"></textarea>
+      </label>
+      <label>기간설정
+        <input id="pollEndAt" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly />
+      </label>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close="pollModal">취소</button>
+        <button class="btn-primary" id="pollCreateBtn">투표 전송</button>
+      </div>
+      <div class="error" id="pollError" hidden></div>
+    </div>
+  </div>
+
+  <!-- 일정 참석자 선택 모달 -->
+  <div class="modal" id="calAttendeeModal" hidden>
+    <div class="modal-card cal-attendee-card">
+      <div class="modal-head">
+        <h2>참석자 선택</h2>
+        <button class="icon-btn" data-close="calAttendeeModal" aria-label="닫기">×</button>
+      </div>
+      <div class="cal-attendee-modal-caption">동료 리스트</div>
+      <input id="calAttendeeSearchInput" type="text" class="cal-attendee-search" placeholder="이름 / 사번 / 부서로 검색" autocomplete="off" />
+      <div id="calAttendeeModalCount" class="muted small" aria-live="polite"></div>
+      <ul id="calAttendeeModalList" class="people-list small cal-attendee-modal-list"></ul>
+      <div class="muted small">동료를 선택하면 참석자 목록에 추가됩니다.</div>
+    </div>
+  </div>
+
+  <!-- 프로필 모달 -->
+  <div class="modal" id="profileModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>내 프로필</h2>
+        <button class="icon-btn" data-close="profileModal" aria-label="닫기">×</button>
+      </div>
+      <div class="profile-head">
+        <span class="avatar avatar-xl" id="profileAvatar"></span>
+        <div>
+          <div class="profile-name" id="profileName">-</div>
+          <div class="profile-sub" id="profileEmpNo">-</div>
+          <div class="profile-sub" id="profileDept">-</div>
+        </div>
+      </div>
+      <label>닉네임
+        <input id="profNickname" type="text" />
+      </label>
+      <label>이메일
+        <input id="profEmail" type="email" />
+      </label>
+      <label>휴대폰
+        <input id="profMobile" type="text" />
+      </label>
+      <label>한 줄 상태
+        <input id="profMotto" type="text" maxlength="120" placeholder="예: 외근 중" />
+      </label>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close="profileModal">닫기</button>
+        <button class="btn-primary" id="btnSaveProfile">저장</button>
+      </div>
+      <div class="error" id="profileError" hidden></div>
+    </div>
+  </div>
+
+  <!-- 동료 프로필 보기 (읽기 전용) -->
+  <div class="modal" id="userProfileModal" hidden>
+    <div class="modal-card user-profile-card">
+      <div class="modal-head">
+        <h2>프로필</h2>
+        <button class="icon-btn" data-close="userProfileModal" aria-label="닫기">×</button>
+      </div>
+      <div class="up-hero">
+        <span class="avatar avatar-xl" id="upAvatar"></span>
+        <div class="up-hero-text">
+          <div class="up-name" id="upName">-</div>
+          <div class="up-sub" id="upDeptJob">-</div>
+        </div>
+      </div>
+      <dl class="up-info">
+        <div class="up-row"><dt>사번</dt><dd id="upEmpNo">-</dd></div>
+        <div class="up-row"><dt>부서</dt><dd id="upDept">-</dd></div>
+        <div class="up-row"><dt>직책</dt><dd id="upJob">-</dd></div>
+        <div class="up-row"><dt>이메일</dt><dd id="upEmail">-</dd></div>
+        <div class="up-row"><dt>휴대폰</dt><dd id="upMobile">-</dd></div>
+        <div class="up-row"><dt>내선</dt><dd id="upExt">-</dd></div>
+      </dl>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close="userProfileModal">닫기</button>
+        <button class="btn-primary" id="btnUpStartChat">채팅하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설정 모달 (v0.5: Slack/Discord/Enterprise 구조) -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-card settings-card">
+      <nav class="settings-nav" aria-label="설정 섹션">
+        <div class="settings-nav-title">설정</div>
+        <button type="button" class="settings-tab active" data-settings-tab="general" title="일반">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.6-.22l-2.39.96a7.17 7.17 0 0 0-1.69-.98l-.38-2.55A.488.488 0 0 0 12 2h-4a.49.49 0 0 0-.49.42l-.38 2.55c-.6.24-1.17.56-1.69.98l-2.39-.96a.49.49 0 0 0-.6.22L2.46 7.3c-.1.2-.05.45.12.61l2.03 1.58c-.04.31-.07.64-.07.96s.02.64.07.96l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.3.6.22l2.39-.97c.52.43 1.09.75 1.69.99l.38 2.55c.05.24.25.42.49.42h4c.24 0 .45-.18.49-.42l.38-2.55c.6-.24 1.16-.57 1.68-.99l2.4.97c.22.08.48 0 .6-.22l1.92-3.32c.1-.2.05-.45-.12-.61l-2.01-1.58zM12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5z"/></svg></span>
+          <span class="settings-tab-txt">일반</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="notify" title="알림">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 22a2.98 2.98 0 0 0 2.99-2h-5.98A2.98 2.98 0 0 0 12 22zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></span>
+          <span class="settings-tab-txt">알림</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="display" title="화면">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M21 2H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7v2H8v2h8v-2h-2v-2h7a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 14H3V4h18v12z"/></svg></span>
+          <span class="settings-tab-txt">화면</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="security" title="보안">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 9.95 9 11 5.16-1.05 9-5.45 9-11V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg></span>
+          <span class="settings-tab-txt">보안</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="retention" title="자동삭제">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-2.34-5.66L15 9h7V2l-2.91 2.91A9.96 9.96 0 0 0 12 2zm1 5h-2v6l5 3 .95-1.58-3.95-2.34V7z"/></svg></span>
+          <span class="settings-tab-txt">자동삭제</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="connection" title="연결">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>
+          <span class="settings-tab-txt">연결</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="data" title="데이터">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 3h18v4H3V3zm0 6h10v4H3V9zm0 6h10v4H3v-4zM16 9h5v10h-5V9z"/></svg></span>
+          <span class="settings-tab-txt">데이터</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="about" title="정보">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></span>
+          <span class="settings-tab-txt">정보</span>
+        </button>
+      </nav>
+      <div class="settings-body">
+        <div class="settings-panes">
+          <!-- 일반 -->
+          <section class="settings-pane" data-pane="general">
+            <header class="st-head">
+              <h2 class="st-head-title">일반</h2>
+              <p class="st-head-desc">Blossom Chat을 어떻게 실행하고 표시할지 제어합니다.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">자동 실행</div>
+                  <div class="st-row-desc">Windows 로그인 시 앱이 자동으로 시작됩니다.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_autoStart" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">트레이로 최소화</div>
+                  <div class="st-row-desc">창을 닫으면 하단 트레이로 숨깁니다.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_minimizeToTray" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">언어</div>
+                  <div class="st-row-desc">앱에 표시되는 기본 언어입니다.</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_language" class="st-select">
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 알림 -->
+          <section class="settings-pane" data-pane="notify" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">알림</h2>
+              <p class="st-head-desc">채널·DM·멘션에 대한 푸시, 소리, 방해금지 규칙을 설정합니다.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">전체 알림</div>
+                  <div class="st-row-desc">Blossom 알림(토스트/배지) 총괄 on/off</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyMaster" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">멘션 알림</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyMention" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">DM 알림</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyDm" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">특정 채널 알림</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyChannel" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">키워드</h3>
+              <p class="st-muted st-gap">쉼표로 구분 (예: 긴급, 배포, outage)</p>
+              <textarea id="st_notifyKeywords" class="st-textarea" rows="2" placeholder=""></textarea>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">방해 금지</h3>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">일정</div>
+                  <div class="st-row-desc">이 시간대에는 OS 알림·소리를 끕니다(앱 내 저장).</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_dndEnabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-dnd-row" id="st_dndRow" hidden>
+                <label>시작 <input type="time" id="st_dndStart" class="st-input" /></label>
+                <span class="st-dnd-sep">~</span>
+                <label>종료 <input type="time" id="st_dndEnd" class="st-input" /></label>
+              </div>
+            </div>
+            <div class="st-group">
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">알림 사운드</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_notifySoundId" class="st-select">
+                    <option value="default">기본</option>
+                    <option value="subtle">은은하게</option>
+                    <option value="none">없음</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">포커스 중에도 알림</div>
+                  <div class="st-row-desc">Blossom 창이 앞에 있을 때도 데스크톱 알림을 띄웁니다.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyOnFocus" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- 화면 -->
+          <section class="settings-pane" data-pane="display" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">화면</h2>
+              <p class="st-head-desc">테마, 가독성, 레이아웃 밀도를 조정합니다.</p>
+            </header>
+            <div class="st-group">
+              <h3 class="st-group-h">모드</h3>
+              <fieldset class="seg-control" role="radiogroup" aria-label="테마 모드">
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="light" />
+                  <span class="seg-pill-body">라이트</span>
+                </label>
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="dark" />
+                  <span class="seg-pill-body">다크</span>
+                </label>
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="auto" />
+                  <span class="seg-pill-body">시스템</span>
+                </label>
+              </fieldset>
+            </div>
+            <div class="st-group">
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">글자 크기</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_fontSize" class="st-select">
+                    <option value="14">작게</option>
+                    <option value="15">기본</option>
+                    <option value="17">크게</option>
+                    <option value="19">아주 크게</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">채팅 밀도</div>
+                  <div class="st-row-desc">메시지 줄 간격</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_chatDensity" class="st-select">
+                    <option value="cozy">여유 (cozy)</option>
+                    <option value="comfortable">보통 (comfortable)</option>
+                    <option value="compact">촘촘 (compact)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">UI 애니메이션</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_uiAnimations" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- 보안 -->
+          <section class="settings-pane" data-pane="security" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">보안</h2>
+              <p class="st-head-desc">접근 제한, 암호화, 감사를 구성합니다. 민감 항목은 관리자 정책이 우선될 수 있습니다.</p>
+            </header>
+            <div class="st-group">
+              <h3 class="st-group-h">접근</h3>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">앱 잠금 PIN <span class="st-badge st-badge--policy" id="st_pinPolicyBadge" hidden>정책</span></div>
+                  <div class="st-row-desc">채팅 잠금 화면에 PIN을 사용 (별도 OS 보안 영역에 저장)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_appPinEnabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-pin-box" id="st_pinBox" hidden>
+                <input type="password" id="st_pinNew" class="st-input" placeholder="새 PIN (숫자 6자리)" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" />
+                <input type="password" id="st_pinConfirm" class="st-input" placeholder="PIN 확인 (숫자 6자리)" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" />
+                <div class="st-pin-hint" id="st_pinHint"></div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">자동 잠금 시간(분)</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <input type="number" id="st_autoLockMin" class="st-input st-input--num" min="1" max="240" step="1" />
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-ctrl" style="flex:1;justify-content:flex-end">
+                  <button type="button" class="btn-secondary" id="btnLoginHistory">로그인 기록</button>
+                  <button type="button" class="btn-danger-ghost" id="btnRemoteLogout">다른 곳에서 로그아웃(세션)</button>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">파일 다운로드 제한</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_fileDownloadRestrict" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field st-row--stack">
+                <div class="st-row-text">
+                  <div class="st-row-title">허용 파일 형식</div>
+                  <div class="st-row-desc">쉼표로 구분합니다. 예: pdf, png, jpg, docx, zip</div>
+                </div>
+                <div class="st-row-ctrl st-row-ctrl--wide">
+                  <input type="text" id="st_allowedFileExtensions" class="st-input" placeholder="pdf,png,jpg,jpeg,gif,webp,txt,log,json,xml,doc,docx,hwp,hwpx,zip" />
+                </div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">파일 1개당 최대 용량(MB)</div>
+                  <div class="st-row-desc">대화창 파일 첨부 전에 로컬에서 차단합니다.</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <input type="number" id="st_maxUploadMb" class="st-input st-input--num" min="1" max="500" step="1" />
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">복사 제한(클립보드)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_copyRestrict" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">엔터프라이즈 보안</h3>
+              <p class="st-muted st-gap">로컬에서 가능한 수준의 보강·기록을 설정합니다(일부는 서버·정책과 연동).</p>
+              <div class="st-row is-disabled" id="st_rowTls" title="HTTPS 사용 시 시스템 루트에 의해 인증">
+                <div class="st-row-text">
+                  <div class="st-row-title">TLS·인증서 검증 <span class="st-badge st-badge--ok">활성</span></div>
+                </div>
+                <input type="checkbox" id="st_tlsEnforce" checked disabled />
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">인증서·호스트 Pinning(신뢰)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_certPinning" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row is-disabled" title="세션/리프레시 토큰은 서버 정책">
+                <div class="st-row-text">
+                  <div class="st-row-title">Refresh token rotation(기대)</div>
+                </div>
+                <input type="checkbox" id="st_refreshTokenRotation" disabled />
+              </div>
+              <div class="st-row is-disabled" title="자격 증명은 OS safeStorage(Windows 암호화)">
+                <div class="st-row-text">
+                  <div class="st-row-title">로컬 토큰/비밀번호 암호화 저장 <span class="st-badge st-badge--ok">OS</span></div>
+                </div>
+                <input type="checkbox" id="st_localTokenEncrypt" checked disabled />
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">감사 로그(로컬)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_auditLogLocal" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">설정 변경 이력(로컬)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_settingsHistory" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- 대화 자동삭제 정책 -->
+          <section class="settings-pane" data-pane="retention" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">대화 자동삭제 정책</h2>
+              <p class="st-head-desc">마지막 대화 이후 설정한 시간 동안 새 메시지가 없으면 대화 내용이 자동 삭제됩니다. 관리자만 수정할 수 있습니다.</p>
+            </header>
+            <div class="retention-admin-lock" id="retentionAdminLock" hidden>관리자 권한이 없어 읽기 전용으로 표시됩니다.</div>
+            <div class="retention-tabs" id="retentionTypeTabs">
+              <button type="button" class="active" data-retention-type="CHANNEL">채널</button>
+              <button type="button" data-retention-type="GROUP">그룹채팅</button>
+              <button type="button" data-retention-type="DIRECT">개인채팅</button>
+            </div>
+            <div class="st-group retention-card">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">자동삭제 활성화</div>
+                  <div class="st-row-desc">비활성 상태가 보관기간을 넘으면 메시지를 soft delete합니다.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="rt_enabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">보관기간</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="rt_period" class="st-input">
+                    <option value="3600">1시간</option>
+                    <option value="21600">6시간</option>
+                    <option value="43200">12시간</option>
+                    <option value="86400">24시간</option>
+                    <option value="259200">3일</option>
+                    <option value="604800">7일</option>
+                    <option value="2592000">30일</option>
+                    <option value="custom">직접 입력</option>
+                  </select>
+                  <input type="number" id="rt_customValue" class="st-input st-input--num" min="1" max="365" value="24" hidden />
+                  <select id="rt_customUnit" class="st-input" hidden>
+                    <option value="hours">시간</option>
+                    <option value="days">일</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">대화가 이어지면 삭제 시간 리셋</div>
+                  <div class="st-row-desc">마지막 메시지 이후 설정한 시간이 지나면 대화 내용이 삭제됩니다.</div>
+                </div>
+                <label class="st-switch"><input type="checkbox" id="rt_resetOnNewActivity" checked disabled /><span class="st-switch-ui"></span></label>
+              </div>
+              <div class="st-row"><div class="st-row-text"><div class="st-row-title">첨부파일 함께 삭제</div></div><label class="st-switch"><input type="checkbox" id="rt_deleteAttachments" /><span class="st-switch-ui"></span></label></div>
+              <div class="st-row"><div class="st-row-text"><div class="st-row-title">기존 대화방에도 적용</div></div><label class="st-switch"><input type="checkbox" id="rt_applyExisting" /><span class="st-switch-ui"></span></label></div>
+              <div class="retention-preview" id="retentionPreviewText"></div>
+              <div class="modal-actions retention-actions">
+                <button type="button" class="btn-secondary" id="btnRetentionReload">변경 취소</button>
+                <button type="button" class="btn-secondary" id="btnRetentionApplyExisting">기존 방 적용</button>
+                <button type="button" class="btn-danger-ghost" id="btnRetentionCleanup">정리 작업 실행</button>
+                <button type="button" class="btn-primary" id="btnRetentionSave">정책 저장</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 연결 -->
+          <section class="settings-pane" data-pane="connection" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">연결</h2>
+              <p class="st-head-desc">Blossom 서버와의 통신, 프록시, 정책을 관리합니다.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row st-row--field" id="st_rowServer">
+                <div class="st-row-text">
+                  <div class="st-row-title">서버 주소 <span class="st-badge st-badge--policy" id="st_serverLockBadge" hidden>관리자</span></div>
+                </div>
+                <div class="st-row-ctrl st-row-ctrl--server">
+                  <input type="url" id="st_serverUrl" class="st-input" placeholder="https://..." />
+                </div>
+              </div>
+              <div class="st-row" style="align-items:flex-start">
+                <div class="st-row-text">
+                  <div class="st-row-title">인증서·TLS 상태</div>
+                </div>
+                <div class="st-cert-box" id="st_certStatus">-</div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">프록시</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_proxyMode" class="st-select">
+                    <option value="system">시스템 기본</option>
+                    <option value="none">직접(프록시 없음)</option>
+                    <option value="custom">사용자 정의</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row" id="st_proxyRow" hidden>
+                <input type="text" id="st_proxyUrl" class="st-input" placeholder="http://user:pass@host:port" style="width:100%" />
+              </div>
+              <div class="st-row">
+                <div class="st-row-ctrl" style="flex:1;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                  <button type="button" class="btn-secondary" id="st_btnConnTest">서버 연결 테스트</button>
+                </div>
+              </div>
+              <p class="st-muted" id="st_connTestMsg" hidden></p>
+              <div class="st-row" id="st_rowAdminLock">
+                <div class="st-row-text">
+                  <div class="st-row-title">관리자 정책(서버 잠금) <span class="st-badge st-badge--policy">표시</span></div>
+                  <div class="st-row-desc">활성화 시 위 서버/프록시 일부는 정책에 의해 잠깁니다(키: adminPolicyServerLock).</div>
+                </div>
+                <label class="st-switch" title="디버그: 정책 시뮬">
+                  <input type="checkbox" id="st_adminPolicyServerLock" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- 데이터 -->
+          <section class="settings-pane" data-pane="data" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">데이터</h2>
+              <p class="st-head-desc">캐시·로그·로컬 저장소를 정리합니다. 이 작업은 복구가 어려울 수 있습니다.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">캐시 삭제</div>
+                </div>
+                <button type="button" class="btn-danger-outline" id="btnCacheClear">캐시 지우기</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">다운로드 데이터</div>
+                </div>
+                <button type="button" class="btn-secondary" id="btnDownloadOpen">다운로드 폴더</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">로그(로컬) 삭제</div>
+                </div>
+                <button type="button" class="btn-danger-outline" id="btnLogClear">로그 삭제</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">로컬 앱 데이터/세션 초기화</div>
+                </div>
+                <button type="button" class="btn-danger-solid" id="btnDataReset">앱 데이터 초기화</button>
+              </div>
+            </div>
+            <div class="st-group" style="margin-top:8px">
+              <p class="st-muted st-gap">초기화는 이 PC에 저장된 접속 정보·쿠키·캐시·임시 데이터를 지우고 앱을 다시 시작합니다. 채팅 데이터와 계정 권한은 중앙 서버에서 다시 가져옵니다.</p>
+            </div>
+          </section>
+
+          <!-- 정보 -->
+          <section class="settings-pane" data-pane="about" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">정보</h2>
+            </header>
+            <div class="about-block">
+              <img class="about-logo" src="assets/app-icon.png" alt="Blossom" width="64" height="64" />
+              <div>
+                <div class="about-name">Blossom Chat</div>
+                <div class="about-ver" id="aboutVersion">v0.0.0</div>
+                <div class="muted small">© Blossom Workspace</div>
+              </div>
+            </div>
+            <div class="st-group about-actions">
+              <button type="button" class="btn-secondary" id="btnReleaseNotes">릴리즈 노트</button>
+              <button type="button" class="btn-secondary" id="btnLicense">라이선스</button>
+            </div>
+            <div class="st-group" id="releaseNotesPanel" hidden>
+              <h3 class="st-group-h">릴리즈 노트</h3>
+              <div id="releaseNotesView" class="st-note-box"></div>
+              <textarea id="releaseNotesEdit" class="st-textarea" rows="7" placeholder="admin 사용자만 릴리즈 노트를 작성할 수 있습니다." hidden></textarea>
+              <div class="st-row" id="releaseNotesActions" hidden>
+                <span class="st-muted">admin 사용자 권한으로 작성 중입니다.</span>
+                <button type="button" class="btn-primary" id="btnReleaseNotesSave">릴리즈 노트 저장</button>
+              </div>
+            </div>
+            <div class="st-group" id="licensePanel" hidden>
+              <h3 class="st-group-h">라이선스 정보</h3>
+              <div class="st-license-box">
+                <strong>Blossom Chat Desktop</strong><br />
+                Copyright (c) Blossom Workspace. Internal distribution only.<br /><br />
+                This application bundles Electron, Chromium, Node.js, electron-builder,
+                flatpickr, and other open-source components. Each component remains
+                licensed under its respective license. Redistribution outside the
+                organization is not permitted without approval.
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="settings-foot">
+          <span class="st-foot-dirty" id="st_footDirty" hidden>저장되지 않은 변경이 있습니다</span>
+          <span class="st-foot-grow"></span>
+          <button type="button" class="btn-secondary" id="btnSettingsCancel" data-close="settingsModal">취소</button>
+          <button type="button" class="btn-primary" id="btnSettingsSave" disabled>현재 페이지 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- v0.4.40: 고정 메시지 목록 모달 -->
+  <div class="modal" id="pinnedListModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>고정 메시지</h2>
+        <button class="icon-btn" data-close="pinnedListModal" aria-label="닫기">×</button>
+      </div>
+      <div class="pinned-list" id="pinnedListBody"></div>
+    </div>
+  </div>
+
+  <!-- v0.4.41: 아이디어 추가/수정 모달 -->
+  <div class="modal" id="ideaFormModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="ideaFormTitle">아이디어 추가</h2>
+        <button class="icon-btn" data-close="ideaFormModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">제목</label>
+        <input type="text" id="ideaFormTitleInput" class="form-input" maxlength="200" placeholder="아이디어 제목" />
+        <label class="form-label">상세</label>
+        <textarea id="ideaFormBodyInput" class="form-input" rows="6" placeholder="자세한 내용을 입력하세요"></textarea>
+        <label class="form-label">상태</label>
+        <select id="ideaFormStatus" class="form-input">
+          <option value="review">검토중</option>
+          <option value="in_progress">진행중</option>
+          <option value="done">완료</option>
+          <option value="hold">보류</option>
+        </select>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" data-close="ideaFormModal">취소</button>
+        <button class="btn-primary" id="btnIdeaSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.4.41: 업무 추가/수정 모달 -->
+  <div class="modal" id="taskFormModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="taskFormTitle">업무 추가</h2>
+        <button class="icon-btn" data-close="taskFormModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">제목</label>
+        <input type="text" id="taskFormTitleInput" class="form-input" maxlength="200" placeholder="업무 제목" />
+        <label class="form-label">상세</label>
+        <textarea id="taskFormDescInput" class="form-input" rows="4" placeholder="업무 설명"></textarea>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">상태</label>
+            <select id="taskFormStatus" class="form-input">
+              <option value="todo">대기</option>
+              <option value="in_progress">진행 중</option>
+              <option value="done">완료</option>
+            </select>
+          </div>
+          <div class="form-col">
+            <label class="form-label">우선순위</label>
+            <select id="taskFormPriority" class="form-input">
+              <option value="low">낮음</option>
+              <option value="normal" selected>보통</option>
+              <option value="high">높음</option>
+            </select>
+          </div>
+          <div class="form-col">
+            <label class="form-label">기한</label>
+            <input type="text" id="taskFormDue" class="form-input" placeholder="YYYY-MM-DD" autocomplete="off" />
+          </div>
+        </div>
+        <label class="form-label">담당자</label>
+        <select id="taskFormAssignee" class="form-input">
+          <option value="">담당자 없음</option>
+        </select>
+        <label class="form-label">체크리스트</label>
+        <textarea id="taskFormChecklist" class="form-input" rows="3" placeholder="한 줄에 하나씩 입력"></textarea>
+        <label class="check">
+          <input id="taskFormApproval" type="checkbox" />
+          운영/보안 승인 요청과 연계
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" data-close="taskFormModal">취소</button>
+        <button class="btn-primary" id="btnTaskSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.4.44: 채널 초대 모달 -->
+  <div class="modal" id="inviteMembersModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>참여자 초대</h2>
+        <button class="icon-btn" data-close="inviteMembersModal" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="inviteSearchInput" class="form-input" placeholder="이름·사번으로 검색" autocomplete="off" />
+        <div class="rp-list" id="inviteCandidateList" style="max-height:50vh;"></div>
+        <div class="rp-empty" id="inviteCandidateEmpty" hidden>일치하는 사용자가 없습니다.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" data-close="inviteMembersModal">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/flatpickr/flatpickr.min.js"></script>
+  <script src="vendor/flatpickr/ko.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/sse.js"></script>
+  <script src="js/app.js"></script>
+
+
+
+</body>
+</html>

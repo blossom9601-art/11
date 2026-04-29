@@ -50,6 +50,18 @@ cp "$DEPLOY/nginx/lumina.conf" "$SRC/nginx/"
 mkdir -p "$SRC/systemd"
 cp "$DEPLOY/systemd/lumina-ap.service"  "$SRC/systemd/"
 cp "$DEPLOY/systemd/lumina-web.service" "$SRC/systemd/"
+cp "$DEPLOY/systemd/lumina-db.service"  "$SRC/systemd/" 2>/dev/null || true
+
+# ── 통합 wrapper (lumina-web 단일 유닛에서 두 gunicorn 동반 기동) ──
+mkdir -p "$SRC/bin"
+cp "$DEPLOY/bin/lumina-web-start.sh" "$SRC/bin/"
+chmod +x "$SRC/bin/lumina-web-start.sh"
+
+# ── systemd drop-ins (mariadb/nginx 동반 정지) ───────────
+mkdir -p "$SRC/systemd/dropins/mariadb.service.d"
+mkdir -p "$SRC/systemd/dropins/nginx.service.d"
+cp "$DEPLOY/systemd/dropins/mariadb.service.d/lumina.conf" "$SRC/systemd/dropins/mariadb.service.d/" 2>/dev/null || true
+cp "$DEPLOY/systemd/dropins/nginx.service.d/lumina.conf"   "$SRC/systemd/dropins/nginx.service.d/" 2>/dev/null || true
 
 ###############################################################################
 # 2) 누락 소스 파일 스텁 생성
@@ -451,6 +463,30 @@ def create_app(config=None):
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     return app
+PYEOF
+
+cat > "$SRC/web/app/cli_api.py" << 'PYEOF'
+"""Blossom Lumina WEB — CLI 연동 API 스텁."""
+from flask import Blueprint, jsonify
+
+cli_api = Blueprint('cli_api', __name__, url_prefix='/api/cli')
+
+@cli_api.route('/ping', methods=['GET'])
+def ping():
+    return jsonify({'status': 'ok'}), 200
+PYEOF
+
+# ── AP 누락 모듈 스텁 ────────────────────────────────────
+cat > "$SRC/ap/server.py" << 'PYEOF'
+"""Blossom Lumina AP — 메인 서버 진입점 스텁."""
+import logging
+logger = logging.getLogger('lumina.ap.server')
+
+def main():
+    logger.info("Lumina AP server starting")
+
+if __name__ == '__main__':
+    main()
 PYEOF
 
 ###############################################################################

@@ -1,11 +1,13 @@
 from flask import Blueprint, jsonify, request, session, current_app, send_from_directory, send_file
 import logging
+import mimetypes
 import os
 import sqlite3
 import uuid
 import json
 import re
 import traceback
+import sqlalchemy as sa
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 import time
@@ -49,6 +51,21 @@ from app.models import (
     MsgRoomMember,
     MsgMessage,
     MsgFile,
+    MsgPinnedMessage,
+    MsgMessageReaction,
+    MsgConversation,
+    MsgChannel,
+    MsgConversationMember,
+    MsgMessageV2,
+    MsgAttachment,
+    MsgMessageReadStatus,
+    MsgMention,
+    MsgNotification,
+    MsgAuditLog,
+    MsgRoomIdea,
+    MsgRoomIdeaLike,
+    MsgRoomIdeaComment,
+    MsgRoomTask,
     WrkReport,
     WrkReportApproval,
     WrkReportClassification,
@@ -166,6 +183,30 @@ from app.services.org_department_service import (
     create_org_department as svc_create_org_department,
     update_org_department as svc_update_org_department,
     soft_delete_org_departments as svc_soft_delete_org_departments,
+)
+from app.services.web_access_control_service import (
+    REQUEST_STATUS_PENDING as WEB_ACCESS_REQUEST_PENDING,
+    approve_request as svc_approve_web_access_request,
+    cancel_request as svc_cancel_web_access_request,
+    create_request as svc_create_web_access_request,
+    create_resource as svc_create_web_access_resource,
+    get_default_policy as svc_get_web_access_policy,
+    get_request as svc_get_web_access_request,
+    get_resource as svc_get_web_access_resource,
+    has_active_grant as svc_has_web_access_grant,
+    has_pending_request as svc_has_web_access_pending_request,
+    list_audit_logs as svc_list_web_access_audit_logs,
+    list_grants as svc_list_web_access_grants,
+    list_notifications as svc_list_web_access_notifications,
+    list_requests as svc_list_web_access_requests,
+    list_resources as svc_list_web_access_resources,
+    reject_request as svc_reject_web_access_request,
+    revoke_grant as svc_revoke_web_access_grant,
+    run_expiry_notifications as svc_run_web_access_notifications,
+    soft_delete_resource as svc_delete_web_access_resource,
+    touch_access as svc_touch_web_access,
+    update_default_policy as svc_update_web_access_policy,
+    update_resource as svc_update_web_access_resource,
 )
 from app.services.org_company_service import (
     list_org_companies as svc_list_org_companies,
@@ -742,6 +783,18 @@ from app.services.quality_type_service import (
 )
 
 api_bp = Blueprint('api', __name__)
+
+
+# ── 서버 시간 동기화 (클라이언트 표시 시각 보정용) ──
+@api_bp.route('/api/server-time', methods=['GET'])
+def get_server_time():
+    """클라이언트가 서버와의 시계 오프셋을 계산할 수 있도록 UTC 시각을 반환."""
+    now_utc = datetime.utcnow()
+    return jsonify({
+        'utc': now_utc.isoformat() + 'Z',
+        'epoch_ms': int(now_utc.timestamp() * 1000),
+    })
+
 
 # ── 인증: 세션 체크 ──
 @api_bp.route('/api/auth/session-check', methods=['GET'])
@@ -3270,6 +3323,7 @@ def _wrk_report_comment_table_ready() -> bool:
 
 
 @api_bp.route('/api/chat/whoami', methods=['GET'])
+@api_bp.route('/api/chat/v2/whoami', methods=['GET'])
 def chat_whoami():
     """Return current chat identity derived from session.
 
@@ -3350,6 +3404,339 @@ def _update_room_last_message(room: MsgRoom, message: MsgMessage) -> None:
     room.last_message_at = message.created_at or datetime.utcnow()
     room.updated_at = room.last_message_at
     room.updated_by_user_id = message.sender_user_id
+    try:
+        _retention_ensure_schema()
+        _retention_reset_room_auto_delete(room.id, room.room_type, room.last_message_at)
+    except Exception:
+        logger.exception('Failed to update retention schedule room_id=%s', getattr(room, 'id', None))
+
+
+_RETENTION_ROOM_TYPES = ('CHANNEL', 'GROUP', 'DIRECT')
+_RETENTION_DEFAULT_SECONDS = 24 * 60 * 60
+
+
+def _dt_iso(v: Optional[datetime]) -> Optional[str]:
+    return v.isoformat() if v else None
+
+
+def _retention_bool(v: Any, default: bool = False) -> bool:
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    return str(v).strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+
+
+def _retention_ensure_schema() -> None:
+    import sqlalchemy as sa
+    inspector = sa.inspect(db.engine)
+
+    def add_col(table: str, name: str, spec: str) -> None:
+        try:
+            cols = {c.get('name') for c in inspector.get_columns(table)}
+            if name in cols:
+                return
+            db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {spec}'))
+        except Exception:
+            db.session.rollback()
+
+    db.session.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS retention_policy (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope_type VARCHAR(16) NOT NULL DEFAULT 'ROOM_TYPE',
+            room_type VARCHAR(16),
+            room_id INTEGER,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            retention_seconds INTEGER NOT NULL DEFAULT 86400,
+            delete_attachments INTEGER NOT NULL DEFAULT 1,
+            exclude_pinned INTEGER NOT NULL DEFAULT 1,
+            exclude_notice INTEGER NOT NULL DEFAULT 1,
+            exclude_important INTEGER NOT NULL DEFAULT 1,
+            reset_on_new_activity INTEGER NOT NULL DEFAULT 1,
+            apply_existing INTEGER NOT NULL DEFAULT 1,
+            created_by INTEGER,
+            updated_by INTEGER,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+        """
+    ))
+    add_col('msg_room', 'last_activity_at', 'DATETIME')
+    add_col('msg_room', 'auto_delete_at', 'DATETIME')
+    add_col('msg_room', 'retention_enabled', 'INTEGER DEFAULT 0')
+    add_col('msg_room', 'retention_value', 'INTEGER')
+    add_col('msg_room', 'retention_unit', 'VARCHAR(16)')
+    add_col('msg_room', 'delete_attachments', 'INTEGER DEFAULT 1')
+    add_col('msg_room', 'exclude_pinned', 'INTEGER DEFAULT 1')
+    add_col('msg_room', 'exclude_notice', 'INTEGER DEFAULT 1')
+    add_col('msg_room', 'exclude_important', 'INTEGER DEFAULT 1')
+    add_col('msg_message', 'delete_reason', 'VARCHAR(64)')
+    add_col('msg_message', 'is_notice', 'INTEGER DEFAULT 0')
+    add_col('msg_message', 'is_important', 'INTEGER DEFAULT 0')
+    add_col('retention_policy', 'exclude_pinned', 'INTEGER DEFAULT 0')
+    add_col('retention_policy', 'exclude_notice', 'INTEGER DEFAULT 0')
+    add_col('retention_policy', 'exclude_important', 'INTEGER DEFAULT 0')
+    add_col('retention_policy', 'reset_on_new_activity', 'INTEGER DEFAULT 1')
+    add_col('retention_policy', 'apply_existing', 'INTEGER DEFAULT 1')
+    add_col('retention_policy', 'created_by', 'INTEGER')
+    add_col('retention_policy', 'updated_by', 'INTEGER')
+    add_col('retention_policy', 'created_at', 'DATETIME')
+    add_col('retention_policy', 'updated_at', 'DATETIME')
+    db.session.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS retention_cleanup_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            room_type VARCHAR(16),
+            deleted_messages INTEGER NOT NULL DEFAULT 0,
+            deleted_files INTEGER NOT NULL DEFAULT 0,
+            reason VARCHAR(64),
+            executed_at DATETIME NOT NULL,
+            actor_user_id INTEGER
+        )
+        """
+    ))
+    db.session.commit()
+
+
+def _retention_room_type(room_type: str) -> str:
+    rt = str(room_type or '').strip().upper()
+    if rt == 'DM':
+        rt = 'DIRECT'
+    if rt not in _RETENTION_ROOM_TYPES:
+        rt = 'GROUP'
+    return rt
+
+
+def _retention_seconds_from_payload(payload: dict) -> int:
+    if payload.get('retention_seconds') is not None:
+        try:
+            return max(60, min(365 * 24 * 3600, int(payload.get('retention_seconds') or _RETENTION_DEFAULT_SECONDS)))
+        except Exception:
+            return _RETENTION_DEFAULT_SECONDS
+    value = int(payload.get('retention_value') or 24)
+    unit = str(payload.get('retention_unit') or 'hours').lower()
+    mul = 3600
+    if unit in ('day', 'days', 'd', '일'):
+        mul = 86400
+    return max(60, min(365 * 24 * 3600, value * mul))
+
+
+def _retention_policy_dict(row: Any) -> dict:
+    m = row._mapping if hasattr(row, '_mapping') else row
+    return {
+        'id': m['id'],
+        'scope_type': m['scope_type'],
+        'room_type': m['room_type'],
+        'room_id': m['room_id'],
+        'enabled': bool(m['enabled']),
+        'retention_seconds': int(m['retention_seconds'] or _RETENTION_DEFAULT_SECONDS),
+        'delete_attachments': bool(m['delete_attachments']),
+        'exclude_pinned': False,
+        'exclude_notice': False,
+        'exclude_important': False,
+        'reset_on_new_activity': bool(m['reset_on_new_activity']),
+        'apply_existing': bool(m['apply_existing']),
+        'created_by': m['created_by'],
+        'updated_by': m['updated_by'],
+        'created_at': str(m['created_at']) if m['created_at'] else None,
+        'updated_at': str(m['updated_at']) if m['updated_at'] else None,
+    }
+
+
+def _retention_get_policy(room_type: str, room_id: Optional[int] = None) -> dict:
+    _retention_ensure_schema()
+    if room_id:
+        row = db.session.execute(text(
+            "SELECT * FROM retention_policy WHERE scope_type='ROOM' AND room_id=:room_id ORDER BY id DESC LIMIT 1"
+        ), {'room_id': int(room_id)}).fetchone()
+        if row:
+            return _retention_policy_dict(row)
+    rt = _retention_room_type(room_type)
+    row = db.session.execute(text(
+        "SELECT * FROM retention_policy WHERE scope_type='ROOM_TYPE' AND room_type=:room_type ORDER BY id DESC LIMIT 1"
+    ), {'room_type': rt}).fetchone()
+    if row:
+        return _retention_policy_dict(row)
+    return {
+        'id': None,
+        'scope_type': 'ROOM_TYPE',
+        'room_type': rt,
+        'room_id': None,
+        'enabled': False,
+        'retention_seconds': _RETENTION_DEFAULT_SECONDS,
+        'delete_attachments': True,
+        'exclude_pinned': False,
+        'exclude_notice': False,
+        'exclude_important': False,
+        'reset_on_new_activity': True,
+        'apply_existing': True,
+        'created_by': None,
+        'updated_by': None,
+        'created_at': None,
+        'updated_at': None,
+    }
+
+
+def _retention_upsert_policy(scope_type: str, room_type: str, room_id: Optional[int], payload: dict, actor_id: Optional[int]) -> dict:
+    _retention_ensure_schema()
+    rt = _retention_room_type(room_type)
+    now = datetime.utcnow()
+    retention_seconds = _retention_seconds_from_payload(payload)
+    params = {
+        'scope_type': scope_type,
+        'room_type': rt,
+        'room_id': room_id,
+        'enabled': 1 if _retention_bool(payload.get('enabled'), False) else 0,
+        'retention_seconds': retention_seconds,
+        'delete_attachments': 1 if _retention_bool(payload.get('delete_attachments'), True) else 0,
+        'exclude_pinned': 0,
+        'exclude_notice': 0,
+        'exclude_important': 0,
+        'reset_on_new_activity': 1 if _retention_bool(payload.get('reset_on_new_activity'), True) else 0,
+        'apply_existing': 1 if _retention_bool(payload.get('apply_existing'), True) else 0,
+        'actor': actor_id,
+        'now': now,
+    }
+    existing = db.session.execute(text(
+        "SELECT id FROM retention_policy WHERE scope_type=:scope_type AND room_type=:room_type AND "
+        "((:room_id IS NULL AND room_id IS NULL) OR room_id=:room_id) ORDER BY id DESC LIMIT 1"
+    ), params).fetchone()
+    if existing:
+        params['id'] = existing[0]
+        db.session.execute(text(
+            """
+            UPDATE retention_policy
+               SET enabled=:enabled, retention_seconds=:retention_seconds, delete_attachments=:delete_attachments,
+                   exclude_pinned=:exclude_pinned, exclude_notice=:exclude_notice, exclude_important=:exclude_important,
+                   reset_on_new_activity=:reset_on_new_activity, apply_existing=:apply_existing,
+                   updated_by=:actor, updated_at=:now
+             WHERE id=:id
+            """
+        ), params)
+    else:
+        db.session.execute(text(
+            """
+            INSERT INTO retention_policy
+            (scope_type, room_type, room_id, enabled, retention_seconds, delete_attachments, exclude_pinned,
+             exclude_notice, exclude_important, reset_on_new_activity, apply_existing, created_by, updated_by, created_at, updated_at)
+            VALUES
+            (:scope_type, :room_type, :room_id, :enabled, :retention_seconds, :delete_attachments, :exclude_pinned,
+             :exclude_notice, :exclude_important, :reset_on_new_activity, :apply_existing, :actor, :actor, :now, :now)
+            """
+        ), params)
+    db.session.commit()
+    if params['apply_existing']:
+        _retention_apply_policy_to_rooms(rt)
+    return _retention_get_policy(rt, room_id)
+
+
+def _retention_reset_room_auto_delete(room_id: int, room_type: str, activity_at: Optional[datetime] = None) -> None:
+    policy = _retention_get_policy(room_type, room_id)
+    now = activity_at or datetime.utcnow()
+    auto_delete_at = now + timedelta(seconds=int(policy['retention_seconds'] or _RETENTION_DEFAULT_SECONDS)) if policy.get('enabled') else None
+    db.session.execute(text(
+        """
+        UPDATE msg_room
+           SET last_activity_at=:last_activity_at,
+               auto_delete_at=:auto_delete_at,
+               retention_enabled=:enabled,
+               retention_value=:retention_value,
+               retention_unit='seconds',
+               delete_attachments=:delete_attachments,
+               exclude_pinned=:exclude_pinned,
+               exclude_notice=:exclude_notice,
+               exclude_important=:exclude_important
+         WHERE id=:room_id
+        """
+    ), {
+        'room_id': room_id,
+        'last_activity_at': now,
+        'auto_delete_at': auto_delete_at,
+        'enabled': 1 if policy.get('enabled') else 0,
+        'retention_value': int(policy.get('retention_seconds') or _RETENTION_DEFAULT_SECONDS),
+        'delete_attachments': 1 if policy.get('delete_attachments') else 0,
+        'exclude_pinned': 0,
+        'exclude_notice': 0,
+        'exclude_important': 0,
+    })
+
+
+def _retention_apply_policy_to_rooms(room_type: str) -> int:
+    _retention_ensure_schema()
+    rows = db.session.execute(text(
+        "SELECT id, room_type, COALESCE(last_message_at, updated_at, created_at) AS activity_at FROM msg_room "
+        "WHERE is_deleted=0 AND UPPER(room_type)=:room_type"
+    ), {'room_type': _retention_room_type(room_type)}).fetchall()
+    for row in rows:
+        _retention_reset_room_auto_delete(row._mapping['id'], row._mapping['room_type'], row._mapping['activity_at'])
+    db.session.commit()
+    return len(rows)
+
+
+def _retention_cleanup_due_rooms(actor_id: Optional[int] = None, limit: int = 100) -> dict:
+    _retention_ensure_schema()
+    now = datetime.utcnow()
+    rows = db.session.execute(text(
+        """
+        SELECT id, room_type, COALESCE(last_activity_at, last_message_at, updated_at, created_at) AS activity_at, auto_delete_at
+          FROM msg_room
+         WHERE is_deleted=0
+           AND retention_enabled=1
+           AND auto_delete_at IS NOT NULL
+           AND auto_delete_at <= :now
+         ORDER BY auto_delete_at ASC
+         LIMIT :limit
+        """
+    ), {'now': now, 'limit': max(1, min(int(limit or 100), 500))}).fetchall()
+    total_rooms = 0
+    total_messages = 0
+    total_files = 0
+    for row in rows:
+        m = row._mapping
+        room_id = int(m['id'])
+        room_type = m['room_type']
+        policy = _retention_get_policy(room_type, room_id)
+        if not policy.get('enabled'):
+            continue
+        activity_at = m['activity_at'] or now
+        if isinstance(activity_at, str):
+            try:
+                activity_at = datetime.fromisoformat(activity_at)
+            except Exception:
+                activity_at = now
+        due_at = activity_at + timedelta(seconds=int(policy['retention_seconds']))
+        if due_at > now:
+            # A new message may have arrived after the batch selected the room.
+            db.session.execute(text("UPDATE msg_room SET auto_delete_at=:due WHERE id=:rid"), {'due': due_at, 'rid': room_id})
+            continue
+
+        cond = ["room_id=:rid", "is_deleted=0", "is_system=0"]
+        params = {'rid': room_id, 'now': now, 'reason': 'RETENTION_IDLE'}
+        where_sql = " AND ".join(cond)
+        msg_ids = [int(r[0]) for r in db.session.execute(text(f"SELECT id FROM msg_message WHERE {where_sql}"), params).fetchall()]
+        deleted_files = 0
+        if msg_ids and policy.get('delete_attachments'):
+            id_sql = ",".join(str(x) for x in msg_ids)
+            deleted_files = db.session.execute(text(f"SELECT COUNT(*) FROM msg_file WHERE message_id IN ({id_sql})")).scalar() or 0
+            db.session.execute(text(f"DELETE FROM msg_file WHERE message_id IN ({id_sql})"))
+        if msg_ids:
+            db.session.execute(text(f"UPDATE msg_message SET is_deleted=1, deleted_at=:now, delete_reason=:reason WHERE id IN ({','.join(str(x) for x in msg_ids)})"), params)
+        db.session.execute(text("UPDATE msg_room SET auto_delete_at=NULL WHERE id=:rid"), {'rid': room_id})
+        db.session.execute(text(
+            """
+            INSERT INTO retention_cleanup_log(room_id, room_type, deleted_messages, deleted_files, reason, executed_at, actor_user_id)
+            VALUES(:rid, :rt, :dm, :df, :reason, :now, :actor)
+            """
+        ), {'rid': room_id, 'rt': room_type, 'dm': len(msg_ids), 'df': int(deleted_files or 0), 'reason': 'RETENTION_IDLE', 'now': now, 'actor': actor_id})
+        total_rooms += 1
+        total_messages += len(msg_ids)
+        total_files += int(deleted_files or 0)
+    db.session.commit()
+    return {'rooms': total_rooms, 'messages': total_messages, 'files': total_files}
 
 
 def _resolve_viewer_user_id_from_session() -> Optional[int]:
@@ -3445,6 +3832,7 @@ def mark_chat_room_read(room_id: int):
 
 @api_bp.route('/api/chat/rooms', methods=['GET'])
 def list_chat_rooms():
+    _room_lifecycle_ensure_schema()
     include_deleted = request.args.get('include_deleted') in ('1', 'true', 'True')
     include_members = request.args.get('include_members') in ('1', 'true', 'True')
     room_type = request.args.get('room_type')
@@ -3476,6 +3864,35 @@ def list_chat_rooms():
         .limit(limit)
         .all()
     )
+    if rooms:
+        state_rows = db.session.execute(text(
+            """
+            SELECT room_id, hidden, local_deleted_at, updated_at
+              FROM msg_user_room_state
+             WHERE user_id=:uid AND room_id IN :room_ids
+            """
+        ).bindparams(sa.bindparam('room_ids', expanding=True)), {
+            'uid': user_id,
+            'room_ids': [room.id for room in rooms],
+        }).fetchall()
+        state_by_room = {int(r._mapping['room_id']): r._mapping for r in state_rows}
+        visible_rooms = []
+        for room in rooms:
+            s = state_by_room.get(room.id)
+            if s and s.get('local_deleted_at'):
+                continue
+            if s and int(s.get('hidden') or 0):
+                last_message_at = room.last_message_at
+                hidden_at = s.get('updated_at')
+                if isinstance(hidden_at, str):
+                    try:
+                        hidden_at = datetime.fromisoformat(hidden_at)
+                    except Exception:
+                        hidden_at = None
+                if not last_message_at or (hidden_at and last_message_at <= hidden_at):
+                    continue
+            visible_rooms.append(room)
+        rooms = visible_rooms
 
     # Build a lookup of the viewer's unread count per room.
     viewer_members = (
@@ -3507,8 +3924,13 @@ def list_chat_directory():
 
     query = (
         UserProfile.query
-        .filter(UserProfile.department.isnot(None))
-        .filter(func.length(func.trim(UserProfile.department)) > 0)
+        .filter(
+            or_(
+                UserProfile.name.isnot(None),
+                UserProfile.nickname.isnot(None),
+                UserProfile.emp_no.isnot(None),
+            )
+        )
     )
     if department:
         query = query.filter(UserProfile.department == department)
@@ -3518,6 +3940,7 @@ def list_chat_directory():
             or_(
                 UserProfile.name.ilike(like_pattern),
                 UserProfile.nickname.ilike(like_pattern),
+                UserProfile.emp_no.ilike(like_pattern),
                 UserProfile.department.ilike(like_pattern),
                 UserProfile.email.ilike(like_pattern),
             )
@@ -3554,13 +3977,162 @@ def _build_direct_key(member_ids):
     return '-'.join(str(uid) for uid in unique_ids)
 
 
+def _room_lifecycle_ensure_schema() -> None:
+    """Add lightweight lifecycle columns/tables used by leave/hide policies.
+
+    Each DDL step is committed independently so a single failure (e.g. a
+    legacy column that already exists, or a DB that disallows ALTER on the
+    fly) never leaves the session in an unusable state for the actual
+    leave/hide operations that follow.
+    """
+    import sqlalchemy as sa
+
+    def add_col(table: str, name: str, spec: str) -> None:
+        try:
+            inspector = sa.inspect(db.engine)
+            cols = {c.get('name') for c in inspector.get_columns(table)}
+            if name in cols:
+                return
+        except Exception:
+            return
+        try:
+            db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {spec}'))
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+    def ensure_table_exists() -> None:
+        try:
+            db.session.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS msg_user_room_state (
+                    user_id INTEGER NOT NULL,
+                    room_id INTEGER NOT NULL,
+                    hidden INTEGER NOT NULL DEFAULT 0,
+                    muted INTEGER NOT NULL DEFAULT 0,
+                    favorite INTEGER NOT NULL DEFAULT 0,
+                    last_read_at DATETIME,
+                    unread_count INTEGER NOT NULL DEFAULT 0,
+                    local_deleted_at DATETIME,
+                    cache_deleted_at DATETIME,
+                    hidden_at DATETIME,
+                    updated_at DATETIME,
+                    PRIMARY KEY (user_id, room_id)
+                )
+                """
+            ))
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+    add_col('msg_room', 'status', "VARCHAR(16) DEFAULT 'ACTIVE'")
+    add_col('msg_room', 'closed_at', 'DATETIME')
+    add_col('msg_room_member', 'participant_status', "VARCHAR(32) DEFAULT 'ACTIVE'")
+    add_col('msg_room_member', 'rejoin_allowed', 'INTEGER DEFAULT 1')
+    ensure_table_exists()
+    add_col('msg_user_room_state', 'hidden', 'INTEGER NOT NULL DEFAULT 0')
+    add_col('msg_user_room_state', 'muted', 'INTEGER NOT NULL DEFAULT 0')
+    add_col('msg_user_room_state', 'favorite', 'INTEGER NOT NULL DEFAULT 0')
+    add_col('msg_user_room_state', 'last_read_at', 'DATETIME')
+    add_col('msg_user_room_state', 'unread_count', 'INTEGER NOT NULL DEFAULT 0')
+    add_col('msg_user_room_state', 'local_deleted_at', 'DATETIME')
+    add_col('msg_user_room_state', 'cache_deleted_at', 'DATETIME')
+    add_col('msg_user_room_state', 'hidden_at', 'DATETIME')
+    add_col('msg_user_room_state', 'updated_at', 'DATETIME')
+
+
+def _room_lifecycle_log(actor_user_id: Optional[int], action: str, room: MsgRoom, before_json=None, after_json=None) -> None:
+    db.session.add(MsgAuditLog(
+        actor_user_id=actor_user_id,
+        action=action,
+        target_type='ROOM',
+        target_id=room.id,
+        before_json=json.dumps(before_json, ensure_ascii=False) if before_json is not None else None,
+        after_json=json.dumps(after_json, ensure_ascii=False) if after_json is not None else None,
+        ip_address=request.headers.get('X-Forwarded-For', request.remote_addr or ''),
+        user_agent=request.headers.get('User-Agent', ''),
+    ))
+
+
+def _upsert_user_room_state(
+    user_id: int,
+    room_id: int,
+    *,
+    hidden: bool = True,
+    clear_local: bool = False,
+    now: Optional[datetime] = None,
+) -> None:
+    now = now or datetime.utcnow()
+    params = {
+        'uid': user_id,
+        'rid': room_id,
+        'hidden': 1 if hidden else 0,
+        'now': now,
+        'local_deleted_at': now if clear_local else None,
+        'cache_deleted_at': now if clear_local else None,
+        'hidden_at': now if hidden else None,
+    }
+    existing = db.session.execute(text(
+        "SELECT 1 FROM msg_user_room_state WHERE user_id=:uid AND room_id=:rid"
+    ), params).fetchone()
+    if existing:
+        db.session.execute(text(
+            """
+            UPDATE msg_user_room_state
+               SET hidden=:hidden,
+                   favorite=0,
+                   unread_count=0,
+                   last_read_at=:now,
+                   local_deleted_at=CASE WHEN :local_deleted_at IS NULL THEN local_deleted_at ELSE :local_deleted_at END,
+                   cache_deleted_at=CASE WHEN :cache_deleted_at IS NULL THEN cache_deleted_at ELSE :cache_deleted_at END,
+                   hidden_at=CASE WHEN :hidden_at IS NULL THEN hidden_at ELSE :hidden_at END,
+                   updated_at=:now
+             WHERE user_id=:uid AND room_id=:rid
+            """
+        ), params)
+    else:
+        db.session.execute(text(
+            """
+            INSERT INTO msg_user_room_state
+            (user_id, room_id, hidden, muted, favorite, last_read_at, unread_count, local_deleted_at, cache_deleted_at, hidden_at, updated_at)
+            VALUES
+            (:uid, :rid, :hidden, 0, 0, :now, 0, :local_deleted_at, :cache_deleted_at, :hidden_at, :now)
+            """
+        ), params)
+
+
+def _direct_room_permanently_exited(room: MsgRoom) -> bool:
+    _room_lifecycle_ensure_schema()
+    row = db.session.execute(text(
+        """
+        SELECT 1
+          FROM msg_room_member
+         WHERE room_id=:rid
+           AND COALESCE(participant_status, 'ACTIVE')='EXITED_PERMANENT'
+         LIMIT 1
+        """
+    ), {'rid': room.id}).fetchone()
+    return row is not None
+
+
 @api_bp.route('/api/chat/rooms', methods=['POST'])
 def create_chat_room():
+    _room_lifecycle_ensure_schema()
     payload = request.get_json() or {}
+    print(f'[chat-rooms-post] sess.emp_no={session.get("emp_no")!r} payload={payload!r}', flush=True)
     room_type = (payload.get('room_type') or '').strip().upper()
-    if room_type not in {'DIRECT', 'GROUP'}:
-        return jsonify({'error': 'room_type must be DIRECT or GROUP'}), 400
+    if room_type not in {'DIRECT', 'GROUP', 'CHANNEL'}:
+        return jsonify({'error': 'room_type must be DIRECT, GROUP or CHANNEL'}), 400
     created_by = payload.get('created_by_user_id')
+    if not created_by:
+        # 세션 기반 폴백 (CHANNEL 생성 등 클라이언트가 모를 수 있음)
+        created_by = _resolve_viewer_user_id_from_session()
     if not created_by:
         return jsonify({'error': 'created_by_user_id is required'}), 400
 
@@ -3568,9 +4140,50 @@ def create_chat_room():
     if room_type == 'DIRECT':
         if len(member_ids) < 2:
             return jsonify({'error': 'DIRECT room requires at least two member_ids'}), 400
-        direct_key = payload.get('direct_key') or _build_direct_key(member_ids)
+        base_direct_key = payload.get('direct_key') or _build_direct_key(member_ids)
+        wanted_member_ids = sorted({int(uid) for uid in member_ids if uid})
+        active_directs = (
+            MsgRoom.query.options(joinedload(MsgRoom.members))
+            .filter(MsgRoom.room_type == 'DIRECT')
+            .filter(MsgRoom.is_deleted.is_(False))
+            .filter(MsgRoom.direct_key.like(f'{base_direct_key}%'))
+            .all()
+        )
+        for candidate in active_directs:
+            candidate_member_ids = sorted({int(m.user_id) for m in candidate.members or []})
+            if candidate_member_ids != wanted_member_ids:
+                continue
+            if _direct_room_permanently_exited(candidate):
+                continue
+            if all(m.left_at is None for m in candidate.members or []):
+                return jsonify(candidate.to_dict(include_members=True)), 200
+        direct_key = base_direct_key
+        existing_direct = MsgRoom.query.filter(MsgRoom.direct_key == base_direct_key).first()
+        if existing_direct and _direct_room_permanently_exited(existing_direct):
+            direct_key = f'{base_direct_key}:{uuid.uuid4().hex[:12]}'
     else:
         direct_key = payload.get('direct_key')
+
+    # CHANNEL: 채널명 중복 방지 (소프트 삭제되지 않은 동일 이름)
+    if room_type == 'CHANNEL':
+        room_name_norm = (payload.get('room_name') or '').strip()
+        if not room_name_norm:
+            return jsonify({'error': '채널명을 입력하세요.'}), 400
+        existing_channel = (
+            MsgRoom.query
+            .filter(MsgRoom.room_type == 'CHANNEL')
+            .filter(MsgRoom.is_deleted.is_(False))
+            .filter(MsgRoom.room_name == room_name_norm)
+            .first()
+        )
+        if existing_channel:
+            return jsonify({
+                'error': 'duplicate_name',
+                'message': f"이미 같은 이름의 채널이 있습니다: '{room_name_norm}'",
+            }), 409
+        # 채널 생성자는 항상 멤버에 포함
+        if int(created_by) not in [int(uid) for uid in member_ids if uid]:
+            member_ids = [int(created_by)] + list(member_ids)
 
     room = MsgRoom(
         room_type=room_type,
@@ -3590,6 +4203,11 @@ def create_chat_room():
         if room_type == 'DIRECT' and direct_key:
             existing = MsgRoom.query.filter(MsgRoom.direct_key == direct_key).first()
             if existing:
+                if _direct_room_permanently_exited(existing):
+                    return jsonify({
+                        'error': 'direct_room_exited_permanently',
+                        'message': '종료된 개인채팅은 복구할 수 없습니다. 새 대화를 시작하세요.',
+                    }), 409
                 revived = False
                 if existing.is_deleted:
                     existing.is_deleted = False
@@ -3611,8 +4229,12 @@ def create_chat_room():
                     if user_id in existing_member_ids:
                         existing_member = MsgRoomMember.query.filter_by(room_id=existing.id, user_id=user_id).first()
                         if existing_member and existing_member.left_at is not None:
+                            # 재가입 시 joined_at 을 보존해야 과거 메시지 이력이 그대로 보인다.
+                            # (listMessages 가 created_at >= joined_at 으로 필터링하므로 리셋하면 이력이 사라진다)
                             existing_member.left_at = None
-                            existing_member.joined_at = datetime.utcnow()
+                            db.session.execute(text(
+                                "UPDATE msg_room_member SET participant_status='ACTIVE', rejoin_allowed=1 WHERE id=:mid"
+                            ), {'mid': existing_member.id})
                             existing_member.last_read_message_id = None
                             existing_member.last_read_at = None
                             existing_member.unread_count_cached = 0
@@ -3640,7 +4262,7 @@ def create_chat_room():
         member = MsgRoomMember(
             room_id=room.id,
             user_id=user_id,
-            member_role=payload.get('member_role', 'MEMBER'),
+            member_role='OWNER' if room_type == 'CHANNEL' and int(user_id) == int(created_by) else payload.get('member_role', 'MEMBER'),
         )
         db.session.add(member)
         assigned_member_ids.append(user_id)
@@ -3696,25 +4318,109 @@ def update_chat_room(room_id: int):
 def delete_chat_room(room_id: int):
     # Hard delete: if a user deletes a conversation, it must not reappear from
     # any tab (including DIRECT revive by direct_key). We therefore physically
-    # remove messages, members, and the room row.
+    # remove messages, members, the room row, *and* all secondary tables that
+    # reference the room — even when the SQLite connection has FK enforcement
+    # disabled (which leaves orphan rows behind by default).
+    #
+    # v0.5.9: 채널 삭제 시 아이디어·업무·반응·고정메시지·첨부파일 메타까지 일괄 정리.
     room = MsgRoom.query.filter(MsgRoom.id == room_id).first_or_404(description='Chat room not found')
 
     actor_id = request.args.get('updated_by_user_id', type=int)
     if not actor_id:
         return jsonify({'error': 'updated_by_user_id is required'}), 400
+    # 권한 정책: 방 생성자이거나, 현재 활성 멤버이면 삭제 허용.
+    # (생성자가 떠난 후에도 남은 멤버가 정리할 수 있도록 함)
     if actor_id != room.created_by_user_id:
-        return jsonify({'error': 'only the room creator can delete this chat room'}), 403
+        is_active_member = MsgRoomMember.query.filter(
+            MsgRoomMember.room_id == room_id,
+            MsgRoomMember.user_id == actor_id,
+            MsgRoomMember.left_at.is_(None),
+        ).first() is not None
+        if not is_active_member:
+            return jsonify({'error': 'only room creator or an active member can delete this chat room'}), 403
 
     room.updated_by_user_id = actor_id
     room.updated_at = datetime.utcnow()
     db.session.flush()
 
-    # Delete children first to avoid FK issues on SQLite.
+    # 1) 메시지 ID 목록부터 확보 (자식 행들이 message_id 로 묶여 있음)
+    msg_id_rows = db.session.execute(
+        text('SELECT id FROM msg_message WHERE room_id = :rid'),
+        {'rid': room_id},
+    ).fetchall()
+    msg_ids = [r[0] for r in msg_id_rows]
+
+    # 2) member.last_read_message_id 끊기 (FK가 켜져 있는 환경에서 message 삭제가 막히지 않도록)
+    try:
+        with db.session.begin_nested():
+            db.session.execute(
+                text(
+                    'UPDATE msg_room_member SET last_read_message_id = NULL '
+                    'WHERE room_id = :rid'
+                ),
+                {'rid': room_id},
+            )
+    except Exception:
+        current_app.logger.exception('clear last_read_message_id skipped (room=%s)', room_id)
+
+    # 3) 메시지 자식 테이블 정리 (FK ON 환경 대비)
+    if msg_ids:
+        try:
+            with db.session.begin_nested():
+                MsgFile.query.filter(MsgFile.message_id.in_(msg_ids)).delete(synchronize_session=False)
+        except Exception:
+            current_app.logger.exception('msg_file cleanup skipped (room=%s)', room_id)
+        try:
+            with db.session.begin_nested():
+                MsgMessageReaction.query.filter(MsgMessageReaction.message_id.in_(msg_ids)).delete(synchronize_session=False)
+        except Exception:
+            current_app.logger.exception('msg_message_reaction cleanup skipped (room=%s)', room_id)
+
+    # 4) 방 부속 테이블 — FK 미선언 또는 ON DELETE SET NULL 대상도 명시적으로 제거
+    try:
+        with db.session.begin_nested():
+            MsgPinnedMessage.query.filter(MsgPinnedMessage.room_id == room_id).delete(synchronize_session=False)
+    except Exception:
+        current_app.logger.exception('msg_pinned_message cleanup skipped (room=%s)', room_id)
+
+    try:
+        with db.session.begin_nested():
+            idea_id_rows = db.session.execute(
+                text('SELECT id FROM msg_room_idea WHERE room_id = :rid'),
+                {'rid': room_id},
+            ).fetchall()
+            idea_ids = [r[0] for r in idea_id_rows]
+            if idea_ids:
+                MsgRoomIdeaComment.query.filter(MsgRoomIdeaComment.idea_id.in_(idea_ids)).delete(synchronize_session=False)
+                MsgRoomIdeaLike.query.filter(MsgRoomIdeaLike.idea_id.in_(idea_ids)).delete(synchronize_session=False)
+                MsgRoomIdea.query.filter(MsgRoomIdea.id.in_(idea_ids)).delete(synchronize_session=False)
+    except Exception:
+        current_app.logger.exception('msg_room_idea* cleanup skipped (room=%s)', room_id)
+
+    try:
+        with db.session.begin_nested():
+            MsgRoomTask.query.filter(MsgRoomTask.room_id == room_id).delete(synchronize_session=False)
+    except Exception:
+        current_app.logger.exception('msg_room_task cleanup skipped (room=%s)', room_id)
+
+    # 5) user_room_state — 채널이 사라졌는데도 남으면 고스트 항목 발생
+    try:
+        with db.session.begin_nested():
+            db.session.execute(
+                text('DELETE FROM user_room_state WHERE room_id = :rid'),
+                {'rid': room_id},
+            )
+    except Exception:
+        # 테이블이 없거나 스키마가 다르면 그냥 무시
+        pass
+
+    # 6) 메시지 → 멤버 → 방 순서로 본체 행 삭제
     MsgMessage.query.filter(MsgMessage.room_id == room_id).delete(synchronize_session=False)
     MsgRoomMember.query.filter(MsgRoomMember.room_id == room_id).delete(synchronize_session=False)
     db.session.delete(room)
     db.session.commit()
-    return jsonify({'status': 'deleted', 'id': room_id})
+    current_app.logger.info('chat room %s deleted by user %s (msgs=%d)', room_id, actor_id, len(msg_ids))
+    return jsonify({'status': 'deleted', 'id': room_id, 'deleted_message_count': len(msg_ids)})
 
 
 @api_bp.route('/api/chat/rooms/<int:room_id>/members', methods=['GET'])
@@ -3745,6 +4451,7 @@ def _create_system_message(room: MsgRoom, sender_user_id: int, text: str) -> Msg
 
 @api_bp.route('/api/chat/rooms/<int:room_id>/members', methods=['POST'])
 def add_chat_room_member(room_id: int):
+    _room_lifecycle_ensure_schema()
     room = _get_room_or_404(room_id)
     payload = request.get_json() or {}
     user_id = payload.get('user_id')
@@ -3759,6 +4466,9 @@ def add_chat_room_member(room_id: int):
             return jsonify({'error': 'member already exists for room'}), 400
         existing.left_at = None
         existing.joined_at = datetime.utcnow()
+        db.session.execute(text(
+            "UPDATE msg_room_member SET participant_status='ACTIVE', rejoin_allowed=1 WHERE id=:mid"
+        ), {'mid': existing.id})
         existing.last_read_message_id = None
         existing.last_read_at = None
         existing.unread_count_cached = 0
@@ -3847,39 +4557,272 @@ def remove_chat_room_member(room_id: int, member_id: int):
     return jsonify({'status': 'left', 'id': member_id, 'left_at': member.left_at.isoformat()})
 
 
-@api_bp.route('/api/chat/rooms/<int:room_id>/leave', methods=['DELETE'])
+@api_bp.route('/api/chat/rooms/<int:room_id>/leave', methods=['DELETE', 'POST'])
+@api_bp.route('/api/rooms/<int:room_id>/leave', methods=['POST', 'DELETE'])
 def leave_chat_room(room_id: int):
     """Leave a room as the current user.
 
-    This endpoint avoids relying on a client-provided MsgRoomMember.id, which can
-    be stale or wrong when the frontend has an incorrect user id cached.
+    Participant state change only — never goes through the message validation
+    path. System notice (if any) is best-effort and never blocks the leave.
     """
-    room = _get_room_or_404(room_id)
+    try:
+        _room_lifecycle_ensure_schema()
+    except Exception:
+        db.session.rollback()
+    room = MsgRoom.query.filter(MsgRoom.id == room_id).first()
+    if not room:
+        return jsonify({'success': False, 'error': 'room_not_found', 'message': '대화방을 찾을 수 없습니다.'}), 404
 
     actor_id_from_session = _resolve_viewer_user_id_from_session()
     actor_id_from_query = request.args.get('actor_user_id', type=int)
     actor_id = actor_id_from_session or actor_id_from_query
     if not actor_id:
-        return jsonify({'error': 'actor_user_id is required'}), 400
-
-    if actor_id == room.created_by_user_id:
-        return jsonify({'error': 'room creator cannot leave'}), 403
+        return jsonify({'success': False, 'error': 'unauthorized', 'message': '로그인 정보가 없습니다.'}), 401
 
     member = MsgRoomMember.query.filter_by(room_id=room_id, user_id=actor_id).first()
     if not member:
-        return jsonify({'status': 'not_a_member'}), 200
+        return jsonify({
+            'success': True,
+            'roomId': room_id,
+            'roomType': (room.room_type or 'GROUP').upper(),
+            'action': 'NOT_A_MEMBER',
+            'removedFromList': True,
+        })
     if member.left_at is not None:
-        return jsonify({'status': 'already_left', 'left_at': member.left_at.isoformat()}), 200
+        return jsonify({
+            'success': True,
+            'roomId': room_id,
+            'roomType': (room.room_type or 'GROUP').upper(),
+            'action': 'ALREADY_LEFT',
+            'left_at': member.left_at.isoformat(),
+            'removedFromList': True,
+        })
 
-    member.left_at = datetime.utcnow()
-    member.unread_count_cached = 0
-    member.last_read_message_id = None
-    member.last_read_at = None
+    now = datetime.utcnow()
+    room_type = (room.room_type or 'GROUP').upper()
+    member_role = (member.member_role or '').upper()
+    before = {
+        'room_type': room_type,
+        'room_status': getattr(room, 'status', None) or 'ACTIVE',
+        'member_role': member_role,
+    }
 
-    leaver_name = _system_user_display_name(member.user)
-    _create_system_message(room, actor_id, f'{leaver_name}님이 나갔습니다.')
-    db.session.commit()
-    return jsonify({'status': 'left', 'id': member.id, 'left_at': member.left_at.isoformat()})
+    if room_type == 'CHANNEL':
+        is_channel_manager = actor_id == room.created_by_user_id or member_role in ('OWNER', 'ADMIN', 'MANAGER')
+        if is_channel_manager:
+            active_managers = (
+                MsgRoomMember.query
+                .filter(MsgRoomMember.room_id == room_id)
+                .filter(MsgRoomMember.left_at.is_(None))
+                .all()
+            )
+            manager_count = sum(
+                1 for m in active_managers
+                if m.user_id == room.created_by_user_id or (m.member_role or '').upper() in ('OWNER', 'ADMIN', 'MANAGER')
+            )
+            if manager_count <= 1:
+                return jsonify({
+                    'success': False,
+                    'error': 'last_channel_manager_cannot_leave',
+                    'message': '마지막 관리자라 채널을 나갈 수 없습니다. 소유권을 이전한 뒤 다시 시도하세요.',
+                }), 403
+
+    participant_status = 'LEFT'
+    rejoin_allowed = 1
+    action = 'LEFT'
+    if room_type == 'DIRECT':
+        participant_status = 'EXITED_PERMANENT'
+        rejoin_allowed = 0
+        action = 'EXITED_PERMANENT'
+    elif room_type == 'CHANNEL':
+        participant_status = 'UNSUBSCRIBED'
+        action = 'UNSUBSCRIBED'
+
+    try:
+        member.left_at = now
+        member.unread_count_cached = 0
+        member.last_read_message_id = None
+        member.last_read_at = None
+        member.is_favorite = False
+        member.is_muted = False
+        try:
+            db.session.flush()
+        except Exception:
+            db.session.rollback()
+            raise
+
+        # Each best-effort step runs in a SAVEPOINT so a failure (e.g. legacy
+        # schema missing a column) does not poison the outer transaction and
+        # the leave action still commits successfully.
+        try:
+            with db.session.begin_nested():
+                db.session.execute(text(
+                    """
+                    UPDATE msg_room_member
+                       SET participant_status=:status,
+                           rejoin_allowed=:rejoin_allowed
+                     WHERE id=:member_id
+                    """
+                ), {'status': participant_status, 'rejoin_allowed': rejoin_allowed, 'member_id': member.id})
+        except Exception:
+            current_app.logger.exception('participant_status update skipped (legacy schema)')
+        try:
+            with db.session.begin_nested():
+                _upsert_user_room_state(actor_id, room_id, hidden=True, clear_local=True, now=now)
+        except Exception:
+            current_app.logger.exception('user_room_state upsert skipped')
+
+        if room_type == 'DIRECT':
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(text(
+                        """
+                        UPDATE msg_room
+                           SET status='CLOSED',
+                               closed_at=COALESCE(closed_at, :now),
+                               updated_at=:now,
+                               updated_by_user_id=:actor
+                         WHERE id=:rid
+                        """
+                    ), {'now': now, 'actor': actor_id, 'rid': room_id})
+            except Exception:
+                current_app.logger.exception('msg_room CLOSED update skipped')
+        elif room_type == 'GROUP':
+            try:
+                active_count = (
+                    MsgRoomMember.query
+                    .filter(MsgRoomMember.room_id == room_id)
+                    .filter(MsgRoomMember.left_at.is_(None))
+                    .count()
+                )
+            except Exception:
+                current_app.logger.exception('active member count failed; defaulting to 99')
+                active_count = 99
+            if active_count <= 1:
+                try:
+                    with db.session.begin_nested():
+                        db.session.execute(text(
+                            """
+                            UPDATE msg_room
+                               SET status='ARCHIVED',
+                                   closed_at=COALESCE(closed_at, :now),
+                                   updated_at=:now,
+                                   updated_by_user_id=:actor
+                             WHERE id=:rid
+                            """
+                        ), {'now': now, 'actor': actor_id, 'rid': room_id})
+                except Exception:
+                    current_app.logger.exception('msg_room ARCHIVED update skipped')
+
+        try:
+            with db.session.begin_nested():
+                _room_lifecycle_log(actor_id, 'ROOM_LEAVE', room, before, {
+                    'participant_status': participant_status,
+                    'left_at': now.isoformat(),
+                })
+        except Exception:
+            current_app.logger.exception('room leave audit log skipped')
+
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception('leave_chat_room failed room_id=%s actor=%s', room_id, actor_id)
+        # Last-resort minimal commit: just mark the member as left so the room
+        # disappears from the user's list even if every other side-effect failed.
+        try:
+            db.session.execute(text(
+                "UPDATE msg_room_member SET left_at=:now WHERE id=:mid AND left_at IS NULL"
+            ), {'now': now, 'mid': member.id})
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'roomId': room_id,
+                'roomType': room_type,
+                'action': action,
+                'removedFromList': True,
+                'left_at': now.isoformat(),
+                'degraded': True,
+                'detail': str(exc),
+            })
+        except Exception:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': 'leave_failed',
+                'message': '대화 나가기 처리 중 오류가 발생했습니다.',
+                'detail': str(exc),
+            }), 500
+
+    # Best-effort system notice — never blocks the leave response.
+    try:
+        leaver_name = _system_user_display_name(member.user)
+        text_body = (
+            f'{leaver_name}님이 대화를 종료했습니다.' if room_type == 'DIRECT'
+            else f'{leaver_name}님이 나갔습니다.'
+        )
+        notice = MsgMessage(
+            room_id=room.id,
+            sender_user_id=actor_id,
+            content_type='SYSTEM',
+            content_text=text_body,
+            is_system=True,
+        )
+        db.session.add(notice)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('leave system notice skipped room_id=%s', room_id)
+
+    return jsonify({
+        'success': True,
+        'roomId': room_id,
+        'roomType': room_type,
+        'action': action,
+        'removedFromList': True,
+        'left_at': now.isoformat(),
+    })
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/hide', methods=['POST'])
+@api_bp.route('/api/rooms/<int:room_id>/hide', methods=['POST'])
+def hide_chat_room(room_id: int):
+    try:
+        _room_lifecycle_ensure_schema()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+    room = MsgRoom.query.filter(MsgRoom.id == room_id).first()
+    if not room:
+        return jsonify({'success': False, 'error': 'room_not_found', 'message': '대화방을 찾을 수 없습니다.'}), 404
+    actor_id = _resolve_viewer_user_id_from_session() or request.args.get('actor_user_id', type=int)
+    if not actor_id:
+        return jsonify({'success': False, 'error': 'unauthorized', 'message': '로그인 정보가 없습니다.'}), 401
+    member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == actor_id)
+        .first()
+    )
+    if not member:
+        return jsonify({'success': True, 'roomId': room_id, 'action': 'NOT_A_MEMBER', 'hidden': True})
+    now = datetime.utcnow()
+    try:
+        with db.session.begin_nested():
+            _upsert_user_room_state(actor_id, room_id, hidden=True, clear_local=False, now=now)
+    except Exception:
+        current_app.logger.exception('hide upsert skipped')
+    try:
+        with db.session.begin_nested():
+            _room_lifecycle_log(actor_id, 'ROOM_HIDE', room, None, {'hidden': True, 'hidden_at': now.isoformat()})
+    except Exception:
+        current_app.logger.exception('hide audit log skipped')
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({'success': True, 'roomId': room_id, 'action': 'HIDDEN', 'hidden_at': now.isoformat()})
 
 
 @api_bp.route('/api/chat/rooms/<int:room_id>/messages', methods=['GET'])
@@ -3952,6 +4895,54 @@ def list_chat_messages(room_id: int):
             for item in items:
                 item['files'] = grouped.get(item.get('id'), [])
 
+    # ---- Pin (고정) 표시 ----
+    if items:
+        msg_ids_for_pin = [item['id'] for item in items if item.get('id')]
+        pinned_ids = set()
+        if msg_ids_for_pin:
+            try:
+                pinned_rows = (
+                    MsgPinnedMessage.query
+                    .filter(MsgPinnedMessage.room_id == room_id)
+                    .filter(MsgPinnedMessage.message_id.in_(msg_ids_for_pin))
+                    .all()
+                )
+                pinned_ids = {row.message_id for row in pinned_rows}
+            except Exception:
+                pinned_ids = set()
+        for item in items:
+            item['is_pinned'] = item.get('id') in pinned_ids
+
+    # ---- 이모지 반응 집계 ----
+    if items:
+        msg_ids_for_reaction = [item['id'] for item in items if item.get('id')]
+        reactions_by_msg: dict = {}
+        if msg_ids_for_reaction:
+            try:
+                rows = (
+                    MsgMessageReaction.query
+                    .filter(MsgMessageReaction.message_id.in_(msg_ids_for_reaction))
+                    .order_by(MsgMessageReaction.id.asc())
+                    .all()
+                )
+                for r in rows:
+                    bucket = reactions_by_msg.setdefault(r.message_id, {})
+                    entry = bucket.setdefault(r.emoji, {
+                        'emoji': r.emoji,
+                        'count': 0,
+                        'user_ids': [],
+                        'mine': False,
+                    })
+                    entry['count'] += 1
+                    entry['user_ids'].append(r.user_id)
+                    if r.user_id == viewer_user_id:
+                        entry['mine'] = True
+            except Exception:
+                reactions_by_msg = {}
+        for item in items:
+            agg = reactions_by_msg.get(item.get('id'), {})
+            item['reactions'] = list(agg.values())
+
     # ---- Compute per-message unread count (how many other members haven't read each message) ----
     # Fetch all active members of this room (excluding the viewer).
     other_members = (
@@ -3983,8 +4974,121 @@ def list_chat_messages(room_id: int):
     })
 
 
+def _build_message_snippet(text: str, keyword: str, radius: int = 40) -> str:
+    """검색 결과 미리보기 스니펫 생성. 키워드 주변 텍스트만 반환."""
+    if not text:
+        return ''
+    if not keyword:
+        return text[:120]
+    lower = text.lower()
+    idx = lower.find(keyword.lower())
+    if idx < 0:
+        return text[:120]
+    start = max(0, idx - radius)
+    end = min(len(text), idx + len(keyword) + radius)
+    snippet = text[start:end]
+    if start > 0:
+        snippet = '…' + snippet
+    if end < len(text):
+        snippet = snippet + '…'
+    return snippet
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/search', methods=['GET'])
+def search_chat_room_messages(room_id: int):
+    """현재 채팅방 내 메시지 검색. 멤버만 접근 가능, joined_at 이후 메시지만 노출."""
+    _get_room_or_404(room_id)
+    keyword = (request.args.get('q') or '').strip()
+    if len(keyword) < 1:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+    limit = min(max(request.args.get('limit', default=50, type=int), 1), 200)
+
+    viewer_user_id = request.args.get('viewer_user_id', type=int)
+    if not viewer_user_id:
+        viewer_user_id = _resolve_viewer_user_id_from_session()
+    if not viewer_user_id:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+
+    viewer_member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == viewer_user_id)
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not viewer_member:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+
+    like = f'%{keyword}%'
+    query = (
+        MsgMessage.query
+        .filter(MsgMessage.room_id == room_id)
+        .filter(MsgMessage.is_deleted.is_(False))
+        .filter(MsgMessage.text.ilike(like))
+    )
+    if viewer_member.joined_at:
+        query = query.filter(MsgMessage.created_at >= viewer_member.joined_at)
+    rows = query.order_by(MsgMessage.id.desc()).limit(limit).all()
+
+    items = []
+    for msg in rows:
+        d = msg.to_dict()
+        d['snippet'] = _build_message_snippet(d.get('text') or '', keyword)
+        items.append(d)
+    return jsonify({'items': items, 'total': len(items), 'q': keyword})
+
+
+@api_bp.route('/api/chat/search', methods=['GET'])
+def search_chat_messages_global():
+    """전체 채팅방(내가 멤버인 곳) 메시지 검색."""
+    keyword = (request.args.get('q') or '').strip()
+    if len(keyword) < 2:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+    limit = min(max(request.args.get('limit', default=50, type=int), 1), 200)
+
+    viewer_user_id = request.args.get('viewer_user_id', type=int)
+    if not viewer_user_id:
+        viewer_user_id = _resolve_viewer_user_id_from_session()
+    if not viewer_user_id:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+
+    member_rows = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.user_id == viewer_user_id)
+        .filter(MsgRoomMember.left_at.is_(None))
+        .all()
+    )
+    if not member_rows:
+        return jsonify({'items': [], 'total': 0, 'q': keyword})
+    joined_by_room = {m.room_id: m.joined_at for m in member_rows}
+    room_ids = list(joined_by_room.keys())
+
+    like = f'%{keyword}%'
+    rows = (
+        MsgMessage.query
+        .filter(MsgMessage.room_id.in_(room_ids))
+        .filter(MsgMessage.is_deleted.is_(False))
+        .filter(MsgMessage.text.ilike(like))
+        .order_by(MsgMessage.id.desc())
+        .limit(limit * 2)  # 일부는 joined_at 필터에서 빠질 수 있어 여유분
+        .all()
+    )
+    items = []
+    for msg in rows:
+        joined_at = joined_by_room.get(msg.room_id)
+        if joined_at and msg.created_at and msg.created_at < joined_at:
+            continue
+        d = msg.to_dict()
+        d['snippet'] = _build_message_snippet(d.get('text') or '', keyword)
+        items.append(d)
+        if len(items) >= limit:
+            break
+    return jsonify({'items': items, 'total': len(items), 'q': keyword})
+
+
 @api_bp.route('/api/chat/rooms/<int:room_id>/messages', methods=['POST'])
 def create_chat_message(room_id: int):
+    _room_lifecycle_ensure_schema()
     room = _get_room_or_404(room_id)
     payload = request.get_json() or {}
     sender_id = payload.get('sender_user_id')
@@ -4001,6 +5105,11 @@ def create_chat_message(room_id: int):
         .first()
     )
     if not active_member:
+        return jsonify({'error': 'not_a_room_member'}), 403
+    status_row = db.session.execute(text(
+        "SELECT COALESCE(participant_status, 'ACTIVE') AS status FROM msg_room_member WHERE id=:mid"
+    ), {'mid': active_member.id}).fetchone()
+    if status_row and status_row._mapping['status'] != 'ACTIVE':
         return jsonify({'error': 'not_a_room_member'}), 403
     content_type = (payload.get('content_type') or 'TEXT').upper()
     if content_type == 'TEXT' and not (payload.get('content_text') or '').strip() and not payload.get('is_system'):
@@ -4031,6 +5140,44 @@ def create_chat_message(room_id: int):
             om.unread_count_cached = (om.unread_count_cached or 0) + 1
 
     db.session.commit()
+    # v0.4.40: 본문에서 @이름 멘션 추출 → 같은 방의 활성 멤버 매칭 시 MsgMention/MsgNotification 작성
+    try:
+        content = (message.content_text or '')
+        if content and '@' in content:
+            members_for_mention = (
+                MsgRoomMember.query
+                .filter(MsgRoomMember.room_id == room_id)
+                .filter(MsgRoomMember.left_at.is_(None))
+                .filter(MsgRoomMember.user_id != int(sender_id))
+                .all()
+            )
+            mentioned_ids = set()
+            for mm in members_for_mention:
+                up = UserProfile.query.get(mm.user_id)
+                if not up or not up.name:
+                    continue
+                token = '@' + up.name
+                if token in content:
+                    mentioned_ids.add(mm.user_id)
+            if mentioned_ids:
+                for uid in mentioned_ids:
+                    db.session.add(MsgMention(
+                        message_id=message.id,
+                        mentioned_user_id=uid,
+                        mentioned_scope='user',
+                        raw_token=f'@{uid}',
+                    ))
+                    db.session.add(MsgNotification(
+                        user_id=uid,
+                        notification_type='mention',
+                        reference_type='message',
+                        reference_id=message.id,
+                        title='멘션 알림',
+                        body=content[:255],
+                    ))
+                db.session.commit()
+    except Exception:
+        db.session.rollback()
     return jsonify(message.to_dict()), 201
 
 
@@ -4121,9 +5268,1336 @@ def create_message_file(message_id: int):
 @api_bp.route('/api/chat/files/<int:file_id>', methods=['DELETE'])
 def delete_message_file(file_id: int):
     record = MsgFile.query.get_or_404(file_id, description='File not found')
+    message = record.message or MsgMessage.query.get(record.message_id)
+    if not message:
+        return jsonify({'error': 'message not found'}), 404
+    viewer_user_id, err = _require_room_member(message.room_id)
+    if err:
+        return err
     db.session.delete(record)
+    db.session.flush()
+    remaining = MsgFile.query.filter_by(message_id=message.id).count()
+    if remaining <= 0 and (message.content_type or '').upper() == 'FILE':
+        text = (message.content_text or '').strip()
+        if not text or text.startswith('첨부 파일:'):
+            message.is_deleted = True
     db.session.commit()
     return jsonify({'status': 'deleted', 'id': file_id})
+
+
+# ===== Pinned messages (메시지 고정) =====
+@api_bp.route('/api/chat/rooms/<int:room_id>/pins', methods=['GET'])
+def list_pinned_messages(room_id: int):
+    """채팅방의 고정된 메시지 목록 (최근 고정 순)."""
+    _get_room_or_404(room_id)
+    viewer_user_id = request.args.get('viewer_user_id', type=int) or _resolve_viewer_user_id_from_session()
+    if not viewer_user_id:
+        return jsonify({'items': [], 'total': 0})
+    viewer_member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == viewer_user_id)
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not viewer_member:
+        return jsonify({'items': [], 'total': 0})
+    pins = (
+        MsgPinnedMessage.query
+        .filter(MsgPinnedMessage.room_id == room_id)
+        .order_by(MsgPinnedMessage.pinned_at.desc(), MsgPinnedMessage.id.desc())
+        .all()
+    )
+    items = []
+    for pin in pins:
+        msg = MsgMessage.query.get(pin.message_id)
+        if not msg or msg.is_deleted:
+            continue
+        item = pin.to_dict()
+        item['message'] = msg.to_dict()
+        items.append(item)
+    return jsonify({'items': items, 'total': len(items)})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/messages/<int:message_id>/pin', methods=['POST'])
+def pin_chat_message(room_id: int, message_id: int):
+    """메시지 고정. 멱등(이미 고정된 경우 200)."""
+    _get_room_or_404(room_id)
+    message = MsgMessage.query.get_or_404(message_id, description='Message not found')
+    if message.room_id != room_id:
+        return jsonify({'error': 'message does not belong to this room'}), 400
+    if message.is_deleted:
+        return jsonify({'error': 'cannot pin a deleted message'}), 400
+    actor_user_id = _resolve_viewer_user_id_from_session()
+    payload = request.get_json(silent=True) or {}
+    if not actor_user_id:
+        actor_user_id = payload.get('actor_user_id')
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    viewer_member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == int(actor_user_id))
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not viewer_member:
+        return jsonify({'error': 'forbidden'}), 403
+    note = (payload.get('note') or '').strip() or None
+    if note and len(note) > 255:
+        note = note[:255]
+    existing = (
+        MsgPinnedMessage.query
+        .filter(MsgPinnedMessage.room_id == room_id)
+        .filter(MsgPinnedMessage.message_id == message_id)
+        .first()
+    )
+    if existing:
+        if note is not None and note != existing.note:
+            existing.note = note
+            db.session.commit()
+        return jsonify({'success': True, 'item': existing.to_dict(), 'created': False})
+    pin = MsgPinnedMessage(
+        room_id=room_id,
+        message_id=message_id,
+        pinned_by_user_id=int(actor_user_id),
+        note=note,
+    )
+    db.session.add(pin)
+    db.session.commit()
+    return jsonify({'success': True, 'item': pin.to_dict(), 'created': True}), 201
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/messages/<int:message_id>/pin', methods=['DELETE'])
+def unpin_chat_message(room_id: int, message_id: int):
+    """메시지 고정 해제. 멱등(이미 해제된 경우 200)."""
+    _get_room_or_404(room_id)
+    actor_user_id = _resolve_viewer_user_id_from_session()
+    if not actor_user_id:
+        actor_user_id = (request.get_json(silent=True) or {}).get('actor_user_id')
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    viewer_member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == int(actor_user_id))
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not viewer_member:
+        return jsonify({'error': 'forbidden'}), 403
+    existing = (
+        MsgPinnedMessage.query
+        .filter(MsgPinnedMessage.room_id == room_id)
+        .filter(MsgPinnedMessage.message_id == message_id)
+        .first()
+    )
+    if not existing:
+        return jsonify({'success': True, 'message_id': message_id, 'removed': False})
+    db.session.delete(existing)
+    db.session.commit()
+    return jsonify({'success': True, 'message_id': message_id, 'removed': True})
+
+
+# ===== v0.4.41: 채팅방 파일/아이디어/업무리스트 =====
+def _require_room_member(room_id: int):
+    """현재 세션 사용자가 방의 활성 멤버인지 확인. (viewer_id, error_response)."""
+    viewer_user_id = _resolve_viewer_user_id_from_session()
+    if not viewer_user_id:
+        return None, (jsonify({'error': 'unauthorized'}), 401)
+    member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == room_id)
+        .filter(MsgRoomMember.user_id == viewer_user_id)
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not member:
+        return None, (jsonify({'error': 'forbidden'}), 403)
+    return viewer_user_id, None
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/files', methods=['GET'])
+def list_room_files(room_id: int):
+    """채팅방 전체 첨부 파일 목록 (메시지 첨부 집계, 최근순)."""
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    rows = (
+        db.session.query(MsgFile, MsgMessage)
+        .join(MsgMessage, MsgFile.message_id == MsgMessage.id)
+        .filter(MsgMessage.room_id == room_id)
+        .filter(MsgMessage.is_deleted.is_(False))
+        .order_by(MsgFile.uploaded_at.desc(), MsgFile.id.desc())
+        .limit(500)
+        .all()
+    )
+    items = []
+    for f, msg in rows:
+        item = f.to_dict()
+        if f.uploader:
+            item['uploader'] = {
+                'id': f.uploader.id,
+                'name': f.uploader.name,
+                'profile_image': f.uploader.profile_image,
+            }
+        item['message_id'] = msg.id
+        item['message_created_at'] = msg.created_at.isoformat() if msg.created_at else None
+        items.append(item)
+    return jsonify({'items': items, 'total': len(items)})
+
+
+@api_bp.route('/api/admin/retention-policies', methods=['GET'])
+def get_admin_retention_policies():
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 조회할 수 있습니다.'}), 403
+    _retention_ensure_schema()
+    items = [_retention_get_policy(rt) for rt in _RETENTION_ROOM_TYPES]
+    return jsonify({'success': True, 'items': items})
+
+
+@api_bp.route('/api/admin/retention-policies/<room_type>', methods=['PUT'])
+def put_admin_retention_policy(room_type: str):
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 수정할 수 있습니다.'}), 403
+    actor_id = _resolve_viewer_user_id_from_session()
+    payload = request.get_json(silent=True) or {}
+    item = _retention_upsert_policy('ROOM_TYPE', room_type, None, payload, actor_id)
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/rooms/<int:room_id>/retention-policy', methods=['GET'])
+def get_room_retention_policy(room_id: int):
+    room = _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    return jsonify({'success': True, 'item': _retention_get_policy(room.room_type, room_id)})
+
+
+@api_bp.route('/api/rooms/<int:room_id>/retention-policy', methods=['PUT'])
+def put_room_retention_policy(room_id: int):
+    room = _get_room_or_404(room_id)
+    actor_id = _resolve_viewer_user_id_from_session()
+    member = MsgRoomMember.query.filter_by(room_id=room_id, user_id=actor_id).filter(MsgRoomMember.left_at.is_(None)).first() if actor_id else None
+    is_room_manager = member and str(member.member_role or '').upper() in ('OWNER', 'ADMIN', 'MANAGER')
+    if not (_is_admin_session() or is_room_manager):
+        return jsonify({'success': False, 'message': '방 관리자만 수정할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    item = _retention_upsert_policy('ROOM', room.room_type, room_id, payload, actor_id)
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/admin/retention-policies/apply-existing', methods=['POST'])
+def apply_existing_retention_policies():
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 실행할 수 있습니다.'}), 403
+    _retention_ensure_schema()
+    counts = {rt: _retention_apply_policy_to_rooms(rt) for rt in _RETENTION_ROOM_TYPES}
+    return jsonify({'success': True, 'counts': counts})
+
+
+@api_bp.route('/api/system/retention-cleanup', methods=['POST'])
+def run_retention_cleanup():
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 실행할 수 있습니다.'}), 403
+    actor_id = _resolve_viewer_user_id_from_session()
+    limit = request.get_json(silent=True) or {}
+    result = _retention_cleanup_due_rooms(actor_id=actor_id, limit=int(limit.get('limit') or 100))
+    return jsonify({'success': True, 'result': result})
+
+
+# ----- Ideas -----
+def _ensure_room_idea_interaction_tables():
+    try:
+        bind = db.engine
+        MsgRoomIdeaLike.__table__.create(bind=bind, checkfirst=True)
+        MsgRoomIdeaComment.__table__.create(bind=bind, checkfirst=True)
+    except Exception:
+        current_app.logger.exception('failed to ensure room idea interaction tables')
+
+
+def _decorate_room_ideas(items, viewer_user_id: int):
+    _ensure_room_idea_interaction_tables()
+    idea_ids = [it.id for it in items]
+    likes_by_idea = {idea_id: [] for idea_id in idea_ids}
+    comments_by_idea = {idea_id: [] for idea_id in idea_ids}
+    if idea_ids:
+        likes = (
+            MsgRoomIdeaLike.query
+            .filter(MsgRoomIdeaLike.idea_id.in_(idea_ids))
+            .order_by(MsgRoomIdeaLike.created_at.asc(), MsgRoomIdeaLike.id.asc())
+            .all()
+        )
+        for like in likes:
+            likes_by_idea.setdefault(like.idea_id, []).append(like.to_dict())
+        comments = (
+            MsgRoomIdeaComment.query
+            .filter(MsgRoomIdeaComment.idea_id.in_(idea_ids))
+            .filter(MsgRoomIdeaComment.is_deleted.is_(False))
+            .order_by(MsgRoomIdeaComment.created_at.asc(), MsgRoomIdeaComment.id.asc())
+            .all()
+        )
+        for comment in comments:
+            comments_by_idea.setdefault(comment.idea_id, []).append(comment.to_dict())
+    return likes_by_idea, comments_by_idea
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas', methods=['GET'])
+def list_room_ideas(room_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    rows = (
+        MsgRoomIdea.query
+        .filter(MsgRoomIdea.room_id == room_id)
+        .filter(MsgRoomIdea.is_deleted.is_(False))
+        .order_by(MsgRoomIdea.created_at.desc(), MsgRoomIdea.id.desc())
+        .all()
+    )
+    likes_by_idea, comments_by_idea = _decorate_room_ideas(rows, viewer_user_id)
+    items = []
+    for it in rows:
+        d = it.to_dict()
+        up = UserProfile.query.get(it.created_by_user_id) if it.created_by_user_id else None
+        if up:
+            d['created_by'] = {'id': up.id, 'name': up.name, 'profile_image': up.profile_image}
+        likes = likes_by_idea.get(it.id, [])
+        comments = comments_by_idea.get(it.id, [])
+        d['likes'] = {
+            'count': len(likes),
+            'liked_by_me': any(like.get('user_id') == viewer_user_id for like in likes),
+            'users': [like.get('user') for like in likes if like.get('user')],
+        }
+        d['comments'] = comments
+        items.append(d)
+    return jsonify({'items': items, 'total': len(items)})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas', methods=['POST'])
+def create_room_idea(room_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'title is required'}), 400
+    if len(title) > 200:
+        title = title[:200]
+    body = (payload.get('body') or '').strip() or None
+    item = MsgRoomIdea(room_id=room_id, title=title, body=body, created_by_user_id=viewer_user_id)
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()}), 201
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas/<int:idea_id>', methods=['PUT'])
+def update_room_idea(room_id: int, idea_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    item = MsgRoomIdea.query.get_or_404(idea_id, description='Idea not found')
+    if item.room_id != room_id or item.is_deleted:
+        return jsonify({'error': 'not_found'}), 404
+    payload = request.get_json(silent=True) or {}
+    if 'title' in payload:
+        title = (payload.get('title') or '').strip()
+        if not title:
+            return jsonify({'error': 'title is required'}), 400
+        item.title = title[:200]
+    if 'body' in payload:
+        body = (payload.get('body') or '').strip()
+        item.body = body or None
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas/<int:idea_id>', methods=['DELETE'])
+def delete_room_idea(room_id: int, idea_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    item = MsgRoomIdea.query.get_or_404(idea_id, description='Idea not found')
+    if item.room_id != room_id:
+        return jsonify({'error': 'not_found'}), 404
+    item.is_deleted = True
+    db.session.commit()
+    return jsonify({'success': True, 'id': idea_id})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas/<int:idea_id>/like', methods=['POST'])
+def toggle_room_idea_like(room_id: int, idea_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    _ensure_room_idea_interaction_tables()
+    item = MsgRoomIdea.query.get_or_404(idea_id, description='Idea not found')
+    if item.room_id != room_id or item.is_deleted:
+        return jsonify({'error': 'not_found'}), 404
+    existing = MsgRoomIdeaLike.query.filter_by(idea_id=idea_id, user_id=viewer_user_id).first()
+    liked = False
+    if existing:
+        db.session.delete(existing)
+    else:
+        db.session.add(MsgRoomIdeaLike(idea_id=idea_id, user_id=viewer_user_id))
+        liked = True
+    db.session.commit()
+    likes = (
+        MsgRoomIdeaLike.query
+        .filter(MsgRoomIdeaLike.idea_id == idea_id)
+        .order_by(MsgRoomIdeaLike.created_at.asc(), MsgRoomIdeaLike.id.asc())
+        .all()
+    )
+    return jsonify({
+        'success': True,
+        'liked': liked,
+        'count': len(likes),
+        'users': [like.to_dict().get('user') for like in likes if like.to_dict().get('user')],
+    })
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/ideas/<int:idea_id>/comments', methods=['POST'])
+def create_room_idea_comment(room_id: int, idea_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    _ensure_room_idea_interaction_tables()
+    item = MsgRoomIdea.query.get_or_404(idea_id, description='Idea not found')
+    if item.room_id != room_id or item.is_deleted:
+        return jsonify({'error': 'not_found'}), 404
+    payload = request.get_json(silent=True) or {}
+    body = (payload.get('body') or payload.get('text') or '').strip()
+    if not body:
+        return jsonify({'error': 'body is required'}), 400
+    if len(body) > 1000:
+        body = body[:1000]
+    comment = MsgRoomIdeaComment(idea_id=idea_id, user_id=viewer_user_id, body=body)
+    db.session.add(comment)
+    db.session.commit()
+    return jsonify({'success': True, 'item': comment.to_dict()}), 201
+
+
+# ----- Tasks -----
+def _parse_due_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(str(s)[:10], '%Y-%m-%d').date()
+    except Exception:
+        return None
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/tasks', methods=['GET'])
+def list_room_tasks(room_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    rows = (
+        MsgRoomTask.query
+        .filter(MsgRoomTask.room_id == room_id)
+        .filter(MsgRoomTask.is_deleted.is_(False))
+        .order_by(MsgRoomTask.status.asc(), MsgRoomTask.created_at.desc(), MsgRoomTask.id.desc())
+        .all()
+    )
+    items = []
+    user_cache = {}
+    for it in rows:
+        d = it.to_dict()
+        for uid_key, out_key in (('assignee_user_id', 'assignee'), ('created_by_user_id', 'created_by')):
+            uid = getattr(it, uid_key)
+            if uid:
+                if uid not in user_cache:
+                    user_cache[uid] = UserProfile.query.get(uid)
+                up = user_cache[uid]
+                if up:
+                    d[out_key] = {'id': up.id, 'name': up.name, 'profile_image': up.profile_image}
+        items.append(d)
+    return jsonify({'items': items, 'total': len(items)})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/tasks', methods=['POST'])
+def create_room_task(room_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'title is required'}), 400
+    item = MsgRoomTask(
+        room_id=room_id,
+        title=title[:200],
+        description=(payload.get('description') or '').strip() or None,
+        status=(payload.get('status') or 'todo'),
+        priority=(payload.get('priority') or 'normal'),
+        assignee_user_id=payload.get('assignee_user_id') or None,
+        due_date=_parse_due_date(payload.get('due_date')),
+        created_by_user_id=viewer_user_id,
+    )
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()}), 201
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/tasks/<int:task_id>', methods=['PUT'])
+def update_room_task(room_id: int, task_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    item = MsgRoomTask.query.get_or_404(task_id, description='Task not found')
+    if item.room_id != room_id or item.is_deleted:
+        return jsonify({'error': 'not_found'}), 404
+    payload = request.get_json(silent=True) or {}
+    if 'title' in payload:
+        title = (payload.get('title') or '').strip()
+        if not title:
+            return jsonify({'error': 'title is required'}), 400
+        item.title = title[:200]
+    if 'description' in payload:
+        d = (payload.get('description') or '').strip()
+        item.description = d or None
+    if 'status' in payload:
+        st = (payload.get('status') or 'todo')
+        if st not in ('todo', 'in_progress', 'done'):
+            st = 'todo'
+        if st == 'done' and item.status != 'done':
+            item.completed_at = datetime.utcnow()
+        elif st != 'done':
+            item.completed_at = None
+        item.status = st
+    if 'priority' in payload:
+        pr = (payload.get('priority') or 'normal')
+        item.priority = pr if pr in ('low', 'normal', 'high') else 'normal'
+    if 'assignee_user_id' in payload:
+        item.assignee_user_id = payload.get('assignee_user_id') or None
+    if 'due_date' in payload:
+        item.due_date = _parse_due_date(payload.get('due_date'))
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+
+@api_bp.route('/api/chat/rooms/<int:room_id>/tasks/<int:task_id>', methods=['DELETE'])
+def delete_room_task(room_id: int, task_id: int):
+    _get_room_or_404(room_id)
+    viewer_user_id, err = _require_room_member(room_id)
+    if err:
+        return err
+    item = MsgRoomTask.query.get_or_404(task_id, description='Task not found')
+    if item.room_id != room_id:
+        return jsonify({'error': 'not_found'}), 404
+    item.is_deleted = True
+    db.session.commit()
+    return jsonify({'success': True, 'id': task_id})
+
+
+# ===== Message reactions (이모지 반응) =====
+def _aggregate_reactions(message_id: int, viewer_user_id: int = None) -> list:
+    rows = (
+        MsgMessageReaction.query
+        .filter(MsgMessageReaction.message_id == message_id)
+        .order_by(MsgMessageReaction.id.asc())
+        .all()
+    )
+    bucket: dict = {}
+    for r in rows:
+        entry = bucket.setdefault(r.emoji, {
+            'emoji': r.emoji,
+            'count': 0,
+            'user_ids': [],
+            'mine': False,
+        })
+        entry['count'] += 1
+        entry['user_ids'].append(r.user_id)
+        if viewer_user_id and r.user_id == viewer_user_id:
+            entry['mine'] = True
+    return list(bucket.values())
+
+
+@api_bp.route('/api/chat/messages/<int:message_id>/reactions', methods=['GET'])
+def list_message_reactions(message_id: int):
+    """메시지 반응 목록 (집계). 비회원도 조회 가능."""
+    MsgMessage.query.get_or_404(message_id, description='Message not found')
+    viewer_user_id = request.args.get('viewer_user_id', type=int) or _resolve_viewer_user_id_from_session()
+    return jsonify({'message_id': message_id, 'reactions': _aggregate_reactions(message_id, viewer_user_id)})
+
+
+@api_bp.route('/api/chat/messages/<int:message_id>/reactions', methods=['POST'])
+def toggle_message_reaction(message_id: int):
+    """이모지 반응 토글. body: {emoji}.
+    - 같은 (메시지, 사용자, 이모지)가 이미 있으면 삭제 (off).
+    - 없으면 추가 (on).
+    응답: 집계된 reactions + acted (added|removed)."""
+    message = MsgMessage.query.get_or_404(message_id, description='Message not found')
+    payload = request.get_json(silent=True) or {}
+    emoji = (payload.get('emoji') or '').strip()
+    if not emoji:
+        return jsonify({'error': 'emoji is required'}), 400
+    if len(emoji) > 32:
+        return jsonify({'error': 'emoji too long'}), 400
+    actor_user_id = _resolve_viewer_user_id_from_session() or payload.get('actor_user_id')
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    actor_user_id = int(actor_user_id)
+    # 권한: 해당 방의 활성 멤버여야 함
+    viewer_member = (
+        MsgRoomMember.query
+        .filter(MsgRoomMember.room_id == message.room_id)
+        .filter(MsgRoomMember.user_id == actor_user_id)
+        .filter(MsgRoomMember.left_at.is_(None))
+        .first()
+    )
+    if not viewer_member:
+        return jsonify({'error': 'forbidden'}), 403
+    existing = (
+        MsgMessageReaction.query
+        .filter(MsgMessageReaction.message_id == message_id)
+        .filter(MsgMessageReaction.user_id == actor_user_id)
+        .filter(MsgMessageReaction.emoji == emoji)
+        .first()
+    )
+    if existing:
+        db.session.delete(existing)
+        acted = 'removed'
+    else:
+        db.session.add(MsgMessageReaction(
+            message_id=message_id,
+            user_id=actor_user_id,
+            emoji=emoji,
+        ))
+        acted = 'added'
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message_id': message_id,
+        'emoji': emoji,
+        'acted': acted,
+        'reactions': _aggregate_reactions(message_id, actor_user_id),
+    })
+
+
+def _chat_v2_slugify(name: str) -> str:
+    slug = re.sub(r'[^a-z0-9]+', '-', (name or '').strip().lower())
+    slug = slug.strip('-')
+    return slug[:140] or f'channel-{uuid.uuid4().hex[:8]}'
+
+
+def _chat_v2_actor_user_id() -> Optional[int]:
+    return _resolve_viewer_user_id_from_session()
+
+
+def _chat_v2_conversation_or_404(conversation_id: int) -> MsgConversation:
+    return (
+        MsgConversation.query
+        .filter(MsgConversation.id == conversation_id)
+        .filter(MsgConversation.is_deleted.is_(False))
+        .first_or_404(description='Conversation not found')
+    )
+
+
+def _chat_v2_channel_or_404(channel_id: int) -> MsgChannel:
+    return MsgChannel.query.filter(MsgChannel.id == channel_id).first_or_404(description='Channel not found')
+
+
+def _chat_v2_active_member(conversation_id: int, user_id: int) -> Optional[MsgConversationMember]:
+    return (
+        MsgConversationMember.query
+        .filter(MsgConversationMember.conversation_id == conversation_id)
+        .filter(MsgConversationMember.user_id == user_id)
+        .filter(MsgConversationMember.left_at.is_(None))
+        .first()
+    )
+
+
+def _chat_v2_has_access(conversation: MsgConversation, user_id: Optional[int]) -> bool:
+    if not user_id:
+        return False
+    if conversation.conversation_type == 'CHANNEL' and conversation.visibility == 'public':
+        return True
+    return _chat_v2_active_member(conversation.id, user_id) is not None
+
+
+def _chat_v2_touch_conversation(conversation: MsgConversation, message: Optional[MsgMessageV2]) -> None:
+    conversation.last_message_id = message.id if message else None
+    conversation.last_message_preview = (message.content or '')[:200] if message else None
+    conversation.last_message_at = message.created_at if message else None
+    conversation.updated_at = datetime.utcnow()
+
+
+def _chat_v2_log(action: str, target_type: str, target_id: Optional[int], before_json=None, after_json=None) -> None:
+    actor_user_id = _chat_v2_actor_user_id()
+    log = MsgAuditLog(
+        actor_user_id=actor_user_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        before_json=json.dumps(before_json, ensure_ascii=False) if before_json is not None else None,
+        after_json=json.dumps(after_json, ensure_ascii=False) if after_json is not None else None,
+        ip_address=request.headers.get('X-Forwarded-For', request.remote_addr or ''),
+        user_agent=request.headers.get('User-Agent', ''),
+    )
+    db.session.add(log)
+
+
+def _chat_v2_emit_mentions(message: MsgMessageV2, mentioned_user_ids: Sequence[int]) -> None:
+    for raw_user_id in mentioned_user_ids or []:
+        try:
+            mentioned_user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            continue
+        db.session.add(MsgMention(
+            message_id=message.id,
+            mentioned_user_id=mentioned_user_id,
+            mentioned_scope='user',
+            raw_token=f'@{mentioned_user_id}',
+        ))
+        db.session.add(MsgNotification(
+            user_id=mentioned_user_id,
+            notification_type='mention',
+            reference_type='message',
+            reference_id=message.id,
+            title='멘션 알림',
+            body=(message.content or '')[:255],
+        ))
+
+
+def _chat_v2_increment_unread(conversation_id: int, sender_id: int) -> None:
+    members = (
+        MsgConversationMember.query
+        .filter(MsgConversationMember.conversation_id == conversation_id)
+        .filter(MsgConversationMember.user_id != sender_id)
+        .filter(MsgConversationMember.left_at.is_(None))
+        .all()
+    )
+    for member in members:
+        member.unread_count_cached = (member.unread_count_cached or 0) + 1
+
+
+@api_bp.route('/api/chat/v2/channels', methods=['POST'])
+def create_chat_v2_channel():
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    payload = request.get_json(silent=True) or {}
+    name = (payload.get('name') or '').strip()
+    channel_type = (payload.get('type') or 'public').strip().lower()
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    if channel_type not in ('public', 'private'):
+        return jsonify({'error': 'type must be public or private'}), 400
+    slug = _chat_v2_slugify(payload.get('slug') or name)
+    # 사전 중복 검사 (UNIQUE 제약 충돌 방지)
+    existing_name = MsgChannel.query.filter(MsgChannel.name == name).first()
+    if existing_name:
+        return jsonify({
+            'error': 'duplicate_name',
+            'message': f"이미 같은 이름의 채널이 있습니다: '{name}'"
+        }), 409
+    if slug:
+        existing_slug = MsgChannel.query.filter(MsgChannel.slug == slug).first()
+        if existing_slug:
+            # slug에 짧은 suffix 추가하여 회피
+            import secrets
+            slug = f"{slug}-{secrets.token_hex(2)}"
+    try:
+        conversation = MsgConversation(
+            conversation_type='CHANNEL',
+            visibility=channel_type,
+            title=name,
+            description=payload.get('description'),
+            owner_user_id=actor_user_id,
+            created_by=actor_user_id,
+            updated_by=actor_user_id,
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(conversation)
+        db.session.flush()
+        channel = MsgChannel(
+            conversation_id=conversation.id,
+            name=name,
+            slug=slug,
+            channel_type=channel_type,
+            description=payload.get('description'),
+            topic=payload.get('topic'),
+            created_by=actor_user_id,
+        )
+        db.session.add(channel)
+        member_ids = {actor_user_id}
+        for raw_user_id in payload.get('memberIds') or []:
+            try:
+                member_ids.add(int(raw_user_id))
+            except (TypeError, ValueError):
+                continue
+        for member_user_id in member_ids:
+            db.session.add(MsgConversationMember(
+                conversation_id=conversation.id,
+                user_id=member_user_id,
+                role='admin' if member_user_id == actor_user_id else 'member',
+            ))
+        _chat_v2_log('channel.create', 'channel', conversation.id, after_json={'name': name, 'type': channel_type})
+        db.session.commit()
+    except IntegrityError as exc:
+        db.session.rollback()
+        msg = str(getattr(exc, 'orig', exc))
+        if 'UNIQUE' in msg.upper() and ('name' in msg or 'slug' in msg):
+            return jsonify({
+                'error': 'duplicate_name',
+                'message': f"이미 같은 이름의 채널이 있습니다: '{name}'"
+            }), 409
+        return jsonify({'error': 'integrity_error', 'message': msg}), 409
+    except Exception as exc:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'server_error', 'message': str(exc)}), 500
+    conversation = MsgConversation.query.get(conversation.id)
+    return jsonify({'success': True, 'item': conversation.to_dict(include_members=True)}), 201
+
+
+@api_bp.route('/api/chat/v2/channels', methods=['GET'])
+def list_chat_v2_channels():
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'rows': [], 'total': 0})
+    keyword = (request.args.get('q') or '').strip()
+    channel_type = (request.args.get('type') or '').strip().lower()
+    query = MsgChannel.query.join(MsgConversation, MsgConversation.id == MsgChannel.conversation_id)
+    query = query.filter(MsgConversation.is_deleted.is_(False))
+    query = query.filter(
+        or_(
+            MsgConversation.visibility == 'public',
+            MsgChannel.conversation_id.in_(
+                db.session.query(MsgConversationMember.conversation_id)
+                .filter(MsgConversationMember.user_id == actor_user_id)
+                .filter(MsgConversationMember.left_at.is_(None))
+            )
+        )
+    )
+    if keyword:
+        like = f'%{keyword}%'
+        query = query.filter(or_(MsgChannel.name.ilike(like), MsgChannel.description.ilike(like)))
+    if channel_type in ('public', 'private'):
+        query = query.filter(MsgChannel.channel_type == channel_type)
+    # SQLite < 3.30 lacks NULLS LAST; emulate with (last_message_at IS NULL, last_message_at DESC)
+    rows = query.order_by(
+        MsgConversation.last_message_at.is_(None),
+        MsgConversation.last_message_at.desc(),
+        MsgChannel.id.desc(),
+    ).all()
+    return jsonify({'rows': [row.to_dict() for row in rows], 'total': len(rows)})
+
+
+@api_bp.route('/api/chat/v2/channels/<int:channel_id>', methods=['GET'])
+def get_chat_v2_channel(channel_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    channel = _chat_v2_channel_or_404(channel_id)
+    conversation = _chat_v2_conversation_or_404(channel.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    return jsonify({'item': conversation.to_dict(include_members=True)})
+
+
+@api_bp.route('/api/chat/v2/channels/<int:channel_id>', methods=['PATCH'])
+def patch_chat_v2_channel(channel_id: int):
+    """채널 이름·설명 수정."""
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    channel = _chat_v2_channel_or_404(channel_id)
+    conversation = _chat_v2_conversation_or_404(channel.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    if 'name' in payload:
+        new_name = (payload['name'] or '').strip()
+        if not new_name:
+            return jsonify({'error': '채널명을 입력하세요.'}), 400
+        channel.name = new_name
+        conversation.name = new_name
+    if 'description' in payload:
+        channel.description = (payload['description'] or '').strip()
+    db.session.commit()
+    return jsonify({'item': _chat_v2_serialize_conversation(conversation, actor_user_id)})
+
+
+@api_bp.route('/api/chat/v2/conversations/<int:conversation_id>', methods=['PATCH'])
+def patch_chat_v2_conversation(conversation_id: int):
+    """그룹 채팅 이름 수정."""
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    conversation = _chat_v2_conversation_or_404(conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    if 'name' in payload:
+        new_name = (payload['name'] or '').strip()
+        if not new_name:
+            return jsonify({'error': '이름을 입력하세요.'}), 400
+        conversation.name = new_name
+        db.session.commit()
+    return jsonify({'item': _chat_v2_serialize_conversation(conversation, actor_user_id)})
+
+
+
+def invite_chat_v2_channel_members(channel_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    channel = _chat_v2_channel_or_404(channel_id)
+    conversation = _chat_v2_conversation_or_404(channel.conversation_id)
+    actor_member = _chat_v2_active_member(conversation.id, actor_user_id)
+    if not actor_member or actor_member.role not in ('admin', 'owner'):
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    invited = []
+    for raw_user_id in payload.get('userIds') or []:
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            continue
+        member = MsgConversationMember.query.filter_by(conversation_id=conversation.id, user_id=user_id).first()
+        if member:
+            if member.left_at is not None:
+                member.left_at = None
+                member.joined_at = datetime.utcnow()
+                member.role = payload.get('role') or member.role or 'member'
+            invited.append(user_id)
+            continue
+        db.session.add(MsgConversationMember(
+            conversation_id=conversation.id,
+            user_id=user_id,
+            role=(payload.get('role') or 'member'),
+        ))
+        invited.append(user_id)
+    _chat_v2_log('channel.invite', 'channel', conversation.id, after_json={'userIds': invited})
+    db.session.commit()
+    return jsonify({'success': True, 'invitedUserIds': invited})
+
+
+@api_bp.route('/api/chat/v2/channels/<int:channel_id>/leave', methods=['POST'])
+def leave_chat_v2_channel(channel_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    channel = _chat_v2_channel_or_404(channel_id)
+    conversation = _chat_v2_conversation_or_404(channel.conversation_id)
+    member = _chat_v2_active_member(conversation.id, actor_user_id)
+    if not member:
+        return jsonify({'status': 'not_a_member'}), 200
+    member.left_at = datetime.utcnow()
+    member.unread_count_cached = 0
+    _chat_v2_log('channel.leave', 'channel', conversation.id, before_json={'userId': actor_user_id})
+    db.session.commit()
+    return jsonify({'success': True, 'leftAt': member.left_at.isoformat()})
+
+
+def _chat_v2_user_summary(user_id: int) -> dict:
+    """org_user 행을 v2 응답용 사용자 요약 dict로 변환."""
+    user = UserProfile.query.get(user_id) if user_id else None
+    if not user:
+        return {'id': user_id, 'name': None, 'department': None, 'avatar': None, 'email': None}
+    return {
+        'id': user.id,
+        'name': user.nickname or user.name,
+        'department': user.department,
+        'avatar': user.profile_image,
+        'email': user.email,
+    }
+
+
+def _chat_v2_dm_key(user_a: int, user_b: int) -> str:
+    a, b = sorted([int(user_a), int(user_b)])
+    return f'dm:{a}:{b}'
+
+
+def _chat_v2_serialize_conversation(conversation: MsgConversation, actor_user_id: int) -> dict:
+    """채널/DM 공통 응답 형식. 프론트의 normalizeRoomFromApi와 호환."""
+    payload = conversation.to_dict(include_members=True)
+    if conversation.conversation_type == 'DIRECT':
+        partner_id = None
+        is_self_dm = False
+        for member in conversation.members:
+            if member.left_at:
+                continue
+            if member.user_id and member.user_id != actor_user_id:
+                partner_id = member.user_id
+                break
+        if partner_id is None:
+            # self-DM: 상대방 없음 → 자기 자신을 partner로
+            partner_id = actor_user_id
+            is_self_dm = True
+        partner = _chat_v2_user_summary(partner_id) if partner_id else None
+        payload['partner'] = partner
+        payload['is_self_dm'] = is_self_dm
+        if partner and not payload.get('title'):
+            payload['title'] = partner.get('name')
+    return payload
+
+
+@api_bp.route('/api/chat/v2/conversations', methods=['GET'])
+def list_chat_v2_conversations():
+    """현재 사용자가 접근 가능한 모든 v2 대화(공개 채널 + 본인 DM/그룹/채널) 목록."""
+    actor_user_id = _chat_v2_actor_user_id()
+    sess_emp = session.get('emp_no')
+    print(f'[chat-v2-list] sess.emp_no={sess_emp!r} actor_user_id={actor_user_id}', flush=True)
+    if not actor_user_id:
+        return jsonify({'rows': [], 'total': 0, 'debug': {'reason': 'no_actor', 'sess_emp_no': sess_emp}})
+    member_conv_subq = (
+        db.session.query(MsgConversationMember.conversation_id)
+        .filter(MsgConversationMember.user_id == actor_user_id)
+        .filter(MsgConversationMember.left_at.is_(None))
+    )
+    query = MsgConversation.query.filter(MsgConversation.is_deleted.is_(False))
+    query = query.filter(
+        or_(
+            and_(MsgConversation.conversation_type == 'CHANNEL', MsgConversation.visibility == 'public'),
+            MsgConversation.id.in_(member_conv_subq),
+        )
+    )
+    rows = query.order_by(
+        MsgConversation.last_message_at.is_(None),
+        MsgConversation.last_message_at.desc(),
+        MsgConversation.id.desc(),
+    ).all()
+    payload = [_chat_v2_serialize_conversation(row, actor_user_id) for row in rows]
+    print(f'[chat-v2-list] actor={actor_user_id} returned={len(payload)} rows', flush=True)
+    return jsonify({'rows': payload, 'total': len(payload)})
+
+
+@api_bp.route('/api/chat/v2/conversations/<int:conversation_id>', methods=['GET'])
+def get_chat_v2_conversation(conversation_id):
+    """단일 v2 대화 상세 조회."""
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    conversation = _chat_v2_conversation_or_404(conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    return jsonify({'item': _chat_v2_serialize_conversation(conversation, actor_user_id)})
+
+
+@api_bp.route('/api/chat/v2/dm', methods=['POST'])
+def create_chat_v2_dm():
+    """다른 사용자와의 1:1 DM을 생성하거나 기존 DM을 반환한다."""
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    payload = request.get_json(silent=True) or {}
+    try:
+        target_user_id = int(payload.get('userId') or payload.get('user_id') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'userId is required'}), 400
+    if not target_user_id:
+        return jsonify({'error': 'userId is required'}), 400
+    target = UserProfile.query.get(target_user_id)
+    if not target:
+        return jsonify({'error': 'user not found'}), 404
+    if target_user_id == actor_user_id:
+        # Self-conversation (메모용) — dm_key 별도로 저장
+        dm_key = _chat_v2_dm_key(actor_user_id, actor_user_id)
+    else:
+        dm_key = _chat_v2_dm_key(actor_user_id, target_user_id)
+    conversation = MsgConversation.query.filter_by(dm_key=dm_key).first()
+    created = False
+    if not conversation:
+        conversation = MsgConversation(
+            conversation_type='DIRECT',
+            visibility='private',
+            owner_user_id=actor_user_id,
+            created_by=actor_user_id,
+            updated_by=actor_user_id,
+            updated_at=datetime.utcnow(),
+            dm_key=dm_key,
+        )
+        db.session.add(conversation)
+        db.session.flush()
+        member_ids = {actor_user_id, target_user_id}
+        for user_id in member_ids:
+            db.session.add(MsgConversationMember(
+                conversation_id=conversation.id,
+                user_id=user_id,
+                role='member',
+            ))
+        _chat_v2_log('dm.create', 'conversation', conversation.id, after_json={'partnerId': target_user_id})
+        db.session.commit()
+        created = True
+        conversation = MsgConversation.query.get(conversation.id)
+    else:
+        # 기존 DM에 actor가 left 상태였다면 다시 활성화
+        member = MsgConversationMember.query.filter_by(
+            conversation_id=conversation.id, user_id=actor_user_id
+        ).first()
+        if member and member.left_at is not None:
+            member.left_at = None
+            member.unread_count_cached = 0
+            db.session.commit()
+        elif not member:
+            db.session.add(MsgConversationMember(
+                conversation_id=conversation.id,
+                user_id=actor_user_id,
+                role='member',
+            ))
+            db.session.commit()
+    return jsonify({
+        'success': True,
+        'created': created,
+        'item': _chat_v2_serialize_conversation(conversation, actor_user_id),
+    }), (201 if created else 200)
+
+
+@api_bp.route('/api/chat/v2/messages', methods=['GET'])
+def list_chat_v2_messages():
+    actor_user_id = _chat_v2_actor_user_id()
+    conversation_id = request.args.get('conversationId', type=int)
+    if not actor_user_id or not conversation_id:
+        return jsonify({'rows': [], 'total': 0, 'hasMore': False})
+    conversation = _chat_v2_conversation_or_404(conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    query = MsgMessageV2.query.filter(MsgMessageV2.conversation_id == conversation_id)
+    before_id = request.args.get('beforeId', type=int)
+    if before_id:
+        query = query.filter(MsgMessageV2.id < before_id)
+    if request.args.get('threadOnly') in ('1', 'true', 'True'):
+        query = query.filter(MsgMessageV2.parent_message_id.isnot(None))
+    if request.args.get('includeDeleted') not in ('1', 'true', 'True'):
+        query = query.filter(MsgMessageV2.status != 'deleted')
+    limit = min(max(request.args.get('limit', default=50, type=int), 1), 100)
+    rows = query.order_by(MsgMessageV2.id.desc()).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
+    attachments = {}
+    if rows:
+        message_ids = [row.id for row in rows]
+        for attachment in MsgAttachment.query.filter(MsgAttachment.message_id.in_(message_ids)).all():
+            attachments.setdefault(attachment.message_id, []).append(attachment.to_dict())
+    payload_rows = []
+    for row in rows:
+        item = row.to_dict()
+        item['attachments'] = attachments.get(row.id, [])
+        payload_rows.append(item)
+    next_cursor = str(rows[0].id) if has_more and rows else None
+    return jsonify({'rows': payload_rows, 'total': len(payload_rows), 'hasMore': has_more, 'nextCursor': next_cursor})
+
+
+@api_bp.route('/api/chat/v2/messages', methods=['POST'])
+def create_chat_v2_message():
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    payload = request.get_json(silent=True) or {}
+    conversation_id = payload.get('conversationId')
+    if not conversation_id:
+        return jsonify({'error': 'conversationId is required'}), 400
+    conversation = _chat_v2_conversation_or_404(int(conversation_id))
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    if not (payload.get('content') or '').strip() and not (payload.get('attachments') or []):
+        return jsonify({'error': 'content or attachments required'}), 400
+    parent_message_id = payload.get('parentMessageId')
+    root_message_id = payload.get('rootMessageId') or parent_message_id
+    message = MsgMessageV2(
+        conversation_id=conversation.id,
+        sender_id=actor_user_id,
+        parent_message_id=parent_message_id,
+        root_message_id=root_message_id,
+        content=payload.get('content'),
+        message_type=(payload.get('type') or 'text').lower(),
+        status='active',
+        updated_at=datetime.utcnow(),
+        metadata_json=json.dumps(payload.get('metadata') or {}, ensure_ascii=False),
+    )
+    db.session.add(message)
+    db.session.flush()
+    for raw_attachment in payload.get('attachments') or []:
+        if not raw_attachment.get('url'):
+            continue
+        db.session.add(MsgAttachment(
+            message_id=message.id,
+            file_name=raw_attachment.get('fileName') or 'attachment',
+            file_size=raw_attachment.get('fileSize'),
+            file_type=raw_attachment.get('fileType'),
+            storage_key=raw_attachment.get('storageKey'),
+            url=raw_attachment.get('url'),
+            preview_url=raw_attachment.get('previewUrl'),
+            checksum=raw_attachment.get('checksum'),
+            uploaded_by=actor_user_id,
+        ))
+    _chat_v2_emit_mentions(message, payload.get('mentions') or [])
+    _chat_v2_increment_unread(conversation.id, actor_user_id)
+    _chat_v2_touch_conversation(conversation, message)
+    _chat_v2_log('message.create', 'message', message.id, after_json=message.to_dict())
+    db.session.commit()
+    return jsonify({'success': True, 'item': message.to_dict()}), 201
+
+
+@api_bp.route('/api/chat/v2/messages/<int:message_id>/attachments', methods=['POST'])
+def add_chat_v2_message_attachment(message_id: int):
+    """기존 v2 메시지에 첨부파일 메타데이터를 추가한다.
+
+    프론트는 먼저 /api/uploads 로 바이너리를 올린 뒤, 그 결과 URL을 본 엔드포인트로 등록한다.
+    body: {url, fileName, fileSize, fileType, previewUrl?, storageKey?}
+    """
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    message = MsgMessageV2.query.get_or_404(message_id, description='Message not found')
+    conversation = _chat_v2_conversation_or_404(message.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    url = (payload.get('url') or payload.get('file_path') or '').strip()
+    if not url:
+        return jsonify({'error': 'url is required'}), 400
+    attachment = MsgAttachment(
+        message_id=message.id,
+        file_name=payload.get('fileName') or payload.get('original_name') or 'attachment',
+        file_size=payload.get('fileSize') or payload.get('file_size'),
+        file_type=payload.get('fileType') or payload.get('content_type'),
+        storage_key=payload.get('storageKey'),
+        url=url,
+        preview_url=payload.get('previewUrl'),
+        checksum=payload.get('checksum'),
+        uploaded_by=actor_user_id,
+    )
+    db.session.add(attachment)
+    db.session.flush()
+    # 파일만 있던 메시지의 미리보기를 보강
+    if not (message.content or '').strip():
+        message.content = '[첨부파일]'
+        _chat_v2_touch_conversation(conversation, message)
+    db.session.commit()
+    return jsonify({'success': True, 'item': attachment.to_dict()}), 201
+
+
+@api_bp.route('/api/chat/v2/messages/<int:message_id>', methods=['PATCH'])
+def update_chat_v2_message(message_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    message = MsgMessageV2.query.get_or_404(message_id, description='Message not found')
+    conversation = _chat_v2_conversation_or_404(message.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    if message.sender_id != actor_user_id:
+        return jsonify({'error': 'only sender can edit'}), 403
+    payload = request.get_json(silent=True) or {}
+    before = message.to_dict()
+    if 'content' in payload:
+        message.content = payload.get('content')
+    message.updated_at = datetime.utcnow()
+    message.edited_at = datetime.utcnow()
+    _chat_v2_touch_conversation(conversation, message)
+    _chat_v2_log('message.update', 'message', message.id, before_json=before, after_json=message.to_dict())
+    db.session.commit()
+    return jsonify({'success': True, 'item': message.to_dict()})
+
+
+@api_bp.route('/api/chat/v2/messages/<int:message_id>', methods=['DELETE'])
+def delete_chat_v2_message(message_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    message = MsgMessageV2.query.get_or_404(message_id, description='Message not found')
+    conversation = _chat_v2_conversation_or_404(message.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    if message.sender_id != actor_user_id:
+        return jsonify({'error': 'only sender can delete'}), 403
+    before = message.to_dict()
+    message.status = 'deleted'
+    message.deleted_at = datetime.utcnow()
+    message.updated_at = datetime.utcnow()
+    latest = (
+        MsgMessageV2.query
+        .filter(MsgMessageV2.conversation_id == conversation.id)
+        .filter(MsgMessageV2.status != 'deleted')
+        .order_by(MsgMessageV2.id.desc())
+        .first()
+    )
+    _chat_v2_touch_conversation(conversation, latest)
+    _chat_v2_log('message.delete', 'message', message.id, before_json=before, after_json=message.to_dict())
+    db.session.commit()
+    return jsonify({'success': True, 'id': message_id})
+
+
+@api_bp.route('/api/chat/v2/threads/<int:message_id>', methods=['GET'])
+def list_chat_v2_threads(message_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'rows': [], 'total': 0})
+    root_message = MsgMessageV2.query.get_or_404(message_id, description='Message not found')
+    conversation = _chat_v2_conversation_or_404(root_message.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    rows = (
+        MsgMessageV2.query
+        .filter(MsgMessageV2.parent_message_id == message_id)
+        .filter(MsgMessageV2.status != 'deleted')
+        .order_by(MsgMessageV2.id.asc())
+        .all()
+    )
+    return jsonify({'rows': [row.to_dict() for row in rows], 'total': len(rows)})
+
+
+@api_bp.route('/api/chat/v2/threads', methods=['POST'])
+def create_chat_v2_thread_message():
+    payload = request.get_json(silent=True) or {}
+    parent_message_id = payload.get('parentMessageId')
+    if not parent_message_id:
+        return jsonify({'error': 'parentMessageId is required'}), 400
+    root_message = MsgMessageV2.query.get_or_404(parent_message_id, description='Message not found')
+    payload['conversationId'] = root_message.conversation_id
+    payload['parentMessageId'] = parent_message_id
+    payload['rootMessageId'] = root_message.root_message_id or root_message.id
+    return create_chat_v2_message()
+
+
+@api_bp.route('/api/chat/v2/messages/<int:message_id>/read', methods=['POST'])
+def read_chat_v2_message(message_id: int):
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'error': 'unauthorized'}), 401
+    message = MsgMessageV2.query.get_or_404(message_id, description='Message not found')
+    conversation = _chat_v2_conversation_or_404(message.conversation_id)
+    if not _chat_v2_has_access(conversation, actor_user_id):
+        return jsonify({'error': 'forbidden'}), 403
+    member = _chat_v2_active_member(conversation.id, actor_user_id)
+    if member:
+        member.last_read_message_id = message.id
+        member.last_read_at = datetime.utcnow()
+        member.unread_count_cached = 0
+    row = MsgMessageReadStatus.query.filter_by(message_id=message.id, user_id=actor_user_id).first()
+    if row:
+        row.read_at = datetime.utcnow()
+    else:
+        db.session.add(MsgMessageReadStatus(message_id=message.id, user_id=actor_user_id))
+    db.session.commit()
+    return jsonify({'success': True, 'messageId': message.id})
+
+
+@api_bp.route('/api/chat/v2/notifications', methods=['GET'])
+def list_chat_v2_notifications():
+    actor_user_id = _chat_v2_actor_user_id()
+    if not actor_user_id:
+        return jsonify({'rows': [], 'total': 0})
+    query = MsgNotification.query.filter(MsgNotification.user_id == actor_user_id)
+    if request.args.get('isRead') in ('0', '1'):
+        query = query.filter(MsgNotification.is_read.is_(request.args.get('isRead') == '1'))
+    rows = query.order_by(MsgNotification.created_at.desc()).limit(100).all()
+    return jsonify({'rows': [row.to_dict() for row in rows], 'total': len(rows)})
 
 # ===== Simple list APIs for tests (public, empty -> []) =====
 @api_bp.route('/api/companies', methods=['GET'])
@@ -4284,6 +6758,7 @@ def list_user_profiles():
                     'phone': (getattr(row, 'mobile_phone', '') or getattr(row, 'ext_phone', '') or '').strip(),
                     'email': row.email or '',
                     'company': row.company or '',
+                    'profile_image': row.profile_image or '',
                 }
             )
         return jsonify({'success': True, 'items': items, 'total': len(items)})
@@ -11831,6 +14306,62 @@ def _normalize_share_scope(raw: Optional[str]) -> str:
     return token
 
 
+CALENDAR_META_RE = re.compile(r'\n*\s*<!--\s*blossom-calendar-meta:(\{.*?\})\s*-->\s*$', re.DOTALL)
+
+
+def _split_calendar_description_meta(raw: Optional[str]) -> tuple[str, Dict[str, object]]:
+    text = raw or ''
+    match = CALENDAR_META_RE.search(text)
+    if not match:
+        return text.strip(), {}
+    body = text[:match.start()].strip()
+    try:
+        meta = json.loads(match.group(1)) or {}
+    except Exception:
+        meta = {}
+    return body, meta if isinstance(meta, dict) else {}
+
+
+def _compose_calendar_description_meta(description: Optional[str], meta: Dict[str, object]) -> Optional[str]:
+    body = (description or '').strip()
+    clean_meta = {k: v for k, v in (meta or {}).items() if v not in (None, '', [], {})}
+    if not clean_meta:
+        return body or None
+    encoded = json.dumps(clean_meta, ensure_ascii=False, separators=(',', ':'))
+    return f"{body}\n\n<!-- blossom-calendar-meta:{encoded} -->".strip()
+
+
+def _normalize_calendar_visibility(raw: Optional[str]) -> str:
+    token = (raw or '').strip().upper()
+    if token in ('PUBLIC', 'OPEN', '공개'):
+        return 'PUBLIC'
+    return 'PRIVATE'
+
+
+def _normalize_calendar_meta(payload: Dict[str, object], existing: Dict[str, object]) -> Dict[str, object]:
+    meta = dict(existing or {})
+    if 'attendees' in payload or 'attendee_labels' in payload or 'attendeeLabels' in payload:
+        raw_attendees = payload.get('attendees') or payload.get('attendee_labels') or payload.get('attendeeLabels') or []
+        if not isinstance(raw_attendees, (list, tuple)):
+            raw_attendees = [raw_attendees]
+        meta['attendees'] = [str(item).strip() for item in raw_attendees if str(item or '').strip()]
+    if 'reminders' in payload or 'reminder_minutes' in payload or 'reminderMinutes' in payload:
+        raw_reminders = payload.get('reminders') or payload.get('reminder_minutes') or payload.get('reminderMinutes') or []
+        if not isinstance(raw_reminders, (list, tuple)):
+            raw_reminders = [raw_reminders]
+        meta['reminders'] = [str(item).strip() for item in raw_reminders if str(item or '').strip()]
+    if 'sticker' in payload:
+        meta['sticker'] = str(payload.get('sticker') or '').strip()
+    if 'is_important' in payload or 'important' in payload:
+        meta['is_important'] = _coerce_bool(payload.get('is_important') if 'is_important' in payload else payload.get('important'), False)
+    if 'visibility' in payload or 'public' in payload:
+        if 'visibility' in payload:
+            meta['visibility'] = _normalize_calendar_visibility(payload.get('visibility'))
+        else:
+            meta['visibility'] = 'PUBLIC' if _coerce_bool(payload.get('public'), False) else 'PRIVATE'
+    return meta
+
+
 def _normalize_dept_token(value: Optional[str]) -> str:
     return (value or '').strip().lower()
 
@@ -12032,6 +14563,7 @@ def _serialize_calendar_schedule(
     actor_user_id: Optional[int] = None,
     actor_profile: Optional[UserProfile] = None,
 ) -> Dict[str, object]:
+    description, meta = _split_calendar_description_meta(schedule.description)
     payload: Dict[str, object] = {
         'id': schedule.id,
         'title': schedule.title,
@@ -12054,7 +14586,11 @@ def _serialize_calendar_schedule(
             else None
         ),
         'share_scope': schedule.share_scope,
-        'description': schedule.description or '',
+        'description': description or '',
+        'attendees': meta.get('attendees') or [],
+        'reminders': meta.get('reminders') or [],
+        'sticker': meta.get('sticker') or '',
+        'is_important': bool(meta.get('is_important')),
         'color_code': schedule.color_code or '',
         'created_at': _serialize_datetime(schedule.created_at),
         'created_by_user_id': schedule.created_by_user_id,
@@ -12156,8 +14692,15 @@ def _apply_schedule_payload(schedule: CalSchedule, payload: Dict[str, object], a
         share_scope = _normalize_share_scope(share_scope_raw)
     schedule.share_scope = share_scope
 
-    description = (payload.get('description') or payload.get('desc') or '').strip()
-    schedule.description = description or None
+    existing_description, existing_meta = _split_calendar_description_meta(schedule.description)
+    if 'description' in payload or 'desc' in payload:
+        description = (payload.get('description') if 'description' in payload else payload.get('desc') or '').strip()
+    else:
+        description = (existing_description or '').strip()
+    schedule.description = _compose_calendar_description_meta(
+        description,
+        _normalize_calendar_meta(payload, existing_meta),
+    )
 
     color_code = (payload.get('color_code') or payload.get('color') or '').strip()
     if color_code:
@@ -26297,7 +28840,13 @@ def _get_store_with_fallback(fid: str):
     try:
         meta = svc_get_upload_meta(fid)
         if meta:
-            store[fid] = {'id': meta['id'], 'name': meta['name'], 'size': meta['size']}
+            store[fid] = {
+                'id': meta['id'],
+                'name': meta['name'],
+                'size': meta['size'],
+                'mime_type': meta.get('mime_type') or '',
+                'disk_name': meta.get('disk_name') or '',
+            }
             return store[fid]
     except Exception:
         # Ignore DB fallback failures
@@ -26363,10 +28912,10 @@ def upload_file():
     path = os.path.join(folder, disk_name)
     f.save(path)
     size = os.path.getsize(path)
-    rec = { 'id': fid, 'name': safe_name, 'size': size }
+    mime_type = getattr(f, 'mimetype', '') or ''
+    rec = { 'id': fid, 'name': safe_name, 'size': size, 'mime_type': mime_type, 'disk_name': disk_name }
     store = _get_store(); store[fid] = rec
     try:
-        mime_type = getattr(f, 'mimetype', '') or ''
         svc_save_upload_meta(fid, file_name=safe_name, file_size=size, mime_type=mime_type, disk_name=disk_name)
     except Exception:
         # Keep upload working even if DB persistence fails
@@ -26396,9 +28945,24 @@ def download_upload(fid):
         return jsonify({'error':'not found'}), 404
     folder = _ensure_folder()
     # locate the file (prefix match)
-    for entry in os.listdir(folder):
-        if entry.startswith(fid):
-            return send_from_directory(folder, entry, as_attachment=True, download_name=rec['name'])
+    disk_name = rec.get('disk_name') or ''
+    candidates = [disk_name] if disk_name else os.listdir(folder)
+    inline = str(request.args.get('inline', '')).strip().lower() in ('1', 'true', 'yes', 'y')
+    mime_type = (rec.get('mime_type') or '').strip() or mimetypes.guess_type(rec.get('name') or '')[0] or None
+    for entry in candidates:
+        if entry and entry.startswith(fid):
+            resp = send_from_directory(
+                folder,
+                entry,
+                as_attachment=not inline,
+                download_name=rec['name'],
+                mimetype=mime_type,
+            )
+            if inline:
+                resp.headers['Cache-Control'] = 'private, max-age=300'
+                resp.headers['X-Content-Type-Options'] = 'nosniff'
+                resp.headers['Accept-Ranges'] = 'bytes'
+            return resp
     return jsonify({'error':'file missing'}), 404
 
 
@@ -33462,14 +36026,23 @@ from app.services.info_message_service import (
 def _is_admin_session() -> bool:
     """현재 세션이 관리자 역할인지 확인."""
     role = (session.get('role') or '').strip().upper()
-    if role == 'ADMIN':
+    if role in ('ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'):
         return True
     uid = session.get('user_id')
     if uid is not None:
         try:
             from app.models import AuthUser
             u = AuthUser.query.get(int(uid))
-            if u and (u.role or '').strip().upper() == 'ADMIN':
+            if u and (u.role or '').strip().upper() in ('ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'):
+                return True
+        except Exception:
+            pass
+    emp_no = (session.get('emp_no') or session.get('employee_no') or '').strip()
+    if emp_no:
+        try:
+            from app.models import AuthUser
+            u = AuthUser.query.filter(AuthUser.emp_no == emp_no).first()
+            if u and (u.role or '').strip().upper() in ('ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'):
                 return True
         except Exception:
             pass
@@ -34468,6 +37041,384 @@ def update_file_policy():
         db.session.rollback()
         logger.exception('file-policy update')
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _web_access_current_actor() -> tuple[Optional[Dict[str, Any]], Optional[tuple[dict, int]]]:
+    user_id = _coerce_positive_int(_resolve_actor_user_id())
+    if not user_id:
+        return None, ({'success': False, 'message': '로그인이 필요합니다.'}, 401)
+    user = UserProfile.query.get(user_id)
+    if not user:
+        return None, ({'success': False, 'message': '사용자 정보를 찾을 수 없습니다.'}, 404)
+    dept = None
+    if getattr(user, 'department_id', None):
+        dept = OrgDepartment.query.get(user.department_id)
+    actor = {
+        'user_id': user.id,
+        'emp_no': (user.emp_no or '').strip(),
+        'name': (user.name or '').strip(),
+        'role': (user.role or '').strip(),
+        'department_id': getattr(user, 'department_id', None),
+        'department_name': ((dept.dept_name if dept else '') or getattr(user, 'department', '') or '').strip(),
+        'manager_emp_no': ((dept.manager_emp_no if dept else '') or '').strip(),
+        'manager_name': ((dept.manager_name if dept else '') or '').strip(),
+        'ip_address': (request.remote_addr or '').strip(),
+    }
+    return actor, None
+
+
+def _is_admin_actor(actor: Dict[str, Any]) -> bool:
+    return str(actor.get('role') or '').strip().upper() in ('ADMIN', '관리자')
+
+
+def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
+    resource_id = int(resource.get('id') or 0)
+    user_id = int(actor.get('user_id') or 0)
+    has_grant = svc_has_web_access_grant(user_id, resource_id)
+    has_pending = svc_has_web_access_pending_request(user_id, resource_id)
+    grants = svc_list_web_access_grants(user_id=user_id, resource_id=resource_id)
+    grant_row = grants[0] if grants else None
+    if int(resource.get('active_flag') or 0) != 1:
+        state = '차단'
+    elif has_grant:
+        state = '사용 가능'
+    elif has_pending:
+        state = '승인 대기'
+    elif grant_row:
+        state = '만료'
+    else:
+        state = '차단'
+    return {
+        'access_status': state,
+        'can_access': bool(has_grant and int(resource.get('active_flag') or 0) == 1),
+        'can_request': bool(not has_grant and not has_pending and int(resource.get('active_flag') or 0) == 1),
+        'request_pending': bool(has_pending),
+        'grant_end_date': (grant_row or {}).get('grant_end_date', ''),
+        'last_accessed_at': (grant_row or {}).get('last_accessed_at', ''),
+        'requested': bool(has_pending or grant_row),
+    }
+
+
+@api_bp.route('/api/access-control/resources', methods=['GET'])
+def api_access_control_resources():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    rows = svc_list_web_access_resources(
+        search=(request.args.get('search') or '').strip(),
+        status=(request.args.get('status') or '').strip(),
+        resource_type=(request.args.get('resource_type') or '').strip(),
+    )
+    items = []
+    for row in rows:
+        merged = dict(row)
+        merged.update(_resource_access_state(row, actor))
+        items.append(merged)
+    return jsonify({'success': True, 'rows': items, 'total': len(items)})
+
+
+@api_bp.route('/api/access-control/resources/<int:resource_id>', methods=['GET'])
+def api_access_control_resource_detail(resource_id: int):
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    row = svc_get_web_access_resource(resource_id)
+    if not row:
+        return jsonify({'success': False, 'message': '자원 정보를 찾을 수 없습니다.'}), 404
+    detail = dict(row)
+    detail.update(_resource_access_state(row, actor))
+    my_requests = svc_list_web_access_requests(user_id=actor['user_id'])
+    detail['request_history'] = [item for item in my_requests if int(item.get('resource_id') or 0) == resource_id]
+    return jsonify({'success': True, 'item': detail})
+
+
+@api_bp.route('/api/access-control/resources', methods=['POST'])
+def api_access_control_create_resource():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 자원을 등록할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_create_web_access_resource(payload, actor['emp_no'])
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/resources/<int:resource_id>', methods=['PUT'])
+def api_access_control_update_resource(resource_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 자원을 수정할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_update_web_access_resource(resource_id, payload, actor['emp_no'])
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    if not item:
+        return jsonify({'success': False, 'message': '자원 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/resources/<int:resource_id>', methods=['DELETE'])
+def api_access_control_delete_resource(resource_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 자원을 삭제할 수 있습니다.'}), 403
+    ok = svc_delete_web_access_resource(resource_id, actor['emp_no'])
+    if not ok:
+        return jsonify({'success': False, 'message': '자원 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True})
+
+
+@api_bp.route('/api/access-control/requests', methods=['GET'])
+def api_access_control_requests():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    scope = (request.args.get('scope') or 'mine').strip()
+    status = (request.args.get('status') or '').strip()
+    if scope == 'approvals':
+        rows = svc_list_web_access_requests(approver_emp_no=actor['emp_no'], status=status or WEB_ACCESS_REQUEST_PENDING)
+    elif _is_admin_actor(actor) and scope == 'all':
+        rows = svc_list_web_access_requests(status=status)
+    else:
+        rows = svc_list_web_access_requests(user_id=actor['user_id'], status=status)
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/requests', methods=['POST'])
+def api_access_control_create_request():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_create_web_access_request(payload, actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/requests/<int:request_id>', methods=['GET'])
+def api_access_control_request_detail(request_id: int):
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    item = svc_get_web_access_request(request_id)
+    if not item:
+        return jsonify({'success': False, 'message': '신청 정보를 찾을 수 없습니다.'}), 404
+    if not _is_admin_actor(actor):
+        is_owner = int(item.get('requester_user_id') or 0) == int(actor['user_id'])
+        is_approver = str(item.get('approver_emp_no') or '').strip().upper() == str(actor['emp_no']).strip().upper()
+        if not (is_owner or is_approver):
+            return jsonify({'success': False, 'message': '조회 권한이 없습니다.'}), 403
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/requests/<int:request_id>/cancel', methods=['POST'])
+def api_access_control_cancel_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    try:
+        item = svc_cancel_web_access_request(request_id, actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    if not item:
+        return jsonify({'success': False, 'message': '신청 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/requests/<int:request_id>/approve', methods=['POST'])
+def api_access_control_approve_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_approve_web_access_request(request_id, actor, opinion=(payload.get('opinion') or ''))
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    if not item:
+        return jsonify({'success': False, 'message': '신청 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/requests/<int:request_id>/reject', methods=['POST'])
+def api_access_control_reject_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_reject_web_access_request(request_id, actor, rejected_reason=(payload.get('rejected_reason') or ''))
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    if not item:
+        return jsonify({'success': False, 'message': '신청 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/resources/<int:resource_id>/access', methods=['POST'])
+def api_access_control_touch_access(resource_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    try:
+        item = svc_touch_web_access(resource_id, actor['user_id'], actor, ip_address=(request.remote_addr or ''))
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 403
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/policy', methods=['GET'])
+def api_access_control_policy():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 정책을 조회할 수 있습니다.'}), 403
+    return jsonify({'success': True, 'item': svc_get_web_access_policy()})
+
+
+@api_bp.route('/api/access-control/policy', methods=['PUT'])
+def api_access_control_update_policy():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 정책을 수정할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    item = svc_update_web_access_policy(payload, actor['emp_no'])
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/grants', methods=['GET'])
+def api_access_control_grants():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 권한 목록을 조회할 수 있습니다.'}), 403
+    user_id = _coerce_positive_int(request.args.get('user_id'))
+    department_id = _coerce_positive_int(request.args.get('department_id'))
+    resource_id = _coerce_positive_int(request.args.get('resource_id'))
+    rows = svc_list_web_access_grants(user_id=user_id, department_id=department_id, resource_id=resource_id)
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/grants/<int:grant_id>/revoke', methods=['POST'])
+def api_access_control_revoke_grant(grant_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 권한을 회수할 수 있습니다.'}), 403
+    ok = svc_revoke_web_access_grant(grant_id, actor)
+    if not ok:
+        return jsonify({'success': False, 'message': '권한 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True})
+
+
+@api_bp.route('/api/access-control/audit-logs', methods=['GET'])
+def api_access_control_audit_logs():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 감사 로그를 조회할 수 있습니다.'}), 403
+    rows = svc_list_web_access_audit_logs(
+        {
+            'actor_name': request.args.get('actor_name') or '',
+            'resource_name': request.args.get('resource_name') or '',
+            'action_type': request.args.get('action_type') or '',
+            'from_date': request.args.get('from_date') or '',
+            'to_date': request.args.get('to_date') or '',
+        }
+    )
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/notifications', methods=['GET'])
+def api_access_control_notifications():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if _is_admin_actor(actor):
+        rows = svc_list_web_access_notifications()
+    else:
+        rows = svc_list_web_access_notifications(user_id=actor['user_id'])
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/notifications/run', methods=['POST'])
+def api_access_control_notifications_run():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 알림을 강제 실행할 수 있습니다.'}), 403
+    result = svc_run_web_access_notifications()
+    return jsonify({'success': True, 'item': result})
 
 
 # ──────────────────────────────────────────────────────────────

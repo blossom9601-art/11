@@ -1,5 +1,23 @@
 // Chat UI interactions (Korean-localized)
 (function(){
+  // === SPA 재진입 시 이전 인스턴스의 setInterval 만 안전하게 정리 ===
+  // setInterval/setTimeout 식별자를 const 로 가리지 않는다 (브라우저별로 const
+  // shadowing + 호스트 함수 분리 호출 시 'Illegal invocation' 등 회귀가 발생).
+  // 글로벌 인터벌 ID 배열만 노출해, 새 IIFE 진입 시 즉시 비운다.
+  try {
+    if (window.__blossomChatIntervals && window.__blossomChatIntervals.length) {
+      window.__blossomChatIntervals.forEach(function(id){
+        try { window.clearInterval(id); } catch(_) {}
+      });
+    }
+  } catch(_) {}
+  window.__blossomChatIntervals = [];
+  // setInterval 호출을 후킹하지 않고, 명시적으로 등록한 인터벌만 추적한다.
+  function __chatRegisterInterval(id){
+    try { window.__blossomChatIntervals.push(id); } catch(_) {}
+    return id;
+  }
+
   const listEl = document.getElementById('chat-list');
   const messagesEl = document.getElementById('chat-messages');
   const messagesScrollbar = document.getElementById('messages-scrollbar');
@@ -24,6 +42,20 @@
   const deleteModalConfirm = document.getElementById('chat-delete-confirm');
   const deleteModalCancel = document.getElementById('chat-delete-cancel');
   const deleteModalBackdrop = document.getElementById('chat-delete-backdrop');
+  const infoModal = document.getElementById('chat-info-modal');
+  const infoModalTitle = document.getElementById('chat-info-title');
+  const infoModalMessage = document.getElementById('chat-info-message');
+  const infoModalIcon = document.getElementById('chat-info-icon');
+  const infoModalConfirm = document.getElementById('chat-info-confirm');
+  const infoModalBackdrop = document.getElementById('chat-info-backdrop');
+  const searchModal = document.getElementById('chat-search-modal');
+  const searchModalBackdrop = document.getElementById('chat-search-backdrop');
+  const searchModalClose = document.getElementById('chat-search-close');
+  const searchModalInput = document.getElementById('chat-search-input');
+  const searchModalStatus = document.getElementById('chat-search-status');
+  const searchModalResults = document.getElementById('chat-search-results');
+  const searchModalScopeBtns = document.querySelectorAll('.chat-search-scope-btn');
+  const btnMsgSearch = document.getElementById('btn-msg-search');
   // No toast container; member-add notices render as plain text in the message list
 
   const profile = {
@@ -81,6 +113,7 @@
   };
   const SELF_CONV_PREFIX = 'self-';
   const FAVORITES_STORAGE_KEY = 'chat-favorites-v1';
+  const TOMBSTONE_STORAGE_KEY = 'chat-tombstones-v1';
   const locallyDeletedRoomIds = new Set();
   // If a user deletes a conversation, we also tombstone the *contact key* so
   // colleagues-tab synthetic chats can never reuse old cached messages.
@@ -124,10 +157,58 @@
     try {
       const contact = primaryContact(conv);
       const key = directoryKeyFor(contact);
-      if (key) locallyDeletedContactKeys.add(key);
+      if (key) {
+        locallyDeletedContactKeys.add(key);
+        persistTombstones();
+      }
       return key;
     } catch (_) {
       return null;
+    }
+  }
+
+  function rememberDeletedRoomId(id){
+    if (!id) return;
+    if (!locallyDeletedRoomIds.has(id)) {
+      locallyDeletedRoomIds.add(id);
+      persistTombstones();
+    }
+  }
+
+  function forgetDeletedRoomId(id){
+    if (!id) return;
+    if (locallyDeletedRoomIds.delete(id)) persistTombstones();
+  }
+
+  function loadTombstones(){
+    const storage = getStorage();
+    if (!storage) return;
+    try {
+      const raw = storage.getItem(TOMBSTONE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.roomIds)) {
+        parsed.roomIds.forEach(id => { if (id) locallyDeletedRoomIds.add(id); });
+      }
+      if (parsed && Array.isArray(parsed.contactKeys)) {
+        parsed.contactKeys.forEach(k => { if (k) locallyDeletedContactKeys.add(k); });
+      }
+    } catch (err) {
+      console.warn('[chat] Failed to read tombstones from storage', err);
+    }
+  }
+
+  function persistTombstones(){
+    const storage = getStorage();
+    if (!storage) return;
+    try {
+      const payload = {
+        roomIds: Array.from(locallyDeletedRoomIds),
+        contactKeys: Array.from(locallyDeletedContactKeys),
+      };
+      storage.setItem(TOMBSTONE_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('[chat] Failed to persist tombstones', err);
     }
   }
 
@@ -231,6 +312,7 @@
   }
 
   loadFavoriteStore();
+  loadTombstones();
 
   function setDragPayload(evt, payload, fallback){
     if (!evt || !evt.dataTransfer) return;
@@ -302,6 +384,7 @@
       return { roomsUrl: '/api/chat/rooms', apiRoot: '/api/chat', profileId: null, userName: '', empNo: '', userImage: '' };
     }
     const roomsUrlAttr = el.getAttribute('data-rooms-url') || '/api/chat/rooms';
+    const roomsCreateUrlAttr = el.getAttribute('data-rooms-create-url') || '/api/chat/rooms';
     const apiRootAttr = el.getAttribute('data-api-root');
     const directoryUrlAttr = el.getAttribute('data-directory-url') || '/api/chat/directory';
     const profileIdAttr = parseInt(el.getAttribute('data-profile-id'), 10);
@@ -309,6 +392,7 @@
     const userImageAttr = el.getAttribute('data-user-image') || '';
     const cfg = {
       roomsUrl: roomsUrlAttr,
+      roomsCreateUrl: roomsCreateUrlAttr,
       apiRoot: apiRootAttr || deriveApiRoot(roomsUrlAttr),
       directoryUrl: directoryUrlAttr,
       profileId: Number.isFinite(profileIdAttr) ? profileIdAttr : null,
@@ -349,6 +433,84 @@
     return el;
   }
 
+  // ---- 안전한 메시지 텍스트 렌더링 (코드블럭 + 인라인 코드 지원) ----
+  // 입력 텍스트를 escape 한 뒤 ```lang ... ``` 와 `code` 를 DOM 노드로 변환해 컨테이너에 추가한다.
+  function renderMessageText(container, rawText){
+    if (!container) return;
+    const text = (rawText == null) ? '' : String(rawText);
+    if (!text.length) return;
+    // 1) 펜스드 코드블럭 분리: ```lang\n...\n```
+    const fenceRe = /```([A-Za-z0-9_+\-]*)\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+    function appendInline(segment){
+      if (!segment) return;
+      // 인라인 코드 처리
+      const inlineRe = /`([^`\n]+)`/g;
+      let li = 0, im;
+      while ((im = inlineRe.exec(segment)) !== null) {
+        if (im.index > li) appendPlainWithBreaks(container, segment.slice(li, im.index));
+        const codeEl = document.createElement('code');
+        codeEl.className = 'msg-inline-code';
+        codeEl.textContent = im[1];
+        container.appendChild(codeEl);
+        li = im.index + im[0].length;
+      }
+      if (li < segment.length) appendPlainWithBreaks(container, segment.slice(li));
+    }
+    function appendPlainWithBreaks(parent, str){
+      const lines = str.split('\n');
+      lines.forEach(function(line, idx){
+        if (idx > 0) parent.appendChild(document.createElement('br'));
+        if (line.length) parent.appendChild(document.createTextNode(line));
+      });
+    }
+    while ((match = fenceRe.exec(text)) !== null) {
+      if (match.index > lastIndex) appendInline(text.slice(lastIndex, match.index));
+      const lang = (match[1] || '').trim();
+      const code = match[2].replace(/\n$/, '');
+      const pre = document.createElement('pre');
+      pre.className = 'msg-codeblock' + (lang ? ' lang-' + lang.toLowerCase() : '');
+      const codeEl = document.createElement('code');
+      codeEl.textContent = code;
+      pre.appendChild(codeEl);
+      // 복사 버튼
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'msg-codeblock-copy';
+      copyBtn.textContent = '복사';
+      copyBtn.setAttribute('aria-label', '코드 복사');
+      copyBtn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = code;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = '복사됨';
+          setTimeout(function(){ copyBtn.textContent = prev; }, 1200);
+        } catch (_){}
+      });
+      pre.appendChild(copyBtn);
+      if (lang) {
+        const tag = document.createElement('span');
+        tag.className = 'msg-codeblock-lang';
+        tag.textContent = lang;
+        pre.appendChild(tag);
+      }
+      container.appendChild(pre);
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) appendInline(text.slice(lastIndex));
+  }
+
   function avatarImg(src, alt, size='md'){
     const node = document.createElement('div');
     const sizeClass = size === 'sm' ? ' avatar-sm' : (size === 'lg' ? ' avatar-lg' : '');
@@ -364,12 +526,42 @@
     return node;
   }
 
+  // 채널 전용 아이콘 (SVG mask로 #6366F1 제니용 적용)
+  const CHANNEL_ICON_SRC = '/static/image/svg/chat/free-icon-font-channel.svg';
+  const CHANNEL_ICON_COLOR = '#6366F1';
+  function _applyChannelMask(el, ratio){
+    el.style.background = CHANNEL_ICON_COLOR;
+    const url = `url('${CHANNEL_ICON_SRC}')`;
+    el.style.webkitMask = url + ' no-repeat center / ' + ratio;
+    el.style.mask = url + ' no-repeat center / ' + ratio;
+  }
+  function channelIconNode(size='md'){
+    const sizeClass = size === 'sm' ? ' avatar-sm' : (size === 'lg' ? ' avatar-lg' : '');
+    const node = document.createElement('div');
+    node.className = 'avatar avatar-channel' + sizeClass;
+    _applyChannelMask(node, '60% 60%');
+    return node;
+  }
+  function isChannelConversation(c){
+    return !!(c && String(c.roomType || '').toUpperCase() === 'CHANNEL');
+  }
+  function renderChannelAvatarInto(container){
+    if (!container) return;
+    container.innerHTML = '';
+    container.classList.remove('has-image');
+    container.classList.add('avatar-channel');
+    _applyChannelMask(container, '50% 50%');
+  }
+
   function renderAvatarInto(container, src, label){
     if (!container) return;
     container.innerHTML = '';
     container.classList.add('has-image');
     container.classList.remove('avatar-token');
+    container.classList.remove('avatar-channel');
     container.style.background = '';
+    container.style.mask = '';
+    container.style.webkitMask = '';
     const img = document.createElement('img');
     img.alt = label || 'avatar';
     img.src = resolveAvatarSrc(src, label);
@@ -382,6 +574,11 @@
 
   function getRoomsUrl(){
     return (chatConfig.roomsUrl || '/api/chat/rooms').split('?')[0];
+  }
+
+  // v1 방 생성/관리 endpoint. v2 conversations(GET 전용)와 분리.
+  function getRoomsCreateUrl(){
+    return (chatConfig.roomsCreateUrl || '/api/chat/rooms').split('?')[0];
   }
 
   function buildRoomUrl(roomId){
@@ -520,12 +717,33 @@
     return nonSelf || members[0];
   }
 
+  function isPlaceholderName(value){
+    const text = String(value == null ? '' : value).trim();
+    if (!text) return true;
+    const lowered = text.toLowerCase();
+    return lowered === '-' || lowered === '—' || lowered === 'null' || lowered === 'none' || lowered === 'undefined';
+  }
+
+  function displayNameForConversation(conv){
+    if (!conv) return '';
+    const isGroup = isGroupConversation(conv);
+    const contact = isGroup ? null : primaryContact(conv);
+    const contactName = contact && !isPlaceholderName(contact.name) ? String(contact.name).trim() : '';
+    const roomName = !isPlaceholderName(conv.name) ? String(conv.name).trim() : '';
+    if (isGroup) return roomName || '그룹 채팅';
+    return contactName || roomName || '대화';
+  }
+
   function normalizeRoomFromApi(room){
     if (!room || typeof room !== 'object') return null;
     const isGroup = String(room.room_type || '').toUpperCase() === 'GROUP';
     const members = Array.isArray(room.members) ? room.members.map(normalizeMemberFromApi).filter(Boolean) : [];
     const contact = isGroup ? null : selectPrimaryMember(members);
-    const name = room.room_name || (contact ? contact.name : `Room #${room.id}`);
+    const rawRoomName = !isPlaceholderName(room.room_name) ? String(room.room_name).trim() : '';
+    const contactName = contact && !isPlaceholderName(contact.name) ? String(contact.name).trim() : '';
+    const name = isGroup
+      ? (rawRoomName || '그룹 채팅')
+      : (contactName || rawRoomName || '대화');
     const lastStamp = room.last_message_at || room.updated_at || room.created_at;
     const convId = `room-${room.id}`;
     const lastInteracted = (lastStamp ? parseTimestampMs(lastStamp) : null) ?? 0;
@@ -575,6 +793,15 @@
       createdAt,
       files: files.length ? files : undefined,
       unreadCount: typeof message.unread_count === 'number' ? message.unread_count : null,
+      pinned: !!message.is_pinned,
+      reactions: Array.isArray(message.reactions) ? message.reactions.map(function(r){
+        return {
+          emoji: r.emoji,
+          count: Number(r.count) || 0,
+          mine: !!r.mine,
+          userIds: Array.isArray(r.user_ids) ? r.user_ids.slice() : [],
+        };
+      }) : [],
     };
   }
 
@@ -929,13 +1156,13 @@
     if (liveRefreshTimer) return;
     const hasLiveRooms = state.isLive || conversations.some(conv => !!conv.roomId);
     if (!hasLiveRooms) return;
-    liveRefreshTimer = setInterval(()=>{
+    liveRefreshTimer = __chatRegisterInterval(setInterval(()=>{
       hydrateFromApi({ silent: true });
       const activeConv = conversations.find(c => c.id === activeId && c.roomId);
       if (activeConv) {
         requestMessageRefresh(activeConv.roomId);
       }
-    }, POLL_INTERVAL_MS);
+    }, POLL_INTERVAL_MS));
   }
 
   function requestMessageRefresh(roomId){
@@ -1126,7 +1353,7 @@
         // doesn't stay stuck in the list and keep throwing errors.
         const conv = conversations.find(c => c.roomId === roomId);
         if (conv) {
-          locallyDeletedRoomIds.add(conv.id);
+          rememberDeletedRoomId(conv.id);
           performDeleteConversation(conv.id, { isLive: true });
         }
         return;
@@ -1220,9 +1447,17 @@
 
   function renderConversationList(filter='all', q=''){
     var ql = (q || '').trim().toLowerCase();
+    function isChannelConv(c){
+      var t = String((c && c.roomType) || '').toUpperCase();
+      return t === 'CHANNEL';
+    }
     var items = conversations
       .filter(function(c){
         if (filter === 'favorites') return !!c.fav;
+        // '채널' 탭(all): CHANNEL 만 표시
+        if (filter === 'all') return isChannelConv(c);
+        // '채팅' 탭(chat): CHANNEL 제외 (DIRECT/GROUP/SELF)
+        if (filter === 'chat') return !isChannelConv(c);
         return true;
       })
       .filter(function(c){
@@ -1253,7 +1488,8 @@
         li.dataset.id = c.id;
         const contact = primaryContact(c);
         const selfConv = isSelfConversation(c);
-        const left = Array.isArray(c.groupAvatars) && c.groupAvatars.length ? (()=>{
+        const channelConv = isChannelConversation(c);
+        const left = channelConv ? channelIconNode('sm') : (Array.isArray(c.groupAvatars) && c.groupAvatars.length ? (()=>{
           const wrap = createEl('div', 'avatar-stack sm');
           c.groupAvatars.slice(0,3).forEach(src => {
             const im = document.createElement('img');
@@ -1263,13 +1499,13 @@
             wrap.appendChild(im);
           });
           return wrap;
-        })() : avatarImg(selfConv ? resolveSelfAvatar() : (contact?.avatar || c.avatar), contact?.name || c.name);
+        })() : avatarImg(selfConv ? resolveSelfAvatar() : (contact?.avatar || c.avatar), contact?.name || c.name));
         const deptRaw = contact?.department || c.dept || '';
-        const deptLabel = deptRaw ? displayDeptName(deptRaw) : '';
+        const deptLabel = channelConv ? '채널' : (deptRaw ? displayDeptName(deptRaw) : '');
         const subline = (deptLabel && deptLabel !== '소속 미지정') ? `<div class="subline">${deptLabel}</div>` : '';
         const previewLine = c.preview ? `<div class="preview">${c.preview}</div>` : '';
         const main = createEl('div', null,
-          `<div class="name">${c.name || ''}</div>${subline}${previewLine}`
+          `<div class="name">${displayNameForConversation(c) || ''}</div>${subline}${previewLine}`
         );
         const right = createEl('div', 'right',
           `<span class="time">${c.displayTime || c.time || ''}</span>${c.unread ? `<span class="badge">${c.unread}</span>` : ''}`
@@ -1441,11 +1677,13 @@
       }
       // render system notice as plain text (no bubble)
       if (m.who === 'system') {
-        const sys = createEl('div', 'system-line', m.text);
+        const sys = createEl('div', 'system-line');
+        renderMessageText(sys, m.text);
         frag.appendChild(sys);
         return;
       }
-      const div = createEl('div', `message ${m.who}`);
+      const div = createEl('div', `message ${m.who}${m.pinned ? ' is-pinned' : ''}`);
+      if (m.id != null) div.setAttribute('data-msg-id', String(m.id));
       const isEmojiOnly = typeof m.text === 'string' && emojiOnlyRe.test(m.text.trim());
       const hasFiles = Array.isArray(m.files) && m.files.length;
       const t = (typeof m.text === 'string' ? m.text : '');
@@ -1453,7 +1691,8 @@
       const isAttachmentPlaceholder = !!hasFiles && tTrim === '[첨부파일]';
       const hasText = tTrim.length > 0 && !isAttachmentPlaceholder;
       if (hasText || !hasFiles) {
-        const text = createEl('div', isEmojiOnly ? 'emoji-only' : null, t || '');
+        const text = createEl('div', isEmojiOnly ? 'emoji-only' : null);
+        renderMessageText(text, t || '');
         div.appendChild(text);
       }
       if (m.files && m.files.length){
@@ -1477,6 +1716,40 @@
       }
       const meta = createEl('div', 'meta', m.time);
       div.appendChild(meta);
+      // ---- 이모지 반응 chips ----
+      if (m.who !== 'system' && m.id != null && Array.isArray(m.reactions) && m.reactions.length) {
+        const wrap = createEl('div', 'msg-reactions');
+        m.reactions.forEach(function(r){
+          if (!r || !r.emoji) return;
+          const chip = createEl('button', 'react-chip' + (r.mine ? ' is-mine' : ''));
+          chip.setAttribute('type', 'button');
+          chip.setAttribute('data-react-msg', String(m.id));
+          chip.setAttribute('data-react-emoji', r.emoji);
+          chip.setAttribute('title', r.mine ? '반응 취소' : '반응 추가');
+          chip.innerHTML = `<span class="rc-emoji">${r.emoji}</span><span class="rc-count">${r.count}</span>`;
+          wrap.appendChild(chip);
+        });
+        div.appendChild(wrap);
+      }
+      // Pin/Unpin 버튼 (시스템 메시지 제외, id 있는 경우만)
+      if (m.who !== 'system' && m.id != null) {
+        const pinBtn = createEl('button', 'msg-pin-btn', m.pinned
+          ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M16 3l5 5-2 2-1-1-4 4 1 4-2 2-5-5-5 5v-2l5-5-5-5 2-2 4 1 4-4-1-1z"/></svg>'
+          : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M16 3l5 5-2 2-1-1-4 4 1 4-2 2-5-5-5 5v-2l5-5-5-5 2-2 4 1 4-4-1-1z"/></svg>');
+        pinBtn.setAttribute('type', 'button');
+        pinBtn.setAttribute('title', m.pinned ? '고정 해제' : '메시지 고정');
+        pinBtn.setAttribute('aria-label', m.pinned ? '고정 해제' : '메시지 고정');
+        pinBtn.setAttribute('data-pin-msg', String(m.id));
+        pinBtn.setAttribute('data-pinned', m.pinned ? '1' : '0');
+        div.appendChild(pinBtn);
+        // 이모지 반응 추가 버튼
+        const reactBtn = createEl('button', 'msg-react-btn', '😊');
+        reactBtn.setAttribute('type', 'button');
+        reactBtn.setAttribute('title', '반응 추가');
+        reactBtn.setAttribute('aria-label', '반응 추가');
+        reactBtn.setAttribute('data-react-add', String(m.id));
+        div.appendChild(reactBtn);
+      }
       // Show "안읽음" indicator outside the bubble, positioned absolutely to the left.
       if (m.who === 'out' && m.unreadCount != null && m.unreadCount > 0) {
         div.style.position = 'relative';
@@ -1656,24 +1929,34 @@
   function updateProfilePanel(conv, isGroup){
     const contact = conv ? primaryContact(conv) : null;
     const selfConv = isSelfConversation(conv);
+    const channelConv = isChannelConversation(conv);
     if (profile.nameEl) {
-      profile.nameEl.textContent = conv ? (isGroup ? (conv.name || '') : (contact?.name || conv.name || '')) : '';
+      profile.nameEl.textContent = conv ? (channelConv ? (displayNameForConversation(conv) || '') : (isGroup ? displayNameForConversation(conv) : (contact?.name || displayNameForConversation(conv) || ''))) : '';
     }
     if (profile.emailEl) {
-      profile.emailEl.textContent = contact?.email || '';
+      profile.emailEl.textContent = channelConv ? '' : (contact?.email || '');
     }
     if (profile.extPhoneEl) {
-      profile.extPhoneEl.textContent = contact?.extPhone || '';
+      profile.extPhoneEl.textContent = channelConv ? '' : (contact?.extPhone || '');
     }
     if (profile.mobilePhoneEl) {
-      profile.mobilePhoneEl.textContent = contact?.mobilePhone || contact?.phone || '';
+      profile.mobilePhoneEl.textContent = channelConv ? '' : (contact?.mobilePhone || contact?.phone || '');
     }
     if (profile.locationEl) {
-      profile.locationEl.textContent = contact?.department || conv?.dept || '';
+      profile.locationEl.textContent = channelConv ? '채널' : (contact?.department || conv?.dept || '');
     }
     if (profile.avatarEl) {
-      const baseSrc = conv ? (selfConv ? resolveSelfAvatar() : (isGroup ? conv.avatar : (contact?.avatar || conv.avatar))) : null;
-      renderAvatarInto(profile.avatarEl, baseSrc, contact?.name || conv?.name || '');
+      if (isChannelConversation(conv)) {
+        const channelAvatarSrc = selfConv ? resolveSelfAvatar() : (contact?.avatar || conv?.avatar || '');
+        if (channelAvatarSrc) {
+          renderAvatarInto(profile.avatarEl, channelAvatarSrc, contact?.name || conv?.name || '');
+        } else {
+          renderChannelAvatarInto(profile.avatarEl);
+        }
+      } else {
+        const baseSrc = conv ? (selfConv ? resolveSelfAvatar() : (isGroup ? conv.avatar : (contact?.avatar || conv.avatar))) : null;
+        renderAvatarInto(profile.avatarEl, baseSrc, contact?.name || conv?.name || '');
+      }
     }
     if (profile.lastEl) {
       if (conv && conv.lastInteracted) {
@@ -1811,7 +2094,7 @@
       created_by_user_id: myId,
       member_ids: memberIds,
     };
-    const resp = await fetch(getRoomsUrl(), {
+    const resp = await fetch(getRoomsCreateUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -1822,7 +2105,7 @@
         await hydrateFromApi();
         return findConversationForEntry(entry);
       }
-      throw new Error('failed to create direct room');
+      throw new Error('failed to create direct room (HTTP ' + resp.status + ')');
     }
     const roomData = await resp.json();
     const normalized = normalizeRoomFromApi(roomData);
@@ -1835,10 +2118,9 @@
       purgeConversationHistory(syntheticId);
       removeConversationLocal(syntheticId);
     }
-
     state.isLive = true;
     conversations.unshift(normalized);
-    locallyDeletedRoomIds.delete(normalized.id);
+    forgetDeletedRoomId(normalized.id);
     syncFavoriteFlag(normalized);
     messageMap[normalized.id] = messageMap[normalized.id] || [];
     rebuildDirectory();
@@ -1940,6 +2222,11 @@
     const wrap = thread.avatarEl; if (!wrap) return;
     wrap.innerHTML = '';
     if (!conv) return;
+    if (isChannelConversation(conv)) {
+      wrap.className = 'avatar-group avatar-single';
+      wrap.appendChild(channelIconNode('sm'));
+      return;
+    }
     const members = materializeMembers(conv).filter((member, idx, arr) => (
       member && member.id != null ? arr.findIndex(m => m && m.id === member.id) === idx : true
     ));
@@ -2060,6 +2347,297 @@
     setTimeout(()=> search.focus(), 10);
   }
 
+  // ===== Pinned messages (메시지 고정) =====
+  const pinnedMap = {}; // convId -> array of pin items
+  const pinBarEl = document.getElementById('chat-pinned-bar');
+  const pinBarTextEl = document.getElementById('cpb-text');
+  const pinBarCountEl = document.getElementById('cpb-count');
+  const pinBarBodyBtn = document.getElementById('cpb-body');
+  const pinBarListBtn = document.getElementById('cpb-list-btn');
+  let pinBarPopoverEl = null;
+
+  function pinPreviewText(item) {
+    const msg = item && item.message;
+    if (!msg) return '(메시지 없음)';
+    const t = (msg.content_text || msg.content || '').trim();
+    if (t) return t;
+    if (msg.file_id || msg.content_type === 'FILE') return '[첨부파일]';
+    return '(빈 메시지)';
+  }
+
+  function renderPinnedBar(convId) {
+    if (!pinBarEl) return;
+    const list = pinnedMap[convId] || [];
+    if (!list.length) {
+      pinBarEl.hidden = true;
+      if (pinBarPopoverEl) pinBarPopoverEl.hidden = true;
+      if (pinBarListBtn) pinBarListBtn.classList.remove('is-open');
+      return;
+    }
+    pinBarEl.hidden = false;
+    const top = list[0];
+    if (pinBarTextEl) pinBarTextEl.textContent = pinPreviewText(top);
+    if (pinBarBodyBtn) pinBarBodyBtn.setAttribute('data-msg-id', String(top.message_id || ''));
+    if (pinBarCountEl) {
+      if (list.length > 1) {
+        pinBarCountEl.hidden = false;
+        pinBarCountEl.textContent = `+${list.length - 1}`;
+      } else {
+        pinBarCountEl.hidden = true;
+      }
+    }
+    if (pinBarPopoverEl && !pinBarPopoverEl.hidden) renderPinnedPopover(convId);
+  }
+
+  function renderPinnedPopover(convId) {
+    if (!pinBarPopoverEl) return;
+    const list = pinnedMap[convId] || [];
+    pinBarPopoverEl.innerHTML = '';
+    if (!list.length) {
+      const empty = createEl('div', 'cpp-empty', '고정된 메시지가 없습니다');
+      pinBarPopoverEl.appendChild(empty);
+      return;
+    }
+    list.forEach(function(item){
+      const row = createEl('div', 'cpp-item');
+      row.setAttribute('data-msg-id', String(item.message_id || ''));
+      const body = createEl('div');
+      body.style.flex = '1';
+      body.style.minWidth = '0';
+      const text = createEl('div', 'cpp-text', pinPreviewText(item));
+      const meta = createEl('div', 'cpp-meta', `${item.pinned_by && item.pinned_by.name ? item.pinned_by.name : ''} · ${item.pinned_at ? formatClockLabel(item.pinned_at) || '' : ''}`);
+      body.appendChild(text);
+      body.appendChild(meta);
+      row.appendChild(body);
+      const unpin = createEl('button', 'cpp-unpin', '해제');
+      unpin.setAttribute('type', 'button');
+      unpin.setAttribute('data-unpin-id', String(item.message_id || ''));
+      row.appendChild(unpin);
+      pinBarPopoverEl.appendChild(row);
+    });
+  }
+
+  function ensurePinnedPopover() {
+    if (pinBarPopoverEl || !pinBarEl) return;
+    pinBarPopoverEl = createEl('div', 'chat-pinned-popover');
+    pinBarPopoverEl.hidden = true;
+    pinBarEl.appendChild(pinBarPopoverEl);
+    pinBarPopoverEl.addEventListener('click', function(ev){
+      const unpinBtn = ev.target.closest('[data-unpin-id]');
+      if (unpinBtn) {
+        ev.stopPropagation();
+        const mid = parseInt(unpinBtn.getAttribute('data-unpin-id'), 10);
+        if (mid) togglePinForMessage(mid, true);
+        return;
+      }
+      const item = ev.target.closest('[data-msg-id]');
+      if (item) {
+        const mid = parseInt(item.getAttribute('data-msg-id'), 10);
+        if (mid) scrollToMessage(mid);
+      }
+    });
+  }
+
+  function scrollToMessage(messageId) {
+    if (!messagesEl || !messageId) return;
+    const target = messagesEl.querySelector(`[data-msg-id="${messageId}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('is-pinned-target');
+    // restart animation
+    void target.offsetWidth;
+    target.classList.add('is-pinned-target');
+  }
+
+  function loadPinnedMessages(convId) {
+    const conv = conversations.find(function(c){ return c.id === convId; });
+    if (!conv || !conv.roomId) {
+      pinnedMap[convId] = [];
+      renderPinnedBar(convId);
+      return;
+    }
+    const url = `${chatConfig.apiRoot}/rooms/${conv.roomId}/pins`;
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : { items: [] }; })
+      .then(function(data){
+        pinnedMap[convId] = Array.isArray(data && data.items) ? data.items : [];
+        renderPinnedBar(convId);
+        // mark messages as pinned in messageMap
+        const pinnedSet = new Set(pinnedMap[convId].map(function(p){ return p.message_id; }));
+        const msgs = messageMap[convId] || [];
+        let changed = false;
+        msgs.forEach(function(m){
+          const next = pinnedSet.has(m.id);
+          if (!!m.pinned !== next) { m.pinned = next; changed = true; }
+        });
+        if (changed && activeId === convId) renderMessages(convId);
+      })
+      .catch(function(){
+        pinnedMap[convId] = [];
+        renderPinnedBar(convId);
+      });
+  }
+
+  function togglePinForMessage(messageId, currentlyPinned) {
+    const conv = conversations.find(function(c){ return c.id === activeId; });
+    if (!conv || !conv.roomId) return;
+    const url = `${chatConfig.apiRoot}/rooms/${conv.roomId}/messages/${messageId}/pin`;
+    const opts = {
+      method: currentlyPinned ? 'DELETE' : 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: currentlyPinned ? null : JSON.stringify({}),
+    };
+    fetch(url, opts)
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r); })
+      .then(function(){ loadPinnedMessages(conv.id); })
+      .catch(function(err){
+        try { console.error('pin toggle failed', err); } catch (_) {}
+      });
+  }
+
+  // Click delegation for pin button on bubbles
+  if (messagesEl) {
+    messagesEl.addEventListener('click', function(ev){
+      const btn = ev.target.closest('.msg-pin-btn');
+      if (!btn) return;
+      ev.stopPropagation();
+      const mid = parseInt(btn.getAttribute('data-pin-msg'), 10);
+      const isPinned = btn.getAttribute('data-pinned') === '1';
+      if (mid) togglePinForMessage(mid, isPinned);
+    });
+  }
+
+  // ===== Reactions: chip toggle + add picker =====
+  const REACTION_EMOJIS = ['👍','👎','😀','😂','😍','😮','😢','😡','🎉','🔥','💯','✅','❗','🙏','👀','💡'];
+  let reactPickerEl = null;
+
+  function ensureReactPicker(){
+    if (reactPickerEl) return reactPickerEl;
+    reactPickerEl = createEl('div', 'react-picker-popover');
+    reactPickerEl.hidden = true;
+    document.body.appendChild(reactPickerEl);
+    REACTION_EMOJIS.forEach(function(em){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = em;
+      b.setAttribute('data-emoji', em);
+      reactPickerEl.appendChild(b);
+    });
+    reactPickerEl.addEventListener('click', function(ev){
+      const btn = ev.target.closest('button[data-emoji]');
+      if (!btn) return;
+      ev.stopPropagation();
+      const em = btn.getAttribute('data-emoji');
+      const mid = parseInt(reactPickerEl.getAttribute('data-msg-id'), 10);
+      if (mid && em) toggleReactionForMessage(mid, em);
+      hideReactPicker();
+    });
+    document.addEventListener('click', function(ev){
+      if (!reactPickerEl || reactPickerEl.hidden) return;
+      if (reactPickerEl.contains(ev.target)) return;
+      hideReactPicker();
+    });
+    return reactPickerEl;
+  }
+  function hideReactPicker(){
+    if (reactPickerEl) reactPickerEl.hidden = true;
+  }
+  function showReactPickerFor(messageId, anchorEl){
+    ensureReactPicker();
+    reactPickerEl.setAttribute('data-msg-id', String(messageId));
+    reactPickerEl.hidden = false;
+    const r = anchorEl.getBoundingClientRect();
+    const sx = window.scrollX || window.pageXOffset;
+    const sy = window.scrollY || window.pageYOffset;
+    reactPickerEl.style.position = 'absolute';
+    reactPickerEl.style.left = (sx + Math.max(8, r.left - 4)) + 'px';
+    reactPickerEl.style.top = (sy + Math.max(8, r.top - 200)) + 'px';
+    setTimeout(function(){
+      const pr = reactPickerEl.getBoundingClientRect();
+      const vw = window.innerWidth;
+      let left = parseFloat(reactPickerEl.style.left);
+      let top = parseFloat(reactPickerEl.style.top);
+      if (left + pr.width > sx + vw - 8) left = sx + vw - pr.width - 8;
+      if (top - sy < 8) top = sy + r.bottom + 8;
+      reactPickerEl.style.left = left + 'px';
+      reactPickerEl.style.top = top + 'px';
+    }, 0);
+  }
+
+  function toggleReactionForMessage(messageId, emoji){
+    if (!messageId || !emoji) return;
+    fetch(`${chatConfig.apiRoot}/messages/${messageId}/reactions`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji: emoji }),
+    })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r); })
+      .then(function(data){
+        const list = Array.isArray(data && data.reactions) ? data.reactions.map(function(r){
+          return {
+            emoji: r.emoji,
+            count: Number(r.count) || 0,
+            mine: !!r.mine,
+            userIds: Array.isArray(r.user_ids) ? r.user_ids.slice() : [],
+          };
+        }) : [];
+        Object.keys(messageMap).forEach(function(cid){
+          const arr = messageMap[cid];
+          if (!arr) return;
+          for (let i = 0; i < arr.length; i++) {
+            if (arr[i] && arr[i].id === messageId) arr[i].reactions = list;
+          }
+        });
+        if (activeId != null) renderMessages(activeId);
+      })
+      .catch(function(err){ try { console.error('reaction toggle failed', err); } catch(_){} });
+  }
+
+  if (messagesEl) {
+    messagesEl.addEventListener('click', function(ev){
+      const chip = ev.target.closest('.react-chip[data-react-emoji]');
+      if (chip) {
+        ev.stopPropagation();
+        const mid = parseInt(chip.getAttribute('data-react-msg'), 10);
+        const em = chip.getAttribute('data-react-emoji');
+        if (mid && em) toggleReactionForMessage(mid, em);
+        return;
+      }
+      const addBtn = ev.target.closest('.msg-react-btn[data-react-add]');
+      if (addBtn) {
+        ev.stopPropagation();
+        const mid = parseInt(addBtn.getAttribute('data-react-add'), 10);
+        if (mid) showReactPickerFor(mid, addBtn);
+      }
+    });
+  }
+
+  if (pinBarBodyBtn) {
+    pinBarBodyBtn.addEventListener('click', function(){
+      const mid = parseInt(pinBarBodyBtn.getAttribute('data-msg-id'), 10);
+      if (mid) scrollToMessage(mid);
+    });
+  }
+  if (pinBarListBtn) {
+    pinBarListBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      ensurePinnedPopover();
+      if (!pinBarPopoverEl) return;
+      const willOpen = pinBarPopoverEl.hidden;
+      if (willOpen) renderPinnedPopover(activeId);
+      pinBarPopoverEl.hidden = !willOpen;
+      pinBarListBtn.classList.toggle('is-open', willOpen);
+    });
+    document.addEventListener('click', function(ev){
+      if (!pinBarPopoverEl || pinBarPopoverEl.hidden) return;
+      if (pinBarEl && pinBarEl.contains(ev.target)) return;
+      pinBarPopoverEl.hidden = true;
+      pinBarListBtn.classList.remove('is-open');
+    });
+  }
+
   function setActive(id){
     activeId = id;
     state.activeDirectoryKey = null;
@@ -2070,14 +2648,12 @@
     const isGroup = isGroupConversation(conv);
 
     if (delBtn) {
-      const canDelete = !conv
-        ? false
-        : (!conv.roomId || state.currentUserId == null || conv.createdByUserId == null)
-          ? true
-          : Number(conv.createdByUserId) === Number(state.currentUserId);
+      // 서버는 방 생성자 또는 활성 멤버에게 삭제를 허용한다.
+      // 대화 목록에 노출된 시점에서 사용자는 이미 활성 멤버이므로 클라이언트에서는 항상 활성화한다.
+      const canDelete = !!conv;
       delBtn.disabled = !canDelete;
       delBtn.setAttribute('aria-disabled', canDelete ? 'false' : 'true');
-      delBtn.title = canDelete ? '삭제' : '삭제(생성자만 가능)';
+      delBtn.title = '삭제';
     }
     if (leaveBtn) {
       const isCreator = !!(
@@ -2090,7 +2666,7 @@
       leaveBtn.title = canLeave ? '나가기' : (isCreator ? '나가기(생성자는 불가)' : '나가기');
     }
     if (thread.nameEl) {
-      thread.nameEl.textContent = conv ? (conv.name || '') : '';
+      thread.nameEl.textContent = conv ? displayNameForConversation(conv) : '';
     }
     updateProfilePanel(conv, isGroup);
     const contactForFavorite = conv && !isGroup ? primaryContact(conv) : null;
@@ -2143,6 +2719,12 @@
     }
     renderMessages._forceScroll = true;
     renderMessages(id && conv ? id : null);
+    if (id && conv && conv.roomId) {
+      loadPinnedMessages(id);
+    } else if (pinBarEl) {
+      pinBarEl.hidden = true;
+      if (pinBarPopoverEl) pinBarPopoverEl.hidden = true;
+    }
 
     // Now that the divider has been rendered, update lastReadMessageId to latest.
     if (conv && conv.roomId) {
@@ -2312,8 +2894,20 @@
       }
 
       // If this is a synthetic/direct conversation without a room yet, try creating it now.
+      let _lastEntry = null;
+      let _lastErr = null;
       if (!conv.roomId && chatConfig.roomsUrl) {
         const entry = findEntryForConversation(conv) || buildPseudoEntryFromConversation(conv);
+        _lastEntry = entry;
+        console.warn('[chat-send-debug] currentUserId=', state.currentUserId, 'entry=', entry, 'conv=', { id: conv.id, name: conv.name, roomType: conv.roomType, roomId: conv.roomId, members: conv.members });
+        // Fallback: if entry exists but userId is missing, try to look it up by name+department from directory
+        if (entry && entry.userId == null && Array.isArray(directory)) {
+          const candidate = directory.find(u => (u.name || '') === (entry.name || '') && (u.department || '') === (entry.department || ''));
+          if (candidate && candidate.id != null) {
+            entry.userId = Number(candidate.id);
+            console.warn('[chat-send-debug] entry.userId resolved via directory lookup ->', entry.userId);
+          }
+        }
         if (entry) {
           try {
             const created = await createDirectRoomForEntry(entry);
@@ -2322,6 +2916,7 @@
               conv = created;
             }
           } catch (err) {
+            _lastErr = err;
             console.warn('[chat] Failed to create room before send', err);
           }
         }
@@ -2329,7 +2924,10 @@
 
       if (!conv.roomId) {
         restoreDraft();
-        window.alert('채팅방을 만들 수 없어 메시지를 보낼 수 없습니다. 잠시 후 다시 시도해주세요.');
+        const detail = (_lastEntry == null)
+          ? '대상 사용자 정보를 찾을 수 없습니다'
+          : (_lastEntry.userId == null ? '대상 사용자 ID(userId)가 비어있습니다 (' + (_lastEntry.name || '?') + ')' : (_lastErr ? ('서버 오류: ' + _lastErr.message) : '서버 응답 없음'));
+        window.alert('채팅방을 만들 수 없어 메시지를 보낼 수 없습니다.\n' + detail + '\n(F12 콘솔에서 [chat-send-debug] 로그 확인)');
         return;
       }
     }
@@ -2512,6 +3110,203 @@
       window.alert('메시지 전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
     }
   }
+
+  // ---- @ / # 자동완성 팝오버 ----
+  // @ = 사람 (directoryEntries), # = 채널 (conversations)
+  const MENTION_MAX_ITEMS = 8;
+  let mentionPopoverEl = null;
+  let mentionState = { open: false, trigger: null, query: '', start: -1, items: [], activeIdx: 0 };
+
+  function ensureMentionPopover(){
+    if (mentionPopoverEl) return mentionPopoverEl;
+    const el = document.createElement('div');
+    el.className = 'mention-popover';
+    el.setAttribute('role', 'listbox');
+    el.hidden = true;
+    document.body.appendChild(el);
+    mentionPopoverEl = el;
+    el.addEventListener('mousedown', function(ev){ ev.preventDefault(); }); // 포커스 유지
+    el.addEventListener('click', function(ev){
+      const li = ev.target.closest('[data-mention-idx]');
+      if (!li) return;
+      const idx = parseInt(li.getAttribute('data-mention-idx'), 10);
+      if (!isNaN(idx)) commitMentionSelection(idx);
+    });
+    return el;
+  }
+
+  function hideMentionPopover(){
+    mentionState.open = false;
+    mentionState.items = [];
+    if (mentionPopoverEl) mentionPopoverEl.hidden = true;
+  }
+
+  function getCaretPos(){
+    if (!inputEl) return 0;
+    const v = inputEl.selectionStart;
+    return (typeof v === 'number') ? v : (inputEl.value || '').length;
+  }
+
+  // 캐럿 직전 텍스트에서 @xxx 또는 #xxx 토큰을 찾는다. 공백/줄바꿈 또는 시작점에서만 트리거.
+  function detectMentionToken(){
+    if (!inputEl) return null;
+    const value = inputEl.value || '';
+    const caret = getCaretPos();
+    const before = value.slice(0, caret);
+    // 토큰: 공백/시작 직후 @ 또는 # 로 시작, 이후 공백 없는 문자
+    const m = before.match(/(^|[\s\n])([@#])([^\s@#]*)$/);
+    if (!m) return null;
+    const trigger = m[2];
+    const query = m[3] || '';
+    const start = before.length - (m[2].length + query.length);
+    return { trigger, query, start };
+  }
+
+  function searchMentionCandidates(trigger, query){
+    const q = (query || '').trim().toLowerCase();
+    if (trigger === '@') {
+      const list = (Array.isArray(directoryEntries) ? directoryEntries : []).slice();
+      const filtered = q ? list.filter(function(e){
+        const n = (e.name || '').toLowerCase();
+        const dept = (typeof displayDeptName === 'function' ? displayDeptName(e.department) : (e.department || '')).toLowerCase();
+        const job = (e.job || '').toLowerCase();
+        return n.indexOf(q) !== -1 || dept.indexOf(q) !== -1 || job.indexOf(q) !== -1;
+      }) : list;
+      return filtered.slice(0, MENTION_MAX_ITEMS).map(function(e){
+        return {
+          label: e.name || '(이름없음)',
+          sub: (typeof displayDeptName === 'function' ? displayDeptName(e.department) : (e.department || '')) + (e.job ? ' · ' + e.job : ''),
+          insertText: '@' + (e.name || '').replace(/\s+/g, ''),
+        };
+      });
+    }
+    if (trigger === '#') {
+      const list = (Array.isArray(conversations) ? conversations : []).slice();
+      const filtered = q ? list.filter(function(c){
+        return (c.name || '').toLowerCase().indexOf(q) !== -1;
+      }) : list;
+      return filtered.slice(0, MENTION_MAX_ITEMS).map(function(c){
+        return {
+          label: c.name || '(이름없음)',
+          sub: c.roomId ? '채널' : '대화',
+          insertText: '#' + (c.name || '').replace(/\s+/g, ''),
+        };
+      });
+    }
+    return [];
+  }
+
+  function renderMentionPopover(){
+    const el = ensureMentionPopover();
+    el.innerHTML = '';
+    if (!mentionState.items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'mention-empty';
+      empty.textContent = '검색 결과가 없습니다';
+      el.appendChild(empty);
+    } else {
+      mentionState.items.forEach(function(item, i){
+        const row = document.createElement('div');
+        row.className = 'mention-item' + (i === mentionState.activeIdx ? ' is-active' : '');
+        row.setAttribute('data-mention-idx', String(i));
+        row.setAttribute('role', 'option');
+        const label = document.createElement('div');
+        label.className = 'mention-label';
+        label.textContent = item.label;
+        row.appendChild(label);
+        if (item.sub) {
+          const sub = document.createElement('div');
+          sub.className = 'mention-sub';
+          sub.textContent = item.sub;
+          row.appendChild(sub);
+        }
+        el.appendChild(row);
+      });
+    }
+    positionMentionPopover();
+    el.hidden = false;
+  }
+
+  function positionMentionPopover(){
+    if (!mentionPopoverEl || !inputEl) return;
+    const rect = inputEl.getBoundingClientRect();
+    const popH = mentionPopoverEl.offsetHeight || 200;
+    let top = rect.top - popH - 6;
+    if (top < 8) top = rect.bottom + 6; // 위쪽 공간 부족 시 아래로
+    let left = rect.left;
+    const maxLeft = window.innerWidth - 280;
+    if (left > maxLeft) left = maxLeft;
+    if (left < 8) left = 8;
+    mentionPopoverEl.style.top = top + 'px';
+    mentionPopoverEl.style.left = left + 'px';
+  }
+
+  function updateMentionPopover(){
+    if (!inputEl) return;
+    const tok = detectMentionToken();
+    if (!tok) { hideMentionPopover(); return; }
+    const items = searchMentionCandidates(tok.trigger, tok.query);
+    mentionState.open = true;
+    mentionState.trigger = tok.trigger;
+    mentionState.query = tok.query;
+    mentionState.start = tok.start;
+    mentionState.items = items;
+    if (mentionState.activeIdx >= items.length) mentionState.activeIdx = 0;
+    if (mentionState.activeIdx < 0) mentionState.activeIdx = 0;
+    renderMentionPopover();
+  }
+
+  function commitMentionSelection(idx){
+    if (!inputEl || !mentionState.open) return;
+    const item = mentionState.items[idx];
+    if (!item) { hideMentionPopover(); return; }
+    const value = inputEl.value || '';
+    const caret = getCaretPos();
+    const before = value.slice(0, mentionState.start);
+    const after = value.slice(caret);
+    const insert = item.insertText + ' ';
+    inputEl.value = before + insert + after;
+    const newCaret = (before + insert).length;
+    try { inputEl.setSelectionRange(newCaret, newCaret); } catch(_){}
+    hideMentionPopover();
+    inputEl.focus();
+  }
+
+  if (inputEl) {
+    inputEl.addEventListener('input', updateMentionPopover);
+    inputEl.addEventListener('blur', function(){ setTimeout(hideMentionPopover, 120); });
+    // 자동완성 keydown은 send용 keydown보다 먼저 등록되어야 Enter 가로채기가 가능하다.
+    inputEl.addEventListener('keydown', function(e){
+      if (!mentionState.open) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (mentionState.items.length) {
+          mentionState.activeIdx = (mentionState.activeIdx + 1) % mentionState.items.length;
+          renderMentionPopover();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (mentionState.items.length) {
+          mentionState.activeIdx = (mentionState.activeIdx - 1 + mentionState.items.length) % mentionState.items.length;
+          renderMentionPopover();
+        }
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (mentionState.items.length) {
+          e.preventDefault();
+          e.stopImmediatePropagation(); // send 방지
+          commitMentionSelection(mentionState.activeIdx);
+        } else {
+          hideMentionPopover();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        hideMentionPopover();
+      }
+    });
+    window.addEventListener('resize', function(){ if (mentionState.open) positionMentionPopover(); });
+    window.addEventListener('scroll', function(){ if (mentionState.open) positionMentionPopover(); }, true);
+  }
+
   inputEl?.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') send(); });
   sendBtn?.addEventListener('click', send);
 
@@ -2577,12 +3372,12 @@
   renderPendingAttachments(); // will remove empty row if any
   if (emojiPopover){ emojiPopover.hidden = true; emojiPopover.setAttribute('aria-hidden','true'); }
   // periodic refresh of recent label (once per minute)
-  setInterval(() => {
+  __chatRegisterInterval(setInterval(() => {
     const conv = conversations.find(c => c.id === activeId);
     if (conv && conv.lastInteracted && profile.lastEl){
       profile.lastEl.textContent = formatRelative(conv.lastInteracted);
     }
-  }, 60000);
+  }, 60000));
 
   hydrateDirectoryFromApi();
   // Resolve the authoritative current user id from the server session.
@@ -2629,10 +3424,240 @@
     pendingDeleteId = null;
   }
 
+  function openInfoModal(message, opts){
+    const options = opts || {};
+    if (!infoModal || !infoModalMessage) {
+      try { window.alert(message); } catch(_) {}
+      return;
+    }
+    if (infoModalTitle) infoModalTitle.textContent = options.title || '알림';
+    if (infoModalIcon) infoModalIcon.textContent = options.icon || 'ℹ️';
+    infoModalMessage.textContent = message || '';
+    infoModal.hidden = false;
+    infoModal.setAttribute('aria-hidden','false');
+    infoModal.classList.add('open');
+    setTimeout(()=> infoModalConfirm?.focus(), 20);
+  }
+  function closeInfoModal(){
+    if (!infoModal) return;
+    infoModal.hidden = true;
+    infoModal.setAttribute('aria-hidden','true');
+    infoModal.classList.remove('open');
+  }
+  infoModalConfirm?.addEventListener('click', closeInfoModal);
+  infoModalBackdrop?.addEventListener('click', closeInfoModal);
+
+  // === 메시지 검색 모달 ===
+  let searchScope = 'room';
+  let searchDebounceTimer = null;
+  let searchRequestSeq = 0;
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  function highlightSnippet(snippet, q){
+    const safe = escapeHtml(snippet);
+    if (!q) return safe;
+    try {
+      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+      return safe.replace(re, '<mark>$1</mark>');
+    } catch(_) { return safe; }
+  }
+  function formatSearchTime(ts){
+    if (!ts) return '';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) {
+        return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      }
+      return (d.getMonth()+1) + '/' + d.getDate();
+    } catch(_) { return ''; }
+  }
+  function findConvByRoomId(roomId){
+    return conversations.find(function(c){ return c.roomId === roomId; });
+  }
+  function openSearchModal(){
+    if (!searchModal) return;
+    searchModal.hidden = false;
+    searchModal.setAttribute('aria-hidden','false');
+    searchModal.classList.add('open');
+    if (searchModalInput) {
+      searchModalInput.value = '';
+      setTimeout(function(){ searchModalInput.focus(); }, 30);
+    }
+    if (searchModalResults) searchModalResults.innerHTML = '';
+    if (searchModalStatus) searchModalStatus.textContent = '검색어를 입력하세요.';
+    setSearchScope(activeId ? 'room' : 'global');
+  }
+  function closeSearchModal(){
+    if (!searchModal) return;
+    searchModal.hidden = true;
+    searchModal.setAttribute('aria-hidden','true');
+    searchModal.classList.remove('open');
+    if (searchDebounceTimer) { clearTimeout(searchDebounceTimer); searchDebounceTimer = null; }
+  }
+  function setSearchScope(scope){
+    searchScope = scope;
+    if (searchModalScopeBtns) {
+      searchModalScopeBtns.forEach(function(b){
+        if (b.getAttribute('data-scope') === scope) b.classList.add('is-active');
+        else b.classList.remove('is-active');
+      });
+    }
+    // 활성 채팅방이 없으면 room scope 비활성화
+    if (scope === 'room' && !activeId) {
+      searchScope = 'global';
+      if (searchModalScopeBtns) {
+        searchModalScopeBtns.forEach(function(b){
+          if (b.getAttribute('data-scope') === 'global') b.classList.add('is-active');
+          else b.classList.remove('is-active');
+        });
+      }
+    }
+    if (searchModalInput && searchModalInput.value.trim().length >= 1) {
+      runSearch(searchModalInput.value);
+    }
+  }
+  function runSearch(q){
+    const keyword = (q || '').trim();
+    const seq = ++searchRequestSeq;
+    if (!searchModalResults || !searchModalStatus) return;
+    if (keyword.length < (searchScope === 'global' ? 2 : 1)) {
+      searchModalResults.innerHTML = '';
+      searchModalStatus.textContent = searchScope === 'global'
+        ? '전체 검색은 2자 이상 입력해주세요.'
+        : '검색어를 입력하세요.';
+      return;
+    }
+    searchModalStatus.textContent = '검색 중…';
+
+    let url;
+    if (searchScope === 'room') {
+      const conv = activeId ? conversations.find(function(c){ return c.id === activeId; }) : null;
+      if (!conv || !conv.roomId) {
+        searchModalStatus.textContent = '현재 선택된 채팅방이 없습니다.';
+        searchModalResults.innerHTML = '';
+        return;
+      }
+      const params = new URLSearchParams({ q: keyword, limit: '50' });
+      if (state.currentUserId != null) params.set('viewer_user_id', String(state.currentUserId));
+      url = chatConfig.apiRoot + '/rooms/' + conv.roomId + '/search?' + params.toString();
+    } else {
+      const params = new URLSearchParams({ q: keyword, limit: '50' });
+      if (state.currentUserId != null) params.set('viewer_user_id', String(state.currentUserId));
+      url = chatConfig.apiRoot + '/search?' + params.toString();
+    }
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : { items: [] }; })
+      .then(function(data){
+        if (seq !== searchRequestSeq) return;
+        const items = (data && Array.isArray(data.items)) ? data.items : [];
+        renderSearchResults(items, keyword);
+      })
+      .catch(function(){
+        if (seq !== searchRequestSeq) return;
+        searchModalStatus.textContent = '검색 중 오류가 발생했습니다.';
+        searchModalResults.innerHTML = '';
+      });
+  }
+  function renderSearchResults(items, keyword){
+    if (!searchModalResults || !searchModalStatus) return;
+    searchModalResults.innerHTML = '';
+    if (!items.length) {
+      searchModalStatus.textContent = '검색 결과가 없습니다.';
+      return;
+    }
+    searchModalStatus.textContent = items.length + '건의 메시지를 찾았습니다.';
+    const frag = document.createDocumentFragment();
+    items.forEach(function(it){
+      const li = document.createElement('li');
+      li.className = 'chat-search-result';
+      li.setAttribute('data-msg-id', String(it.id || ''));
+      li.setAttribute('data-room-id', String(it.room_id || ''));
+      const conv = findConvByRoomId(it.room_id);
+      const roomName = conv ? (conv.name || '채팅방') : ('#' + (it.room_id || ''));
+      const senderName = it.sender_user_name || it.sender_name || ('사용자 ' + (it.sender_user_id || ''));
+      const timeStr = formatSearchTime(it.created_at);
+      const snippet = highlightSnippet(it.snippet || it.text || '', keyword);
+      const showRoomBadge = (searchScope === 'global');
+      li.innerHTML =
+        '<div class="chat-search-result__top">' +
+          '<span class="chat-search-result__name">' + escapeHtml(senderName) + '</span>' +
+          (showRoomBadge ? '<span class="chat-search-result__room">' + escapeHtml(roomName) + '</span>' : '') +
+          '<span class="chat-search-result__time">' + escapeHtml(timeStr) + '</span>' +
+        '</div>' +
+        '<div class="chat-search-result__snippet">' + snippet + '</div>';
+      li.addEventListener('click', function(){
+        jumpToSearchResult(it.room_id, it.id);
+      });
+      frag.appendChild(li);
+    });
+    searchModalResults.appendChild(frag);
+  }
+  function flashSearchTarget(messageId){
+    if (!messagesEl || !messageId) return false;
+    const target = messagesEl.querySelector('[data-msg-id="' + messageId + '"]');
+    if (!target) return false;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('is-search-target');
+    void target.offsetWidth;
+    target.classList.add('is-search-target');
+    return true;
+  }
+  function jumpToSearchResult(roomId, messageId){
+    if (!messageId) return;
+    const conv = findConvByRoomId(roomId);
+    closeSearchModal();
+    if (!conv) {
+      openInfoModal('해당 채팅방에 접근할 수 없습니다.', { title: '이동 불가', icon: '⚠️' });
+      return;
+    }
+    const needSwitch = (activeId !== conv.id);
+    if (needSwitch) {
+      setActive(conv.id);
+    }
+    // 메시지 로드 후 스크롤 시도 (최대 1.5초 대기)
+    let tries = 0;
+    function tryScroll(){
+      tries += 1;
+      if (flashSearchTarget(messageId)) return;
+      if (tries < 30) {
+        setTimeout(tryScroll, 50);
+      }
+    }
+    setTimeout(tryScroll, needSwitch ? 200 : 0);
+  }
+  if (btnMsgSearch) btnMsgSearch.addEventListener('click', openSearchModal);
+  if (searchModalClose) searchModalClose.addEventListener('click', closeSearchModal);
+  if (searchModalBackdrop) searchModalBackdrop.addEventListener('click', closeSearchModal);
+  if (searchModalScopeBtns) {
+    searchModalScopeBtns.forEach(function(b){
+      b.addEventListener('click', function(){ setSearchScope(b.getAttribute('data-scope')); });
+    });
+  }
+  if (searchModalInput) {
+    searchModalInput.addEventListener('input', function(){
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      const v = searchModalInput.value;
+      searchDebounceTimer = setTimeout(function(){ runSearch(v); }, 220);
+    });
+    searchModalInput.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape') { closeSearchModal(); }
+    });
+  }
+
   function performDeleteConversation(targetId, options = {}){
     if (!targetId) return;
     const { isLive = false } = options;
-    if (isLive) locallyDeletedRoomIds.add(targetId);
+    if (isLive) rememberDeletedRoomId(targetId);
     const idx = conversations.findIndex(c => c.id === targetId);
     if (idx < 0) return;
     tombstoneContactForConversation(conversations[idx]);
@@ -2745,7 +3770,7 @@
   function openDeleteModal(conv){
     if (!conv) return;
     const isGroup = Array.isArray(conv.groupAvatars);
-    const label = isGroup ? '이 그룹 채팅을 삭제할까요?' : `${conv.name || '대화'}과의 채팅을 삭제할까요?`;
+    const label = isGroup ? '이 그룹 채팅을 삭제할까요?' : `${displayNameForConversation(conv)}과의 채팅을 삭제할까요?`;
     if (!deleteModal || !deleteModalMessage || !deleteModalConfirm) {
       if (window.confirm(label)) requestDeleteConversation(conv);
       return;
@@ -2760,8 +3785,12 @@
 
   async function requestDeleteConversation(conv){
     if (!conv) return false;
+    // 서버에 보낼 actor 식별자가 비어있으면 세션 기반으로 한 번 더 시도
+    if (conv.roomId && state.currentUserId == null) {
+      try { await ensureCurrentUserId(); } catch(_) {}
+    }
     // Always keep a local tombstone so a deleted conversation doesn't reappear.
-    locallyDeletedRoomIds.add(conv.id);
+    rememberDeletedRoomId(conv.id);
 
     // Also tombstone the contact key so colleague-tab synthetic chats never
     // reuse old cached messages after deletion.
@@ -2792,14 +3821,14 @@
         });
         if (!resp.ok && resp.status !== 404) {
           if (resp.status === 403) {
-            window.alert('채팅룸 삭제는 생성자만 가능합니다.');
+            openInfoModal('채팅방 삭제 권한이 없습니다. (방 생성자 또는 활성 멤버만 삭제할 수 있습니다.)', { title: '삭제 불가', icon: '⚠️' });
             return false;
           }
           throw new Error('room delete failed');
         }
       } catch (err) {
         console.warn('[chat] Failed to delete room', err);
-        window.alert('채팅을 삭제하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        openInfoModal('채팅을 삭제하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', { title: '오류', icon: '⚠️' });
         return false;
       }
     }
@@ -3018,18 +4047,18 @@
             created_by_user_id: myId,
             member_ids: memberIds,
           };
-          const resp = await fetch(getRoomsUrl(), {
+          const resp = await fetch(getRoomsCreateUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify(payload),
           });
-          if (!resp.ok) throw new Error('failed to create group room');
+          if (!resp.ok) throw new Error('failed to create group room (HTTP ' + resp.status + ')');
           const roomData = await resp.json();
           const normalized = normalizeRoomFromApi(roomData);
           if (!normalized) return null;
           conversations.unshift(normalized);
-          locallyDeletedRoomIds.delete(normalized.id);
+          forgetDeletedRoomId(normalized.id);
           syncFavoriteFlag(normalized);
           messageMap[normalized.id] = messageMap[normalized.id] || [];
           return { conv: normalized, addedName: friendName };
@@ -3092,13 +4121,56 @@
   // Robust drop handlers (capture phase) on thread and key child areas
   const threadHeader = document.querySelector('.thread-header');
   const threadInput = document.querySelector('.thread-input');
-  function onDragOver(e){ e.preventDefault(); threadContainer.classList.add('droppable'); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; }
-  function onDragLeave(){ threadContainer.classList.remove('droppable'); }
+  function isFileDrag(e){
+    if (!e || !e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    if (!types) return false;
+    for (let i = 0; i < types.length; i++) {
+      if (types[i] === 'Files' || types[i] === 'application/x-moz-file') return true;
+    }
+    return false;
+  }
+  function onDragOver(e){
+    e.preventDefault();
+    threadContainer.classList.add('droppable');
+    if (isFileDrag(e)) threadContainer.classList.add('droppable-files');
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  }
+  function onDragLeave(){
+    threadContainer.classList.remove('droppable');
+    threadContainer.classList.remove('droppable-files');
+  }
   async function onDrop(e){
     e.preventDefault();
     e.stopPropagation();
     if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
     threadContainer.classList.remove('droppable');
+    threadContainer.classList.remove('droppable-files');
+
+    // 1) 외부 파일 드롭: pendingFiles로 추가
+    if (isFileDrag(e)) {
+      const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+      if (!files.length) return;
+      const activeConv = conversations.find(c => c.id === activeId);
+      if (!activeConv) {
+        try { window.alert('파일을 추가하려면 먼저 대화방을 선택해주세요.'); } catch(_){}
+        return;
+      }
+      // 50MB 제한 (서버 정책과 무관하게 사전 컷)
+      const MAX = 50 * 1024 * 1024;
+      const oversized = files.filter(f => f.size > MAX);
+      const accepted = files.filter(f => f.size <= MAX);
+      if (oversized.length) {
+        try { window.alert(oversized.length + '개 파일이 50MB를 초과해 제외되었습니다.'); } catch(_){}
+      }
+      if (!accepted.length) return;
+      pendingFiles.push.apply(pendingFiles, accepted);
+      renderPendingAttachments();
+      try { inputEl?.focus(); } catch(_){}
+      return;
+    }
+
+    // 2) 기존: 친구/대화 드래그 처리
     const payload = readDragPayload(e);
     if (!payload) return;
     const activeConv = conversations.find(c => c.id === activeId) || null;
@@ -3132,18 +4204,21 @@
   if (threadHeader){
     ['dragenter','dragover'].forEach(evt => threadHeader.addEventListener(evt, onDragOver, true));
     threadHeader.addEventListener('dragleave', onDragLeave, true);
-    // no drop on header (avoid duplicate handling)
+    threadHeader.addEventListener('drop', onDrop, true);
   }
   if (messagesEl){
     ['dragenter','dragover'].forEach(evt => messagesEl.addEventListener(evt, onDragOver, true));
     messagesEl.addEventListener('dragleave', onDragLeave, true);
-    // no drop on messages (avoid duplicate handling)
+    messagesEl.addEventListener('drop', onDrop, true);
   }
   if (threadInput){
     ['dragenter','dragover'].forEach(evt => threadInput.addEventListener(evt, onDragOver, true));
     threadInput.addEventListener('dragleave', onDragLeave, true);
-    // no drop on input (avoid duplicate handling)
+    threadInput.addEventListener('drop', onDrop, true);
   }
+  // 윈도우 밖에서 파일을 떨어뜨릴 때 브라우저 페이지 이동 방지 (chat 페이지에 한정)
+  window.addEventListener('dragover', function(e){ if (isFileDrag(e)) e.preventDefault(); }, false);
+  window.addEventListener('drop', function(e){ if (isFileDrag(e)) e.preventDefault(); }, false);
 
   // --- Context menu for chat list ---
   const contextMenu = document.createElement('div');
@@ -3280,6 +4355,578 @@
     const mailto = `mailto:${recipients.join(',')}?subject=${subject}&body=${body}`;
     window.location.href = mailto;
   });
+
+  // Chat settings drawer (standalone DOM binding)
+  (function initSettingsDrawer(){
+    const settingsBtn = document.getElementById('btn-chat-settings');
+    let drawer = document.getElementById('chat-settings-drawer');
+    const profilePanel = document.querySelector('.chat-profile');
+    if (!settingsBtn) return;
+
+    // 알림 뮤트 (localStorage)
+    const MUTE_KEY = 'chat-muted-v1';
+    function loadMutedSet(){
+      try { return new Set(JSON.parse(localStorage.getItem(MUTE_KEY) || '[]')); } catch(_){ return new Set(); }
+    }
+    function saveMutedSet(set){
+      try { localStorage.setItem(MUTE_KEY, JSON.stringify(Array.from(set))); } catch(_){}
+    }
+    const mutedIds = loadMutedSet();
+    function isMuted(convId){ return mutedIds.has(String(convId)); }
+    function toggleMute(convId){
+      const key = String(convId);
+      if (mutedIds.has(key)) mutedIds.delete(key); else mutedIds.add(key);
+      saveMutedSet(mutedIds);
+    }
+    window.__chatIsMuted = isMuted;
+
+    function ensureDrawer(){
+      if (drawer) return drawer;
+      const aside = document.createElement('aside');
+      aside.className = 'chat-settings-drawer';
+      aside.id = 'chat-settings-drawer';
+      aside.hidden = true;
+      aside.setAttribute('aria-hidden', 'true');
+      aside.setAttribute('aria-label', '설정');
+      aside.innerHTML =
+        '<div class="csd-header">' +
+          '<h3 class="csd-title" id="csd-title">채팅 설정</h3>' +
+          '<button class="icon-btn csd-close" id="btn-chat-settings-close" aria-label="설정 닫기">×</button>' +
+        '</div>' +
+        '<div class="csd-body">' +
+          '<div class="csd-section">' +
+            '<div class="csd-section-label">이름</div>' +
+            '<div class="csd-row-edit">' +
+              '<input class="csd-input" id="csd-name-input" type="text" maxlength="60" autocomplete="off" placeholder="이름 입력" />' +
+            '</div>' +
+          '</div>' +
+          '<div class="csd-section" id="csd-section-invite">' +
+            '<button class="csd-action-btn" id="csd-btn-invite">멤버 초대</button>' +
+          '</div>' +
+          '<div class="csd-section csd-danger-zone">' +
+            '<button class="csd-action-btn csd-danger" id="csd-btn-leave">나가기</button>' +
+            '<button class="csd-action-btn csd-danger" id="csd-btn-delete">삭제</button>' +
+          '</div>' +
+        '</div>';
+      const wrapper = document.querySelector('.chat-wrapper');
+      if (wrapper) wrapper.appendChild(aside);
+      drawer = aside;
+      drawer.querySelector('#btn-chat-settings-close')?.addEventListener('click', closeDrawer);
+      drawer.querySelector('#csd-btn-invite')?.addEventListener('click', function(){
+        closeDrawer();
+        if (addMemberBtn && !addMemberBtn.disabled) addMemberBtn.click();
+      });
+      drawer.querySelector('#csd-btn-leave')?.addEventListener('click', function(){
+        closeDrawer();
+        if (leaveBtn && !leaveBtn.disabled) leaveBtn.click();
+      });
+      drawer.querySelector('#csd-btn-delete')?.addEventListener('click', function(){
+        closeDrawer();
+        if (delBtn && !delBtn.disabled) delBtn.click();
+      });
+      return drawer;
+    }
+
+    function openDrawer(){
+      const currentDrawer = ensureDrawer();
+      if (!currentDrawer) return;
+      const titleEl = document.getElementById('csd-title');
+      const threadNameEl = document.getElementById('thread-name');
+      const nameInput = document.getElementById('csd-name-input');
+      const descInput = document.getElementById('csd-desc-input');
+      const descSection = document.getElementById('csd-section-desc');
+      const inviteSection = document.getElementById('csd-section-invite');
+      const muteSwitch = document.getElementById('csd-mute-switch');
+      const conv = (typeof activeId !== 'undefined') ? conversations.find(c => c.id === activeId) : null;
+      const roomType = String((conv && conv.roomType) || '').toUpperCase();
+      const isChannel = roomType === 'CHANNEL';
+      const isDirect = roomType === 'DIRECT';
+      if (titleEl) titleEl.textContent = isChannel ? '채널 설정' : '채팅 설정';
+      if (nameInput) nameInput.value = (conv && conv.name) || (threadNameEl ? (threadNameEl.textContent || '').trim() : '');
+      if (descSection) {
+        if (isChannel) descSection.classList.remove('csd-hidden');
+        else descSection.classList.add('csd-hidden');
+      }
+      if (descInput) descInput.value = (conv && conv.description) || '';
+      if (inviteSection) inviteSection.style.display = isDirect ? 'none' : '';
+      if (muteSwitch && conv) {
+        const muted = isMuted(conv.id);
+        muteSwitch.setAttribute('aria-checked', muted ? 'true' : 'false');
+      }
+      const csdLeave = document.getElementById('csd-btn-leave');
+      if (csdLeave && leaveBtn) { csdLeave.disabled = !!leaveBtn.disabled; }
+      const csdDel = document.getElementById('csd-btn-delete');
+      if (csdDel && delBtn) { csdDel.disabled = !!delBtn.disabled; csdDel.title = delBtn.title || '삭제'; }
+      currentDrawer.hidden = false;
+      currentDrawer.setAttribute('aria-hidden', 'false');
+      settingsBtn.setAttribute('aria-expanded', 'true');
+      if (profilePanel) profilePanel.hidden = true;
+    }
+
+    function closeDrawer(){
+      const currentDrawer = ensureDrawer();
+      if (!currentDrawer) return;
+      currentDrawer.hidden = true;
+      currentDrawer.setAttribute('aria-hidden', 'true');
+      settingsBtn.setAttribute('aria-expanded', 'false');
+      if (profilePanel) profilePanel.hidden = false;
+    }
+
+    const closeBtn = document.getElementById('btn-chat-settings-close');
+    closeBtn?.addEventListener('click', closeDrawer);
+
+    settingsBtn.addEventListener('click', function(evt){
+      evt.preventDefault();
+      const currentDrawer = ensureDrawer();
+      if (!currentDrawer) return;
+      if (currentDrawer.hidden) openDrawer();
+      else closeDrawer();
+    });
+
+    listEl?.addEventListener('click', function(){
+      const currentDrawer = ensureDrawer();
+      if (currentDrawer && !currentDrawer.hidden) closeDrawer();
+    });
+
+    document.addEventListener('keydown', function(evt){
+      if (evt.key !== 'Escape') return;
+      const currentDrawer = ensureDrawer();
+      if (currentDrawer && !currentDrawer.hidden) closeDrawer();
+    });
+
+    document.getElementById('csd-btn-invite')?.addEventListener('click', function(){
+      closeDrawer();
+      if (addMemberBtn && !addMemberBtn.disabled) addMemberBtn.click();
+    });
+    document.getElementById('csd-btn-leave')?.addEventListener('click', function(){
+      closeDrawer();
+      if (leaveBtn && !leaveBtn.disabled) leaveBtn.click();
+    });
+    document.getElementById('csd-btn-delete')?.addEventListener('click', function(){
+      closeDrawer();
+      if (delBtn && !delBtn.disabled) delBtn.click();
+    });
+
+    // 알림 토글
+    const muteSwitch = document.getElementById('csd-mute-switch');
+    if (muteSwitch) {
+      const doToggle = function(){
+        const conv = conversations.find(c => c.id === activeId);
+        if (!conv) return;
+        toggleMute(conv.id);
+        muteSwitch.setAttribute('aria-checked', isMuted(conv.id) ? 'true' : 'false');
+      };
+      muteSwitch.addEventListener('click', function(e){ e.preventDefault(); doToggle(); });
+      muteSwitch.addEventListener('keydown', function(e){
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); doToggle(); }
+      });
+    }
+
+    // 통합 저장 버튼: 이름 + (채널) 설명
+    const saveBtn = document.getElementById('csd-btn-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async function(){
+        const conv = conversations.find(c => c.id === activeId);
+        if (!conv) return;
+        const nameInput = document.getElementById('csd-name-input');
+        const descInput = document.getElementById('csd-desc-input');
+        const newName = (nameInput && nameInput.value || '').trim();
+        const newDesc = descInput ? descInput.value : '';
+        const isChannel = String(conv.roomType || '').toUpperCase() === 'CHANNEL';
+        if (!newName) { if (nameInput) nameInput.focus(); return; }
+        saveBtn.disabled = true;
+        try {
+          // 1) 방 이름 변경 (v1 PATCH /api/chat/rooms/<roomId>)
+          if (conv.roomId) {
+            try {
+              const r = await fetch(`${chatConfig.apiRoot}/rooms/${conv.roomId}`, {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ room_name: newName }),
+              });
+              if (r.ok) {
+                conv.name = newName;
+                const threadNameEl = document.getElementById('thread-name');
+                if (threadNameEl) threadNameEl.textContent = newName;
+                const profileNameEl = document.getElementById('profile-name');
+                if (profileNameEl && !isChannel) profileNameEl.textContent = newName;
+                lastListRenderSignature = null;
+                if (typeof renderList === 'function') renderList(getActiveFilter(), searchEl ? searchEl.value : '');
+              }
+            } catch(_){}
+          }
+          // 2) 채널 설명 변경 (v2 PATCH /api/chat/v2/channels/<channelId>)
+          if (isChannel && conv.channelId) {
+            try {
+              const r2 = await fetch(`/api/chat/v2/channels/${conv.channelId}`, {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ name: newName, description: newDesc }),
+              });
+              if (r2.ok) { conv.description = newDesc; }
+            } catch(_){}
+          }
+          closeDrawer();
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
+  })();
+
+  // 새 채널 만들기 + 멤버 선택 모달 (remote_chat.js의 standalone 모듈을 통합)
+  (function initNewChannelModal(){
+    function $(id){ return document.getElementById(id); }
+    function getCfg(){
+      var el = document.getElementById('chat-config');
+      return {
+        apiRoot: (el && el.getAttribute('data-api-root')) || '/api/chat',
+        directoryUrl: '/api/chat/directory'
+      };
+    }
+    var directory = [];
+    var directoryError = '';
+    var directoryLoaded = false;
+    var selectedIds = new Set();
+
+    function loadDirectory(){
+      var cfg = getCfg();
+      directoryError = '';
+      return fetch(cfg.directoryUrl, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r){
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(rows){
+          directory = Array.isArray(rows) ? rows : [];
+          directoryLoaded = true;
+        })
+        .catch(function(err){
+          directory = [];
+          directoryLoaded = true;
+          directoryError = (err && err.message) || '로드 실패';
+        });
+    }
+    function renderMembers(){
+      var listEl = $('new-channel-member-list');
+      var searchEl = $('new-channel-member-search');
+      if (!listEl) return;
+      var term = ((searchEl && searchEl.value) || '').trim().toLowerCase();
+      if (!term) { listEl.hidden = true; listEl.innerHTML = ''; return; }
+      listEl.innerHTML = '';
+      listEl.hidden = false;
+      var pool = directory.filter(function(u){ return u && (u.user_id != null || u.id != null); });
+      var matched = pool.filter(function(u){
+        var name = String(u.name || u.display_name || '').toLowerCase();
+        var dept = String(u.department || u.dept || '').toLowerCase();
+        return name.indexOf(term) >= 0 || dept.indexOf(term) >= 0;
+      });
+      var LIMIT = 50;
+      var filtered = matched.slice(0, LIMIT);
+      if (!filtered.length) {
+        var li = document.createElement('li');
+        if (directoryError) { li.className = 'error'; li.textContent = '동료 목록을 불러오지 못했습니다 (' + directoryError + ')'; }
+        else if (!directoryLoaded) { li.className = 'empty'; li.textContent = '동료 목록을 불러오는 중입니다...'; }
+        else { li.className = 'empty'; li.textContent = '검색 결과가 없습니다.'; }
+        listEl.appendChild(li);
+        return;
+      }
+      filtered.forEach(function(u){
+        var uid = u.user_id != null ? u.user_id : u.id;
+        var li = document.createElement('li');
+        var dept = u.department || u.dept || '';
+        li.innerHTML = '<span>' + (u.name || u.display_name || '') + (dept ? ' <small style="color:#94a3b8;">· ' + dept + '</small>' : '') + '</span>';
+        if (selectedIds.has(uid)) li.classList.add('selected');
+        li.addEventListener('click', function(){
+          if (selectedIds.has(uid)) selectedIds.delete(uid); else selectedIds.add(uid);
+          renderMembers(); renderSelected();
+        });
+        listEl.appendChild(li);
+      });
+      if (matched.length > LIMIT) {
+        var more = document.createElement('li');
+        more.className = 'empty';
+        more.textContent = '… ' + (matched.length - LIMIT) + '명 더 있음. 검색을 좁혀주세요.';
+        listEl.appendChild(more);
+      }
+    }
+    function renderSelected(){
+      var wrap = $('new-channel-member-selected');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      selectedIds.forEach(function(uid){
+        var u = directory.find(function(x){ return (x.user_id != null ? x.user_id : x.id) === uid; });
+        if (!u) return;
+        var chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = u.name || u.display_name || ('#' + uid);
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.setAttribute('aria-label', '제거');
+        close.textContent = '\u00d7';
+        close.addEventListener('click', function(){
+          selectedIds.delete(uid);
+          renderSelected(); renderMembers();
+        });
+        chip.appendChild(close);
+        wrap.appendChild(chip);
+      });
+    }
+    function showError(msg){
+      var el = $('new-channel-error');
+      if (!el) return;
+      if (!msg) { el.hidden = true; el.textContent = ''; return; }
+      el.hidden = false; el.textContent = msg;
+    }
+
+    // ===== Member Picker (separate modal) =====
+    var mpSelectedDept = null;
+    var mpTempSelected = new Set();
+    function _mpUserId(u){ return u.user_id != null ? u.user_id : u.id; }
+    function buildDeptTree(){
+      var tree = $('mp-tree');
+      if (!tree) return;
+      tree.innerHTML = '';
+      var groups = {};
+      directory.forEach(function(u){
+        if (!u) return;
+        var d = u.department || u.dept || '미지정';
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(u);
+      });
+      var deptNames = Object.keys(groups).sort();
+      function addItem(label, key, count){
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mp-tree-item' + ((mpSelectedDept === key) ? ' active' : '');
+        btn.textContent = label + ' (' + count + ')';
+        btn.addEventListener('click', function(){
+          mpSelectedDept = key;
+          var head = $('mp-list-head'); if (head) head.textContent = label;
+          Array.prototype.forEach.call(tree.querySelectorAll('.mp-tree-item'), function(el){ el.classList.remove('active'); });
+          btn.classList.add('active');
+          buildMemberList();
+        });
+        tree.appendChild(btn);
+      }
+      addItem('전체', null, directory.length);
+      deptNames.forEach(function(d){ addItem(d, d, groups[d].length); });
+    }
+    function buildMemberList(){
+      var listEl = $('mp-list');
+      var searchEl = $('mp-search');
+      var countEl = $('mp-count');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      var term = ((searchEl && searchEl.value) || '').trim().toLowerCase();
+      var pool = directory.filter(function(u){
+        if (!u) return false;
+        if (mpSelectedDept != null && (u.department || u.dept || '미지정') !== mpSelectedDept) return false;
+        if (term) {
+          var name = String(u.name || u.display_name || '').toLowerCase();
+          var dept = String(u.department || u.dept || '').toLowerCase();
+          if (name.indexOf(term) < 0 && dept.indexOf(term) < 0) return false;
+        }
+        return true;
+      });
+      var LIMIT = 200;
+      var slice = pool.slice(0, LIMIT);
+      if (!slice.length) {
+        var em = document.createElement('li');
+        em.className = 'mp-empty';
+        em.textContent = directoryError ? ('동료 목록 로드 실패: ' + directoryError) : (directoryLoaded ? '결과 없음' : '불러오는 중...');
+        listEl.appendChild(em);
+      } else {
+        slice.forEach(function(u){
+          var uid = _mpUserId(u);
+          var li = document.createElement('li');
+          li.className = 'mp-item';
+          var checked = mpTempSelected.has(uid) ? 'checked' : '';
+          var dept = u.department || u.dept || '';
+          var name = u.name || u.display_name || ('#' + uid);
+          li.innerHTML = '<label><input type="checkbox" data-uid="' + uid + '" ' + checked + ' /> <span class="mp-name">' + name + '</span>' + (dept ? ' <small class="mp-dept">' + dept + '</small>' : '') + '</label>';
+          var cb = li.querySelector('input[type=checkbox]');
+          cb.addEventListener('change', function(){
+            if (cb.checked) mpTempSelected.add(uid); else mpTempSelected.delete(uid);
+            if (countEl) countEl.textContent = '선택 ' + mpTempSelected.size + '명';
+          });
+          listEl.appendChild(li);
+        });
+        if (pool.length > LIMIT) {
+          var more = document.createElement('li');
+          more.className = 'mp-empty';
+          more.textContent = '… ' + (pool.length - LIMIT) + '명 더 있음. 검색을 좁혀주세요.';
+          listEl.appendChild(more);
+        }
+      }
+      if (countEl) countEl.textContent = '선택 ' + mpTempSelected.size + '명';
+    }
+    function openMemberPicker(){
+      var modal = $('member-picker-modal');
+      if (!modal) return;
+      if (modal.parentNode !== document.body) document.body.appendChild(modal);
+      mpTempSelected = new Set();
+      selectedIds.forEach(function(uid){ mpTempSelected.add(uid); });
+      mpSelectedDept = null;
+      var searchEl = $('mp-search'); if (searchEl) searchEl.value = '';
+      var head = $('mp-list-head'); if (head) head.textContent = '전체';
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      modal.classList.add('open');
+      if (!directoryLoaded) {
+        loadDirectory().then(function(){ buildDeptTree(); buildMemberList(); });
+      } else {
+        buildDeptTree(); buildMemberList();
+      }
+    }
+    function closeMemberPicker(){
+      var modal = $('member-picker-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      modal.classList.remove('open');
+    }
+    function applyMemberPicker(){
+      selectedIds = new Set();
+      mpTempSelected.forEach(function(uid){ selectedIds.add(uid); });
+      renderSelected();
+      closeMemberPicker();
+    }
+
+    function openModal(){
+      var modal = $('chat-new-channel-modal');
+      if (!modal) return;
+      if (modal.parentNode !== document.body) { try { document.body.appendChild(modal); } catch(_){} }
+      selectedIds.clear();
+      var nameEl = $('new-channel-name');
+      var descEl = $('new-channel-desc');
+      var searchInputEl = $('new-channel-member-search');
+      if (nameEl) nameEl.value = '';
+      if (descEl) descEl.value = '';
+      if (searchInputEl) searchInputEl.value = '';
+      var visPublic = modal.querySelector('input[name="new-channel-visibility"][value="public"]');
+      if (visPublic) visPublic.checked = true;
+      showError('');
+      renderSelected();
+      var listEl = $('new-channel-member-list');
+      if (listEl) { listEl.hidden = true; listEl.innerHTML = ''; }
+      if (!directoryLoaded) loadDirectory();
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      modal.classList.add('open');
+      document.body.classList.add('chat-modal-open');
+      setTimeout(function(){ if (nameEl) nameEl.focus(); }, 50);
+    }
+    function closeModal(){
+      var modal = $('chat-new-channel-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      modal.classList.remove('open');
+      document.body.classList.remove('chat-modal-open');
+    }
+    function submitForm(){
+      var nameEl = $('new-channel-name');
+      var descEl = $('new-channel-desc');
+      var modal = $('chat-new-channel-modal');
+      var confirmBtn = $('new-channel-confirm');
+      var name = nameEl ? nameEl.value.trim() : '';
+      if (!name) { showError('채널명을 입력하세요.'); if (nameEl) nameEl.focus(); return; }
+      var visEl = modal ? modal.querySelector('input[name="new-channel-visibility"]:checked') : null;
+      var visibility = visEl ? visEl.value : 'public';
+      var description = descEl ? descEl.value.trim() : '';
+      var memberIds = [];
+      try { selectedIds.forEach(function(uid){ memberIds.push(uid); }); } catch(_){}
+      // 뷰어(생성자) 식별 – data-profile-id 또는 whoami 폴백
+      var cfgEl = document.getElementById('chat-config');
+      var viewerId = cfgEl ? parseInt(cfgEl.getAttribute('data-profile-id') || '0', 10) : 0;
+
+      function doPost(viewerOrNull){
+        if (viewerOrNull && memberIds.indexOf(viewerOrNull) < 0) memberIds.unshift(viewerOrNull);
+        var payload = {
+          room_type: 'CHANNEL',
+          room_name: name,
+          member_ids: memberIds,
+          member_role: 'MEMBER',
+          visibility: visibility,
+        };
+        if (viewerOrNull) payload.created_by_user_id = viewerOrNull;
+        if (description) payload.description = description;
+        if (confirmBtn) confirmBtn.disabled = true;
+        return fetch('/api/chat/rooms', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify(payload),
+        }).then(function(r){
+          return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, data: d }; });
+        }).then(function(res){
+          if (!res.ok) {
+            var msg = (res.data && (res.data.message || res.data.error)) || ('채널 생성 실패 (HTTP ' + res.status + ')');
+            showError(msg);
+            return;
+          }
+          closeModal();
+          window.location.reload();
+        }).catch(function(){
+          showError('네트워크 오류가 발생했습니다.');
+        }).then(function(){
+          if (confirmBtn) confirmBtn.disabled = false;
+        });
+      }
+
+      if (viewerId) { doPost(viewerId); return; }
+      // 폴백: whoami 로 사용자 ID 조회
+      fetch('/api/chat/whoami', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){
+          var uid = j && (j.user_id || j.id || j.profile_id);
+          if (!uid) { showError('로그인 정보가 없습니다. 다시 로그인 해주세요.'); return; }
+          doPost(parseInt(uid, 10));
+        })
+        .catch(function(){
+          // 서버 세션이 있으면 created_by_user_id 없이도 통과
+          doPost(null);
+        });
+    }
+
+    // 트리거 버튼 + 모달 위치 보정
+    var triggerBtn = $('btn-new-channel');
+    var modalRoot = $('chat-new-channel-modal');
+    var pickerRoot = $('member-picker-modal');
+    if (modalRoot && modalRoot.parentNode !== document.body) { try { document.body.appendChild(modalRoot); } catch(_){} }
+    if (pickerRoot && pickerRoot.parentNode !== document.body) { try { document.body.appendChild(pickerRoot); } catch(_){} }
+    if (triggerBtn) triggerBtn.addEventListener('click', function(e){ e.preventDefault(); openModal(); });
+
+    // 위임 이벤트 (가장 안정적)
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('#btn-new-channel')) { e.preventDefault(); openModal(); return; }
+      if (t.closest('#new-channel-cancel') || t.closest('#new-channel-cancel-2') || t.closest('#chat-new-channel-backdrop')) { e.preventDefault(); closeModal(); return; }
+      if (t.closest('#new-channel-confirm')) { e.preventDefault(); submitForm(); return; }
+      if (t.closest('#new-channel-dept-toggle')) { e.preventDefault(); openMemberPicker(); return; }
+      if (t.closest('#member-picker-cancel') || t.closest('#member-picker-cancel-2') || t.closest('#member-picker-backdrop')) { e.preventDefault(); closeMemberPicker(); return; }
+      if (t.closest('#member-picker-apply')) { e.preventDefault(); applyMemberPicker(); return; }
+      // 자동완성 외부 클릭 시 닫기
+      if (!(t.closest('#new-channel-member-list') || t.closest('#new-channel-member-search'))) {
+        var le = $('new-channel-member-list'); if (le) le.hidden = true;
+      }
+    }, false);
+    document.addEventListener('input', function(e){
+      if (e.target && e.target.id === 'new-channel-member-search') renderMembers();
+      if (e.target && e.target.id === 'mp-search') buildMemberList();
+    }, false);
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && e.target && e.target.id === 'new-channel-name') { e.preventDefault(); submitForm(); }
+      else if (e.key === 'Escape') {
+        var m1 = $('chat-new-channel-modal'); if (m1 && !m1.hidden) closeModal();
+        var m2 = $('member-picker-modal'); if (m2 && !m2.hidden) closeMemberPicker();
+      }
+    }, false);
+  })();
 
   // Avatar is non-interactive by design; no handlers attached.
 })();

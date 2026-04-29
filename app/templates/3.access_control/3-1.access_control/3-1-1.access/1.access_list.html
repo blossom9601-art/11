@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260423a">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260424a" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content">
+		<div class="content-wrapper">
+			<div class="ac-page-header">
+				<div>
+					<h1>접근제어 접속</h1>
+					<p>승인받은 자원만 보여드립니다. 자원을 선택하면 접속 정보와 상세를 확인할 수 있습니다.</p>
+				</div>
+			</div>
+			<div class="access-grid">
+				<section class="access-card">
+					<div class="access-card-head">
+						<div>
+							<h2>내 승인 자원</h2>
+							<p>현재 접근 권한이 부여된 자원 목록입니다.</p>
+						</div>
+						<div id="access-total" class="status-badge status-usable">0건</div>
+					</div>
+					<form class="access-filter access-filter--simple" id="access-filter-form">
+						<div>
+							<label for="access-search-name">자원명 검색</label>
+							<input id="access-search-name" name="searchName" type="text" placeholder="예: NAVER">
+						</div>
+						<div>
+							<label for="access-type-filter">분류</label>
+							<select id="access-type-filter" name="resourceType">
+								<option value="">전체</option>
+								<option value="WEB">WEB</option>
+								<option value="SSH">SSH</option>
+							</select>
+						</div>
+					</form>
+					<div class="access-table-wrap">
+						<div id="access-state" class="state-box" hidden></div>
+						<table class="access-table" id="access-table">
+							<thead>
+								<tr>
+									<th>자원명</th>
+									<th>접속점</th>
+									<th>만료일</th>
+									<th>최근 접속</th>
+								</tr>
+							</thead>
+							<tbody id="access-table-body"></tbody>
+						</table>
+					</div>
+				</section>
+				<aside class="access-card">
+					<div class="access-card-head">
+						<div>
+							<h2>상세 정보</h2>
+							<p>선택한 자원의 권한 상태와 접속 시 주의사항을 확인합니다.</p>
+						</div>
+					</div>
+					<div class="panel-body" id="access-detail-panel">
+						<div class="state-box">목록에서 자원을 선택하세요.</div>
+					</div>
+				</aside>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

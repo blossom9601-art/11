@@ -1,48 +1,42 @@
 ###############################################################################
 # blossom-lumina-web.spec
-# Blossom Lumina — WEB 서버 패키지 (NGINX + Gunicorn + Flask)
-# 역할: 대시보드 UI, 조회 API, 관리자 기능
+# Blossom Lumina — 단일 통합 WEB 서비스 패키지
+# 역할: 하나의 systemd 유닛(lumina-web.service)에서 두 gunicorn(Asset Mgmt + Chat
+#       8001, Dashboard 8000)을 wrapper 로 동반 기동.
 # 대상: Rocky Linux 8.10 / 9.x / 10.x
+# 주의: 애플리케이션 코드(/opt/blossom/web, /opt/blossom/lumina/web), nginx 설정,
+#       TLS, secure.env 는 별도 배포되며 이 패키지는 건드리지 않는다.
 ###############################################################################
 
 %define _name       lumina-web
-%define _version    2.0.0
+%define _version    2.1.2
 %define _release    1%{?dist}
-%define _prefix     /opt/blossom/lumina
-%define _confdir    /etc/blossom/lumina
 %define _logdir     /var/log/blossom/lumina/web
-%define _libdir_bl  /var/lib/blossom/lumina/web
-%define _rundir     /run/blossom/lumina
 
 Name:           %{_name}
 Version:        %{_version}
 Release:        %{_release}
-Summary:        Blossom Lumina — WEB 대시보드 서버 (NGINX + Gunicorn + Flask)
+Summary:        Blossom Lumina — 통합 WEB 서비스 (Asset Mgmt + Chat + Dashboard, 단일 systemd 유닛)
 License:        Proprietary
 URL:            https://blossom.local
 Group:          System Environment/Daemons
 BuildArch:      noarch
-Requires:       lumina-common >= 2.0.0
-Requires:       python3 >= 3.6
-Requires:       python3-flask >= 2.0
-Requires:       python3-gunicorn >= 20.0
-Requires:       python3-PyMySQL >= 0.9
-Requires:       python3-paramiko >= 2.0
-Requires:       nginx >= 1.14
-Requires:       openssl >= 1.1.1
+Requires:       bash
 
 %description
-Blossom Lumina WEB 대시보드 서버.
-NGINX를 리버스 프록시로 사용하여 Gunicorn + Flask 앱을 서빙한다.
-DB는 READ-ONLY 접근만 허용 (lumina_web_reader 계정).
+Blossom Lumina — 단일 통합 WEB 서비스 유닛.
 
-보안 기본값:
-- HTTPS 강제 (HTTP → HTTPS 리다이렉트)
-- HSTS 활성화
-- 보안 헤더 기본 주입
-- Gunicorn 내부 바인딩 전용 (127.0.0.1:8000)
-- secure cookie / session
-- Flask DEBUG = False
+하나의 systemd 서비스(lumina-web.service) 안에서 두 개의 gunicorn 프로세스를
+동반 기동/정지한다. 두 프로세스 모두 /opt/blossom/web/venv (python3.11) 공유.
+  - 127.0.0.1:8001 : Asset Mgmt + Chat (python3.11 venv)
+  - 127.0.0.1:8000 : Lumina Dashboard (python3.11 venv)
+
+제공 파일:
+  - /usr/lib/systemd/system/lumina-web.service  (단일 통합 유닛)
+  - /usr/local/bin/lumina-web-start.sh           (두 gunicorn wrapper)
+
+애플리케이션 코드 / nginx 설정 / TLS / DB 자격 등은 별도 배포되며
+이 패키지는 건드리지 않는다.
 
 ###############################################################################
 # install
@@ -50,44 +44,18 @@ DB는 READ-ONLY 접근만 허용 (lumina_web_reader 계정).
 %install
 rm -rf %{buildroot}
 
-# ── WEB 앱 코드 ──────────────────────────────────────────
-install -d -m 0755 %{buildroot}%{_prefix}/web
-install -d -m 0755 %{buildroot}%{_prefix}/web/app
-install -d -m 0755 %{buildroot}%{_prefix}/web/app/routes
-install -d -m 0755 %{buildroot}%{_prefix}/web/app/templates
-install -d -m 0755 %{buildroot}%{_prefix}/web/app/static
-
-install -m 0644 %{_sourcedir}/web/wsgi.py               %{buildroot}%{_prefix}/web/
-install -m 0644 %{_sourcedir}/web/gunicorn.conf.py       %{buildroot}%{_prefix}/web/
-install -m 0644 %{_sourcedir}/web/app/__init__.py        %{buildroot}%{_prefix}/web/app/
-install -m 0644 %{_sourcedir}/web/app/cli_api.py         %{buildroot}%{_prefix}/web/app/
-
-# ── 설정 파일 ────────────────────────────────────────────
-install -d -m 0755 %{buildroot}%{_confdir}
-install -m 0640 %{_sourcedir}/conf/web.conf              %{buildroot}%{_confdir}/web.conf
-
-# ── NGINX 설정 ───────────────────────────────────────────
-install -d -m 0755 %{buildroot}%{_sysconfdir}/nginx/conf.d
-install -m 0644 %{_sourcedir}/nginx/lumina.conf \
-    %{buildroot}%{_sysconfdir}/nginx/conf.d/lumina.conf
-
-# ── systemd unit ─────────────────────────────────────────
+# ── systemd unit (단일 통합 유닛) ────────────────────────
 install -d -m 0755 %{buildroot}%{_unitdir}
 install -m 0644 %{_sourcedir}/systemd/lumina-web.service \
     %{buildroot}%{_unitdir}/lumina-web.service
 
-# ── 데이터 디렉터리 ──────────────────────────────────────
-install -d -m 0750 %{buildroot}%{_libdir_bl}
+# ── 통합 wrapper 스크립트 (두 gunicorn 동반 기동) ────────
+install -d -m 0755 %{buildroot}/usr/local/bin
+install -m 0755 %{_sourcedir}/bin/lumina-web-start.sh \
+    %{buildroot}/usr/local/bin/lumina-web-start.sh
 
 # ── 로그 디렉터리 ────────────────────────────────────────
-install -d -m 0750 %{buildroot}%{_logdir}
-
-# ── tmpfiles.d ───────────────────────────────────────────
-install -d -m 0755 %{buildroot}%{_tmpfilesdir}
-cat > %{buildroot}%{_tmpfilesdir}/lumina-web.conf << 'TMPEOF'
-d /run/blossom/lumina          0755  root        root        -
-f /run/blossom/lumina/gunicorn.pid   0644  lumina-web  lumina-web  -
-TMPEOF
+install -d -m 0755 %{buildroot}%{_logdir}
 
 ###############################################################################
 # files
@@ -95,46 +63,14 @@ TMPEOF
 %files
 %defattr(-,root,root,-)
 
-# WEB 앱 코드
-%dir %{_prefix}/web
-%{_prefix}/web/wsgi.py
-%{_prefix}/web/gunicorn.conf.py
-%dir %{_prefix}/web/app
-%{_prefix}/web/app/__init__.py
-%{_prefix}/web/app/cli_api.py
-%dir %{_prefix}/web/app/routes
-%dir %{_prefix}/web/app/templates
-%dir %{_prefix}/web/app/static
-
-# 설정
-%config(noreplace) %attr(0640,root,lumina-web) %{_confdir}/web.conf
-
-# NGINX 설정
-%config(noreplace) %{_sysconfdir}/nginx/conf.d/lumina.conf
-
-# systemd
+# systemd 유닛
 %{_unitdir}/lumina-web.service
 
-# 데이터 디렉터리
-%dir %attr(0750,lumina-web,lumina-web) %{_libdir_bl}
+# 통합 wrapper
+%attr(0755,root,root) /usr/local/bin/lumina-web-start.sh
 
 # 로그 디렉터리
-%dir %attr(0750,lumina-web,lumina-web) %{_logdir}
-
-# tmpfiles
-%{_tmpfilesdir}/lumina-web.conf
-
-###############################################################################
-# pre — 서비스 계정 생성
-###############################################################################
-%pre
-getent group lumina-web >/dev/null 2>&1 || \
-    groupadd -r lumina-web
-getent passwd lumina-web >/dev/null 2>&1 || \
-    useradd -r -g lumina-web -G lumina \
-        -d %{_prefix}/web \
-        -s /sbin/nologin \
-        -c "Lumina WEB Service" lumina-web
+%dir %{_logdir}
 
 ###############################################################################
 # post — 설치 후
@@ -143,39 +79,34 @@ getent passwd lumina-web >/dev/null 2>&1 || \
 systemctl daemon-reload
 systemctl enable lumina-web.service 2>/dev/null || true
 
-# tmpfiles 적용
-systemd-tmpfiles --create lumina-web.conf 2>/dev/null || true
-
-# SELinux: Gunicorn → DB 연결 허용
-if command -v setsebool &>/dev/null; then
-    setsebool -P httpd_can_network_connect_db 1 2>/dev/null || true
-    setsebool -P httpd_can_network_connect 1 2>/dev/null || true
-fi
+# 구(舊) 분리 유닛이 남아 있다면 정지/마스킹 — 단일 lumina-web 만 운용
+for old_unit in blossom-web.service lumina-dashboard.service; do
+    if systemctl list-unit-files | grep -q "^${old_unit}"; then
+        systemctl stop "$old_unit" 2>/dev/null || true
+        systemctl disable "$old_unit" 2>/dev/null || true
+        systemctl mask "$old_unit" 2>/dev/null || true
+    fi
+done
+rm -f /etc/systemd/system/blossom-web.service
+rm -f /etc/systemd/system/lumina-dashboard.service
+rm -rf /etc/systemd/system/lumina-web.service.d
+# /etc/systemd/system 에 같은 이름 override 가 남아 있으면 RPM 유닛이 가려진다.
+# (관리자가 수동 배치한 경우엔 그대로 두지만, 자동 머지 wrapper 가 동일 내용이면 제거 권장)
+systemctl daemon-reload
 
 echo ""
 echo "================================================================"
-echo " Blossom Lumina WEB 서버 설치 완료"
+echo " Blossom Lumina WEB — 단일 유닛 설치 완료 (lumina-web.service)"
 echo "================================================================"
 echo ""
-echo " 1. 설정 파일 편집:"
-echo "    vi %{_confdir}/web.conf         (WEB 앱 설정)"
-echo "    vi %{_confdir}/secure.env       (SECRET_KEY, DB 비밀번호)"
+echo " 필수 선제 조건 (이 패키지는 건드리지 않음):"
+echo "   - /opt/blossom/web/                       (Asset Mgmt + Chat, python3.11 venv)"
+echo "   - /opt/blossom/lumina/web/                (Dashboard, python3.11 venv 공유)"
+echo "   - /etc/blossom/lumina/secure.env          (SECRET_KEY, DB 자격)"
+echo "   - /etc/nginx/conf.d/lumina-web.conf       (nginx 설정)"
 echo ""
-echo " 2. TLS 인증서 배치 (HTTPS):"
-echo "    %{_confdir}/tls/server.crt"
-echo "    %{_confdir}/tls/server.key"
-echo ""
-echo " 3. NGINX 설정 확인:"
-echo "    vi /etc/nginx/conf.d/lumina.conf"
-echo "    nginx -t"
-echo ""
-echo " 4. 서비스 시작:"
-echo "    systemctl start lumina-web"
-echo "    systemctl restart nginx"
-echo ""
-echo " 5. 방화벽:"
-echo "    firewall-cmd --permanent --add-service=https"
-echo "    firewall-cmd --reload"
+echo " 서비스 재시작:"
+echo "   systemctl restart lumina-web"
 echo ""
 echo "================================================================"
 
@@ -193,22 +124,30 @@ fi
 ###############################################################################
 %postun
 systemctl daemon-reload
-
 if [ $1 -eq 0 ]; then
-    echo "Lumina WEB 서버가 제거되었습니다."
-    echo "※ NGINX 재시작 필요: systemctl restart nginx"
+    echo "Lumina WEB 단일 유닛 패키지가 제거되었습니다."
 fi
 
 ###############################################################################
 # changelog
 ###############################################################################
 %changelog
+* Sun Apr 26 2026 Blossom Admin <admin@blossom.local> - 2.1.2-1
+- wrapper: dashboard 도 /opt/blossom/web/venv (python3.11) 사용 — python3.6 의존성 제거
+- nginx conf 파일명을 lumina-web.conf 로 통일 (post 메시지 갱신)
+- 포트 80 사용 안 함 (정책): 443/9601 만 노출
+
+* Sun Apr 26 2026 Blossom Admin <admin@blossom.local> - 2.1.1-1
+- 패키지 범위 축소: 단일 systemd 유닛(lumina-web.service) + wrapper 만 제공
+- 애플리케이션 코드(/opt/blossom/web, /opt/blossom/lumina/web) 미포함
+- nginx 설정, web.conf, lumina-web 사용자 계정 생성 제거
+- 기존 운영 환경의 dashboard / nginx 설정을 덮어쓰는 부작용 차단
+
+* Sun Apr 26 2026 Blossom Admin <admin@blossom.local> - 2.1.0-1
+- 단일 systemd 유닛 통합: Asset Mgmt + Chat + Dashboard 한 데몬에서 동반 기동
+- /usr/local/bin/lumina-web-start.sh wrapper 추가 (두 gunicorn 동반 실행)
+- blossom-web.service / lumina-dashboard.service 자동 정지·마스킹 (post)
+- KillMode=mixed 로 cgroup 전체 종료 보장
+
 * Sun Apr 06 2026 Blossom Admin <admin@blossom.local> - 2.0.0-1
-- 보안 중심 3티어 아키텍처 재설계
-- NGINX reverse proxy + Gunicorn + Flask 구조
-- HTTPS 강제, HSTS, 보안 헤더 기본 적용
-- DB READ-ONLY 접근 (lumina_web_reader)
-- 전용 서비스 계정 (lumina-web)
-- secure cookie / session 기본 설정
-- request size 제한, timeout 정책
-- SELinux boolean 자동 설정
+- 보안 중심 3티어 아키텍처 재설계 (구버전)

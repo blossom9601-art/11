@@ -54,6 +54,11 @@ install -d -m 0755 %{buildroot}%{_unitdir}
 install -m 0644 %{_sourcedir}/systemd/lumina-db.service \
     %{buildroot}%{_unitdir}/lumina-db.service
 
+# ── mariadb drop-in (lumina-db 정지 시 mariadb도 동반 정지) ──
+install -d -m 0755 %{buildroot}%{_unitdir}/mariadb.service.d
+install -m 0644 %{_sourcedir}/systemd/dropins/mariadb.service.d/lumina.conf \
+    %{buildroot}%{_unitdir}/mariadb.service.d/lumina.conf
+
 # ── MariaDB 보안 설정 ────────────────────────────────────
 install -d -m 0755 %{buildroot}%{_sysconfdir}/my.cnf.d
 cat > %{buildroot}%{_sysconfdir}/my.cnf.d/lumina-security.cnf << 'DBCNF'
@@ -162,6 +167,8 @@ install -d -m 0755 %{buildroot}%{_confdir}
 
 # systemd
 %{_unitdir}/lumina-db.service
+# mariadb drop-in (디렉터리는 mariadb-server가 소유할 수 있어 파일만 등록)
+%{_unitdir}/mariadb.service.d/lumina.conf
 
 # MariaDB 설정
 %config(noreplace) %{_sysconfdir}/my.cnf.d/lumina-security.cnf

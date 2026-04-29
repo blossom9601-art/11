@@ -1,0 +1,82 @@
+{
+  "name": "blossom-desktop",
+  "version": "0.5.10",
+  "private": true,
+  "description": "Blossom 사내 메신저 데스크탑 앱 (Electron)",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "cross-env BLOSSOM_DEV=1 electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "kr.blossom.chat",
+    "productName": "Blossom Chat",
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Network"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Blossom Chat",
+      "menuCategory": "Blossom",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": true,
+      "language": "1042",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "license": "build/license.txt",
+      "include": "build/installer.nsh",
+      "artifactName": "Blossom-Chat-Setup-${version}.${ext}",
+      "uninstallDisplayName": "Blossom Chat ${version}"
+    }
+  },
+  "devDependencies": {
+    "bmp-js": "^0.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "flatpickr": "^4.6.13",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "pdfjs-dist": "^5.6.205"
+  }
+}

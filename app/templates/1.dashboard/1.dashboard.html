@@ -26,24 +26,8 @@
                     {% set dashboard_empty_state %}
                     <div class="no-data-lottie" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;flex-direction:column;position:relative;">
                         <div style="width:140px;height:140px;display:flex;align-items:center;justify-content:center;">
-                            <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <defs>
-                                    <linearGradient id="dashboardNoDataBgInitial" x1="20" y1="18" x2="95" y2="102" gradientUnits="userSpaceOnUse">
-                                        <stop stop-color="#F8FBFF"/>
-                                        <stop offset="1" stop-color="#EEF4FB"/>
-                                    </linearGradient>
-                                </defs>
-                                <rect x="18" y="20" width="84" height="80" rx="20" fill="url(#dashboardNoDataBgInitial)" stroke="#D8E3F0"/>
-                                <rect x="32" y="36" width="56" height="8" rx="4" fill="#C2D1E2"/>
-                                <rect x="32" y="50" width="40" height="8" rx="4" fill="#D3DEEA"/>
-                                <rect x="32" y="68" width="12" height="18" rx="4" fill="#A8BDD3"/>
-                                <rect x="50" y="60" width="12" height="26" rx="4" fill="#8FA9C6"/>
-                                <rect x="68" y="72" width="12" height="14" rx="4" fill="#C7D5E5"/>
-                                <circle cx="85" cy="84" r="12" fill="#FFFFFF" stroke="#D8E3F0"/>
-                                <path d="M85 78V85L89.5 88.5" stroke="#7B93AE" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
+                            <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" style="width:90px;height:90px;object-fit:contain;" />
                         </div>
-                        <span style="color:#94a3b8;font-size:13px;margin-top:4px;">데이터 없음</span>
                     </div>
                     {% endset %}
                     <!-- 상단 바: 날짜(좌) + 기간 선택(우) -->
@@ -156,8 +140,8 @@
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
-    <script src="/static/js/vendor/lottie.min.js?v=5.12.2"></script>
-    <script src="/static/js/1.dashboard/1.dashboard.js?v=2.3.7"></script>
+    <script src="/static/js/vendor/lottie_light.min.js?v=5.12.2"></script>
+    <script src="/static/js/1.dashboard/1.dashboard.js?v=2.4.5"></script>
 
     </body>
 </html>

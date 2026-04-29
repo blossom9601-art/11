@@ -355,6 +355,13 @@
   const typeSelectedLabel = document.getElementById('sch-type-selected');
   const shareModeHiddenInput = document.getElementById('share-mode-value');
   const shareModeChips = Array.from(document.querySelectorAll('.share-mode-chip'));
+  const importantBtn = document.getElementById('sch-important-btn');
+  const attendeeInput = document.getElementById('sch-attendee-input');
+  const attendeeAddBtn = document.getElementById('sch-attendee-add');
+  const attendeeList = document.getElementById('sch-attendee-list');
+  const reminderSelect = document.getElementById('sch-reminder');
+  const stickerSelect = document.getElementById('sch-sticker');
+  const colorInput = document.getElementById('sch-color');
   const inputLocation = document.getElementById('sch-location');
   const btnSave = document.getElementById('sch-save-btn');
   const btnCancel = document.getElementById('sch-cancel-btn');
@@ -401,6 +408,8 @@
     openerEl: null,
     openerActiveEl: null,
     existingAttachments: [],
+    attendees: [],
+    important: false,
   };
   // Preserve last explicit time range when toggling 종일 on/off
   let lastTimeRange = { start: '', end: '' };
@@ -655,12 +664,22 @@
         inputLocation,
         inputDesc,
         inputAttachments,
+        attendeeInput,
+        reminderSelect,
+        stickerSelect,
+        colorInput,
       ].filter(Boolean);
       controls.forEach((el) => {
         try { el.disabled = isReadOnly; } catch (_) {}
       });
       if (btnAllDay) {
         btnAllDay.disabled = isReadOnly;
+      }
+      if (importantBtn) {
+        importantBtn.disabled = isReadOnly;
+      }
+      if (attendeeAddBtn) {
+        attendeeAddBtn.disabled = isReadOnly;
       }
       if (typeDropdownTrigger) {
         typeDropdownTrigger.disabled = isReadOnly;
@@ -730,6 +749,8 @@
         openerEl: openerEl || modalCtx.openerEl || null,
         openerActiveEl: (document && document.activeElement) ? document.activeElement : null,
         existingAttachments: Array.isArray(event?.extendedProps?.attachments) ? event.extendedProps.attachments.slice() : [],
+        attendees: normalizeTokenList(event?.extendedProps?.attendees || []),
+        important: !!event?.extendedProps?.isImportant,
       };
       syncShareLabelsFromPayload();
       modalTitle.textContent = mode === 'edit' ? '일정 수정' : (mode === 'view' ? '일정 보기' : '일정 등록');
@@ -818,6 +839,14 @@
       renderShareChips(modalCtx.shares);
   // description
   inputDesc.value = event?.extendedProps?.description || '';
+  renderAttendees(modalCtx.attendees);
+  setImportant(!!modalCtx.important);
+  if (reminderSelect) {
+    const reminders = event?.extendedProps?.reminders || [];
+    reminderSelect.value = Array.isArray(reminders) && reminders.length ? String(reminders[0] || '') : '';
+  }
+  if (stickerSelect) stickerSelect.value = event?.extendedProps?.sticker || '';
+  if (colorInput) colorInput.value = event?.backgroundColor || event?.extendedProps?.color || typeToColor(type || '미팅');
   // set all-day UI state (after potential override)
   setAllDayUI(!!(event ? event.allDay : allDay));
   if (!modalCtx.allDay) {
@@ -898,6 +927,43 @@
         shareSearchAbortController = null;
       }
     }
+
+    function normalizeTokenList(items) {
+      if (!Array.isArray(items)) return [];
+      const seen = new Set();
+      return items
+        .map((item) => String(item || '').trim())
+        .filter((item) => {
+          if (!item || seen.has(item)) return false;
+          seen.add(item);
+          return true;
+        });
+    }
+
+    function renderAttendees(items) {
+      modalCtx.attendees = normalizeTokenList(items);
+      if (!attendeeList) return;
+      attendeeList.innerHTML = modalCtx.attendees.map((name) => `
+        <button type="button" class="schedule-token" data-attendee="${escapeHtml(name)}">
+          <span>${escapeHtml(name)}</span><span aria-hidden="true">×</span>
+        </button>
+      `).join('');
+    }
+
+    function addAttendeeFromInput() {
+      const value = (attendeeInput?.value || '').trim();
+      if (!value) return;
+      renderAttendees([...(modalCtx.attendees || []), value]);
+      if (attendeeInput) attendeeInput.value = '';
+    }
+
+    function setImportant(flag) {
+      modalCtx.important = !!flag;
+      if (importantBtn) {
+        importantBtn.classList.toggle('is-on', modalCtx.important);
+        importantBtn.setAttribute('aria-pressed', modalCtx.important ? 'true' : 'false');
+      }
+    }
     modalClose?.addEventListener('click', closeModal);
   btnCancel?.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
@@ -909,6 +975,20 @@
 
     shareSearch?.addEventListener('input', handleShareSearchInput);
     shareSearch?.addEventListener('keydown', handleShareSearchKeydown);
+    importantBtn?.addEventListener('click', () => setImportant(!modalCtx.important));
+    attendeeAddBtn?.addEventListener('click', addAttendeeFromInput);
+    attendeeInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        addAttendeeFromInput();
+      }
+    });
+    attendeeList?.addEventListener('click', (event) => {
+      const token = event.target.closest('.schedule-token[data-attendee]');
+      if (!token) return;
+      const name = token.getAttribute('data-attendee') || '';
+      renderAttendees((modalCtx.attendees || []).filter((item) => item !== name));
+    });
     shareSuggest?.addEventListener('click', (event) => {
       const li = event.target.closest('li[data-user-id], li[data-dept-id]');
       if (!li) return;
@@ -2214,7 +2294,7 @@
       const type = selectType.value || '미팅';
       const location = (inputLocation.value || '').trim();
       const description = (inputDesc?.value || '').trim();
-      const color = typeToColor(type);
+      const color = (colorInput && colorInput.value) || typeToColor(type);
       const selectedMode = getShareModeValue();
       const payloadBase = {
         title,
@@ -2230,6 +2310,11 @@
         shareMode: selectedMode,
         shareUsers: modalCtx.shareUsersPayload || [],
         shareDepartments: modalCtx.shareDepartmentsPayload || [],
+        attendees: modalCtx.attendees || [],
+        reminders: reminderSelect && reminderSelect.value ? [reminderSelect.value] : [],
+        sticker: stickerSelect ? stickerSelect.value : '',
+        isImportant: !!modalCtx.important,
+        color,
       };
       let payload;
       try {
@@ -2338,6 +2423,10 @@
           shareDepartments: item.share_departments || [],
           location: item.location || '',
           description: item.description || '',
+          attendees: Array.isArray(item.attendees) ? item.attendees : [],
+          reminders: Array.isArray(item.reminders) ? item.reminders : [],
+          sticker: item.sticker || '',
+          isImportant: !!item.is_important,
           attachments: Array.isArray(item.attachments) ? item.attachments : [],
           ownerUserId: item.owner_user_id || null,
           owner: item.owner || null,
@@ -2436,6 +2525,10 @@
         share_scope: shareModeToScope(shareMode),
         share_users: shareModeToScope(shareMode) === 'SELECT' ? shareUsers : [],
         share_departments: shareModeToScope(shareMode) === 'SELECT' ? shareDepartments : [],
+        attendees: overrides?.attendees || fcEvent.extendedProps?.attendees || [],
+        reminders: overrides?.reminders || fcEvent.extendedProps?.reminders || [],
+        sticker: overrides?.sticker ?? fcEvent.extendedProps?.sticker ?? '',
+        is_important: !!(overrides?.isImportant ?? fcEvent.extendedProps?.isImportant),
         color_code: overrides?.color || fcEvent.backgroundColor || null,
       };
     }
@@ -2477,6 +2570,11 @@
         share_scope: shareScope,
         share_users: shareScope === 'SELECT' ? (options.shareUsers || []) : [],
         share_departments: shareScope === 'SELECT' ? (options.shareDepartments || []) : [],
+        attendees: options.attendees || [],
+        reminders: options.reminders || [],
+        sticker: options.sticker || '',
+        is_important: !!options.isImportant,
+        color_code: options.color || null,
       };
     }
 

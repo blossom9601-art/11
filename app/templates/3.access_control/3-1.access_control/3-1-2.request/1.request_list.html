@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260422d">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260421b" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content">
+		<div class="content-wrapper">
+			<div class="ac-page-header">
+				<div>
+					<h1>접근제어 신청</h1>
+					<p>권한이 없는 자원은 신청서를 제출하고, 팀장 승인 현황과 본인 이력을 함께 확인합니다.</p>
+				</div>
+			</div>
+			<div class="request-layout">
+				<section class="request-card">
+					<div class="request-head">
+						<div>
+							<h2>신청서 작성</h2>
+							<p>팀장 승인 후 승인 종료일까지 접근 권한이 자동 부여됩니다.</p>
+						</div>
+					</div>
+					<form class="request-form" id="request-form">
+						<div>
+							<label for="request-resource-id">신청 대상 자원명</label>
+							<select id="request-resource-id" name="resourceId"></select>
+						</div>
+						<div>
+							<label for="request-resource-url">URL</label>
+							<input id="request-resource-url" name="resourceUrl" type="text" readonly>
+						</div>
+						<div>
+							<label for="request-reason">신청 사유</label>
+							<textarea id="request-reason" name="reason" placeholder="업무 목적과 필요 기간을 구체적으로 입력하세요."></textarea>
+						</div>
+						<div class="request-grid-2">
+							<div>
+								<label for="request-start-date">사용 시작일</label>
+								<input id="request-start-date" name="startDate" type="date">
+							</div>
+							<div>
+								<label for="request-end-date">사용 종료일</label>
+								<input id="request-end-date" name="endDate" type="date">
+							</div>
+						</div>
+						<div class="request-grid-2">
+							<div>
+								<label for="request-emergency-flag">긴급 여부</label>
+								<select id="request-emergency-flag" name="emergencyFlag">
+									<option value="0">일반</option>
+									<option value="1">긴급</option>
+								</select>
+							</div>
+							<div>
+								<label for="request-attachment">첨부파일(선택)</label>
+								<input id="request-attachment" name="attachment" type="file">
+							</div>
+						</div>
+						<div>
+							<label for="request-approver">팀장(승인자)</label>
+							<input id="request-approver" name="approver" type="text" readonly placeholder="부서 팀장이 자동 지정됩니다.">
+						</div>
+						<div class="request-actions">
+							<div id="request-form-message" style="font-size:12px;color:#64748b;">동일 자원 승인 대기 건이 있거나 유효 권한이 있으면 제출할 수 없습니다.</div>
+							<button type="submit" class="action-chip action-primary">신청 제출</button>
+						</div>
+					</form>
+				</section>
+				<section class="request-card">
+					<div class="request-head">
+						<div>
+							<h2>신청 및 승인 현황</h2>
+							<p>본인 신청 목록과 팀장 승인 대기 목록을 전환해서 확인합니다.</p>
+						</div>
+					</div>
+					<div class="segment-tabs">
+						<button type="button" class="segment-btn active" data-segment="mine">내 신청</button>
+						<button type="button" class="segment-btn" data-segment="approvals">팀장 승인</button>
+					</div>
+					<div class="request-table-wrap">
+						<div id="request-table-state" class="empty-state">신청 목록을 불러오는 중입니다.</div>
+						<table class="request-table" id="request-table" hidden>
+							<thead>
+								<tr>
+									<th>신청번호</th>
+									<th>자원명</th>
+									<th>URL</th>
+									<th>신청자</th>
+									<th>신청일</th>
+									<th>승인자</th>
+									<th>상태</th>
+									<th>반려사유</th>
+									<th>액션</th>
+								</tr>
+							</thead>
+							<tbody id="request-table-body"></tbody>
+						</table>
+					</div>
+					<div class="panel-wrap" id="request-detail-panel">
+						<div class="empty-state">상세를 선택하면 신청 정보, 과거 이력, 승인 의견이 표시됩니다.</div>
+					</div>
+				</section>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

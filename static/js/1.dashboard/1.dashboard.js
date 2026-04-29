@@ -5,8 +5,8 @@
  */
 (function(){
     // External dependencies
-    var LOTTIE_LOCAL = '/static/js/vendor/lottie.min.js';
-    var LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
+    var LOTTIE_LOCAL = '/static/js/vendor/lottie_light.min.js';
+    var LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie_light.min.js';
     var NODATA_LOTTIE_PATH = '/static/image/svg/free-animated-no-data.json';
     var _lottieLoading = false;
     var _lottieReady = false;
@@ -105,37 +105,13 @@
         return toNum(obj) > 0;
     }
 
-    /** 데이터가 없을 때 Lottie 애니메이션을 노출 */
+    /** 데이터가 없을 때 스티커 이미지를 노출 */
     function showNoData(containerId, legendId){
         var el = document.getElementById(containerId);
         if(!el) return;
         el.innerHTML = '<div class="no-data-lottie" style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;flex-direction:column;position:relative;">' +
-            '<div id="lottie-' + containerId + '" style="width:240px;max-width:100%;height:180px;display:flex;align-items:center;justify-content:center;"></div>' +
-            '<span style="color:#64748b;font-size:13px;font-weight:600;margin-top:6px;">데이터 없음</span></div>';
-        ensureLottie(function(){
-            var lottieEl = document.getElementById('lottie-' + containerId);
-            if(!lottieEl){ return; }
-
-            // JSON 직접 fetch 후 animationData로 주입해 path 기반 fetch 이슈를 우회한다.
-            fetch(NODATA_LOTTIE_PATH, { cache: 'no-store', credentials: 'same-origin' })
-                .then(function(r){
-                    if(!r.ok) throw new Error('json ' + r.status);
-                    return r.json();
-                })
-                .then(function(json){
-                    window.lottie.loadAnimation({
-                        container: lottieEl,
-                        renderer: 'svg',
-                        loop: true,
-                        autoplay: true,
-                        animationData: json,
-                        rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
-                    });
-                })
-                .catch(function(){
-                    lottieEl.innerHTML = '<span style="font-size:12px;color:#94a3b8;">애니메이션 로드 실패</span>';
-                });
-        });
+            '<img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" style="width:90px;max-width:100%;height:90px;object-fit:contain;" />' +
+            '</div>';
         var legend = document.getElementById(legendId);
         if(legend) legend.innerHTML = '';
     }

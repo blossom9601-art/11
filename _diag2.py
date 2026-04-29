@@ -1,0 +1,21 @@
+﻿import paramiko
+c = paramiko.SSHClient()
+c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+c.connect("192.168.56.108", username="root", password="123456", timeout=10, allow_agent=False, look_for_keys=False)
+def run(cmd):
+    print(f"\n$ {cmd[:240]}")
+    _, o, e = c.exec_command(cmd, timeout=60)
+    print(o.read().decode("utf-8","replace").rstrip())
+    er = e.read().decode("utf-8","replace").rstrip()
+    if er: print("STDERR:", er)
+
+run("ls -la /opt/blossom/lumina/web/app/")
+run("wc -l /opt/blossom/lumina/web/app/__init__.py /opt/blossom/lumina/web/app/cli_api.py /opt/blossom/lumina/web/wsgi.py /opt/blossom/lumina/web/gunicorn.conf.py 2>&1")
+run("head -5 /opt/blossom/lumina/web/app/__init__.py")
+run("ls /root/ | grep -iE 'backup|lumina|dashboard|unit'")
+run("ls /etc/nginx/conf.d/")
+run("rpm -qf /etc/nginx/conf.d/lumina.conf 2>&1")
+run("rpm -qf /etc/nginx/conf.d/blossom-lumina.conf 2>&1")
+run("ls /var/cache/dnf/ 2>&1 | head -5")
+run("find / -name '__init__.py' -path '*/lumina/web/app/*' 2>/dev/null")
+c.close()

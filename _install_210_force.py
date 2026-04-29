@@ -1,0 +1,26 @@
+import paramiko, time
+c = paramiko.SSHClient()
+c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+c.connect("192.168.56.108", username="root", password="123456", timeout=10, allow_agent=False, look_for_keys=False)
+
+def run(cmd):
+    print(f"\n$ {cmd[:220]}")
+    _, o, e = c.exec_command(cmd, timeout=120)
+    print(o.read().decode("utf-8","replace").rstrip())
+    er = e.read().decode("utf-8","replace").rstrip()
+    if er: print("STDERR:", er)
+
+run("rpm -Uvh --nodeps --force /tmp/lumina-web-2.1.0-1.noarch.rpm")
+run("systemctl daemon-reload && systemctl restart lumina-web")
+time.sleep(5)
+run("rpm -q lumina-web")
+run("systemctl is-active lumina-web")
+run("ls -l /usr/local/bin/lumina-web-start.sh /usr/lib/systemd/system/lumina-web.service")
+run("cat /usr/lib/systemd/system/lumina-web.service | head -20")
+run(r"ss -tlnp | grep -E ':(8000|8001|443|9601)\b'")
+run("systemctl list-unit-files | grep -E 'lumina|blossom'")
+run("pgrep -af gunicorn | head -10")
+run("curl -sk -o /dev/null -w '443/api/auth/session-check -> HTTP %{http_code}\\n' https://127.0.0.1/api/auth/session-check")
+run("curl -sk -o /dev/null -w '9601/ -> HTTP %{http_code}\\n' https://127.0.0.1:9601/")
+c.close()
+print("\nDONE.")

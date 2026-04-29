@@ -101,7 +101,10 @@
                         <div class="form-grid">
                             <div class="form-row">
                                 <label for="sch-name">일정 이름 <span class="required">*</span></label>
-                                <input id="sch-name" class="form-input" placeholder="일정 제목을 입력하세요" required />
+                                <div class="schedule-title-row">
+                                    <input id="sch-name" class="form-input" placeholder="일정 제목을 입력하세요" required />
+                                    <button type="button" id="sch-important-btn" class="important-btn" aria-pressed="false">중요</button>
+                                </div>
                             </div>
                             <div class="form-row">
                                 <label for="sch-start-time">일정 시간</label>
@@ -170,7 +173,44 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <div class="form-row" style="grid-column: 1 / -1;">
+                                <label for="sch-attendee-input">참석자</label>
+                                <div class="schedule-token-field">
+                                    <div class="schedule-token-input-row">
+                                        <input type="text" id="sch-attendee-input" class="form-input" placeholder="참석자 이름을 입력하고 추가하세요" autocomplete="off">
+                                        <button type="button" class="btn-secondary" id="sch-attendee-add">추가</button>
+                                    </div>
+                                    <div class="schedule-token-list" id="sch-attendee-list" aria-label="선택된 참석자"></div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-reminder">알림</label>
+                                <select id="sch-reminder" class="form-input">
+                                    <option value="">알림 없음</option>
+                                    <option value="10분 전">10분 전</option>
+                                    <option value="30분 전">30분 전</option>
+                                    <option value="1시간 전">1시간 전</option>
+                                    <option value="1일 전">1일 전</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-sticker">스티커</label>
+                                <select id="sch-sticker" class="form-input">
+                                    <option value="">선택 안 함</option>
+                                    <option value="/static/image/svg/free-sticker-process.svg">프로세스</option>
+                                    <option value="/static/image/svg/error/free-sticker-teamwork.svg">팀워크</option>
+                                    <option value="/static/image/svg/error/free-sticker-business.svg">비즈니스</option>
+                                    <option value="/static/image/svg/error/free-sticker-report.svg">리포트</option>
+                                    <option value="/static/image/svg/error/free-sticker-business2.svg">비즈니스 2</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="sch-color">일정 색상</label>
+                                <div class="schedule-color-row">
+                                    <input type="color" id="sch-color" class="schedule-color-input" value="#6366f1">
+                                    <span class="schedule-color-hint">달력에 표시되는 제목 색상</span>
+                                </div>
+                            </div>
                             <!-- 설명 -->
                             <div class="form-row" style="grid-column: 1 / -1;">
                                 <label for="sch-description">일정 설명</label>

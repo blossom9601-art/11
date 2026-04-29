@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.38">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/12.chat_management.js?v=20260424-4" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>채팅관리</h1>
+					<p>채팅 사용 여부, 채널 정책, 메시지 정책, 파일 정책, 알림 정책, 보관 정책을 통합 관리합니다.</p>
+				</div>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="관리자 설정 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_chat_management_settings') }}">채팅관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_info_message') }}">문구관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+			</div>
+
+			<form id="chat-policy-form" class="setting-form" autocomplete="off">
+				<div class="settings-columns">
+					<section class="setting-card" aria-labelledby="cp-basic-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-basic-title">기본 설정</h2>
+								<p>채팅 기능과 DM·채널 사용 여부를 제어합니다.</p>
+							</div>
+							<span class="smtp-status-badge" id="chat-policy-badge">미설정</span>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-chat-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">채팅 기능 사용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-dm-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">DM 허용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-channel-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">채널 기능 활성화</span>
+								</label>
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="basic">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="cp-channel-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-channel-title">채널 정책</h2>
+								<p>채널 생성 권한과 외부 사용자 초대 정책을 관리합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label for="policy-channel-creation-scope">채널 생성 권한 범위</label>
+								<select id="policy-channel-creation-scope" class="form-input">
+									<option value="all_users">전체 사용자</option>
+									<option value="admins_only">관리자만</option>
+									<option value="approved_users">승인 사용자만</option>
+								</select>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-channel-private">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">private 채널 생성 허용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-channel-external">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">외부 사용자 초대 허용</span>
+								</label>
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="channel">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="cp-message-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-message-title">메시지 정책</h2>
+								<p>메시지 수정·삭제·읽음 표시 동작을 제어합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label for="policy-message-edit-window">메시지 수정 가능 시간(분)</label>
+								<input id="policy-message-edit-window" type="number" min="0" class="form-input">
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-message-delete">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">메시지 삭제 허용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-message-read">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">읽음 표시 기능 사용</span>
+								</label>
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="message">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="cp-file-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-file-title">파일 정책</h2>
+								<p>업로드 용량과 허용 확장자, 미리보기 정책을 설정합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row">
+								<label for="policy-file-max-upload">최대 업로드 용량(MB)</label>
+								<input id="policy-file-max-upload" type="number" min="1" class="form-input">
+							</div>
+							<div class="form-row">
+								<label class="switch">
+									<input type="checkbox" id="policy-file-preview">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">미리보기 허용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="policy-file-extensions">허용 확장자</label>
+								<input id="policy-file-extensions" type="text" class="form-input" placeholder="pdf, docx, xlsx, png">
+								<span class="helper-text">쉼표(,)로 구분하여 입력합니다.</span>
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="file">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="cp-notification-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-notification-title">알림 정책</h2>
+								<p>멘션·전체 알림과 야간 알림 제한 시간을 설정합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-notification-mention">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">멘션 알림</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="policy-notification-broadcast-limit">전체 채널 알림 제한</label>
+								<select id="policy-notification-broadcast-limit" class="form-input">
+									<option value="admins_only">관리자만</option>
+									<option value="channel_admins">채널 관리자만</option>
+									<option value="all_members">전체 멤버</option>
+								</select>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="policy-notification-quiet-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">야간 알림 제한</span>
+								</label>
+							</div>
+							<div class="form-row">
+								<label for="policy-notification-quiet-start">야간 시작</label>
+								<input id="policy-notification-quiet-start" type="time" class="form-input">
+							</div>
+							<div class="form-row">
+								<label for="policy-notification-quiet-end">야간 종료</label>
+								<input id="policy-notification-quiet-end" type="time" class="form-input">
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="notification">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="cp-retention-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="cp-retention-title">보관 / 감사</h2>
+								<p>보관 기간과 감사 로그 기록 정책을 관리합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row">
+								<label for="policy-retention-message-days">메시지 보관 기간(일)</label>
+								<input id="policy-retention-message-days" type="number" min="1" class="form-input">
+							</div>
+							<div class="form-row">
+								<label for="policy-retention-file-days">파일 보관 기간(일)</label>
+								<input id="policy-retention-file-days" type="number" min="1" class="form-input">
+							</div>
+							<div class="form-row">
+								<label class="switch">
+									<input type="checkbox" id="policy-audit-message-delete">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">메시지 삭제 로그 기록</span>
+								</label>
+							</div>
+							<div class="form-row">
+								<label class="switch">
+									<input type="checkbox" id="policy-audit-file-upload">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">파일 업로드 로그 기록</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="policy-audit-admin-view">관리자 열람 권한</label>
+								<input id="policy-audit-admin-view" type="text" class="form-input" placeholder="chat.system.admin">
+							</div>
+						</div>
+						<div class="setting-card-actions">
+							<button type="button" class="btn-save-sm" data-cp-section="retention">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+				</div>
+				<p class="setting-status" id="chat-policy-status" hidden></p>
+			</form>
+		</div>
+	</main>
+</body>
+</html>

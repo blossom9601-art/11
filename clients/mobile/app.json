@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Blossom",
+    "slug": "blossom-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "blossom",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "kr.blossom.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "kr.blossom.mobile",
+      "permissions": ["NOTIFICATIONS", "INTERNET"]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#38bdf8"
+        }
+      ]
+    ],
+    "extra": {
+      "defaultServerUrl": "https://192.168.56.108"
+    }
+  }
+}

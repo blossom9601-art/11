@@ -83,6 +83,13 @@ mkdir -p "$SRC/systemd"
 cp "$DEPLOY/systemd/lumina-agent.service" "$SRC/systemd/"
 cp "$DEPLOY/systemd/lumina-ap.service"    "$SRC/systemd/"
 cp "$DEPLOY/systemd/lumina-web.service"   "$SRC/systemd/"
+cp "$DEPLOY/systemd/lumina-db.service"    "$SRC/systemd/"
+
+# ── systemd drop-ins (mariadb / nginx 동반 정지) ─────────
+mkdir -p "$SRC/systemd/dropins/mariadb.service.d"
+mkdir -p "$SRC/systemd/dropins/nginx.service.d"
+cp "$DEPLOY/systemd/dropins/mariadb.service.d/lumina.conf" "$SRC/systemd/dropins/mariadb.service.d/"
+cp "$DEPLOY/systemd/dropins/nginx.service.d/lumina.conf"   "$SRC/systemd/dropins/nginx.service.d/"
 
 ###############################################################################
 # 2) 누락 소스 파일 생성 (bin, cli, ap, web 스텁)

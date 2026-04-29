@@ -15,7 +15,10 @@ MENU_SEEDS = [
     ('system.san',               'SAN',             'system',      3),
     ('system.network',           '네트워크',        'system',      4),
     ('system.security',          '보안장비',        'system',      5),
-    ('governance',               '거버넌스',        None,          3),
+    ('access_control',           '접근제어',        None,          3),
+    ('access_control.access',    '접속',            'access_control', 1),
+    ('access_control.request',   '신청',            'access_control', 2),
+    ('governance',               '거버넌스',        None,          4),
     ('governance.backup',        '백업 정책',       'governance',  1),
     ('governance.package',       '패키지 관리',     'governance',  2),
     ('governance.vulnerability', '취약점 분석',     'governance',  3),
@@ -23,24 +26,24 @@ MENU_SEEDS = [
     ('governance.vpn',           'VPN 정책',        'governance',  5),
     ('governance.leased_line',   '전용회선 정책',   'governance',  6),
     ('governance.unused_asset',  '불용자산 관리',   'governance',  7),
-    ('datacenter',               '데이터센터',      None,          4),
+    ('datacenter',               '데이터센터',      None,          5),
     ('datacenter.access',        '출입 관리',       'datacenter',  1),
     ('datacenter.data_delete',   '데이터 삭제 관리','datacenter',  2),
     ('datacenter.rack',          'RACK 관리',       'datacenter',  3),
     ('datacenter.temperature',   '온습도 관리',     'datacenter',  4),
     ('datacenter.cctv',          'CCTV 관리',       'datacenter',  5),
-    ('cost',                     '비용관리',        None,          5),
+    ('cost',                     '비용관리',        None,          6),
     ('cost.opex',                'OPEX',            'cost',        1),
     ('cost.capex',               'CAPEX',           'cost',        2),
-    ('project',                  '프로젝트',        None,          6),
+    ('project',                  '프로젝트',        None,          7),
     ('project.status',           '프로젝트 현황',   'project',     1),
     ('project.work',             '작업 현황',       'project',     2),
     ('project.ticket',           '티켓 현황',       'project',     3),
     ('project.workflow',         '워크플로우 제작',  'project',     4),
-    ('insight',                  '인사이트',        None,          7),
+    ('insight',                  '인사이트',        None,          8),
     ('insight.technical',        '기술자료',        'insight',     1),
     ('insight.blog',             '블로그',          'insight',     2),
-    ('category',                 '카테고리',        None,          8),
+    ('category',                 '카테고리',        None,          9),
     ('category.business',        '비즈니스',        'category',    1),
     ('category.hardware',        '하드웨어',        'category',    2),
     ('category.software',        '소프트웨어',      'category',    3),
@@ -48,7 +51,7 @@ MENU_SEEDS = [
     ('category.company',         '회사',            'category',    5),
     ('category.customer',        '고객',            'category',    6),
     ('category.vendor',          '벤더',            'category',    7),
-    ('settings',                 '설정',            None,          9),
+    ('settings',                 '설정',            None,          10),
     ('settings.user',            '사용자',          'settings',    1),
     ('settings.permission',      '화면권한',        'settings',    2),
     ('settings.auth',            '인증관리',        'settings',    3),
@@ -56,6 +59,7 @@ MENU_SEEDS = [
     ('settings.mail',            '메일관리',        'settings',    5),
     ('settings.quality',         '품질유형',        'settings',    6),
     ('settings.log',             '통합로그',        'settings',    7),
+    ('settings.access_control',  '접근제어',        'settings',    8),
 ]
 
 # ── 메뉴별 내보내기(다운로드) 허용 설정 ──
@@ -438,6 +442,9 @@ _URL_MENU_MAP = [
     ('/hw_security', 'system.security'), ('/api/hw-security', 'system.security'),
     ('/hw_', 'system'), ('/api/hw', 'system'), ('/api/hardware', 'system'),
     ('/api/sw', 'system'), ('/api/software', 'system'),
+    # access control 하위
+    ('/api/access-control', 'access_control'),
+    ('/p/access_control_', 'access_control'),
     # governance 하위
     ('/api/gov-backup', 'governance.backup'), ('/api/backup', 'governance.backup'),
     ('/api/gov-package', 'governance.package'),
@@ -463,6 +470,7 @@ _URL_MENU_MAP = [
     # category
     ('/api/category', 'category'), ('/api/cat', 'category'),
     # settings
+    ('/admin/auth/access-control', 'settings.access_control'),
     ('/admin/auth/', 'settings'),
 ]
 

@@ -10,6 +10,48 @@
 .settings-col-stack > section:last-child { flex:1; }
 .cp-policy-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px 18px; }
 .cp-policy-grid .cp-full { grid-column:1 / -1; }
+/* Unify font for time/number/date inputs (no monospace browser default) */
+.cp-policy-grid input[type="time"],
+.cp-policy-grid input[type="date"],
+.cp-policy-grid input[type="datetime-local"],
+.cp-policy-grid input[type="number"],
+.setting-card input[type="time"],
+.setting-card input[type="date"],
+.setting-card input[type="datetime-local"] {
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: #374151;
+}
+.cp-policy-grid input[type="time"]::-webkit-datetime-edit,
+.setting-card input[type="time"]::-webkit-datetime-edit {
+  font-family: inherit;
+  color: #374151;
+}
+.cp-policy-grid input[type="time"]::-webkit-datetime-edit-ampm-field,
+.cp-policy-grid input[type="time"]::-webkit-datetime-edit-hour-field,
+.cp-policy-grid input[type="time"]::-webkit-datetime-edit-minute-field,
+.setting-card input[type="time"]::-webkit-datetime-edit-ampm-field,
+.setting-card input[type="time"]::-webkit-datetime-edit-hour-field,
+.setting-card input[type="time"]::-webkit-datetime-edit-minute-field {
+  font-family: inherit;
+  font-size: 13px;
+  color: #374151;
+  padding: 0 2px;
+}
+/* Per-section setting actions inside cards */
+.setting-card .setting-card-actions { display:flex; justify-content:flex-end; gap:8px; padding-top:10px; border-top:1px solid #f1f5f9; margin-top:auto; }
+.setting-card .setting-card-actions .btn-save-sm {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#6366f1; color:#fff; border:none;
+  padding:8px 16px; border-radius:8px; font-size:12.5px; font-weight:600;
+  cursor:pointer; transition:.2s;
+}
+.setting-card .setting-card-actions .btn-save-sm:hover { background:#4f46e5; box-shadow:0 2px 8px rgba(99,102,241,.30); }
+.setting-card .setting-card-actions .btn-save-sm:active { transform:translateY(1px); }
+.setting-card .setting-card-actions .btn-save-sm svg { flex-shrink:0; }
+.setting-card .setting-card-actions .btn-save-sm:disabled { opacity:.6; cursor:wait; }
 
 @media (max-width:1200px) { .settings-columns { grid-template-columns:1fr; } }
 .setting-card { background:#fff; border:1px solid #e5e7eb; border-radius:18px; padding:20px 22px; box-shadow:0 8px 30px rgba(15,23,42,0.05); display:flex; flex-direction:column; gap:18px; }

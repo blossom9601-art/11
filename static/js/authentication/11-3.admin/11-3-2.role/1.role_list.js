@@ -1,7 +1,18 @@
 (function(){
     'use strict';
-    if(window.__roleListInitialized) return;
-    window.__roleListInitialized = true;
+    /*
+     * SPA 재진입 대응:
+     * - 전역 가드(window.__roleListInitialized) 대신 DOM 마커(`#perm-role-matrix[data-role-init]`)로 초기화 여부를 판단한다.
+     * - main.main-content 가 SPA 네비게이션으로 교체되면 마커가 사라지므로 init()이 다시 실행된다.
+     * - 문서 레벨 리스너(드롭다운 outside-click, beforeunload)는 한 번만 바인딩하기 위해 별도 플래그를 둔다.
+     * - 이전 선택(role/dept/section/source)은 sessionStorage 에 보존하여 재진입 시 복원한다.
+     * - SPA 가 매 navigation 마다 이 스크립트를 새로 평가하므로(IIFE 가 누적 실행)
+     *   각 인스턴스는 window.__roleListGen 카운터로 자기 세대를 기억한다.
+     *   비동기 콜백/이벤트 핸들러는 자기 세대가 최신인지 확인 후 동작 → race 방지.
+     */
+    window.__roleListGen = (window.__roleListGen || 0) + 1;
+    var MY_GEN = window.__roleListGen;
+    function isLatest(){ return window.__roleListGen === MY_GEN; }
 
     /* == API URLs == */
     var API = {
@@ -43,10 +54,47 @@
     }
 
     /* == Init == */
-    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    var STORAGE_KEY = 'roleList.lastSelection.v1';
+
+    function readSavedSelection(){
+        try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}') || {}; } catch(_e){ return {}; }
+    }
+    function saveSelection(){
+        try {
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                source: currentSource,
+                section: currentSection,
+                roleId: currentRoleId,
+                roleName: currentRoleName,
+                deptId: currentDeptId
+            }));
+        } catch(_e){}
+    }
+
+    function isRoleListPage(){
+        return !!document.querySelector('#perm-role-matrix');
+    }
 
     function init(){
+        if(!isLatest()){ return; }
+        var matrix = document.getElementById('perm-role-matrix');
+        if(!matrix) return;                       // 화면권한 페이지가 아니면 종료
+        if(matrix.getAttribute('data-role-init') === String(MY_GEN)) return; // 같은 세대의 중복 init 방지
+        matrix.setAttribute('data-role-init', String(MY_GEN));
+
+        // 이전 SPA 인스턴스 상태 초기화 (새 DOM 이므로 모듈 변수도 리셋)
+        menuTree = []; flatMenus = [];
+        detailTree = []; flatDetails = [];
+        allRoles = []; allDepts = [];
+        currentRoleId = null; currentDeptId = null; currentRoleName = '';
+        dirtyPerms = {}; originalPerms = {};
+        dirtyDetailPerms = {}; originalDetailPerms = {};
+
+        // 이전 선택 복원 (탭/소스/섹션은 즉시 반영, role/dept 는 목록 로드 후 적용)
+        var saved = readSavedSelection();
+        if(saved.source === 'dept' || saved.source === 'role') currentSource = saved.source;
+        if(saved.section === 'detail' || saved.section === 'menu') currentSection = saved.section;
+
         bindSectionToggle();
         bindSourceToggle();
         bindRoleSearch();
@@ -59,8 +107,66 @@
         bindSystemTabGuard();
         initMessageModal();
         initConfirmModal();
+
+        // 토글/패널 UI 를 저장된 source/section 기준으로 동기화
+        try {
+            var secBtns = document.querySelectorAll('.perm-section-btn');
+            for(var i=0;i<secBtns.length;i++) secBtns[i].classList.toggle('active', secBtns[i].getAttribute('data-section')===currentSection);
+            var srcBtns = document.querySelectorAll('.perm-source-btn');
+            for(var j=0;j<srcBtns.length;j++) srcBtns[j].classList.toggle('active', srcBtns[j].getAttribute('data-source')===currentSource);
+            var rolePanel = document.getElementById('perm-panel-role');
+            var deptPanel = document.getElementById('perm-panel-dept');
+            if(rolePanel) rolePanel.style.display = (currentSource==='role') ? '' : 'none';
+            if(deptPanel) deptPanel.style.display = (currentSource==='dept') ? '' : 'none';
+        } catch(_e){}
+
         loadMenus();
         loadDetailPages();
+        if(currentSource === 'dept') loadDepts(true);
+    }
+
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+
+    /*
+     * SPA 재진입 대응 - 멀티 IIFE 인스턴스 race 방지:
+     * SPA 는 매 navigation 마다 이 스크립트를 새로 평가한다 → IIFE 가 누적 실행되어
+     * 여러 인스턴스가 각자의 closure 상태(flatMenus 등) 로 동시에 init() 을 돌리는 race
+     * 가 발생할 수 있다.  해결: 항상 "최신" 인스턴스의 init 만 window.__roleListPage 에 등록하고
+     * 모든 트리거(blossom:pageLoaded / popstate / mutation observer)는 그 최신 init 만 호출한다.
+     */
+    window.__roleListPage = { init: init, isPage: isRoleListPage };
+
+    if(!window.__roleListPageLoadedBound){
+        window.__roleListPageLoadedBound = true;
+        var triggerInit = function(reason){
+            var page = window.__roleListPage;
+            if(!page || !page.isPage()) return;
+            try { page.init(); } catch(_e){}
+        };
+        document.addEventListener('blossom:pageLoaded', function(){ triggerInit('blossom:pageLoaded'); });
+        document.addEventListener('blossom:spa:navigated', function(){ triggerInit('blossom:spa:navigated'); });
+        window.addEventListener('popstate', function(){ setTimeout(function(){ triggerInit('popstate'); }, 50); });
+
+        // 마지막 보루: main 이 교체되어도 위 이벤트가 누락될 가능성에 대비하여
+        // body 의 자식 변화(=main 교체)를 관찰해 매트릭스가 새로 들어오면 init 호출.
+        try {
+            var mo = new MutationObserver(function(mutations){
+                for(var i=0;i<mutations.length;i++){
+                    var m = mutations[i];
+                    for(var j=0;j<m.addedNodes.length;j++){
+                        var n = m.addedNodes[j];
+                        if(n && n.nodeType === 1){
+                            if(n.id === 'perm-role-matrix' || (n.querySelector && n.querySelector('#perm-role-matrix'))){
+                                triggerInit('mutation-observer');
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            mo.observe(document.body, { childList: true, subtree: true });
+        } catch(_e){}
     }
 
     /* ====== Section Toggle (메뉴화면권한 / 상세화면권한) ====== */
@@ -82,6 +188,7 @@
 
     function switchSection(sec){
         currentSection = sec;
+        saveSelection();
         var btns = document.querySelectorAll('.perm-section-btn');
         for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active', btns[i].getAttribute('data-section')===sec);
         /* 매트릭스 초기화 */
@@ -119,6 +226,7 @@
 
     function switchSource(src){
         currentSource = src;
+        saveSelection();
         dirtyPerms = {}; originalPerms = {};
         dirtyDetailPerms = {}; originalDetailPerms = {};
         var btns = document.querySelectorAll('.perm-source-btn');
@@ -148,6 +256,7 @@
     function loadMenus(){
         apiFetch(API.menus)
             .then(function(data){
+                if(!isLatest()) return;
                 menuTree = (data && data.menus) || [];
                 flatMenus = flattenTree(menuTree, 0);
                 loadRoles(true);
@@ -176,6 +285,7 @@
     function loadDetailPages(){
         apiFetch(API.detailPages)
             .then(function(data){
+                if(!isLatest()) return;
                 detailTree = (data && data.pages) || [];
                 flatDetails = flattenDetailTree(detailTree, 0);
             })
@@ -200,36 +310,58 @@
     /* ====== Role List ====== */
     function loadRoles(autoSelect){
         apiFetch(API.roles).then(function(data){
+            if(!isLatest()) { return; }
             allRoles = (data && data.roles) || [];
-            console.log('[role_list] roles loaded:', allRoles.length);
-            if(autoSelect){
-                var defaultRole = null;
-                for(var i=0;i<allRoles.length;i++){
-                    var n = (allRoles[i].name||'').toLowerCase();
-                    if(n === '사용자'){
-                        defaultRole = allRoles[i]; break;
-                    }
-                }
-                if(!defaultRole){
-                    for(var j=0;j<allRoles.length;j++){
-                        var nm = (allRoles[j].name||'').toLowerCase();
-                        if(nm !== 'admin' && nm !== 'administrator'){
-                            defaultRole = allRoles[j]; break;
-                        }
-                    }
-                }
-                if(defaultRole) selectRole(defaultRole);
+            if(!autoSelect || !allRoles.length) return;
+
+            // 1) 이전 선택 role 우선 복원 (sessionStorage)
+            var saved = readSavedSelection();
+            var restored = null;
+            if(saved && saved.roleId){
+                restored = findInList(allRoles, saved.roleId);
             }
+            if(!restored && saved && saved.roleName){
+                for(var k=0;k<allRoles.length;k++){
+                    if((allRoles[k].name||'') === saved.roleName){ restored = allRoles[k]; break; }
+                }
+            }
+            if(restored){ selectRole(restored); return; }
+
+            // 2) 기본값: '사용자' → 첫 번째 비-admin → 첫 번째
+            var defaultRole = null;
+            for(var i=0;i<allRoles.length;i++){
+                var n = (allRoles[i].name||'').toLowerCase();
+                if(n === '사용자'){
+                    defaultRole = allRoles[i]; break;
+                }
+            }
+            if(!defaultRole){
+                for(var j=0;j<allRoles.length;j++){
+                    var nm = (allRoles[j].name||'').toLowerCase();
+                    if(nm !== 'admin' && nm !== 'administrator'){
+                        defaultRole = allRoles[j]; break;
+                    }
+                }
+            }
+            if(!defaultRole) defaultRole = allRoles[0];
+            if(defaultRole) selectRole(defaultRole);
+        }).catch(function(err){
+            if(err && err.message === 'session_expired') return;
+            showMessage('오류', '역할 목록을 불러오지 못했습니다.');
         });
     }
 
     /* ====== Dept List ====== */
     function loadDepts(autoSelect){
         apiFetch(API.depts).then(function(data){
+            if(!isLatest()) return;
             allDepts = (data && data.departments) || [];
-            if(autoSelect && allDepts.length>0){
-                selectDept(allDepts[0]);
-            }
+            if(!autoSelect || !allDepts.length) return;
+            var saved = readSavedSelection();
+            var restored = saved && saved.deptId ? findInList(allDepts, saved.deptId) : null;
+            selectDept(restored || allDepts[0]);
+        }).catch(function(err){
+            // dept 목록 로드 실패 - 조용히 무시
         });
     }
 
@@ -360,6 +492,7 @@
 
     /* ====== Select Role ====== */
     function selectRole(role){
+        if(!isLatest()) { return; }
         currentRoleId = role.id;
         currentRoleName = role.name || '';
         dirtyPerms = {}; originalPerms = {};
@@ -368,6 +501,7 @@
         if(searchInput){ searchInput.value = role.name; searchInput.placeholder = '역할 선택'; }
         var dropdown = document.getElementById('perm-role-dropdown');
         if(dropdown) dropdown.style.display = 'none';
+        saveSelection();
         if(currentSection === 'detail') loadDetailPermissions(role.id, 'role');
         else loadPermissions(role.id, 'role');
     }
@@ -385,6 +519,7 @@
         if(searchInput){ searchInput.value = dept.dept_name; searchInput.placeholder = '부서 선택'; }
         var dropdown = document.getElementById('perm-dept-dropdown');
         if(dropdown) dropdown.style.display = 'none';
+        saveSelection();
         if(currentSection === 'detail') loadDetailPermissions(dept.id, 'dept');
         else loadPermissions(dept.id, 'dept');
     }
@@ -398,6 +533,7 @@
         var url = (type==='dept') ? API.deptPerms(targetId) : API.rolePerms(targetId);
         apiFetch(url)
             .then(function(data){
+                if(!isLatest()) { return; }
                 var perms = (data && data.permissions) || {};
                 // 미설정 메뉴는 READ 기본값 적용
                 for(var i=0;i<flatMenus.length;i++){
@@ -766,8 +902,11 @@
 
     /* ====== Page Leave Guard ====== */
     function bindBeforeUnload(){
+        // window 리스너는 SPA 재진입마다 누적되지 않도록 모듈 전역에서 한 번만 등록
+        if(window.__roleListBeforeUnloadBound) return;
+        window.__roleListBeforeUnloadBound = true;
         window.addEventListener('beforeunload', function(e){
-            if(hasDirtyChanges()){ e.preventDefault(); e.returnValue = ''; }
+            if(isRoleListPage() && hasDirtyChanges()){ e.preventDefault(); e.returnValue = ''; }
         });
     }
 
@@ -822,14 +961,12 @@
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
             .then(function(res){
-                console.log('[role_list] fetch', url, 'status=', res.status, 'redirected=', res.redirected, 'ct=', res.headers.get('content-type'));
                 if(res.redirected && res.url && res.url.indexOf('/login')!==-1){
                     window.location.href = '/login';
                     throw new Error('session_expired');
                 }
                 if(!res.ok){
                     return res.text().then(function(body){
-                        console.error('[role_list] HTTP error', res.status, url, body.substring(0, 200));
                         throw new Error('HTTP ' + res.status);
                     });
                 }

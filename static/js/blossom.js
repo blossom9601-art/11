@@ -3458,16 +3458,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 채팅 버튼: 채팅 페이지로 SPA 이동
+    // 채팅 버튼: chat.js 초기화를 보장하기 위해 풀 페이지 이동
     const chatBtn = document.getElementById('btn-chat');
     if (chatBtn) {
         chatBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            if (typeof window.blsSpaNavigate === 'function') {
-                window.blsSpaNavigate('/addon/chat');
-            } else {
-                window.location.href = '/addon/chat';
-            }
+            window.location.href = '/addon/chat';
         });
     }
 
@@ -4173,6 +4169,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (/^\/p\/cat_business_group_(detail|manager|system|service|task|log|file)$/.test(url.pathname)) return false;
             // 비즈니스 대시보드는 첫 진입 레이아웃 안정성을 위해 항상 풀 리로드로 진입한다.
             if (url.pathname === '/p/cat_business_dashboard') return false;
+            // 채팅은 독립 페이지 스크립트가 매 진입마다 새로 평가되어야 한다.
+            if (url.pathname === '/addon/chat') return false;
             var ok = false;
             for (var pi = 0; pi < __spaRoutePrefixes.length; pi++) {
                 if (url.pathname.startsWith(__spaRoutePrefixes[pi]) || url.pathname === __spaRoutePrefixes[pi].replace(/\/$/, '')) {

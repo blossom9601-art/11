@@ -172,6 +172,8 @@
 	'cat_customer_client1': _category_match_map['customer'],
 	'cat_vendor_manufacturer': _category_match_map['vendor']
 	,
+	'access_control_access': ['access_control_access'],
+	'access_control_request': ['access_control_request'],
 	'insight_trend': ['insight_trend', 'insight_security', 'insight_report', 'insight_technical'],
 	'insight_blog_it': ['insight_blog_it', 'insight_blog_it_detail']
 } %}
@@ -191,6 +193,16 @@
 					<li><a href="{{ url_for('pages.show', key='hw_san_director') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_san_director') or []) | join(',') }}">SAN</a></li>
 					<li><a href="{{ url_for('pages.show', key='hw_network_l2') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_network_l2') or []) | join(',') }}">네트워크</a></li>
 					<li><a href="{{ url_for('pages.show', key='hw_security_firewall') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_security_firewall') or []) | join(',') }}">보안장비</a></li>
+				</ul>
+			</li>
+			{% endif %}
+			{% if sidebar_perms.get('access_control', {}).get('read', True) %}
+			<li class="menu-item has-submenu">
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/control/free-icon-font-access-control.svg" class="menu-icon" alt="접근제어"/><span class="menu-text">접근제어</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<ul class="submenu">
+					<li><a href="{{ url_for('pages.show', key='access_control_status') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('access_control_status') or []) | join(',') }}">현황</a></li>
+					<li><a href="{{ url_for('pages.show', key='access_control_access') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('access_control_access') or []) | join(',') }}">접속</a></li>
+					<li><a href="{{ url_for('pages.show', key='access_control_request') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('access_control_request') or []) | join(',') }}">신청</a></li>
 				</ul>
 			</li>
 			{% endif %}

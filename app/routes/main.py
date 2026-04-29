@@ -114,14 +114,21 @@ def addon_notifications():
 
 @main_bp.route('/addon/chat')
 def addon_chat():
-    """채팅 (임시 스텁)"""
-    if not _is_spa_fetch():
-        return render_template('layouts/spa_shell.html', current_key='addon_chat', menu_code=None)
+    """채팅 페이지.
+
+    SPA navigation 으로 진입할 경우 chat.js 의 IIFE 가 재실행되지 않아
+    채널 리스트/이벤트 바인딩이 동작하지 않는 회귀가 있다. 따라서
+    1) 클라이언트(blossom.js)에서 /addon/chat 경로는 SPA intercept 대상에서 제외하여 풀 페이지로 진입하고,
+    2) 서버에서도 SPA shell 을 반환하지 않고 항상 풀 페이지를 직접 렌더한다.
+    이 둘이 함께 적용되어야 chat.js 가 매번 새로 평가되어 안정적으로 동작한다.
+    다른 페이지에서 채팅 메뉴 클릭 → 풀 페이지 이동, 채팅 페이지에서 다른 메뉴 클릭 → SPA 정상 동작.
+    """
     try:
         chat_rooms_url = url_for('api.list_chat_rooms')
     except Exception:
         chat_rooms_url = '/api/chat/rooms'
-    chat_api_root = chat_rooms_url.rsplit('/', 1)[0] if '/' in chat_rooms_url else '/api/chat'
+    chat_rooms_create_url = '/api/chat/rooms'
+    chat_api_root = '/api/chat'
     chat_js_version = _static_asset_stamp('js/addon_application/3.chat.js')
     
     # Pass current user information if logged in, otherwise empty fallback
@@ -150,6 +157,7 @@ def addon_chat():
         'addon_application/3.chat.html',
         chat_rooms_url=chat_rooms_url,
         chat_api_root=chat_api_root,
+        chat_directory_url='/api/chat/directory',
         chat_js_version=chat_js_version,
         **context,
     )

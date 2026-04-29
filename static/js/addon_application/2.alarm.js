@@ -83,6 +83,19 @@ document.addEventListener('DOMContentLoaded', function(){
 
 	// ── API ───────────────────────────────────────────────
 
+	function mutationOptions(method){
+		return {
+			method: method,
+			credentials: 'same-origin',
+			headers: {
+				'Accept': 'application/json',
+				'Content-Type': 'application/json',
+				'X-Requested-With': 'XMLHttpRequest'
+			},
+			body: '{}'
+		};
+	}
+
 	function fetchNotifications(cb){
 		var url = '/api/notifications?per_page=' + PER_PAGE + '&page=' + state.page;
 		if (state.category) url += '&category=' + encodeURIComponent(state.category);
@@ -97,17 +110,17 @@ document.addEventListener('DOMContentLoaded', function(){
 	}
 
 	function markRead(id, cb){
-		fetch('/api/notifications/' + id + '/read', { method: 'PUT', credentials: 'same-origin' })
+		fetch('/api/notifications/' + id + '/read', mutationOptions('PUT'))
 			.then(function(){ if (cb) cb(); }).catch(function(){});
 	}
 
 	function markAllRead(cb){
-		fetch('/api/notifications/read-all', { method: 'POST', credentials: 'same-origin' })
+		fetch('/api/notifications/read-all', mutationOptions('POST'))
 			.then(function(){ if (cb) cb(); }).catch(function(){});
 	}
 
 	function deleteAll(cb){
-		fetch('/api/notifications/delete-all', { method: 'POST', credentials: 'same-origin' })
+		fetch('/api/notifications/delete-all', mutationOptions('POST'))
 			.then(function(res){ return res.json(); })
 			.then(function(data){
 				if (data.success && cb) cb();

@@ -3,7 +3,7 @@ import os
 import re
 import time
 import ipaddress
-from app.models import db, AuthUser, AuthLoginHistory, AuthPasswordHistory, UserProfile, OrgDepartment
+from app.models import db, AuthUser, AuthLoginHistory, AuthPasswordHistory, UserProfile, OrgDepartment, MsgChatPolicy
 from app.models import AuthRole, Role, RoleUser, SmtpConfig, SmsConfig, MfaConfig, MfaPendingCode, CompanyOtpConfig
 from app.models import PermissionAuditLog, Menu, RoleMenuPermission, DepartmentMenuPermission, UserMenuPermission
 from datetime import datetime, timedelta
@@ -23,6 +23,28 @@ ROLE_PERMISSION_FIELDS = (
 )
 ADMIN_SESSION_ROLES = ('admin', 'ADMIN', '관리자')
 TEMP_PASSWORD_TTL_MINUTES = 10
+CHAT_POLICY_DEFAULTS = {
+    'basic.chat_enabled': {'enabled': True},
+    'basic.dm_enabled': {'enabled': True},
+    'basic.channel_enabled': {'enabled': True},
+    'channel.creation_scope': {'value': 'all_users'},
+    'channel.allow_private_channel': {'enabled': True},
+    'channel.allow_external_invite': {'enabled': False},
+    'message.edit_window_minutes': {'value': 30},
+    'message.allow_delete': {'enabled': True},
+    'message.read_receipt_enabled': {'enabled': True},
+    'file.max_upload_mb': {'value': 50},
+    'file.allowed_extensions': {'value': ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'zip']},
+    'file.preview_enabled': {'enabled': True},
+    'notification.mention_enabled': {'enabled': True},
+    'notification.channel_broadcast_limit': {'value': 'admins_only'},
+    'notification.quiet_hours': {'enabled': False, 'start': '22:00', 'end': '07:00'},
+    'retention.message_days': {'value': 365},
+    'retention.file_days': {'value': 180},
+    'audit.message_delete_log': {'enabled': True},
+    'audit.file_upload_log': {'enabled': True},
+    'audit.admin_view_permission': {'value': 'chat.system.admin'},
+}
 
 
 def _parse_user_agent(ua):
@@ -2818,6 +2840,117 @@ def admin_file_management_settings():
     return render_template('authentication/11-3.admin/11-3-3.setting/11.file_management.html')
 
 
+@auth_bp.route('/admin/auth/chat-management', methods=['GET'])
+def admin_chat_management_settings():
+    """채팅관리 설정 페이지를 렌더링한다."""
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_chat_management', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/12.chat_management.html')
+
+
+@auth_bp.route('/admin/auth/chat-policy', methods=['GET'])
+def admin_chat_policy_get():
+    """채팅관리 정책을 반환한다."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+    try:
+        rows = MsgChatPolicy.query.order_by(MsgChatPolicy.policy_group.asc(), MsgChatPolicy.policy_key.asc()).all()
+        if not rows:
+            return jsonify({'loaded': False, 'groups': {}, 'items': []})
+        items = []
+        groups = {}
+        for row in rows:
+            parsed = {}
+            try:
+                parsed = json.loads(row.value_json or '{}')
+            except Exception:
+                parsed = {'raw': row.value_json}
+            item = {
+                'id': row.id,
+                'policyKey': row.policy_key,
+                'policyGroup': row.policy_group,
+                'value': parsed,
+                'updatedAt': row.updated_at.isoformat() if row.updated_at else None,
+                'updatedBy': row.updated_by,
+            }
+            items.append(item)
+            groups.setdefault(row.policy_group, []).append(item)
+        return jsonify({'loaded': True, 'groups': groups, 'items': items})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/admin/auth/chat-policy', methods=['PUT'])
+def admin_chat_policy_put():
+    """채팅관리 정책을 저장한다."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    raw_policies = payload.get('policies') or {}
+    if not isinstance(raw_policies, dict):
+        return jsonify({'success': False, 'message': 'policies must be an object'}), 400
+    try:
+        changed = []
+        for policy_key, policy_value in raw_policies.items():
+            if not isinstance(policy_key, str) or '.' not in policy_key:
+                continue
+            row = MsgChatPolicy.query.filter_by(policy_key=policy_key).first()
+            policy_group = policy_key.split('.', 1)[0]
+            new_json = json.dumps(policy_value, ensure_ascii=False)
+            old_json = row.value_json if row else ''
+            if row is None:
+                row = MsgChatPolicy(
+                    policy_key=policy_key,
+                    policy_group=policy_group,
+                    value_json=new_json,
+                    updated_by=session.get('user_id'),
+                    updated_at=datetime.utcnow(),
+                )
+                db.session.add(row)
+                changed.append(policy_key)
+                _settings_log('채팅관리', policy_key, '', new_json)
+                continue
+            if old_json == new_json:
+                continue
+            row.policy_group = policy_group
+            row.value_json = new_json
+            row.updated_by = session.get('user_id')
+            row.updated_at = datetime.utcnow()
+            changed.append(policy_key)
+            _settings_log('채팅관리', policy_key, old_json, new_json)
+
+        if payload.get('restoreDefaults'):
+            for policy_key, policy_value in CHAT_POLICY_DEFAULTS.items():
+                row = MsgChatPolicy.query.filter_by(policy_key=policy_key).first()
+                new_json = json.dumps(policy_value, ensure_ascii=False)
+                if row is None:
+                    row = MsgChatPolicy(
+                        policy_key=policy_key,
+                        policy_group=policy_key.split('.', 1)[0],
+                        value_json=new_json,
+                        updated_by=session.get('user_id'),
+                        updated_at=datetime.utcnow(),
+                    )
+                    db.session.add(row)
+                elif row.value_json != new_json:
+                    _settings_log('채팅관리', policy_key, row.value_json, new_json)
+                    row.value_json = new_json
+                    row.updated_by = session.get('user_id')
+                    row.updated_at = datetime.utcnow()
+                if policy_key not in changed:
+                    changed.append(policy_key)
+
+        db.session.commit()
+        return jsonify({'success': True, 'changedKeys': changed})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 # ── 활성 세션 관리 ────────────────────────────────────────────────────
 @auth_bp.route('/admin/auth/sessions', methods=['GET'])
 def admin_sessions_page():
@@ -3101,6 +3234,18 @@ def admin_page_tab():
     if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
         return render_template('layouts/spa_shell.html', current_key='admin_page_tab', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/9.page_tab.html')
+
+
+@auth_bp.route('/admin/auth/access-control', methods=['GET'])
+def admin_access_control_settings():
+    """접근제어 설정 페이지를 렌더링한다."""
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_access_control', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/12.access_control.html')
 
 
 @auth_bp.route('/admin/auth/brand', methods=['GET'])

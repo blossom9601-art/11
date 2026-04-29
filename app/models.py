@@ -1519,6 +1519,7 @@ class MsgMessage(db.Model):
                 'name': self.sender.name,
                 'department': self.sender.department,
                 'email': self.sender.email,
+                'profile_image': self.sender.profile_image,
             }
         return payload
 
@@ -1549,6 +1550,863 @@ class MsgFile(db.Model):
             'content_type': self.content_type,
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None,
             'uploaded_by_user_id': self.uploaded_by_user_id,
+        }
+
+
+class MsgPinnedMessage(db.Model):
+    """채팅방 메시지 고정(Pin) 이력. 한 메시지는 한 방에서 한 번만 고정 가능."""
+    __tablename__ = 'msg_pinned_message'
+    __table_args__ = (
+        db.UniqueConstraint('room_id', 'message_id', name='uq_msg_pinned_message_room_message'),
+        db.Index('ix_msg_pinned_message_room_id', 'room_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('msg_room.id', ondelete='CASCADE'), nullable=False)
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message.id', ondelete='CASCADE'), nullable=False)
+    pinned_by_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    pinned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    note = db.Column(db.String(255))
+
+    pinned_by = db.relationship('UserProfile', foreign_keys=[pinned_by_user_id], lazy='joined')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'message_id': self.message_id,
+            'pinned_by_user_id': self.pinned_by_user_id,
+            'pinned_at': self.pinned_at.isoformat() if self.pinned_at else None,
+            'note': self.note,
+            'pinned_by': {
+                'id': self.pinned_by.id,
+                'name': self.pinned_by.name,
+            } if self.pinned_by else None,
+        }
+
+
+class MsgMessageReaction(db.Model):
+    """메시지에 대한 이모지 반응. (메시지+사용자+이모지) 단위 유일."""
+    __tablename__ = 'msg_message_reaction'
+    __table_args__ = (
+        db.UniqueConstraint('message_id', 'user_id', 'emoji', name='uq_msg_reaction_msg_user_emoji'),
+        db.Index('ix_msg_reaction_message_id', 'message_id'),
+        db.Index('ix_msg_reaction_user_id', 'user_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    emoji = db.Column(db.String(32), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MsgConversation(db.Model):
+    """채널/DM/스레드를 포괄하는 v2 대화 엔티티"""
+    __tablename__ = 'msg_conversation'
+    __table_args__ = (
+        db.Index('ix_msg_conversation_type_visibility', 'conversation_type', 'visibility'),
+        db.Index('ix_msg_conversation_last_message_at', 'last_message_at'),
+        db.Index('ix_msg_conversation_dm_key', 'dm_key'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_type = db.Column(db.String(16), nullable=False)
+    visibility = db.Column(db.String(16), nullable=False, default='private')
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    owner_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    parent_conversation_id = db.Column(db.Integer, db.ForeignKey('msg_conversation.id'))
+    parent_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    dm_key = db.Column(db.String(255), unique=True)
+    last_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    last_message_preview = db.Column(db.Text)
+    last_message_at = db.Column(db.DateTime)
+    is_archived = db.Column(db.Boolean, nullable=False, default=False)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    updated_at = db.Column(db.DateTime)
+    updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+
+    channel = db.relationship('MsgChannel', back_populates='conversation', uselist=False, lazy='selectin')
+    members = db.relationship('MsgConversationMember', back_populates='conversation', cascade='all, delete-orphan', lazy='selectin')
+
+    def to_dict(self, include_members: bool = False) -> dict:
+        payload = {
+            'id': self.id,
+            'conversation_type': self.conversation_type,
+            'visibility': self.visibility,
+            'title': self.title,
+            'description': self.description,
+            'owner_user_id': self.owner_user_id,
+            'parent_conversation_id': self.parent_conversation_id,
+            'parent_message_id': self.parent_message_id,
+            'dm_key': self.dm_key,
+            'last_message_id': self.last_message_id,
+            'last_message_preview': self.last_message_preview,
+            'last_message_at': self.last_message_at.isoformat() if self.last_message_at else None,
+            'is_archived': bool(self.is_archived),
+            'is_deleted': bool(self.is_deleted),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_by': self.created_by,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by': self.updated_by,
+        }
+        if self.channel:
+            payload['channel'] = self.channel.to_dict()
+        if include_members:
+            payload['members'] = [member.to_dict() for member in self.members if not member.left_at]
+        return payload
+
+
+class MsgChannel(db.Model):
+    """채널 메타데이터"""
+    __tablename__ = 'msg_channel'
+    __table_args__ = (
+        db.Index('ix_msg_channel_name', 'name'),
+        db.Index('ix_msg_channel_type', 'channel_type'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('msg_conversation.id', ondelete='CASCADE'), nullable=False, unique=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    slug = db.Column(db.String(140), unique=True)
+    channel_type = db.Column(db.String(16), nullable=False, default='public')
+    description = db.Column(db.Text)
+    topic = db.Column(db.String(255))
+    created_by = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    archived_at = db.Column(db.DateTime)
+
+    conversation = db.relationship('MsgConversation', back_populates='channel', lazy='joined')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'conversation_id': self.conversation_id,
+            'name': self.name,
+            'slug': self.slug,
+            'type': self.channel_type,
+            'description': self.description,
+            'topic': self.topic,
+            'created_by': self.created_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'archived_at': self.archived_at.isoformat() if self.archived_at else None,
+        }
+
+
+class MsgConversationMember(db.Model):
+    """v2 대화 멤버십"""
+    __tablename__ = 'msg_conversation_member'
+    __table_args__ = (
+        db.UniqueConstraint('conversation_id', 'user_id', name='uq_msg_conversation_member_conv_user'),
+        db.Index('ix_msg_conversation_member_user_id', 'user_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('msg_conversation.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    role = db.Column(db.String(32), nullable=False, default='member')
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    left_at = db.Column(db.DateTime)
+    mute_until = db.Column(db.DateTime)
+    is_favorite = db.Column(db.Boolean, nullable=False, default=False)
+    notification_level = db.Column(db.String(32), nullable=False, default='all')
+    last_read_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    last_read_at = db.Column(db.DateTime)
+    unread_count_cached = db.Column(db.Integer, nullable=False, default=0)
+
+    conversation = db.relationship('MsgConversation', back_populates='members')
+    user = db.relationship('UserProfile', lazy='joined')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'conversation_id': self.conversation_id,
+            'user_id': self.user_id,
+            'role': self.role,
+            'joined_at': self.joined_at.isoformat() if self.joined_at else None,
+            'left_at': self.left_at.isoformat() if self.left_at else None,
+            'mute_until': self.mute_until.isoformat() if self.mute_until else None,
+            'is_favorite': bool(self.is_favorite),
+            'notification_level': self.notification_level,
+            'last_read_message_id': self.last_read_message_id,
+            'last_read_at': self.last_read_at.isoformat() if self.last_read_at else None,
+            'unread_count_cached': self.unread_count_cached,
+            'user': {
+                'id': self.user.id if self.user else None,
+                'name': self.user.name if self.user else None,
+                'department': self.user.department if self.user else None,
+                'email': self.user.email if self.user else None,
+                'profile_image': self.user.profile_image if self.user else None,
+            } if self.user else None,
+        }
+
+
+class MsgMessageV2(db.Model):
+    """채널 중심 메시지 모델"""
+    __tablename__ = 'msg_message_v2'
+    __table_args__ = (
+        db.Index('ix_msg_message_v2_conversation_id', 'conversation_id'),
+        db.Index('ix_msg_message_v2_parent_message_id', 'parent_message_id'),
+        db.Index('ix_msg_message_v2_sender_id', 'sender_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('msg_conversation.id', ondelete='CASCADE'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    parent_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    root_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    content = db.Column(db.Text)
+    message_type = db.Column(db.String(32), nullable=False, default='text')
+    status = db.Column(db.String(16), nullable=False, default='active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime)
+    edited_at = db.Column(db.DateTime)
+    deleted_at = db.Column(db.DateTime)
+    metadata_json = db.Column(db.Text)
+
+    sender = db.relationship('UserProfile', foreign_keys=[sender_id], lazy='joined')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'conversationId': self.conversation_id,
+            'senderId': self.sender_id,
+            'parentMessageId': self.parent_message_id,
+            'rootMessageId': self.root_message_id,
+            'content': self.content,
+            'type': self.message_type,
+            'status': self.status,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+            'editedAt': self.edited_at.isoformat() if self.edited_at else None,
+            'deletedAt': self.deleted_at.isoformat() if self.deleted_at else None,
+            'metadata': self.metadata_json,
+            'sender': {
+                'id': self.sender.id,
+                'name': self.sender.name,
+                'department': self.sender.department,
+                'email': self.sender.email,
+            } if self.sender else None,
+        }
+
+
+class MsgAttachment(db.Model):
+    """v2 메시지 첨부 메타데이터"""
+    __tablename__ = 'msg_attachment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id', ondelete='CASCADE'), nullable=False)
+    file_name = db.Column(db.String(255), nullable=False)
+    file_size = db.Column(db.Integer)
+    file_type = db.Column(db.String(120))
+    storage_key = db.Column(db.String(1024))
+    url = db.Column(db.String(1024), nullable=False)
+    preview_url = db.Column(db.String(1024))
+    checksum = db.Column(db.String(128))
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'messageId': self.message_id,
+            'fileName': self.file_name,
+            'fileSize': self.file_size,
+            'fileType': self.file_type,
+            'url': self.url,
+            'previewUrl': self.preview_url,
+            'uploadedAt': self.uploaded_at.isoformat() if self.uploaded_at else None,
+        }
+
+
+class MsgMessageReadStatus(db.Model):
+    """메시지 읽음 상세 이력"""
+    __tablename__ = 'msg_message_read_status'
+    __table_args__ = (
+        db.UniqueConstraint('message_id', 'user_id', name='uq_msg_message_read_status_message_user'),
+        db.Index('ix_msg_message_read_status_user_id', 'user_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    read_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MsgMention(db.Model):
+    """메시지 멘션 이력"""
+    __tablename__ = 'msg_mention'
+    __table_args__ = (
+        db.Index('ix_msg_mention_user_id', 'mentioned_user_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id', ondelete='CASCADE'), nullable=False)
+    mentioned_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+    mentioned_scope = db.Column(db.String(32), nullable=False, default='user')
+    raw_token = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MsgNotification(db.Model):
+    """개인 알림"""
+    __tablename__ = 'msg_notification'
+    __table_args__ = (
+        db.Index('ix_msg_notification_user_id', 'user_id'),
+        db.Index('ix_msg_notification_is_read_created_at', 'is_read', 'created_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    notification_type = db.Column(db.String(32), nullable=False)
+    reference_type = db.Column(db.String(32), nullable=False)
+    reference_id = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    body = db.Column(db.Text)
+    is_read = db.Column(db.Boolean, nullable=False, default=False)
+    delivered_at = db.Column(db.DateTime)
+    read_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'type': self.notification_type,
+            'referenceType': self.reference_type,
+            'referenceId': self.reference_id,
+            'title': self.title,
+            'body': self.body,
+            'isRead': bool(self.is_read),
+            'deliveredAt': self.delivered_at.isoformat() if self.delivered_at else None,
+            'readAt': self.read_at.isoformat() if self.read_at else None,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class MsgChatPolicy(db.Model):
+    """채팅관리 정책 저장소"""
+    __tablename__ = 'msg_chat_policy'
+    __table_args__ = (
+        db.Index('ix_msg_chat_policy_group', 'policy_group'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    policy_key = db.Column(db.String(120), nullable=False, unique=True)
+    policy_group = db.Column(db.String(64), nullable=False)
+    value_json = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'policyKey': self.policy_key,
+            'policyGroup': self.policy_group,
+            'valueJson': self.value_json,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+            'updatedBy': self.updated_by,
+        }
+
+
+class MsgAuditLog(db.Model):
+    """채팅 감사 로그"""
+    __tablename__ = 'msg_audit_log'
+    __table_args__ = (
+        db.Index('ix_msg_audit_log_action_created_at', 'action', 'created_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+    action = db.Column(db.String(64), nullable=False)
+    target_type = db.Column(db.String(32), nullable=False)
+    target_id = db.Column(db.Integer)
+    before_json = db.Column(db.Text)
+    after_json = db.Column(db.Text)
+    ip_address = db.Column(db.String(64))
+    user_agent = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MsgRoomIdea(db.Model):
+    """채팅방 아이디어 보드"""
+    __tablename__ = 'msg_room_idea'
+    __table_args__ = (
+        db.Index('ix_msg_room_idea_room_id', 'room_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('msg_room.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text)
+    created_by_user_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'title': self.title,
+            'body': self.body,
+            'created_by_user_id': self.created_by_user_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class MsgRoomIdeaLike(db.Model):
+    """채팅방 아이디어 좋아요"""
+    __tablename__ = 'msg_room_idea_like'
+    __table_args__ = (
+        db.UniqueConstraint('idea_id', 'user_id', name='uq_msg_room_idea_like_user'),
+        db.Index('ix_msg_room_idea_like_idea_id', 'idea_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    idea_id = db.Column(db.Integer, db.ForeignKey('msg_room_idea.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship('UserProfile', foreign_keys=[user_id])
+
+    def to_dict(self) -> dict:
+        user = self.user
+        return {
+            'id': self.id,
+            'idea_id': self.idea_id,
+            'user_id': self.user_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'profile_image': user.profile_image,
+            } if user else None,
+        }
+
+
+class MsgRoomIdeaComment(db.Model):
+    """채팅방 아이디어 댓글"""
+    __tablename__ = 'msg_room_idea_comment'
+    __table_args__ = (
+        db.Index('ix_msg_room_idea_comment_idea_id', 'idea_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    idea_id = db.Column(db.Integer, db.ForeignKey('msg_room_idea.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+
+    user = db.relationship('UserProfile', foreign_keys=[user_id])
+
+    def to_dict(self) -> dict:
+        user = self.user
+        return {
+            'id': self.id,
+            'idea_id': self.idea_id,
+            'user_id': self.user_id,
+            'body': self.body,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'profile_image': user.profile_image,
+            } if user else None,
+        }
+
+
+class MsgRoomTask(db.Model):
+    """채팅방 업무리스트"""
+    __tablename__ = 'msg_room_task'
+    __table_args__ = (
+        db.Index('ix_msg_room_task_room_id', 'room_id'),
+        db.Index('ix_msg_room_task_status', 'status'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('msg_room.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default='todo')  # todo, in_progress, done
+    priority = db.Column(db.String(20), nullable=False, default='normal')  # low, normal, high
+    assignee_user_id = db.Column(db.Integer)
+    due_date = db.Column(db.Date)
+    created_by_user_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    completed_at = db.Column(db.DateTime)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'room_id': self.room_id,
+            'title': self.title,
+            'description': self.description,
+            'status': self.status,
+            'priority': self.priority,
+            'assignee_user_id': self.assignee_user_id,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'created_by_user_id': self.created_by_user_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Event Bridge (Webhook → Rule → Card Message)
+# ---------------------------------------------------------------------------
+
+class EvtSource(db.Model):
+    """외부 이벤트 소스 (Wazuh/Zabbix/ELK/접근통제 등)"""
+    __tablename__ = 'evt_source'
+    __table_args__ = (
+        db.Index('ix_evt_source_is_active', 'is_active'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    kind = db.Column(db.String(32), nullable=False, default='custom')  # wazuh,zabbix,elk,custom,syslog,api
+    webhook_token = db.Column(db.String(64), nullable=False, unique=True)
+    secret = db.Column(db.String(128))
+    ip_allowlist = db.Column(db.Text)  # JSON array of CIDRs
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+    updated_at = db.Column(db.DateTime)
+    updated_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'kind': self.kind,
+            'webhookToken': self.webhook_token,
+            'webhookUrl': f'/api/events/in/{self.webhook_token}',
+            'hasSecret': bool(self.secret),
+            'ipAllowlist': self.ip_allowlist,
+            'isActive': bool(self.is_active),
+            'description': self.description,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class EvtRule(db.Model):
+    """이벤트 매칭 → 채널 라우팅 룰"""
+    __tablename__ = 'evt_rule'
+    __table_args__ = (
+        db.Index('ix_evt_rule_source_priority', 'source_id', 'priority', 'is_active'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_id = db.Column(db.Integer, db.ForeignKey('evt_source.id'))  # NULL = 모든 소스
+    name = db.Column(db.String(160), nullable=False)
+    priority = db.Column(db.Integer, nullable=False, default=100)
+    match_json = db.Column(db.Text, nullable=False)  # [{path,op,value}, ...]
+    severity = db.Column(db.String(16), nullable=False, default='info')  # info/warning/error/critical
+    target_channel_id = db.Column(db.Integer, db.ForeignKey('msg_channel.id'))
+    target_conversation_id = db.Column(db.Integer, db.ForeignKey('msg_conversation.id'))
+    mention_user_ids = db.Column(db.Text)  # JSON array
+    title_template = db.Column(db.String(255))
+    body_template = db.Column(db.Text)
+    action_buttons = db.Column(db.Text)  # JSON array [{label,kind,payload}]
+    dedupe_key_template = db.Column(db.String(255))
+    dedupe_window_sec = db.Column(db.Integer, nullable=False, default=30)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+    updated_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'sourceId': self.source_id,
+            'name': self.name,
+            'priority': self.priority,
+            'matchJson': self.match_json,
+            'severity': self.severity,
+            'targetChannelId': self.target_channel_id,
+            'targetConversationId': self.target_conversation_id,
+            'mentionUserIds': self.mention_user_ids,
+            'titleTemplate': self.title_template,
+            'bodyTemplate': self.body_template,
+            'actionButtons': self.action_buttons,
+            'dedupeKeyTemplate': self.dedupe_key_template,
+            'dedupeWindowSec': self.dedupe_window_sec,
+            'isActive': bool(self.is_active),
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class EvtLog(db.Model):
+    """수신된 이벤트 원본 + 처리 결과"""
+    __tablename__ = 'evt_log'
+    __table_args__ = (
+        db.Index('ix_evt_log_source_received', 'source_id', 'received_at'),
+        db.Index('ix_evt_log_dedupe_key_received', 'dedupe_key', 'received_at'),
+        db.Index('ix_evt_log_status', 'status'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_id = db.Column(db.Integer, db.ForeignKey('evt_source.id'), nullable=False)
+    rule_id = db.Column(db.Integer, db.ForeignKey('evt_rule.id'))
+    raw_payload = db.Column(db.Text, nullable=False)
+    normalized_payload = db.Column(db.Text)
+    severity = db.Column(db.String(16))
+    dedupe_key = db.Column(db.String(255))
+    message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    status = db.Column(db.String(16), nullable=False, default='received')  # received/processed/dropped/suppressed/failed
+    error_msg = db.Column(db.Text)
+    received_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    processed_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'sourceId': self.source_id,
+            'ruleId': self.rule_id,
+            'severity': self.severity,
+            'dedupeKey': self.dedupe_key,
+            'messageId': self.message_id,
+            'status': self.status,
+            'errorMsg': self.error_msg,
+            'receivedAt': self.received_at.isoformat() if self.received_at else None,
+            'processedAt': self.processed_at.isoformat() if self.processed_at else None,
+            'rawPayload': self.raw_payload,
+            'normalizedPayload': self.normalized_payload,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Access Approval (접근 신청/승인/회수)
+# ---------------------------------------------------------------------------
+
+class AccApprovalLine(db.Model):
+    """결재선 정의"""
+    __tablename__ = 'acc_approval_line'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    steps_json = db.Column(db.Text, nullable=False)  # [{step:1,role:"team_lead",approver_user_ids:[]}, ...]
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'stepsJson': self.steps_json,
+            'isDefault': bool(self.is_default),
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AccTarget(db.Model):
+    """접근 가능 자원 카탈로그"""
+    __tablename__ = 'acc_target'
+    __table_args__ = (
+        db.Index('ix_acc_target_kind', 'kind'),
+        db.Index('ix_acc_target_is_active', 'is_active'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(160), nullable=False)
+    kind = db.Column(db.String(32), nullable=False)  # web,admin_console,ssh,db,was,ilo,idrac,nw,san,other
+    endpoint = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    approval_line_id = db.Column(db.Integer, db.ForeignKey('acc_approval_line.id'))
+    notify_channel_id = db.Column(db.Integer, db.ForeignKey('msg_channel.id'))
+    default_ttl_min = db.Column(db.Integer, nullable=False, default=60)
+    max_ttl_min = db.Column(db.Integer, nullable=False, default=480)
+    allowed_hours_json = db.Column(db.Text)
+    ip_allowlist = db.Column(db.Text)
+    revoke_webhook_url = db.Column(db.String(500))  # 만료/회수 시 호출할 외부 URL
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'name': self.name,
+            'kind': self.kind,
+            'endpoint': self.endpoint,
+            'description': self.description,
+            'approvalLineId': self.approval_line_id,
+            'notifyChannelId': self.notify_channel_id,
+            'defaultTtlMin': self.default_ttl_min,
+            'maxTtlMin': self.max_ttl_min,
+            'allowedHoursJson': self.allowed_hours_json,
+            'ipAllowlist': self.ip_allowlist,
+            'revokeWebhookUrl': self.revoke_webhook_url,
+            'isActive': bool(self.is_active),
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AccRequest(db.Model):
+    """접근 신청"""
+    __tablename__ = 'acc_request'
+    __table_args__ = (
+        db.Index('ix_acc_request_requester_status', 'requester_id', 'status'),
+        db.Index('ix_acc_request_target_status', 'target_id', 'status'),
+        db.Index('ix_acc_request_status_expires', 'status', 'expires_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    target_id = db.Column(db.Integer, db.ForeignKey('acc_target.id'), nullable=False)
+    reason = db.Column(db.Text, nullable=False)
+    requested_ttl_min = db.Column(db.Integer, nullable=False, default=60)
+    is_emergency = db.Column(db.Boolean, nullable=False, default=False)
+    status = db.Column(db.String(16), nullable=False, default='pending')
+    # pending/approved/rejected/expired/revoked/active/closed
+    current_step = db.Column(db.Integer, nullable=False, default=1)
+    approved_at = db.Column(db.DateTime)
+    activated_at = db.Column(db.DateTime)
+    expires_at = db.Column(db.DateTime)
+    revoked_at = db.Column(db.DateTime)
+    revoked_by = db.Column(db.Integer, db.ForeignKey('org_user.id'))
+    revoke_reason = db.Column(db.Text)
+    source_message_id = db.Column(db.Integer, db.ForeignKey('msg_message_v2.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime)
+
+    requester = db.relationship('UserProfile', foreign_keys=[requester_id], lazy='joined')
+
+    def to_dict(self, include_approvals: bool = False) -> dict:
+        payload = {
+            'id': self.id,
+            'requesterId': self.requester_id,
+            'requesterName': self.requester.name if self.requester else None,
+            'targetId': self.target_id,
+            'reason': self.reason,
+            'requestedTtlMin': self.requested_ttl_min,
+            'isEmergency': bool(self.is_emergency),
+            'status': self.status,
+            'currentStep': self.current_step,
+            'approvedAt': self.approved_at.isoformat() if self.approved_at else None,
+            'activatedAt': self.activated_at.isoformat() if self.activated_at else None,
+            'expiresAt': self.expires_at.isoformat() if self.expires_at else None,
+            'revokedAt': self.revoked_at.isoformat() if self.revoked_at else None,
+            'revokedBy': self.revoked_by,
+            'revokeReason': self.revoke_reason,
+            'sourceMessageId': self.source_message_id,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+        }
+        return payload
+
+
+class AccApproval(db.Model):
+    """단계별 결재 처리 이력"""
+    __tablename__ = 'acc_approval'
+    __table_args__ = (
+        db.Index('ix_acc_approval_request_step', 'request_id', 'step'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('acc_request.id', ondelete='CASCADE'), nullable=False)
+    step = db.Column(db.Integer, nullable=False)
+    approver_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    decision = db.Column(db.String(16), nullable=False)  # approve/reject/delegate
+    comment = db.Column(db.Text)
+    decided_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    approver = db.relationship('UserProfile', foreign_keys=[approver_id], lazy='joined')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'requestId': self.request_id,
+            'step': self.step,
+            'approverId': self.approver_id,
+            'approverName': self.approver.name if self.approver else None,
+            'decision': self.decision,
+            'comment': self.comment,
+            'decidedAt': self.decided_at.isoformat() if self.decided_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Push Device (모바일 푸시 토큰 등록 — FCM/APNs)
+# ---------------------------------------------------------------------------
+
+class PushDevice(db.Model):
+    """모바일/웹 푸시 디바이스 토큰"""
+    __tablename__ = 'push_device'
+    __table_args__ = (
+        db.Index('ix_push_device_user_id', 'user_id'),
+        db.Index('ix_push_device_revoked_at', 'revoked_at'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    platform = db.Column(db.String(16), nullable=False)  # ios/android/web
+    device_token = db.Column(db.String(512), nullable=False, unique=True)
+    device_name = db.Column(db.String(120))
+    app_version = db.Column(db.String(32))
+    os_version = db.Column(db.String(32))
+    last_ip = db.Column(db.String(64))
+    registered_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    revoked_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'userId': self.user_id,
+            'platform': self.platform,
+            'deviceTokenMasked': (self.device_token[:8] + '…' + self.device_token[-6:]) if self.device_token else None,
+            'deviceName': self.device_name,
+            'appVersion': self.app_version,
+            'osVersion': self.os_version,
+            'registeredAt': self.registered_at.isoformat() if self.registered_at else None,
+            'lastSeenAt': self.last_seen_at.isoformat() if self.last_seen_at else None,
+            'revokedAt': self.revoked_at.isoformat() if self.revoked_at else None,
+        }
+
+
+class PushLog(db.Model):
+    """푸시 발송 시도 이력"""
+    __tablename__ = 'push_log'
+    __table_args__ = (
+        db.Index('ix_push_log_user_attempted', 'user_id', 'attempted_at'),
+        db.Index('ix_push_log_status', 'status'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('msg_notification.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
+    device_id = db.Column(db.Integer, db.ForeignKey('push_device.id'))
+    provider = db.Column(db.String(16), nullable=False, default='fcm')  # fcm/apns/webpush
+    status = db.Column(db.String(16), nullable=False, default='queued')  # queued/sent/delivered/failed/skipped
+    error_code = db.Column(db.String(64))
+    error_msg = db.Column(db.Text)
+    attempted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    delivered_at = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'notificationId': self.notification_id,
+            'userId': self.user_id,
+            'deviceId': self.device_id,
+            'provider': self.provider,
+            'status': self.status,
+            'errorCode': self.error_code,
+            'errorMsg': self.error_msg,
+            'attemptedAt': self.attempted_at.isoformat() if self.attempted_at else None,
+            'deliveredAt': self.delivered_at.isoformat() if self.delivered_at else None,
         }
 
 

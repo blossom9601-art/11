@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260222-7">
+    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260424-15">
 </head>
 <body class="chat-layout">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -23,9 +23,13 @@
                 <!-- Left: conversations -->
                 <aside class="chat-sidebar">
                     <div class="chat-tabs" role="tablist">
-                        <button class="chat-tab active" data-filter="all" role="tab" aria-selected="true">대화</button>
-                        <button class="chat-tab" data-filter="favorites" role="tab">즐겨찾기</button>
+                        <button class="chat-tab active" data-filter="all" role="tab" aria-selected="true">채널</button>
+                        <button class="chat-tab" data-filter="chat" role="tab">채팅</button>
                         <button class="chat-tab" data-filter="colleagues" role="tab">동료</button>
+                        <button class="chat-new-channel" id="btn-new-channel" type="button" title="새 채널 만들기" aria-label="새 채널 만들기">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span>새 채널</span>
+                        </button>
                     </div>
                     <div class="chat-search">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M21 21l-4.2-4.2M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/></svg>
@@ -43,7 +47,7 @@
                             <div id="thread-avatar" class="avatar-group" aria-hidden="true"></div>
                             <div>
                                     <div class="name" id="thread-name"></div>
-                                <div class="status"><span class="dot online"></span><span id="thread-status">온라인</span></div>
+                                <div class="status"><span class="dot online"></span><span id="thread-status">채널</span></div>
                             </div>
                         </div>
                         <div class="thread-tools">
@@ -52,9 +56,21 @@
                                     <path d="M12 5v14M5 12h14" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
                             </button>
+                            <button class="icon-btn" id="btn-msg-search" title="메시지 검색" aria-label="메시지 검색">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="11" cy="11" r="7" stroke="#64748b" stroke-width="2"/>
+                                    <path d="M20 20l-3.5-3.5" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </button>
                             <button class="icon-btn star" id="btn-favorite" title="즐겨찾기" aria-label="즐겨찾기" aria-pressed="false">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M12 3l2.9 5.88 6.5.95-4.7 4.58 1.11 6.49L12 17.77l-5.81 3.13 1.11-6.49-4.7-4.58 6.5-.95L12 3z" stroke="currentColor" stroke-width="2" fill="none"/>
+                                </svg>
+                            </button>
+                            <button class="icon-btn" id="btn-chat-settings" title="설정" aria-label="설정" aria-expanded="false">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="3" stroke="#64748b" stroke-width="2"/>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="#64748b" stroke-width="2"/>
                                 </svg>
                             </button>
                             <button class="icon-btn" id="btn-leave" title="나가기" aria-label="나가기">
@@ -71,6 +87,19 @@
                             </button>
                         </div>
                     </header>
+                    <div id="chat-pinned-bar" class="chat-pinned-bar" hidden aria-label="고정된 메시지">
+                        <div class="cpb-icon" aria-hidden="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 3l5 5-2 2-1-1-4 4 1 4-2 2-5-5-5 5v-2l5-5-5-5 2-2 4 1 4-4-1-1z" stroke="#0ea5e9" stroke-width="2" stroke-linejoin="round" fill="rgba(14,165,233,0.08)"/></svg>
+                        </div>
+                        <button type="button" class="cpb-body" id="cpb-body" title="이 메시지로 이동">
+                            <span class="cpb-label">고정된 메시지</span>
+                            <span class="cpb-text" id="cpb-text"></span>
+                        </button>
+                        <span class="cpb-count" id="cpb-count" hidden></span>
+                        <button type="button" class="cpb-list-btn" id="cpb-list-btn" title="모든 고정 메시지 보기" aria-label="모든 고정 메시지 보기">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="messages-viewport">
                         <div id="chat-messages" class="messages" aria-live="polite"></div>
                         <div class="messages-scrollbar" id="messages-scrollbar" aria-hidden="true">
@@ -95,6 +124,64 @@
                     
                 </section>
 
+                <!-- Settings drawer: overlays the profile panel -->
+                <aside class="chat-settings-drawer" id="chat-settings-drawer" hidden aria-label="설정" aria-hidden="true">
+                    <div class="csd-header">
+                        <h3 class="csd-title" id="csd-title">설정</h3>
+                        <button class="icon-btn csd-close" id="btn-chat-settings-close" aria-label="설정 닫기">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="csd-body">
+                        <!-- 이름 변경 -->
+                        <div class="csd-section" id="csd-section-name">
+                            <div class="csd-section-label">이름</div>
+                            <div class="csd-row-edit">
+                                <input class="csd-input" id="csd-name-input" type="text" maxlength="60" autocomplete="off" placeholder="이름 입력" />
+                            </div>
+                        </div>
+                        <!-- 설명 (채널만) -->
+                        <div class="csd-section csd-channel-only" id="csd-section-desc">
+                            <div class="csd-section-label">채널 설명</div>
+                            <textarea class="csd-input csd-textarea" id="csd-desc-input" maxlength="200" rows="2" placeholder="채널 목적을 입력하세요."></textarea>
+                        </div>
+                        <!-- 알림 설정 -->
+                        <div class="csd-section">
+                            <div class="csd-section-label">알림</div>
+                            <label class="csd-toggle-row" id="csd-mute-row">
+                                <span class="csd-toggle-label">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px;margin-right:6px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    알림 끄기
+                                </span>
+                                <div class="csd-switch" role="switch" id="csd-mute-switch" aria-checked="false" tabindex="0" aria-label="알림 끄기">
+                                    <span class="csd-switch-knob"></span>
+                                </div>
+                            </label>
+                        </div>
+                        <!-- 멤버 초대 -->
+                        <div class="csd-section" id="csd-section-invite">
+                            <div class="csd-section-label">멤버</div>
+                            <button class="csd-action-btn" id="csd-btn-invite">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="margin-right:6px"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                멤버 초대
+                            </button>
+                        </div>
+                        <div class="csd-divider"></div>
+                        <!-- 나가기 / 삭제 / 저장 (아이콘 전용) -->
+                        <div class="csd-section csd-actions-row" id="csd-actions-row">
+                            <button class="csd-icon-btn csd-danger" id="csd-btn-leave" type="button" title="나가기" aria-label="나가기">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10 17l5-5-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M15 12H3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button class="csd-icon-btn csd-danger" id="csd-btn-delete" type="button" title="삭제" aria-label="삭제">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button class="csd-icon-btn csd-save" id="csd-btn-save" type="button" title="저장" aria-label="저장">
+                                <img src="/static/image/svg/save.svg" alt="" width="18" height="18" />
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+
                 <!-- Right: profile -->
                 <aside class="chat-profile">
                     <div class="profile-card">
@@ -117,8 +204,6 @@
                     </div>
                 </aside>
             </div>
-        </section>
-    </main>
 
     <div id="chat-delete-modal" class="chat-modal" hidden aria-hidden="true">
         <div class="chat-modal__backdrop" id="chat-delete-backdrop" aria-hidden="true"></div>
@@ -135,17 +220,133 @@
         </div>
     </div>
 
-    <div id="chat-config" hidden
+    <div id="chat-info-modal" class="chat-modal" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" id="chat-info-backdrop" aria-hidden="true"></div>
+        <div class="chat-modal__dialog" role="dialog" aria-labelledby="chat-info-title" aria-modal="true">
+            <div class="chat-modal__body">
+                <div class="chat-modal__icon" id="chat-info-icon" aria-hidden="true">ℹ️</div>
+                <h3 id="chat-info-title">알림</h3>
+                <p id="chat-info-message"></p>
+            </div>
+            <div class="chat-modal__actions">
+                <button type="button" class="modal-btn primary" id="chat-info-confirm">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-search-modal" class="chat-modal" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" id="chat-search-backdrop" aria-hidden="true"></div>
+        <div class="chat-modal__dialog chat-modal__dialog--wide chat-search-dialog" role="dialog" aria-labelledby="chat-search-title" aria-modal="true">
+            <div class="chat-search-header">
+                <h3 id="chat-search-title">메시지 검색</h3>
+                <button type="button" class="close-btn" id="chat-search-close" aria-label="닫기">×</button>
+            </div>
+            <div class="chat-search-body">
+                <div class="chat-search-controls">
+                    <input id="chat-search-input" class="form-input chat-search-input" type="text" placeholder="검색어 입력 (2자 이상)" autocomplete="off" />
+                    <div class="chat-search-scope" role="tablist" aria-label="검색 범위">
+                        <button type="button" class="chat-search-scope-btn is-active" data-scope="room">현재 채팅방</button>
+                        <button type="button" class="chat-search-scope-btn" data-scope="global">전체 채팅방</button>
+                    </div>
+                </div>
+                <div id="chat-search-status" class="chat-search-status" aria-live="polite"></div>
+                <ul id="chat-search-results" class="chat-search-results"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-new-channel-modal" class="chat-modal modal-overlay-full bls-new-channel" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" id="chat-new-channel-backdrop" aria-hidden="true"></div>
+        <div class="server-add-content bls-new-channel__content" role="dialog" aria-labelledby="chat-new-channel-title" aria-modal="true">
+            <div class="server-add-header">
+                <button type="button" class="close-btn" id="new-channel-cancel" aria-label="닫기">×</button>
+                <div class="server-add-title">
+                    <h3 id="chat-new-channel-title">새 채널 만들기</h3>
+                </div>
+            </div>
+            <div class="server-add-body bls-new-channel__body">
+                <div class="form-row">
+                    <label for="new-channel-name">채널명 <span class="req">*</span></label>
+                    <input id="new-channel-name" class="form-input" type="text" maxlength="60" placeholder="예) 개발팀-공지" autocomplete="off" />
+                </div>
+                <div class="form-row">
+                    <label>공개 범위</label>
+                    <div class="form-radio-group">
+                        <label class="form-radio">
+                            <input type="radio" name="new-channel-visibility" value="public" checked />
+                            <span>공개 — 모든 사용자가 검색·참여 가능</span>
+                        </label>
+                        <label class="form-radio">
+                            <input type="radio" name="new-channel-visibility" value="private" />
+                            <span>비공개 — 초대된 멤버만 참여</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label for="new-channel-desc">설명 (선택)</label>
+                    <textarea id="new-channel-desc" class="form-input" rows="2" maxlength="200" placeholder="이 채널의 목적을 입력하세요"></textarea>
+                </div>
+                <div class="form-row">
+                    <label for="new-channel-member-search">초대할 멤버 (선택)</label>
+                    <div class="nc-member-input-wrap">
+                        <input id="new-channel-member-search" class="form-input nc-member-search" type="text" placeholder="이름 검색" autocomplete="off" />
+                        <button type="button" class="nc-dept-toggle" id="new-channel-dept-toggle" aria-label="멤버 선택" title="멤버 선택">+</button>
+                        <ul id="new-channel-member-list" class="new-channel-member-list nc-suggest" aria-label="자동완성" hidden></ul>
+                    </div>
+                    <div id="new-channel-member-selected" class="new-channel-member-selected" aria-label="선택된 멤버"></div>
+                </div>
+                <div id="new-channel-error" class="form-error" hidden></div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons">
+                    <button type="button" class="btn-secondary" id="new-channel-cancel-2">취소</button>
+                    <button type="button" class="btn-primary" id="new-channel-confirm">만들기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="member-picker-modal" class="chat-modal modal-overlay-full bls-member-picker" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" id="member-picker-backdrop" aria-hidden="true"></div>
+        <div class="mp-content" role="dialog" aria-labelledby="member-picker-title" aria-modal="true">
+            <div class="mp-header">
+                <h3 id="member-picker-title">멤버 선택</h3>
+                <button type="button" class="close-btn" id="member-picker-cancel" aria-label="닫기">×</button>
+            </div>
+            <div class="mp-toolbar">
+                <input id="mp-search" class="form-input" type="text" placeholder="이름 또는 부서로 검색" autocomplete="off" />
+                <span id="mp-count" class="mp-count">선택 0명</span>
+            </div>
+            <div class="mp-body">
+                <aside class="mp-tree" id="mp-tree" aria-label="부서 트리"></aside>
+                <section class="mp-list-wrap">
+                    <div class="mp-list-head" id="mp-list-head">전체</div>
+                    <ul class="mp-list" id="mp-list" aria-label="멤버 목록"></ul>
+                </section>
+            </div>
+            <div class="mp-actions">
+                <button type="button" class="btn-secondary" id="member-picker-cancel-2">취소</button>
+                <button type="button" class="btn-primary" id="member-picker-apply">적용</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="chat-config" hidden
             data-rooms-url="{{ chat_rooms_url or '/api/chat/rooms' }}"
+            data-rooms-create-url="{{ chat_rooms_create_url or '/api/chat/rooms' }}"
             data-api-root="{{ chat_api_root or '/api/chat' }}"
             data-profile-id="{{ current_user_profile_id or '' }}"
-                data-user-name="{{ current_user_name or '' }}"
-                data-user-emp-no="{{ current_emp_no or '' }}"
-                data-user-dept="{{ current_user_department or current_user_dept or current_dept or '' }}"
-                data-user-image="{{ current_profile_image or '' }}"
-                data-directory-url="{{ chat_directory_url or '/api/chat/directory' }}"></div>
+            data-user-name="{{ current_user_name or '' }}"
+            data-user-emp-no="{{ current_emp_no or '' }}"
+            data-user-dept="{{ current_user_department or current_user_dept or current_dept or '' }}"
+            data-user-image="{{ current_profile_image or '' }}"
+            data-directory-url="{{ chat_directory_url or '/api/chat/directory' }}"></div>
+
+        <script src="/static/js/addon_application/3.chat.js?{{ chat_js_version or 'v=20260425-01' }}"></script>
+
+        </section>
+    </main>
 
     <script src="/static/js/blossom.js"></script>
-    <script src="/static/js/addon_application/3.chat.js?{{ chat_js_version or 'v=20260222-12' }}"></script>
 </body>
 </html>

@@ -66,6 +66,29 @@ def notify_entity_change(entity, action='update', detail=None):
     broadcast('invalidate', payload)
 
 
+def notify_chat_event(event: str, conversation_id, data=None):
+    """채팅 실시간 이벤트 브로드캐스트 (SSE).
+
+    이벤트 종류:
+      - chat.message.created  : 새 메시지 도착
+      - chat.message.updated  : 메시지 수정
+      - chat.message.deleted  : 메시지 삭제
+      - chat.event.card       : 이벤트 카드 메시지 (Wazuh 등)
+      - chat.approval.card    : 승인 요청 카드
+      - chat.approval.update  : 승인 상태 변경
+
+    클라이언트는 EventSource로 받아서 conversationId가 자기 채널이면
+    화면을 갱신한다(폴링 fallback과 공존).
+    """
+    payload = {
+        'event': event,
+        'conversationId': conversation_id,
+    }
+    if data:
+        payload['data'] = data
+    broadcast('chat', payload)
+
+
 def format_sse(event, data):
     """SSE 프로토콜 형식으로 포맷"""
     lines = []

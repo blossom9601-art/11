@@ -57,6 +57,10 @@ _KEY_MENU_CODE = {
     'dashboard': 'dashboard',
     'hw_server': 'system.server', 'hw_storage': 'system.storage', 'hw_san': 'system.san',
     'hw_network': 'system.network', 'hw_security': 'system.security',
+    'access_control': 'access_control',
+    'access_control_status': 'access_control.status',
+    'access_control_access': 'access_control.access',
+    'access_control_request': 'access_control.request',
     'gov_backup': 'governance.backup', 'gov_package': 'governance.package',
     'gov_vulnerability': 'governance.vulnerability', 'gov_ip': 'governance.ip',
     'gov_vpn': 'governance.vpn', 'gov_leased': 'governance.leased_line',
@@ -78,7 +82,7 @@ _KEY_MENU_CODE = {
     'admin_user': 'settings.user', 'admin_role': 'settings.permission',
     'admin_auth': 'settings.auth', 'admin_security': 'settings.security',
     'admin_mail': 'settings.mail', 'admin_quality': 'settings.quality',
-    'admin_log': 'settings.log',
+    'admin_log': 'settings.log', 'admin_access_control': 'settings.access_control',
 }
 
 
@@ -355,6 +359,10 @@ TEMPLATE_MAP = {
     'hw_security_etc_package': 'layouts/tab13-package-shared.html',
     'hw_security_etc_log': '2.hardware/2-5.security/2-5-8.etc/tab14-log.html',
     'hw_security_etc_file': '2.hardware/2-5.security/2-5-8.etc/tab15-file.html',
+    # Access Control
+    'access_control_status': '3.access_control/3-1.access_control/3-1-3.status/1.status_list.html',
+    'access_control_access': '3.access_control/3-1.access_control/3-1-1.access/1.access_list.html',
+    'access_control_request': '3.access_control/3-1.access_control/3-1-2.request/1.request_list.html',
     # High Availability Active-Active detail & tab pages (pattern identical to unix/security_etc)
     # High Availability Active-Passive detail & tab pages (unix pattern)
     # Governance

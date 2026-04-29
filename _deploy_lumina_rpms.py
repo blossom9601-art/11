@@ -427,6 +427,13 @@ def phase3_configure_services():
         svc_content = f.read()
     put_str(c1, svc_content, "/etc/systemd/system/lumina-db.service")
 
+    # mariadb drop-in: lumina-db 정지 시 mariadb도 동반 정지
+    mariadb_dropin_path = os.path.join(DEPLOY_DIR, "systemd", "dropins", "mariadb.service.d", "lumina.conf")
+    with open(mariadb_dropin_path, encoding="utf-8") as f:
+        mariadb_dropin = f.read()
+    run(c1, "mkdir -p /etc/systemd/system/mariadb.service.d", "ttt1")
+    put_str(c1, mariadb_dropin, "/etc/systemd/system/mariadb.service.d/lumina.conf")
+
     run(c1, """
 systemctl daemon-reload
 systemctl enable lumina-db.service 2>/dev/null
@@ -481,7 +488,9 @@ systemctl enable lumina-ap
 
     WEB_SERVICE = """[Unit]
 Description=Blossom Lumina WEB Server (Gunicorn + Flask Dashboard)
-After=network-online.target
+# nginx와 동반 기동/정지 (정지 전파는 nginx PartOf drop-in이 담당)
+Requires=nginx.service
+After=network-online.target nginx.service
 Wants=network-online.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
@@ -506,6 +515,13 @@ SyslogIdentifier=lumina-web
 WantedBy=multi-user.target
 """
     put_str(c3, WEB_SERVICE, "/etc/systemd/system/lumina-web.service")
+
+    # nginx drop-in: lumina-web 정지 시 nginx도 동반 정지
+    nginx_dropin_path = os.path.join(DEPLOY_DIR, "systemd", "dropins", "nginx.service.d", "lumina.conf")
+    with open(nginx_dropin_path, encoding="utf-8") as f:
+        nginx_dropin = f.read()
+    run(c3, "mkdir -p /etc/systemd/system/nginx.service.d", "ttt3")
+    put_str(c3, nginx_dropin, "/etc/systemd/system/nginx.service.d/lumina.conf")
 
     run(c3, """
 systemctl daemon-reload

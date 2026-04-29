@@ -1,0 +1,238 @@
+/* ============================================================
+   Blossom Chat - 모바일 로그인 화면 전용 스타일
+   ------------------------------------------------------------
+   웹/데스크톱 카드형 로그인을 모바일(앱) 친화적으로 재구성.
+   - 풀스크린 그라데이션 BG
+   - 상단 큰 브랜드 로고 + 앱 이름
+   - 중앙~하단의 카드형 입력 영역 (라운드 + 그림자)
+   - 큰 터치 타깃 (input 높이 52px, 버튼 56px)
+   - 가상 키보드 노출 시 자동 스크롤
+   - safe-area(노치/제스처바) 대응
+   ============================================================ */
+
+@media (max-width: 720px) {
+  /* 풀스크린 컨테이너 */
+  #loginModal {
+    background: linear-gradient(160deg, #1f2436 0%, #2b2e3b 45%, #3a2b4d 100%) !important;
+    background-image: linear-gradient(160deg, #1f2436 0%, #2b2e3b 45%, #3a2b4d 100%) !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  #loginModal::before {
+    background: radial-gradient(circle at 20% 0%, rgba(110, 80, 200, 0.35) 0%, transparent 55%),
+                radial-gradient(circle at 90% 100%, rgba(50, 110, 200, 0.28) 0%, transparent 50%) !important;
+    backdrop-filter: none !important;
+  }
+
+  /* 카드: 모바일에선 카드 느낌 줄이고 화면 전체 차지 */
+  #loginModal .modal-card.login-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100vh;
+    margin: 0 !important;
+    padding: calc(48px + var(--safe-top, 0px)) 28px calc(32px + var(--safe-bottom, 0px)) !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* 브랜드 영역 - 상단 중앙, 큰 로고 */
+  #loginModal .brand-large {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-top: 24px;
+  }
+  #loginModal .brand-logo {
+    width: 88px !important;
+    height: 88px !important;
+    border-radius: 22px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45),
+                0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  #loginModal .brand-name {
+    font-size: 26px !important;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+  }
+  #loginModal .brand-sub {
+    font-size: 14px !important;
+    opacity: 0.78;
+  }
+
+  /* 입력 라벨 */
+  #loginModal .modal-card.login-card label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0 !important;
+    color: rgba(255, 255, 255, 0.78) !important;
+  }
+
+  /* 큰 입력 필드 */
+  #loginModal .modal-card.login-card input[type="text"],
+  #loginModal .modal-card.login-card input[type="password"] {
+    height: 52px;
+    padding: 0 16px !important;
+    font-size: 16px !important; /* iOS 자동 확대 방지 */
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  #loginModal .modal-card.login-card input[type="text"]:focus,
+  #loginModal .modal-card.login-card input[type="password"]:focus {
+    outline: none;
+    border-color: rgba(160, 130, 255, 0.85) !important;
+    background: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 0 0 4px rgba(160, 130, 255, 0.18);
+  }
+  #loginModal .modal-card.login-card input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* 자동로그인 체크박스 줄 */
+  #loginModal .modal-card.login-card label.check {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    margin-top: 4px !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+  #loginModal .modal-card.login-card label.check input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #a682ff;
+    margin: 0;
+  }
+
+  /* 액션 버튼 영역 */
+  #loginModal .modal-card.login-card .modal-actions {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* 메인 로그인 버튼 - 큰 터치 타깃 */
+  #loginModal .modal-card.login-card .btn-primary,
+  #loginModal .modal-card.login-card .btn-block {
+    height: 56px;
+    border-radius: 14px !important;
+    font-size: 17px !important;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    border: 0;
+    cursor: pointer;
+    transition: transform .08s ease, box-shadow .15s ease, opacity .15s ease;
+  }
+  #loginModal .modal-card.login-card .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d6cff 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 24px rgba(110, 90, 220, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  #loginModal .modal-card.login-card .btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: 0 6px 14px rgba(110, 90, 220, 0.4);
+  }
+  #loginModal .modal-card.login-card .btn-ghost {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  }
+  #loginModal .modal-card.login-card .btn-ghost:active {
+    background: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  /* 에러 박스 */
+  #loginModal .modal-card.login-card .error {
+    margin-top: 4px;
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+    font-size: 14px !important;
+    background: rgba(220, 38, 38, 0.95) !important;
+    color: #fff !important;
+    box-shadow: 0 6px 18px rgba(220, 38, 38, 0.3);
+  }
+
+  /* 하단 서버 설정 링크 */
+  #loginModal .login-reset-row {
+    margin-top: auto;
+    padding-top: 24px;
+  }
+  #loginModal .btn-ghost-link {
+    font-size: 13px;
+    padding: 12px 16px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  /* 잠금 모드: 프로필 영역 강조 */
+  #loginModal .lock-profile {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 0;
+  }
+  #loginModal .lock-profile .avatar-lg {
+    width: 72px;
+    height: 72px;
+    font-size: 26px;
+  }
+  #loginModal .lock-name {
+    font-size: 20px;
+    font-weight: 600;
+  }
+  #loginModal .lock-sub {
+    font-size: 13px;
+    opacity: 0.7;
+  }
+}
+
+/* 더 좁은 화면(소형 폰) */
+@media (max-width: 380px) {
+  #loginModal .modal-card.login-card {
+    padding-left: 22px !important;
+    padding-right: 22px !important;
+  }
+  #loginModal .brand-logo {
+    width: 76px !important;
+    height: 76px !important;
+  }
+  #loginModal .brand-name {
+    font-size: 22px !important;
+  }
+}
+
+/* 가로 모드 (랜드스케이프): 상단 패딩 축소 */
+@media (max-width: 900px) and (orientation: landscape) {
+  #loginModal .modal-card.login-card {
+    padding-top: calc(20px + var(--safe-top, 0px)) !important;
+    min-height: auto;
+  }
+  #loginModal .brand-large {
+    margin-bottom: 12px;
+    padding-top: 8px;
+  }
+  #loginModal .brand-logo {
+    width: 64px !important;
+    height: 64px !important;
+  }
+}

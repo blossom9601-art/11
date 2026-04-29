@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260422d">
+	<link rel="stylesheet" href="/static/css/3.access_control/3-1.access_control/3-1-3.status/status_list.css?v=20260424j">
+	<script src="/static/js/blossom.js?v=20260408a" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-3.status/1.status_list.js?v=20260424m" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content">
+		<div class="content-wrapper">
+			<div class="page-header">
+				<div class="page-utility-right" data-info-key="access_control.status"></div>
+				<h1>접근제어 현황</h1>
+				<p>승인 대상 자원을 한 곳에서 등록하고 관리합니다.</p>
+			</div>
+
+			<div class="system-tabs" role="tablist" aria-label="자원 분류">
+				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="내부 서비스">내부 서비스</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="외부 서비스">외부 서비스</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리 콘솔">관리 콘솔</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="기타">기타</button>
+			</div>
+
+			<div class="tab-content single-pane">
+				<div class="tab-pane active" id="status-list-pane">
+					<div class="tab-header">
+						<div class="tab-header-left">
+							<h2>자원 목록 <span class="count-badge" id="status-count">0</span></h2>
+						</div>
+						<div class="tab-header-right">
+							<div class="search-container" role="search">
+								<div class="search-input-wrapper" id="status-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="status-search" placeholder="자원명·분류·상태 검색" class="search-input" aria-label="자원 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="status-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+								</div>
+							</div>
+							<div class="page-size-selector compact">
+								<select id="status-page-size" class="page-size-select" aria-controls="status-table" aria-label="페이지 당 행 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<select id="status-category-filter" class="status-filter-select" aria-label="분류 필터">
+								<option value="">분류 전체</option>
+								<option value="내부 서비스">내부 서비스</option>
+								<option value="외부 서비스">외부 서비스</option>
+								<option value="관리 콘솔">관리 콘솔</option>
+								<option value="기타">기타</option>
+							</select>
+							<select id="status-state-filter" class="status-filter-select" aria-label="상태 필터">
+								<option value="">상태 전체</option>
+								<option value="사용 가능">사용 가능</option>
+								<option value="차단">차단</option>
+							</select>
+							<select id="status-type-filter" class="status-filter-select" aria-label="유형 필터">
+								<option value="">유형 전체</option>
+								<option value="WEB">WEB</option>
+								<option value="SSH">SSH</option>
+							</select>
+							<button class="header-btn" id="status-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
+								<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
+							</button>
+							<button class="header-btn" id="status-download-btn" title="CSV 다운로드" aria-label="CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
+							<button class="header-btn" id="status-add-btn" title="자원 추가" aria-label="자원 추가">
+								<img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<div class="system-table-container server-table-container">
+						<table class="system-data-table server-data-table" id="status-table">
+							<thead>
+								<tr>
+									<th data-col="select" class="status-col-check"><input type="checkbox" id="status-select-all" aria-label="전체 선택"></th>
+									<th data-col="resource_name">자원명</th>
+									<th data-col="category">분류</th>
+									<th data-col="endpoint_summary">접속점</th>
+									<th data-col="endpoint_count">접속점 수</th>
+									<th data-col="active_flag">상태</th>
+									<th data-col="actions">관리</th>
+								</tr>
+							</thead>
+							<tbody id="status-table-body"></tbody>
+						</table>
+					</div>
+
+					<!-- Empty State -->
+					<div id="status-empty" class="system-empty" hidden role="status" aria-live="polite">
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3 id="status-empty-title">등록된 자원이 없습니다.</h3>
+							<p id="status-empty-desc">우측 상단 '추가' 버튼을 눌러 자원을 등록하세요.</p>
+						</div>
+					</div>
+
+					<div class="modern-pagination" id="status-pagination">
+						<div class="pagination-info"><span id="status-pagination-info">0개 항목</span></div>
+						<div class="pagination-controls">
+							<button class="pagination-btn" id="status-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
+							<button class="pagination-btn" id="status-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
+							<div class="page-numbers" id="status-page-numbers"></div>
+							<button class="pagination-btn" id="status-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"/></button>
+							<button class="pagination-btn" id="status-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"/></button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<datalist id="status-protocol-options" hidden>
+		<option value="HTTPS"></option>
+		<option value="HTTP"></option>
+		<option value="SSH"></option>
+	</datalist>
+
+	<!-- 자원 등록/수정 모달 -->
+	<div id="status-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3 id="status-modal-title">자원 등록</h3>
+					<p class="server-add-subtitle">자원과 접속점(WEB / SSH)을 함께 등록하세요. 한 자원에 여러 접속점을 등록할 수 있습니다.</p>
+				</div>
+				<button class="close-btn" type="button" id="status-modal-close" title="닫기" data-modal-close="1">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<form id="status-add-form" autocomplete="off">
+					<input type="hidden" name="id" id="form-id">
+
+					<div class="form-section">
+						<div class="section-header"><h4>기본 정보</h4></div>
+						<div class="form-grid">
+							<div class="form-row"><label>자원명<span class="required">*</span></label><input name="resource_name" id="form-resource-name" class="form-input" required maxlength="120" placeholder="예: HPE iLO DC1, NAVER"></div>
+							<div class="form-row"><label>분류</label>
+								<select name="category" id="form-category" class="form-input search-select" data-searchable="true">
+									<option value="내부 서비스">내부 서비스</option>
+									<option value="외부 서비스">외부 서비스</option>
+									<option value="관리 콘솔">관리 콘솔</option>
+									<option value="기타" selected>기타</option>
+								</select>
+							</div>
+							<div class="form-row"><label>태그</label><input name="tags" id="form-tags" class="form-input" maxlength="200" placeholder="쉼표로 구분 (예: 운영, 핵심, 외부)"></div>
+							<div class="form-row"><label>상태</label>
+								<select name="active_flag" id="form-active-flag" class="form-input search-select" data-searchable="true">
+									<option value="1">사용 가능</option>
+									<option value="0">차단</option>
+								</select>
+							</div>
+							<div class="form-row form-row-wide"><label>설명</label><textarea name="description" id="form-description" class="form-input" rows="2" maxlength="500" placeholder="자원에 대한 간단한 설명"></textarea></div>
+						</div>
+					</div>
+
+					<div class="form-section">
+						<div class="section-header endpoint-section-header">
+							<h4>접속점</h4>
+							<button type="button" class="endpoint-add-btn" id="endpoint-add-btn" title="접속점 추가">
+								<img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="endpoint-add-icon">
+								<span>접속점 추가</span>
+							</button>
+						</div>
+						<div id="endpoint-list" class="endpoint-list"></div>
+						<p class="endpoint-empty-msg" id="endpoint-empty-msg" hidden>등록된 접속점이 없습니다. 우측 "접속점 추가"를 눌러 등록하세요.</p>
+					</div>
+				</form>
+			</div>
+			<div class="server-add-actions align-right">
+				<span id="status-form-message" class="form-message"></span>
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" id="status-form-delete" hidden>삭제</button>
+					<button type="button" class="btn-secondary" data-modal-close="1">취소</button>
+					<button type="button" class="btn-primary" id="status-form-submit">등록</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 접속점 행 템플릿 -->
+	<template id="endpoint-row-template">
+		<div class="endpoint-row" data-endpoint>
+			<div class="endpoint-row-head">
+				<input type="text" class="form-input endpoint-label" data-role="label" maxlength="50" placeholder="라벨 (예: 관리 콘솔, 원격 SSH)">
+				<select class="form-input endpoint-kind" data-role="kind">
+					<option value="WEB">WEB</option>
+					<option value="SSH">SSH</option>
+				</select>
+				<select class="form-input endpoint-protocol" data-role="protocol"></select>
+				<button type="button" class="endpoint-remove-btn" data-role="remove" title="이 접속점 삭제">
+					<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="endpoint-remove-icon">
+				</button>
+			</div>
+			<div class="endpoint-row-body">
+				<div class="endpoint-field">
+					<label>호스트<span class="required">*</span></label>
+					<input type="text" class="form-input endpoint-host" data-role="host" maxlength="200" placeholder="IP 또는 도메인 (예: 10.0.0.5)">
+				</div>
+				<div class="endpoint-field endpoint-field-port">
+					<label>포트</label>
+					<input type="number" class="form-input endpoint-port" data-role="port" min="1" max="65535" placeholder="기본 포트 자동">
+				</div>
+				<div class="endpoint-field endpoint-field-path" data-role="path-wrap">
+					<label>경로 <span class="endpoint-optional">(선택)</span></label>
+					<input type="text" class="form-input endpoint-path" data-role="url_path" maxlength="200" placeholder="/login">
+				</div>
+			</div>
+			<div class="endpoint-preview" data-role="preview"></div>
+		</div>
+	</template>
+
+	<!-- 삭제처리 확인 모달 -->
+	<div id="status-delete-modal" class="system-add-modal system-delete-modal server-add-modal modal-overlay-full" aria-hidden="true">
+		<div class="server-add-content">
+			<div class="server-add-header">
+				<div class="server-add-title">
+					<h3>삭제처리</h3>
+					<p class="server-add-subtitle" id="status-delete-subtitle">선택된 0개의 자원을 정말 삭제하시겠습니까?</p>
+				</div>
+				<button class="close-btn" type="button" data-modal-close="1" title="닫기">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				</button>
+			</div>
+			<div class="server-add-body">
+				<div class="form-section">
+					<p>삭제된 자원은 복구할 수 없습니다. 진행하시겠습니까?</p>
+				</div>
+			</div>
+			<div class="server-add-actions align-right">
+				<div class="action-buttons right">
+					<button type="button" class="btn-secondary" data-modal-close="1">취소</button>
+					<button type="button" class="btn-primary" id="status-delete-confirm">삭제</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

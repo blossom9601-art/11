@@ -10,6 +10,7 @@ sftp = ssh.open_sftp()
 
 # 배포할 파일 (DIFF가 난 api.py + auth.py도 1줄 차이)
 deploy_files = [
+    'app/models.py',
     'app/routes/api.py',
     'app/routes/auth.py',
 ]
@@ -37,11 +38,11 @@ sftp.close()
 
 # blossom-web 서비스 재시작
 print('\n서비스 재시작 중...')
-_, o, e = ssh.exec_command('systemctl restart blossom-web.service')
+_, o, e = ssh.exec_command('systemctl restart lumina-web.service')
 e.read()
 
 # 상태 확인
-_, o, _ = ssh.exec_command('systemctl is-active blossom-web.service')
+_, o, _ = ssh.exec_command('systemctl is-active lumina-web.service')
 status = o.read().decode().strip()
 print(f'blossom-web: {status}')
 

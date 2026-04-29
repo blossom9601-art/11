@@ -70,6 +70,7 @@ from app.services.sw_high_availability_type_service import init_sw_ha_type_table
 from app.services.software_asset_service import init_software_asset_table
 from app.services.sw_system_allocation_service import init_sw_system_allocation_table
 from app.services.chat_service import init_chat_tables
+from app.services.messenger_phase2_service import init_messenger_phase2_tables
 from app.services.network_ip_policy_service import init_network_ip_policy_table
 from app.services.network_dns_policy_service import init_network_dns_policy_table
 from app.services.network_ip_diagram_service import init_network_ip_diagram_table
@@ -97,6 +98,7 @@ from app.services.hw_frame_frontbay_service import init_hw_frame_frontbay_table
 from app.services.quality_type_service import init_quality_type_table
 from app.services.page_tab_config_service import init_page_tab_config_table
 from app.services.brand_setting_service import init_brand_setting_table
+from app.services.web_access_control_service import init_web_access_control_tables
 from flask_migrate import Migrate
 import os
 
@@ -1050,6 +1052,13 @@ def create_app(config_name='default'):
             except Exception:
                 pass
         try:
+            init_messenger_phase2_tables(app)
+        except Exception as messenger_p2_init_err:
+            try:
+                print('[messenger-phase2] table init failed:', messenger_p2_init_err, flush=True)
+            except Exception:
+                pass
+        try:
             init_software_asset_table(app)
         except Exception as sw_asset_init_err:
             try:
@@ -1580,6 +1589,13 @@ def create_app(config_name='default'):
                 print('[brand-setting] table init failed:', brand_init_err, flush=True)
             except Exception:
                 pass
+        try:
+            init_web_access_control_tables(app)
+        except Exception as web_access_init_err:
+            try:
+                print('[web-access-control] table init failed:', web_access_init_err, flush=True)
+            except Exception:
+                pass
 
 
     # 블루프린트 등록
@@ -1601,6 +1617,7 @@ def create_app(config_name='default'):
     from app.routes.tab32_assign_group_api import tab32_assign_group_api_bp
     from app.routes.notification_api import notification_api_bp
     from app.routes.sse_api import sse_bp
+    from app.routes.messenger_phase2 import messenger_phase2_bp
     from app.routes.agent_api import agent_api_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(pages_bp)
@@ -1621,6 +1638,7 @@ def create_app(config_name='default'):
     app.register_blueprint(tab32_assign_group_api_bp)
     app.register_blueprint(notification_api_bp)
     app.register_blueprint(sse_bp)
+    app.register_blueprint(messenger_phase2_bp)
 
 
     # CLI 명령어 등록
@@ -2241,6 +2259,19 @@ def create_app(config_name='default'):
     # ── RAG 인덱스 백그라운드 워커 시작 ──────────────────────────────────────
     _start_rag_background_worker(app)
 
+    # ── 접근제어 만료 임박 알림 백그라운드 워커 시작 ────────────────────────
+    _start_web_access_notifier(app)
+
+    # ── 푸시 알림 발송 백그라운드 워커 시작 ────────────────────────────────
+    try:
+        from app.services.push_dispatch_service import start_push_dispatch_worker
+        start_push_dispatch_worker(app)
+    except Exception as _e:
+        try:
+            print('[push-dispatch] start error:', _e, flush=True)
+        except Exception:
+            pass
+
     return app
 
 
@@ -2284,3 +2315,44 @@ def _start_rag_background_worker(app) -> None:
     t = threading.Thread(target=_worker_loop, name='rag-index-worker', daemon=True)
     t.start()
     print('[rag] background worker started (interval=10s)', flush=True)
+
+
+def _start_web_access_notifier(app) -> None:
+    """접근제어 만료 임박 알림 데몬.
+
+    - 앱 프로세스당 1회 시작
+    - 1시간 간격으로 만료 임박 grant를 스캔하여 감사 로그/알림 적재
+    - 정책 notify_before_days 값을 매 사이클마다 다시 읽어 동적으로 반영
+    """
+    import threading
+    import time
+
+    if getattr(app, '_web_access_notifier_started', False):
+        return
+    app._web_access_notifier_started = True
+
+    interval_seconds = 60 * 60  # 1시간
+
+    def _loop():
+        # 첫 실행은 30초 후 (앱 부팅과 분리)
+        time.sleep(30)
+        from app.services.web_access_control_service import run_expiry_notifications
+        while True:
+            try:
+                with app.app_context():
+                    result = run_expiry_notifications(app)
+                if result.get('created') or result.get('expired_grants'):
+                    print(
+                        '[web-access-notifier] notified=%s expired=%s notify_before_days=%s'
+                        % (result.get('created'), result.get('expired_grants'), result.get('notify_before_days')),
+                        flush=True,
+                    )
+            except Exception as exc:
+                try:
+                    print('[web-access-notifier] error:', exc, flush=True)
+                except Exception:
+                    pass
+            time.sleep(interval_seconds)
+
+    threading.Thread(target=_loop, name='web-access-notifier', daemon=True).start()
+    print('[web-access-notifier] background worker started (interval=3600s)', flush=True)

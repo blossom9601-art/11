@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.35">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
+	<link rel="stylesheet" href="/static/css/authentication/11-3.admin/11-3-3.setting/12.access_control.css?v=20260422a">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/12.access_control.js?v=20260422a" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper">
+			<div class="page-header">
+				<div>
+					<h1>접근제어 설정</h1>
+					<p>승인 정책을 정의하고, 신청·승인·접속·회수 이력을 감사 로그로 추적합니다.</p>
+				</div>
+			</div>
+			<div class="system-tabs" role="tablist" aria-label="관리자 설정 탭">
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_security_settings') }}">보안관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_file_management_settings') }}">파일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_sessions_page') }}">세션관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_mail_settings') }}">메일관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_quality_type') }}">품질유형</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_change_log') }}">통합로그</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_access_control_settings') }}">접근제어</a>
+			</div>
+
+			<!-- ════════ 승인 정책 ════════ -->
+			<section class="setting-card" id="ac-policy-card" aria-labelledby="ac-policy-title">
+				<div class="setting-card-header">
+					<div>
+						<h2 id="ac-policy-title">승인 정책</h2>
+						<p>승인 단계, 권한 기간, 만료 알림, 긴급/중복 신청 처리 방식을 정의합니다.</p>
+					</div>
+				</div>
+				<form id="admin-policy-form" class="setting-form" autocomplete="off">
+					<div class="form-grid">
+						<div class="form-row">
+							<label for="policy-team-lead">팀장 승인 필요</label>
+							<select id="policy-team-lead" class="form-input">
+								<option value="1">예</option>
+								<option value="0">아니오</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-admin-approval">관리자 승인 추가 요구</label>
+							<select id="policy-admin-approval" class="form-input">
+								<option value="0">아니오</option>
+								<option value="1">예</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-default-days">기본 권한 기간(일)</label>
+							<input type="number" id="policy-default-days" class="form-input" min="1" max="365">
+						</div>
+						<div class="form-row">
+							<label for="policy-max-days">최대 권한 기간(일)</label>
+							<input type="number" id="policy-max-days" class="form-input" min="1" max="365">
+						</div>
+						<div class="form-row">
+							<label for="policy-notify-days">만료 전 알림 일수</label>
+							<input type="number" id="policy-notify-days" class="form-input" min="0" max="30">
+						</div>
+						<div class="form-row">
+							<label for="policy-emergency">긴급 신청 허용</label>
+							<select id="policy-emergency" class="form-input">
+								<option value="1">허용</option>
+								<option value="0">차단</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-duplicate">중복 신청 제한</label>
+							<select id="policy-duplicate" class="form-input">
+								<option value="1">제한</option>
+								<option value="0">허용</option>
+							</select>
+						</div>
+					</div>
+
+					<div class="setting-actions">
+						<div class="action-buttons">
+							<button type="submit" class="btn-save">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+						<p class="setting-status" id="admin-policy-status">아직 저장된 정책이 없습니다.</p>
+					</div>
+				</form>
+			</section>
+
+			<!-- ════════ 감사 로그 ════════ -->
+			<section class="setting-card" id="ac-audit-card" aria-labelledby="ac-audit-title">
+				<div class="setting-card-header">
+					<div>
+						<h2 id="ac-audit-title">감사 로그</h2>
+						<p>신청, 승인, 반려, 접속, 회수, 만료 임박 알림 이력을 조건별로 조회합니다.</p>
+					</div>
+					<button type="button" id="admin-notify-run" class="chip-link">만료 임박 알림 실행</button>
+				</div>
+
+				<form id="admin-audit-filter-form" class="setting-form" autocomplete="off">
+					<div class="form-grid">
+						<div class="form-row">
+							<label for="audit-actor-name">사용자</label>
+							<div class="ac-combo" data-combo="actor">
+								<input type="text" id="audit-actor-name" class="form-input ac-combo-input" placeholder="이름 검색 (최소 1자)" autocomplete="off">
+								<button type="button" class="ac-combo-clear" data-combo-clear="actor" hidden aria-label="지우기">×</button>
+								<ul class="ac-combo-menu" id="audit-actor-menu" hidden role="listbox"></ul>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="audit-resource-name">자원명</label>
+							<div class="ac-combo" data-combo="resource">
+								<input type="text" id="audit-resource-name" class="form-input ac-combo-input" placeholder="자원명 검색" autocomplete="off">
+								<button type="button" class="ac-combo-clear" data-combo-clear="resource" hidden aria-label="지우기">×</button>
+								<ul class="ac-combo-menu" id="audit-resource-menu" hidden role="listbox"></ul>
+							</div>
+						</div>
+						<div class="form-row">
+							<label for="audit-action-type">행위 유형</label>
+							<select id="audit-action-type" class="form-input">
+								<option value="">전체</option>
+								<option value="신청">신청</option>
+								<option value="승인">승인</option>
+								<option value="반려">반려</option>
+								<option value="접속">접속</option>
+								<option value="권한회수">권한회수</option>
+								<option value="만료임박알림">만료임박알림</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="audit-from-date">기간 시작</label>
+							<input type="text" id="audit-from-date" class="form-input" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
+						</div>
+						<div class="form-row">
+							<label for="audit-to-date">기간 종료</label>
+							<input type="text" id="audit-to-date" class="form-input" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
+						</div>
+					</div>
+				</form>
+
+				<div id="admin-audit-state" class="ac-empty-state">감사 로그를 불러오는 중입니다.</div>
+				<div class="ac-table-wrap">
+					<table class="ac-table" id="admin-audit-table" hidden>
+						<thead>
+							<tr>
+								<th>일시</th>
+								<th>사용자</th>
+								<th>대상 자원</th>
+								<th>행위</th>
+								<th>결과</th>
+								<th>IP</th>
+								<th>비고</th>
+							</tr>
+						</thead>
+						<tbody id="admin-audit-body"></tbody>
+					</table>
+				</div>
+			</section>
+		</div>
+	</main>
+</body>
+</html>
