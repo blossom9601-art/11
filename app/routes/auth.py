@@ -471,11 +471,15 @@ def login():
         return _render_sign_in()
 
     if request.method == 'POST':
-        emp_no = request.form.get('employee_id')
+        emp_no = (request.form.get('employee_id') or '').strip()
         password = request.form.get('password')
         
         if not emp_no or not password:
             flash('사번과 비밀번호를 모두 입력해주세요.', 'error')
+            return _render_sign_in()
+
+        if not re.fullmatch(r'[A-Za-z0-9]+', emp_no):
+            flash('사번은 영문과 숫자만 입력할 수 있습니다.', 'error')
             return _render_sign_in()
         
         # 사용자 조회

@@ -9,11 +9,11 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/admin.css">
     <link rel="stylesheet" href="/static/css/authentication.css?v=1.0.24">
-    <script defer src="/static/js/blossom.js?v=20260412_terms"></script>
-    <script defer src="/static/js/authentication/11-2.basic/sign-in.js?v=20260412_mfa"></script>
+    <script defer src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script defer src="/static/js/authentication/11-2.basic/sign-in.js?v=20260502_empalpha"></script>
 </head>
 <body class="page-auth-signin">
     <div class="login-left" style="background-image: url('{{ login_background_image }}');"></div>
@@ -34,7 +34,8 @@
             <form action="/login" method="post" class="login-form" id="login-form">
                 <div class="input-group">
                     <label for="employee_id">사번</label>
-                    <input type="text" id="employee_id" name="employee_id" placeholder="사번을 입력하세요" required>
+                    <input type="text" id="employee_id" name="employee_id" placeholder="사번을 입력하세요" required autocomplete="username"
+                           pattern="[A-Za-z0-9]+" title="영문과 숫자만 입력할 수 있습니다.">
                 </div>
                 <div class="input-group">
                     <label for="password">비밀번호</label>
@@ -104,7 +105,8 @@
                     <div class="forgot-panel" id="forgot-step1">
                         <div class="chpw-field">
                             <label for="forgot-emp">사번</label>
-                            <input type="text" id="forgot-emp" name="emp_no" placeholder="사번을 입력하세요" required>
+                            <input type="text" id="forgot-emp" name="emp_no" placeholder="사번을 입력하세요" required
+                                   pattern="[A-Za-z0-9]+" title="영문과 숫자만 입력할 수 있습니다.">
                         </div>
                     </div>
                     <!-- Step 2: 이메일 -->

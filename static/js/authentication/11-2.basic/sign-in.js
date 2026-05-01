@@ -17,6 +17,46 @@
     const codeModal = document.getElementById('mfa-code-modal');
     const loginForm = document.getElementById('login-form');
     let timerInterval = null;
+
+    /** 사번: 영문 대소문자·숫자만 허용 */
+    function alphanumericOnly(str) {
+        return String(str).replace(/[^A-Za-z0-9]/g, '');
+    }
+    function bindEmpNoAlphanumeric(el) {
+        if (!el) return;
+        el.addEventListener('input', function (e) {
+            if (e.isComposing) return;
+            var v = el.value;
+            var f = alphanumericOnly(v);
+            if (v !== f) {
+                var sel = el.selectionStart;
+                var before = v.slice(0, sel);
+                var caret = alphanumericOnly(before).length;
+                el.value = f;
+                el.setSelectionRange(caret, caret);
+            }
+        });
+        el.addEventListener('compositionend', function () {
+            var v = el.value;
+            var f = alphanumericOnly(v);
+            if (v !== f) el.value = f;
+        });
+        el.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+            var filtered = alphanumericOnly(paste);
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            var cur = el.value;
+            el.value = cur.slice(0, start) + filtered + cur.slice(end);
+            var pos = start + filtered.length;
+            el.setSelectionRange(pos, pos);
+        });
+    }
+    bindEmpNoAlphanumeric(document.getElementById('employee_id'));
+    bindEmpNoAlphanumeric(document.getElementById('chpw-emp'));
+    bindEmpNoAlphanumeric(document.getElementById('forgot-emp'));
+
     let currentMethod = '';
     let currentTtl = 300;
 
@@ -394,6 +434,7 @@
         var pw = loginForm.password.value.trim();
 
         if (!empId || !pw) { loginForm.reportValidity(); return; }
+        if (!loginForm.checkValidity()) { loginForm.reportValidity(); return; }
 
         /* MFA 인증 완료 후 재제출 */
         if (loginForm.dataset.mfaCompleted === 'true') {
