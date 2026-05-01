@@ -24,26 +24,23 @@
     }
     function bindEmpNoAlphanumeric(el) {
         if (!el) return;
-        /* IME(한글 등): 조합 중에는 input 필터가 스킵되는 경우가 많음 → 삽입 전에 차단 */
+        /* IME 한글·자모: insertCompositionText 는 data 없이 오는 경우가 많음 → 조합 삽입 전부 차단 */
         el.addEventListener(
             'beforeinput',
             function (e) {
                 var t = e.inputType || '';
-                if (
-                    t !== 'insertText' &&
-                    t !== 'insertCompositionText' &&
-                    t !== 'insertReplacementText'
-                ) {
+                if (t === 'insertCompositionText') {
+                    e.preventDefault();
                     return;
                 }
+                if (t !== 'insertText' && t !== 'insertReplacementText') return;
                 var data = e.data;
                 if (data == null || data === '') return;
                 if (/[^A-Za-z0-9]/.test(data)) e.preventDefault();
             },
             true
         );
-        el.addEventListener('input', function (e) {
-            if (e.isComposing) return;
+        el.addEventListener('input', function () {
             var v = el.value;
             var f = alphanumericOnly(v);
             if (v !== f) {
