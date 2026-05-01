@@ -458,8 +458,8 @@
 			window.alert('삭제할 자원을 먼저 선택하세요.');
 			return;
 		}
-		qs('status-delete-subtitle').textContent = '선택된 ' + state.selected.size + '개의 자원을 정말 삭제하시겠습니까?';
-		var m = qs('status-delete-modal');
+		qs('delete-subtitle').textContent = '선택된 ' + state.selected.size + '개의 자원을 정말 삭제처리하시겠습니까?';
+		var m = qs('system-delete-modal');
 		m.classList.add('show');
 		m.setAttribute('aria-hidden', 'false');
 		m.style.display = 'flex';
@@ -472,7 +472,7 @@
 		document.body.classList.add('modal-open');
 	}
 	function closeBulkDeleteModal() {
-		var m = qs('status-delete-modal');
+		var m = qs('system-delete-modal');
 		m.classList.remove('show');
 		m.setAttribute('aria-hidden', 'true');
 		m.style.display = '';
@@ -481,7 +481,7 @@
 	function performBulkDelete() {
 		var ids = Array.from(state.selected);
 		if (!ids.length) { closeBulkDeleteModal(); return; }
-		var btn = qs('status-delete-confirm');
+		var btn = qs('system-delete-confirm');
 		btn.disabled = true;
 		var promises = ids.map(function (id) {
 			return fetchJson('/api/access-control/resources/' + id, { method: 'DELETE' }).catch(function () { return null; });
@@ -529,6 +529,16 @@
 		a.href = url; a.download = fname;
 		document.body.appendChild(a); a.click(); document.body.removeChild(a);
 		URL.revokeObjectURL(url);
+	}
+
+	function requestSelectedResources() {
+		if (state.selected.size === 0) {
+			alert('접근 신청할 자원을 먼저 선택하세요.');
+			return;
+		}
+		var ids = Array.from(state.selected);
+		try { localStorage.setItem('accessControlRequestResourceIds', JSON.stringify(ids)); } catch (_) {}
+		window.location.href = '/p/access_control_request?resource_ids=' + encodeURIComponent(ids.join(','));
 	}
 
 	var _eventsBound = false;
@@ -580,6 +590,7 @@
 			renderRows();
 		});
 		qs('status-add-btn').addEventListener('click', function () { openModal(null); });
+		qs('status-request-btn').addEventListener('click', requestSelectedResources);
 		qs('status-delete-btn').addEventListener('click', openBulkDeleteModal);
 		qs('status-download-btn').addEventListener('click', downloadCsv);
 
@@ -647,18 +658,18 @@
 			ensurePrimary();
 		});
 
-		var dm = qs('status-delete-modal');
+		var dm = qs('system-delete-modal');
 		dm.addEventListener('click', function (event) {
 			var target = event.target;
 			if (target.closest && target.closest('[data-modal-close="1"]')) { closeBulkDeleteModal(); return; }
 			if (target === dm) closeBulkDeleteModal();
 		});
-		qs('status-delete-confirm').addEventListener('click', performBulkDelete);
+		qs('system-delete-confirm').addEventListener('click', performBulkDelete);
 
 		document.addEventListener('keydown', function (event) {
 			if (event.key !== 'Escape') return;
 			if (getModal().classList.contains('show')) closeModal();
-			else if (qs('status-delete-modal').classList.contains('show')) closeBulkDeleteModal();
+			else if (qs('system-delete-modal').classList.contains('show')) closeBulkDeleteModal();
 		});
 	}
 

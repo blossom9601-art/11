@@ -9,20 +9,50 @@
 
     async _fetch(path, options) {
       const opts = Object.assign({ credentials: 'include', headers: {} }, options || {});
+      const onResponse = typeof opts.__onResponse === 'function' ? opts.__onResponse : null;
+      if ('__onResponse' in opts) delete opts.__onResponse;
       // CSRF 우회 + 일관된 AJAX 마킹
       if (!opts.headers['X-Requested-With']) opts.headers['X-Requested-With'] = 'XMLHttpRequest';
       if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
         opts.body = JSON.stringify(opts.body);
         opts.headers['Content-Type'] = 'application/json';
       }
+      if (!this.serverUrl && /^\//.test(path) && window.location && window.location.protocol === 'file:') {
+        const err = new Error('서버 주소가 설정되지 않아 요청을 보낼 수 없습니다. 서버 설정에서 http://127.0.0.1:8080 을 저장하세요.');
+        err.status = 0;
+        err.url = path;
+        err.method = (opts.method || 'GET').toString().toUpperCase();
+        throw err;
+      }
       const url = this.serverUrl + path;
-      const res = await fetch(url, opts);
+      const method = (opts.method || 'GET').toString().toUpperCase();
+      let res;
+      try {
+        res = await fetch(url, opts);
+      } catch (netErr) {
+        // 네트워크 자체 실패 (DNS/연결/CORS 등) — URL 정보를 살려서 다시 throw
+        const err = new Error((netErr && netErr.message) || 'Network error');
+        err.status = 0;
+        err.url = url;
+        err.method = method;
+        err.cause = netErr;
+        throw err;
+      }
       const ctype = res.headers.get('content-type') || '';
       const data = ctype.includes('application/json') ? await res.json().catch(() => null) : await res.text();
+      if (onResponse) {
+        try { onResponse({ method, url, status: res.status, ok: res.ok, body: data }); } catch (_) {}
+      }
       if (!res.ok) {
-        const err = new Error((data && (data.message || data.error)) || res.statusText);
+        const serverMessage = data && (data.message || data.error);
+        const notFoundMessage = res.status === 404
+          ? '요청 경로를 찾을 수 없습니다: ' + method + ' ' + path + ' (서버: ' + (this.serverUrl || '미설정') + ')'
+          : null;
+        const err = new Error(notFoundMessage || serverMessage || res.statusText);
         err.status = res.status;
         err.payload = data;
+        err.url = url;
+        err.method = method;
         throw err;
       }
       return data;
@@ -75,6 +105,32 @@
       const qs = q.toString();
       return this._fetch('/api/chat/directory' + (qs ? '?' + qs : ''));
     },
+    // v0.5.10: 동료(조직) 목록 — /api/chat/directory 단일 소스. 정규화된 배열 반환.
+    // 동료 화면·캘린더 참석자 선택·DM 검색 모두 같은 응답을 사용한다.
+    async fetchCoworkers(opts) {
+      const o = opts || {};
+      const rows = await this.listDirectory({
+        q: o.q || '',
+        department: o.department || undefined,
+        limit: o.limit || 1000,
+      });
+      const src = Array.isArray(rows) ? rows
+        : rows && Array.isArray(rows.items) ? rows.items
+        : rows && Array.isArray(rows.users) ? rows.users
+        : rows && Array.isArray(rows.data) ? rows.data
+        : [];
+      return src
+        .filter(Boolean)
+        .map((u, idx) => Object.assign({}, u, {
+          id: u.id || u.user_id || ('row:' + idx + ':' + (u.emp_no || u.name || u.nickname || '')),
+          name: u.name || u.nickname || u.user_name || u.userName || u.employeeName || '',
+          nickname: u.nickname || '',
+          emp_no: u.emp_no || u.employee_id || u.employeeNo || u.employee_no || u.userId || '',
+          department: u.department || u.dept_name || u.deptName || u.teamName || u.team_name || '',
+          email: u.email || '',
+          profile_image: u.profile_image || u.avatar || '',
+        }));
+    },
 
     // ── 방 목록 (include_members=1) ──────────────────────
     listRooms() {
@@ -93,9 +149,42 @@
       const qs = actorUserId ? ('?updated_by_user_id=' + encodeURIComponent(actorUserId)) : '';
       return this._fetch('/api/chat/rooms/' + roomId + qs, { method: 'DELETE' });
     },
-    leaveRoom(roomId, actorUserId) {
+    async leaveRoom(roomId, actorUserId) {
       const qs = actorUserId ? ('?actor_user_id=' + encodeURIComponent(actorUserId)) : '';
-      return this._fetch('/api/chat/rooms/' + roomId + '/leave' + qs, { method: 'DELETE' });
+      const candidates = [
+        { path: '/api/rooms/' + roomId + '/leave' + qs, method: 'POST' },
+        { path: '/api/chat/rooms/' + roomId + '/leave' + qs, method: 'POST' },
+        { path: '/api/chat/rooms/' + roomId + '/leave' + qs, method: 'DELETE' },
+      ];
+      let lastErr = null;
+      for (const c of candidates) {
+        try {
+          return await this._fetch(c.path, { method: c.method, body: c.method === 'POST' ? {} : undefined });
+        } catch (e) {
+          const status = e && e.status;
+          if (status === 405 || status === 404) { lastErr = e; continue; }
+          throw e;
+        }
+      }
+      throw lastErr || new Error('대화 나가기 엔드포인트를 찾을 수 없습니다.');
+    },
+    async hideRoom(roomId, actorUserId) {
+      const qs = actorUserId ? ('?actor_user_id=' + encodeURIComponent(actorUserId)) : '';
+      const candidates = [
+        { path: '/api/rooms/' + roomId + '/hide' + qs, method: 'POST' },
+        { path: '/api/chat/rooms/' + roomId + '/hide' + qs, method: 'POST' },
+      ];
+      let lastErr = null;
+      for (const c of candidates) {
+        try {
+          return await this._fetch(c.path, { method: c.method, body: {} });
+        } catch (e) {
+          const status = e && e.status;
+          if (status === 405 || status === 404) { lastErr = e; continue; }
+          throw e;
+        }
+      }
+      throw lastErr || new Error('대화 숨기기 엔드포인트를 찾을 수 없습니다.');
     },
     listRoomMembers(roomId) {
       return this._fetch('/api/chat/rooms/' + roomId + '/members');
@@ -116,6 +205,10 @@
       const qs = actorUserId ? ('?actor_user_id=' + actorUserId) : '';
       return this._fetch('/api/chat/rooms/' + roomId + '/members/' + memberId + qs, { method: 'DELETE' });
     },
+    // v0.5.8: 채널 멤버 역할 변경 (관리자 위임 등)
+    updateRoomMember(roomId, memberId, patch) {
+      return this._fetch('/api/chat/rooms/' + roomId + '/members/' + memberId, { method: 'PATCH', body: patch });
+    },
     markRoomRead(roomId) {
       return this._fetch('/api/chat/rooms/' + roomId + '/mark-read', { method: 'POST' });
     },
@@ -130,6 +223,8 @@
       if (o.page) q.set('page', String(o.page));
       if (o.afterId) q.set('after_id', String(o.afterId));
       if (o.beforeId) q.set('before_id', String(o.beforeId));
+      // v0.4.57: viewer_user_id 명시 전달 — 서버 세션 추출 실패 시에도 빈 응답이 나오지 않도록 보장
+      if (o.viewerUserId) q.set('viewer_user_id', String(o.viewerUserId));
       return this._fetch('/api/chat/rooms/' + roomId + '/messages?' + q.toString());
     },
     sendMessage(roomId, senderUserId, text, opts) {
@@ -175,6 +270,12 @@
     deleteRoomIdea(roomId, ideaId) {
       return this._fetch('/api/chat/rooms/' + roomId + '/ideas/' + ideaId, { method: 'DELETE' });
     },
+    toggleRoomIdeaLike(roomId, ideaId) {
+      return this._fetch('/api/chat/rooms/' + roomId + '/ideas/' + ideaId + '/like', { method: 'POST' });
+    },
+    createRoomIdeaComment(roomId, ideaId, body) {
+      return this._fetch('/api/chat/rooms/' + roomId + '/ideas/' + ideaId + '/comments', { method: 'POST', body: { body } });
+    },
     listRoomTasks(roomId) {
       return this._fetch('/api/chat/rooms/' + roomId + '/tasks');
     },
@@ -192,37 +293,50 @@
     async uploadFile(file) {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(this.serverUrl + '/api/uploads', {
-        method: 'POST', credentials: 'include', body: fd,
-      });
-      if (!res.ok) throw new Error('upload failed: ' + res.status);
-      return res.json();
+      return this._fetch('/api/uploads', { method: 'POST', body: fd });
     },
     attachFileToMessage(messageId, payload) {
       return this._fetch('/api/chat/messages/' + messageId + '/files', {
         method: 'POST', body: payload,
       });
     },
+    deleteMessageFile(fileId) {
+      return this._fetch('/api/chat/files/' + fileId, { method: 'DELETE' });
+    },
+    listRetentionPolicies() {
+      return this._fetch('/api/retention-policies');
+    },
+    updateRetentionPolicy(roomType, payload) {
+      return this._fetch('/api/retention-policies/' + encodeURIComponent(roomType), {
+        method: 'PUT', body: payload,
+      });
+    },
+    applyRetentionPoliciesToExisting() {
+      return this._fetch('/api/retention-policies/apply-existing', { method: 'POST', body: {} });
+    },
+    runRetentionCleanup() {
+      return this._fetch('/api/system/retention-cleanup', { method: 'POST', body: { limit: 100 } });
+    },
 
 
     // ── 달력 (웹 Blossom 동기화) ─────────────────────
-    listCalendarSchedules(opts) {
+    listCalendarSchedules(opts, metaOptions) {
       const q = new URLSearchParams();
       if (opts && opts.start) q.set('start', opts.start);
       if (opts && opts.end) q.set('end', opts.end);
       if (opts && opts.q) q.set('q', opts.q);
       if (opts && opts.limit) q.set('limit', String(opts.limit));
       const qs = q.toString();
-      return this._fetch('/api/calendar/schedules' + (qs ? '?' + qs : ''));
+      return this._fetch('/api/calendar/schedules' + (qs ? '?' + qs : ''), metaOptions || {});
     },
-    createCalendarSchedule(payload) {
-      return this._fetch('/api/calendar/schedules', { method: 'POST', body: payload });
+    createCalendarSchedule(payload, metaOptions) {
+      return this._fetch('/api/calendar/schedules', Object.assign({ method: 'POST', body: payload }, metaOptions || {}));
     },
-    updateCalendarSchedule(id, payload) {
-      return this._fetch('/api/calendar/schedules/' + id, { method: 'PUT', body: payload });
+    updateCalendarSchedule(id, payload, metaOptions) {
+      return this._fetch('/api/calendar/schedules/' + id, Object.assign({ method: 'PUT', body: payload }, metaOptions || {}));
     },
-    deleteCalendarSchedule(id) {
-      return this._fetch('/api/calendar/schedules/' + id, { method: 'DELETE' });
+    deleteCalendarSchedule(id, metaOptions) {
+      return this._fetch('/api/calendar/schedules/' + id, Object.assign({ method: 'DELETE' }, metaOptions || {}));
     },
 
     // ── 메모 (프로필>메모 동기화) ────────────────────
@@ -237,6 +351,9 @@
     },
     deleteMemoGroup(id) {
       return this._fetch('/api/memo/groups/' + id, { method: 'DELETE' });
+    },
+    reorderMemoGroups(payload) {
+      return this._fetch('/api/memo/groups/reorder', { method: 'POST', body: payload });
     },
     listMemos(groupId, opts) {
       const q = new URLSearchParams();
@@ -254,6 +371,9 @@
     },
     deleteMemo(memoId) {
       return this._fetch('/api/memo/memos/' + memoId, { method: 'DELETE' });
+    },
+    reorderMemos(groupId, payload) {
+      return this._fetch('/api/memo/groups/' + groupId + '/memos/reorder', { method: 'POST', body: payload });
     },
 
     registerDevice() { return Promise.resolve(null); },

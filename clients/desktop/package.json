@@ -1,6 +1,6 @@
 {
   "name": "blossom-desktop",
-  "version": "0.5.10",
+  "version": "0.5.39",
   "private": true,
   "description": "Blossom 사내 메신저 데스크탑 앱 (Electron)",
   "main": "src/main/index.js",
@@ -19,6 +19,8 @@
     "files": [
       "src/**/*",
       "renderer/**/*",
+      "build/icon.ico",
+      "build/icon.png",
       "package.json"
     ],
     "directories": {
@@ -73,6 +75,9 @@
     "sharp": "^0.34.5"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
     "electron-store": "^8.2.0",
     "flatpickr": "^4.6.13",
     "jszip": "^3.10.1",

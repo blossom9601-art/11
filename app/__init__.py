@@ -397,6 +397,39 @@ def create_app(config_name='default'):
             print('[org-user] location migration outer error:', _e2, flush=True)
     _ensure_org_user_location(app)
 
+    # ── calendar repeat 컬럼 마이그레이션 ──
+    def _ensure_calendar_repeat_columns(application):
+        try:
+            with application.app_context():
+                engine = db.get_engine()
+                with engine.connect() as conn:
+                    changed = False
+                    try:
+                        conn.execute(db.text("SELECT repeat_type FROM cal_schedule LIMIT 1"))
+                    except Exception:
+                        try:
+                            conn.execute(db.text("ALTER TABLE cal_schedule ADD COLUMN repeat_type VARCHAR(20) NOT NULL DEFAULT 'none'"))
+                            changed = True
+                        except Exception as _e:
+                            print('[calendar] repeat_type column migration failed:', _e, flush=True)
+                    try:
+                        conn.execute(db.text("SELECT repeat_rule FROM cal_schedule LIMIT 1"))
+                    except Exception:
+                        try:
+                            conn.execute(db.text("ALTER TABLE cal_schedule ADD COLUMN repeat_rule TEXT"))
+                            changed = True
+                        except Exception as _e:
+                            print('[calendar] repeat_rule column migration failed:', _e, flush=True)
+                    if changed:
+                        try:
+                            conn.commit()
+                        except Exception:
+                            pass
+                        print('[calendar] repeat columns ensured', flush=True)
+        except Exception as _e2:
+            print('[calendar] repeat column migration outer error:', _e2, flush=True)
+    _ensure_calendar_repeat_columns(app)
+
     # ── 보안 감사 로그 테이블 생성 (DB 초기화 후) ──
     from app.security import init_security_tables
     init_security_tables(app)

@@ -9,20 +9,50 @@
 
     async _fetch(path, options) {
       const opts = Object.assign({ credentials: 'include', headers: {} }, options || {});
+      const onResponse = typeof opts.__onResponse === 'function' ? opts.__onResponse : null;
+      if ('__onResponse' in opts) delete opts.__onResponse;
       // CSRF 우회 + 일관된 AJAX 마킹
       if (!opts.headers['X-Requested-With']) opts.headers['X-Requested-With'] = 'XMLHttpRequest';
       if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
         opts.body = JSON.stringify(opts.body);
         opts.headers['Content-Type'] = 'application/json';
       }
+      if (!this.serverUrl && /^\//.test(path) && window.location && window.location.protocol === 'file:') {
+        const err = new Error('서버 주소가 설정되지 않아 요청을 보낼 수 없습니다. 서버 설정에서 http://127.0.0.1:8080 을 저장하세요.');
+        err.status = 0;
+        err.url = path;
+        err.method = (opts.method || 'GET').toString().toUpperCase();
+        throw err;
+      }
       const url = this.serverUrl + path;
-      const res = await fetch(url, opts);
+      const method = (opts.method || 'GET').toString().toUpperCase();
+      let res;
+      try {
+        res = await fetch(url, opts);
+      } catch (netErr) {
+        // 네트워크 자체 실패 (DNS/연결/CORS 등) — URL 정보를 살려서 다시 throw
+        const err = new Error((netErr && netErr.message) || 'Network error');
+        err.status = 0;
+        err.url = url;
+        err.method = method;
+        err.cause = netErr;
+        throw err;
+      }
       const ctype = res.headers.get('content-type') || '';
       const data = ctype.includes('application/json') ? await res.json().catch(() => null) : await res.text();
+      if (onResponse) {
+        try { onResponse({ method, url, status: res.status, ok: res.ok, body: data }); } catch (_) {}
+      }
       if (!res.ok) {
-        const err = new Error((data && (data.message || data.error)) || res.statusText);
+        const serverMessage = data && (data.message || data.error);
+        const notFoundMessage = res.status === 404
+          ? '요청 경로를 찾을 수 없습니다: ' + method + ' ' + path + ' (서버: ' + (this.serverUrl || '미설정') + ')'
+          : null;
+        const err = new Error(notFoundMessage || serverMessage || res.statusText);
         err.status = res.status;
         err.payload = data;
+        err.url = url;
+        err.method = method;
         throw err;
       }
       return data;
@@ -274,15 +304,15 @@
       return this._fetch('/api/chat/files/' + fileId, { method: 'DELETE' });
     },
     listRetentionPolicies() {
-      return this._fetch('/api/admin/retention-policies');
+      return this._fetch('/api/retention-policies');
     },
     updateRetentionPolicy(roomType, payload) {
-      return this._fetch('/api/admin/retention-policies/' + encodeURIComponent(roomType), {
+      return this._fetch('/api/retention-policies/' + encodeURIComponent(roomType), {
         method: 'PUT', body: payload,
       });
     },
     applyRetentionPoliciesToExisting() {
-      return this._fetch('/api/admin/retention-policies/apply-existing', { method: 'POST', body: {} });
+      return this._fetch('/api/retention-policies/apply-existing', { method: 'POST', body: {} });
     },
     runRetentionCleanup() {
       return this._fetch('/api/system/retention-cleanup', { method: 'POST', body: { limit: 100 } });
@@ -290,23 +320,23 @@
 
 
     // ── 달력 (웹 Blossom 동기화) ─────────────────────
-    listCalendarSchedules(opts) {
+    listCalendarSchedules(opts, metaOptions) {
       const q = new URLSearchParams();
       if (opts && opts.start) q.set('start', opts.start);
       if (opts && opts.end) q.set('end', opts.end);
       if (opts && opts.q) q.set('q', opts.q);
       if (opts && opts.limit) q.set('limit', String(opts.limit));
       const qs = q.toString();
-      return this._fetch('/api/calendar/schedules' + (qs ? '?' + qs : ''));
+      return this._fetch('/api/calendar/schedules' + (qs ? '?' + qs : ''), metaOptions || {});
     },
-    createCalendarSchedule(payload) {
-      return this._fetch('/api/calendar/schedules', { method: 'POST', body: payload });
+    createCalendarSchedule(payload, metaOptions) {
+      return this._fetch('/api/calendar/schedules', Object.assign({ method: 'POST', body: payload }, metaOptions || {}));
     },
-    updateCalendarSchedule(id, payload) {
-      return this._fetch('/api/calendar/schedules/' + id, { method: 'PUT', body: payload });
+    updateCalendarSchedule(id, payload, metaOptions) {
+      return this._fetch('/api/calendar/schedules/' + id, Object.assign({ method: 'PUT', body: payload }, metaOptions || {}));
     },
-    deleteCalendarSchedule(id) {
-      return this._fetch('/api/calendar/schedules/' + id, { method: 'DELETE' });
+    deleteCalendarSchedule(id, metaOptions) {
+      return this._fetch('/api/calendar/schedules/' + id, Object.assign({ method: 'DELETE' }, metaOptions || {}));
     },
 
     // ── 메모 (프로필>메모 동기화) ────────────────────

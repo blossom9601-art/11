@@ -186,16 +186,21 @@ from app.services.org_department_service import (
 )
 from app.services.web_access_control_service import (
     REQUEST_STATUS_PENDING as WEB_ACCESS_REQUEST_PENDING,
+    REQUEST_STATUS_PARTIAL_APPROVED as WEB_ACCESS_REQUEST_PARTIAL_APPROVED,
+    WebAccessValidationError,
     approve_request as svc_approve_web_access_request,
     cancel_request as svc_cancel_web_access_request,
+    create_approver_delegation as svc_create_web_access_delegation,
     create_request as svc_create_web_access_request,
     create_resource as svc_create_web_access_resource,
     get_default_policy as svc_get_web_access_policy,
+    get_access_activity as svc_get_web_access_activity,
     get_request as svc_get_web_access_request,
     get_resource as svc_get_web_access_resource,
     has_active_grant as svc_has_web_access_grant,
     has_pending_request as svc_has_web_access_pending_request,
     list_audit_logs as svc_list_web_access_audit_logs,
+    list_approver_delegations as svc_list_web_access_delegations,
     list_grants as svc_list_web_access_grants,
     list_notifications as svc_list_web_access_notifications,
     list_requests as svc_list_web_access_requests,
@@ -3407,6 +3412,7 @@ def _update_room_last_message(room: MsgRoom, message: MsgMessage) -> None:
     try:
         _retention_ensure_schema()
         _retention_reset_room_auto_delete(room.id, room.room_type, room.last_message_at)
+        _retention_reset_user_auto_delete_for_room(room.id, room.room_type, room.last_message_at)
     except Exception:
         logger.exception('Failed to update retention schedule room_id=%s', getattr(room, 'id', None))
 
@@ -3417,6 +3423,36 @@ _RETENTION_DEFAULT_SECONDS = 24 * 60 * 60
 
 def _dt_iso(v: Optional[datetime]) -> Optional[str]:
     return v.isoformat() if v else None
+
+
+def _retention_coerce_datetime(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+    if hasattr(value, 'to_pydatetime'):
+        try:
+            return _retention_coerce_datetime(value.to_pydatetime())
+        except Exception:
+            return None
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    if text_value.endswith('Z'):
+        text_value = text_value[:-1] + '+00:00'
+    try:
+        parsed = datetime.fromisoformat(text_value)
+        return _retention_coerce_datetime(parsed)
+    except Exception:
+        pass
+    for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(text_value, fmt)
+        except Exception:
+            continue
+    return None
 
 
 def _retention_bool(v: Any, default: bool = False) -> bool:
@@ -3485,6 +3521,17 @@ def _retention_ensure_schema() -> None:
     add_col('retention_policy', 'updated_by', 'INTEGER')
     add_col('retention_policy', 'created_at', 'DATETIME')
     add_col('retention_policy', 'updated_at', 'DATETIME')
+    try:
+        _room_lifecycle_ensure_schema()
+        inspector = sa.inspect(db.engine)
+    except Exception:
+        logger.exception('Failed to ensure room lifecycle schema for retention')
+    add_col('msg_user_room_state', 'retention_enabled', 'INTEGER DEFAULT 0')
+    add_col('msg_user_room_state', 'retention_value', 'INTEGER')
+    add_col('msg_user_room_state', 'retention_unit', 'VARCHAR(16)')
+    add_col('msg_user_room_state', 'delete_attachments', 'INTEGER DEFAULT 1')
+    add_col('msg_user_room_state', 'retention_last_activity_at', 'DATETIME')
+    add_col('msg_user_room_state', 'retention_auto_delete_at', 'DATETIME')
     db.session.execute(text(
         """
         CREATE TABLE IF NOT EXISTS retention_cleanup_log (
@@ -3581,11 +3628,141 @@ def _retention_get_policy(room_type: str, room_id: Optional[int] = None) -> dict
     }
 
 
-def _retention_upsert_policy(scope_type: str, room_type: str, room_id: Optional[int], payload: dict, actor_id: Optional[int]) -> dict:
+def _retention_get_user_policy(room_type: str, user_id: Optional[int]) -> dict:
+    _retention_ensure_schema()
+    rt = _retention_room_type(room_type)
+    if user_id:
+        row = db.session.execute(text(
+            """
+            SELECT *
+              FROM retention_policy
+             WHERE scope_type='USER_ROOM_TYPE'
+               AND room_type=:room_type
+               AND room_id IS NULL
+               AND created_by=:user_id
+             ORDER BY id DESC
+             LIMIT 1
+            """
+        ), {'room_type': rt, 'user_id': int(user_id)}).fetchone()
+        if row:
+            return _retention_policy_dict(row)
+    item = _retention_get_policy(rt)
+    item.update({
+        'id': None,
+        'scope_type': 'USER_ROOM_TYPE',
+        'room_type': rt,
+        'room_id': None,
+        'created_by': int(user_id) if user_id else None,
+        'updated_by': None,
+        'created_at': None,
+        'updated_at': None,
+    })
+    return item
+
+
+def _retention_user_room_rows(room_type: str, user_id: int) -> list:
+    _retention_ensure_schema()
+    return db.session.execute(text(
+        """
+        SELECT r.id, r.room_type, COALESCE(r.last_message_at, r.updated_at, r.created_at) AS activity_at
+          FROM msg_room r
+          JOIN msg_room_member m ON m.room_id=r.id
+         WHERE r.is_deleted=0
+           AND UPPER(r.room_type)=:room_type
+           AND m.user_id=:user_id
+           AND m.left_at IS NULL
+        """
+    ), {'room_type': _retention_room_type(room_type), 'user_id': int(user_id)}).fetchall()
+
+
+def _retention_upsert_user_room_schedule(user_id: int, room_id: int, room_type: str, activity_at: Optional[datetime], policy: dict) -> None:
+    _retention_ensure_schema()
+    now = _retention_coerce_datetime(activity_at) or datetime.utcnow()
+    enabled = bool(policy.get('enabled'))
+    retention_seconds = int(policy.get('retention_seconds') or _RETENTION_DEFAULT_SECONDS)
+    auto_delete_at = now + timedelta(seconds=retention_seconds) if enabled else None
+    params = {
+        'uid': int(user_id),
+        'rid': int(room_id),
+        'hidden': 0,
+        'now': datetime.utcnow(),
+        'last_activity_at': now,
+        'auto_delete_at': auto_delete_at,
+        'enabled': 1 if enabled else 0,
+        'retention_value': retention_seconds,
+        'delete_attachments': 1 if policy.get('delete_attachments') else 0,
+    }
+    existing = db.session.execute(text(
+        "SELECT 1 FROM msg_user_room_state WHERE user_id=:uid AND room_id=:rid"
+    ), params).fetchone()
+    if existing:
+        db.session.execute(text(
+            """
+            UPDATE msg_user_room_state
+               SET retention_enabled=:enabled,
+                   retention_value=:retention_value,
+                   retention_unit='seconds',
+                   delete_attachments=:delete_attachments,
+                   retention_last_activity_at=:last_activity_at,
+                   retention_auto_delete_at=:auto_delete_at,
+                   updated_at=:now
+             WHERE user_id=:uid AND room_id=:rid
+            """
+        ), params)
+    else:
+        db.session.execute(text(
+            """
+            INSERT INTO msg_user_room_state
+            (user_id, room_id, hidden, muted, favorite, last_read_at, unread_count, local_deleted_at,
+             cache_deleted_at, hidden_at, updated_at, retention_enabled, retention_value, retention_unit,
+             delete_attachments, retention_last_activity_at, retention_auto_delete_at)
+            VALUES
+            (:uid, :rid, 0, 0, 0, :now, 0, NULL, NULL, NULL, :now, :enabled, :retention_value,
+             'seconds', :delete_attachments, :last_activity_at, :auto_delete_at)
+            """
+        ), params)
+
+
+def _retention_reset_user_room_auto_delete(user_id: int, room_id: int, room_type: str, activity_at: Optional[datetime] = None) -> None:
+    policy = _retention_get_user_policy(room_type, user_id)
+    _retention_upsert_user_room_schedule(user_id, room_id, room_type, activity_at, policy)
+
+
+def _retention_apply_policy_to_user_rooms(room_type: str, user_id: int) -> int:
+    rows = _retention_user_room_rows(room_type, user_id)
+    for row in rows:
+        m = row._mapping
+        _retention_reset_user_room_auto_delete(user_id, m['id'], m['room_type'], m['activity_at'])
+    db.session.commit()
+    return len(rows)
+
+
+def _retention_reset_user_auto_delete_for_room(room_id: int, room_type: str, activity_at: Optional[datetime] = None) -> None:
+    _retention_ensure_schema()
+    rows = db.session.execute(text(
+        """
+        SELECT DISTINCT m.user_id
+          FROM msg_room_member m
+          JOIN retention_policy p
+            ON p.scope_type='USER_ROOM_TYPE'
+           AND p.room_type=:room_type
+           AND p.room_id IS NULL
+           AND p.created_by=m.user_id
+         WHERE m.room_id=:room_id
+           AND m.left_at IS NULL
+        """
+    ), {'room_id': int(room_id), 'room_type': _retention_room_type(room_type)}).fetchall()
+    for row in rows:
+        _retention_reset_user_room_auto_delete(int(row[0]), room_id, room_type, activity_at)
+
+
+def _retention_upsert_policy(scope_type: str, room_type: str, room_id: Optional[int], payload: dict, actor_id: Optional[int], owner_user_id: Optional[int] = None) -> dict:
     _retention_ensure_schema()
     rt = _retention_room_type(room_type)
     now = datetime.utcnow()
     retention_seconds = _retention_seconds_from_payload(payload)
+    user_scope = str(scope_type or '').upper() == 'USER_ROOM_TYPE'
+    policy_owner_id = int(owner_user_id or actor_id) if user_scope and (owner_user_id or actor_id) else actor_id
     params = {
         'scope_type': scope_type,
         'room_type': rt,
@@ -3599,12 +3776,19 @@ def _retention_upsert_policy(scope_type: str, room_type: str, room_id: Optional[
         'reset_on_new_activity': 1 if _retention_bool(payload.get('reset_on_new_activity'), True) else 0,
         'apply_existing': 1 if _retention_bool(payload.get('apply_existing'), True) else 0,
         'actor': actor_id,
+        'policy_owner': policy_owner_id,
         'now': now,
     }
-    existing = db.session.execute(text(
-        "SELECT id FROM retention_policy WHERE scope_type=:scope_type AND room_type=:room_type AND "
-        "((:room_id IS NULL AND room_id IS NULL) OR room_id=:room_id) ORDER BY id DESC LIMIT 1"
-    ), params).fetchone()
+    if user_scope:
+        existing = db.session.execute(text(
+            "SELECT id FROM retention_policy WHERE scope_type=:scope_type AND room_type=:room_type AND "
+            "room_id IS NULL AND created_by=:policy_owner ORDER BY id DESC LIMIT 1"
+        ), params).fetchone()
+    else:
+        existing = db.session.execute(text(
+            "SELECT id FROM retention_policy WHERE scope_type=:scope_type AND room_type=:room_type AND "
+            "((:room_id IS NULL AND room_id IS NULL) OR room_id=:room_id) ORDER BY id DESC LIMIT 1"
+        ), params).fetchone()
     if existing:
         params['id'] = existing[0]
         db.session.execute(text(
@@ -3625,18 +3809,23 @@ def _retention_upsert_policy(scope_type: str, room_type: str, room_id: Optional[
              exclude_notice, exclude_important, reset_on_new_activity, apply_existing, created_by, updated_by, created_at, updated_at)
             VALUES
             (:scope_type, :room_type, :room_id, :enabled, :retention_seconds, :delete_attachments, :exclude_pinned,
-             :exclude_notice, :exclude_important, :reset_on_new_activity, :apply_existing, :actor, :actor, :now, :now)
+             :exclude_notice, :exclude_important, :reset_on_new_activity, :apply_existing, :policy_owner, :actor, :now, :now)
             """
         ), params)
     db.session.commit()
     if params['apply_existing']:
-        _retention_apply_policy_to_rooms(rt)
+        if user_scope and policy_owner_id:
+            _retention_apply_policy_to_user_rooms(rt, int(policy_owner_id))
+        elif str(scope_type or '').upper() == 'ROOM_TYPE':
+            _retention_apply_policy_to_rooms(rt)
+    if user_scope:
+        return _retention_get_user_policy(rt, int(policy_owner_id))
     return _retention_get_policy(rt, room_id)
 
 
 def _retention_reset_room_auto_delete(room_id: int, room_type: str, activity_at: Optional[datetime] = None) -> None:
     policy = _retention_get_policy(room_type, room_id)
-    now = activity_at or datetime.utcnow()
+    now = _retention_coerce_datetime(activity_at) or datetime.utcnow()
     auto_delete_at = now + timedelta(seconds=int(policy['retention_seconds'] or _RETENTION_DEFAULT_SECONDS)) if policy.get('enabled') else None
     db.session.execute(text(
         """
@@ -3677,6 +3866,52 @@ def _retention_apply_policy_to_rooms(room_type: str) -> int:
     return len(rows)
 
 
+def _retention_cleanup_due_user_rooms(actor_id: int, limit: int = 100) -> dict:
+    _retention_ensure_schema()
+    now = datetime.utcnow()
+    rows = db.session.execute(text(
+        """
+        SELECT s.room_id,
+               r.room_type,
+               COALESCE(s.retention_last_activity_at, r.last_activity_at, r.last_message_at, r.updated_at, r.created_at) AS activity_at,
+               s.retention_auto_delete_at
+          FROM msg_user_room_state s
+          JOIN msg_room r ON r.id=s.room_id
+          JOIN msg_room_member m ON m.room_id=s.room_id AND m.user_id=s.user_id
+         WHERE s.user_id=:user_id
+           AND s.retention_enabled=1
+           AND s.retention_auto_delete_at IS NOT NULL
+           AND s.retention_auto_delete_at <= :now
+           AND r.is_deleted=0
+           AND m.left_at IS NULL
+         ORDER BY s.retention_auto_delete_at ASC
+         LIMIT :limit
+        """
+    ), {'user_id': int(actor_id), 'now': now, 'limit': max(1, min(int(limit or 100), 500))}).fetchall()
+    total_rooms = 0
+    for row in rows:
+        m = row._mapping
+        room_id = int(m['room_id'])
+        room_type = m['room_type']
+        policy = _retention_get_user_policy(room_type, actor_id)
+        if not policy.get('enabled'):
+            continue
+        activity_at = _retention_coerce_datetime(m['activity_at']) or now
+        due_at = activity_at + timedelta(seconds=int(policy['retention_seconds']))
+        if due_at > now:
+            db.session.execute(text(
+                "UPDATE msg_user_room_state SET retention_auto_delete_at=:due WHERE user_id=:uid AND room_id=:rid"
+            ), {'due': due_at, 'uid': int(actor_id), 'rid': room_id})
+            continue
+        _upsert_user_room_state(int(actor_id), room_id, hidden=True, clear_local=True, now=now)
+        db.session.execute(text(
+            "UPDATE msg_user_room_state SET retention_auto_delete_at=NULL WHERE user_id=:uid AND room_id=:rid"
+        ), {'uid': int(actor_id), 'rid': room_id})
+        total_rooms += 1
+    db.session.commit()
+    return {'rooms': total_rooms, 'messages': 0, 'files': 0, 'scope': 'USER'}
+
+
 def _retention_cleanup_due_rooms(actor_id: Optional[int] = None, limit: int = 100) -> dict:
     _retention_ensure_schema()
     now = datetime.utcnow()
@@ -3702,12 +3937,7 @@ def _retention_cleanup_due_rooms(actor_id: Optional[int] = None, limit: int = 10
         policy = _retention_get_policy(room_type, room_id)
         if not policy.get('enabled'):
             continue
-        activity_at = m['activity_at'] or now
-        if isinstance(activity_at, str):
-            try:
-                activity_at = datetime.fromisoformat(activity_at)
-            except Exception:
-                activity_at = now
+        activity_at = _retention_coerce_datetime(m['activity_at']) or now
         due_at = activity_at + timedelta(seconds=int(policy['retention_seconds']))
         if due_at > now:
             # A new message may have arrived after the batch selected the room.
@@ -3880,7 +4110,9 @@ def list_chat_rooms():
         for room in rooms:
             s = state_by_room.get(room.id)
             if s and s.get('local_deleted_at'):
-                continue
+                local_deleted_at = _retention_coerce_datetime(s.get('local_deleted_at'))
+                if not room.last_message_at or (local_deleted_at and room.last_message_at <= local_deleted_at):
+                    continue
             if s and int(s.get('hidden') or 0):
                 last_message_at = room.last_message_at
                 hidden_at = s.get('updated_at')
@@ -4870,6 +5102,16 @@ def list_chat_messages(room_id: int):
         })
     if viewer_member.joined_at:
         query = query.filter(MsgMessage.created_at >= viewer_member.joined_at)
+    try:
+        _room_lifecycle_ensure_schema()
+        state_row = db.session.execute(text(
+            "SELECT local_deleted_at FROM msg_user_room_state WHERE user_id=:uid AND room_id=:rid"
+        ), {'uid': viewer_user_id, 'rid': room_id}).fetchone()
+        local_deleted_at = _retention_coerce_datetime(state_row._mapping['local_deleted_at']) if state_row else None
+        if local_deleted_at:
+            query = query.filter(MsgMessage.created_at > local_deleted_at)
+    except Exception:
+        db.session.rollback()
     if not include_deleted:
         query = query.filter(MsgMessage.is_deleted.is_(False))
     if request.args.get('after_id'):
@@ -5028,6 +5270,16 @@ def search_chat_room_messages(room_id: int):
     )
     if viewer_member.joined_at:
         query = query.filter(MsgMessage.created_at >= viewer_member.joined_at)
+    try:
+        _room_lifecycle_ensure_schema()
+        state_row = db.session.execute(text(
+            "SELECT local_deleted_at FROM msg_user_room_state WHERE user_id=:uid AND room_id=:rid"
+        ), {'uid': viewer_user_id, 'rid': room_id}).fetchone()
+        local_deleted_at = _retention_coerce_datetime(state_row._mapping['local_deleted_at']) if state_row else None
+        if local_deleted_at:
+            query = query.filter(MsgMessage.created_at > local_deleted_at)
+    except Exception:
+        db.session.rollback()
     rows = query.order_by(MsgMessage.id.desc()).limit(limit).all()
 
     items = []
@@ -5062,6 +5314,25 @@ def search_chat_messages_global():
         return jsonify({'items': [], 'total': 0, 'q': keyword})
     joined_by_room = {m.room_id: m.joined_at for m in member_rows}
     room_ids = list(joined_by_room.keys())
+    local_deleted_by_room = {}
+    try:
+        _room_lifecycle_ensure_schema()
+        state_rows = db.session.execute(text(
+            """
+            SELECT room_id, local_deleted_at
+              FROM msg_user_room_state
+             WHERE user_id=:uid AND room_id IN :room_ids AND local_deleted_at IS NOT NULL
+            """
+        ).bindparams(sa.bindparam('room_ids', expanding=True)), {
+            'uid': viewer_user_id,
+            'room_ids': room_ids,
+        }).fetchall()
+        local_deleted_by_room = {
+            int(r._mapping['room_id']): _retention_coerce_datetime(r._mapping['local_deleted_at'])
+            for r in state_rows
+        }
+    except Exception:
+        db.session.rollback()
 
     like = f'%{keyword}%'
     rows = (
@@ -5077,6 +5348,9 @@ def search_chat_messages_global():
     for msg in rows:
         joined_at = joined_by_room.get(msg.room_id)
         if joined_at and msg.created_at and msg.created_at < joined_at:
+            continue
+        local_deleted_at = local_deleted_by_room.get(msg.room_id)
+        if local_deleted_at and msg.created_at and msg.created_at <= local_deleted_at:
             continue
         d = msg.to_dict()
         d['snippet'] = _build_message_snippet(d.get('text') or '', keyword)
@@ -5454,7 +5728,20 @@ def get_admin_retention_policies():
         return jsonify({'success': False, 'message': '관리자만 조회할 수 있습니다.'}), 403
     _retention_ensure_schema()
     items = [_retention_get_policy(rt) for rt in _RETENTION_ROOM_TYPES]
-    return jsonify({'success': True, 'items': items})
+    return jsonify({'success': True, 'scope': 'GLOBAL', 'items': items})
+
+
+@api_bp.route('/api/retention-policies', methods=['GET'])
+def get_retention_policies():
+    actor_id = _resolve_viewer_user_id_from_session()
+    if not actor_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+    _retention_ensure_schema()
+    if _is_admin_session():
+        items = [_retention_get_policy(rt) for rt in _RETENTION_ROOM_TYPES]
+        return jsonify({'success': True, 'scope': 'GLOBAL', 'items': items})
+    items = [_retention_get_user_policy(rt, actor_id) for rt in _RETENTION_ROOM_TYPES]
+    return jsonify({'success': True, 'scope': 'USER', 'items': items})
 
 
 @api_bp.route('/api/admin/retention-policies/<room_type>', methods=['PUT'])
@@ -5464,7 +5751,20 @@ def put_admin_retention_policy(room_type: str):
     actor_id = _resolve_viewer_user_id_from_session()
     payload = request.get_json(silent=True) or {}
     item = _retention_upsert_policy('ROOM_TYPE', room_type, None, payload, actor_id)
-    return jsonify({'success': True, 'item': item})
+    return jsonify({'success': True, 'scope': 'GLOBAL', 'item': item})
+
+
+@api_bp.route('/api/retention-policies/<room_type>', methods=['PUT'])
+def put_retention_policy(room_type: str):
+    actor_id = _resolve_viewer_user_id_from_session()
+    if not actor_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+    payload = request.get_json(silent=True) or {}
+    if _is_admin_session():
+        item = _retention_upsert_policy('ROOM_TYPE', room_type, None, payload, actor_id)
+        return jsonify({'success': True, 'scope': 'GLOBAL', 'item': item})
+    item = _retention_upsert_policy('USER_ROOM_TYPE', room_type, None, payload, actor_id, owner_user_id=actor_id)
+    return jsonify({'success': True, 'scope': 'USER', 'item': item})
 
 
 @api_bp.route('/api/rooms/<int:room_id>/retention-policy', methods=['GET'])
@@ -5495,16 +5795,33 @@ def apply_existing_retention_policies():
         return jsonify({'success': False, 'message': '관리자만 실행할 수 있습니다.'}), 403
     _retention_ensure_schema()
     counts = {rt: _retention_apply_policy_to_rooms(rt) for rt in _RETENTION_ROOM_TYPES}
-    return jsonify({'success': True, 'counts': counts})
+    return jsonify({'success': True, 'scope': 'GLOBAL', 'counts': counts})
+
+
+@api_bp.route('/api/retention-policies/apply-existing', methods=['POST'])
+def apply_current_retention_policies():
+    actor_id = _resolve_viewer_user_id_from_session()
+    if not actor_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+    _retention_ensure_schema()
+    if _is_admin_session():
+        counts = {rt: _retention_apply_policy_to_rooms(rt) for rt in _RETENTION_ROOM_TYPES}
+        return jsonify({'success': True, 'scope': 'GLOBAL', 'counts': counts})
+    counts = {rt: _retention_apply_policy_to_user_rooms(rt, actor_id) for rt in _RETENTION_ROOM_TYPES}
+    return jsonify({'success': True, 'scope': 'USER', 'counts': counts})
 
 
 @api_bp.route('/api/system/retention-cleanup', methods=['POST'])
 def run_retention_cleanup():
-    if not _is_admin_session():
-        return jsonify({'success': False, 'message': '관리자만 실행할 수 있습니다.'}), 403
     actor_id = _resolve_viewer_user_id_from_session()
+    if not actor_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
     limit = request.get_json(silent=True) or {}
-    result = _retention_cleanup_due_rooms(actor_id=actor_id, limit=int(limit.get('limit') or 100))
+    if _is_admin_session():
+        result = _retention_cleanup_due_rooms(actor_id=actor_id, limit=int(limit.get('limit') or 100))
+        result['scope'] = 'GLOBAL'
+    else:
+        result = _retention_cleanup_due_user_rooms(actor_id=actor_id, limit=int(limit.get('limit') or 100))
     return jsonify({'success': True, 'result': result})
 
 
@@ -7022,10 +7339,21 @@ def me_profile():
     auth_user = AuthUser.query.filter_by(emp_no=emp_no).first()
 
     if request.method == 'GET':
+        role = ((getattr(auth_user, 'role', '') if auth_user else '') or session.get('role') or '').strip()
+        role_upper = role.upper()
+        is_admin = role_upper == 'ADMIN' or _is_admin_session()
+        if is_admin and not role:
+            role = 'ADMIN'
+            role_upper = 'ADMIN'
         merged = {
+            'id': (int(prof.id) if prof and getattr(prof, 'id', None) else None),
             'emp_no': emp_no,
             'name': (prof.name if prof and prof.name else ''),
             'nickname': (prof.nickname if prof and prof.nickname else ''),
+            'role': role_upper or role,
+            'role_name': '관리자' if is_admin else (role or ''),
+            'is_admin': bool(is_admin),
+            'admin': bool(is_admin),
             'department_id': (getattr(prof, 'department_id', None) if prof else None),
             'department': (prof.department if prof and prof.department else ''),
             'location': (getattr(prof, 'location', '') or '' if prof else ''),
@@ -8945,7 +9273,12 @@ def list_calendar_schedules():
         query = _calendar_query(include_deleted=include_deleted)
         query = query.filter(_calendar_visible_filter(actor_user_id, actor_profile))
         if start:
-            query = query.filter(CalSchedule.end_datetime >= start)
+            query = query.filter(
+                or_(
+                    CalSchedule.end_datetime >= start,
+                    and_(CalSchedule.repeat_type != 'none', CalSchedule.start_datetime <= (end or start)),
+                )
+            )
         if end:
             query = query.filter(CalSchedule.start_datetime <= end)
         if owner_user_id:
@@ -14295,6 +14628,144 @@ def _calendar_color_for_type(event_type: str) -> str:
     return CALENDAR_TYPE_COLORS.get(event_type, '#a5b4fc')
 
 
+CALENDAR_REPEAT_TYPES = {'none', 'daily', 'weekly', 'monthly', 'yearly', 'custom'}
+CALENDAR_REPEAT_END_TYPES = {'never', 'until', 'count'}
+CALENDAR_REPEAT_WEEKDAYS = {'MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'}
+
+
+def _normalize_repeat_type(raw: Optional[str]) -> str:
+    token = (raw or 'none').strip().lower()
+    if token in ('', 'no', 'off', 'false'):
+        return 'none'
+    if token in ('day', 'days'):
+        return 'daily'
+    if token in ('week', 'weeks'):
+        return 'weekly'
+    if token in ('month', 'months'):
+        return 'monthly'
+    if token in ('year', 'years'):
+        return 'yearly'
+    return token if token in CALENDAR_REPEAT_TYPES else 'none'
+
+
+def _parse_calendar_date_key(raw) -> Optional[str]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    match = re.match(r'^(\d{4}-\d{2}-\d{2})', text)
+    if not match:
+        return None
+    try:
+        datetime.strptime(match.group(1), '%Y-%m-%d')
+    except ValueError:
+        return None
+    return match.group(1)
+
+
+def _coerce_repeat_rule(raw) -> Dict[str, object]:
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _serialize_repeat_rule(raw) -> Dict[str, object]:
+    rule = _coerce_repeat_rule(raw)
+    return rule if isinstance(rule, dict) else {}
+
+
+def _normalize_calendar_repeat_rule(
+    raw_rule,
+    repeat_type: str,
+    start_dt: datetime,
+    existing_rule: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
+    if repeat_type == 'none':
+        return {}
+
+    source = _coerce_repeat_rule(raw_rule)
+    if not source and existing_rule:
+        source = dict(existing_rule or {})
+
+    try:
+        interval = int(source.get('interval') or 1)
+    except (TypeError, ValueError):
+        interval = 1
+    if interval < 1:
+        raise ValueError('반복 주기는 1 이상이어야 합니다.')
+
+    frequency = _normalize_repeat_type(source.get('frequency') or source.get('freq') or source.get('unit') or repeat_type)
+    if repeat_type != 'custom':
+        frequency = repeat_type
+    if frequency == 'none' or frequency == 'custom':
+        frequency = 'daily'
+
+    end_type = str(source.get('endType') or source.get('end_type') or 'never').strip().lower()
+    if end_type not in CALENDAR_REPEAT_END_TYPES:
+        end_type = 'never'
+
+    rule: Dict[str, object] = {
+        'interval': interval,
+        'frequency': frequency,
+        'endType': end_type,
+    }
+
+    if frequency == 'weekly':
+        raw_days = source.get('daysOfWeek') or source.get('days_of_week') or []
+        if not isinstance(raw_days, (list, tuple)):
+            raw_days = [raw_days]
+        days = []
+        for day in raw_days:
+            token = str(day or '').strip().upper()
+            if token in CALENDAR_REPEAT_WEEKDAYS and token not in days:
+                days.append(token)
+        if not days:
+            days = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'][start_dt.weekday():start_dt.weekday() + 1]
+        rule['daysOfWeek'] = days
+
+    if frequency in ('monthly', 'yearly'):
+        rule['monthDayPolicy'] = 'clamp'
+
+    if end_type == 'until':
+        until = _parse_calendar_date_key(source.get('untilDate') or source.get('until_date'))
+        if not until:
+            raise ValueError('반복 종료 날짜를 입력하세요.')
+        if until < start_dt.strftime('%Y-%m-%d'):
+            raise ValueError('반복 종료일은 시작일보다 빠를 수 없습니다.')
+        rule['untilDate'] = until
+    elif end_type == 'count':
+        try:
+            count = int(source.get('count') or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count < 1:
+            raise ValueError('반복 횟수는 1 이상이어야 합니다.')
+        rule['count'] = count
+
+    raw_exdates = source.get('exdates') or source.get('exceptionDates') or []
+    if not isinstance(raw_exdates, (list, tuple)):
+        raw_exdates = [raw_exdates]
+    exdates = []
+    for raw_exdate in raw_exdates:
+        exdate = _parse_calendar_date_key(raw_exdate)
+        if exdate and exdate not in exdates:
+            exdates.append(exdate)
+    if exdates:
+        rule['exdates'] = exdates
+
+    return rule
+
+
 def _normalize_share_scope(raw: Optional[str]) -> str:
     token = (raw or '').strip().upper()
     if token == 'CUSTOM':
@@ -14302,7 +14773,7 @@ def _normalize_share_scope(raw: Optional[str]) -> str:
     if token in ('DEPT', 'DEPARTMENT', 'TEAM'):
         token = 'DEPARTMENT'
     if token not in ('ALL', 'PRIVATE', 'SELECT', 'DEPARTMENT'):
-        return 'ALL'
+        return 'PRIVATE'
     return token
 
 
@@ -14434,7 +14905,9 @@ def _calendar_can_view(schedule: CalSchedule, actor_user_id: int, actor_profile:
         return False
     if schedule.owner_user_id == actor_user_id:
         return True
-    scope = (schedule.share_scope or 'ALL').upper()
+    scope = (schedule.share_scope or 'PRIVATE').upper()
+    if scope == 'PRIVATE':
+        return False
     if scope == 'ALL':
         return True
     if scope == 'DEPARTMENT':
@@ -14454,7 +14927,7 @@ def _calendar_can_edit(schedule: CalSchedule, actor_user_id: int, actor_profile:
         return False
     if schedule.owner_user_id == actor_user_id:
         return True
-    scope = (schedule.share_scope or 'ALL').upper()
+    scope = (schedule.share_scope or 'PRIVATE').upper()
     if scope != 'SELECT':
         return False
     if any((link.user_id == actor_user_id and bool(link.can_edit)) for link in (schedule.share_users or [])):
@@ -14521,41 +14994,50 @@ def _serialize_calendar_attachment(row: CalScheduleAttachment, schedule_id: int)
 def _replace_share_links(
     schedule: CalSchedule,
     share_scope: str,
-    share_users_payload: List[Dict[str, object]],
-    share_depts_payload: List[Dict[str, object]],
+    share_users_payload: Optional[List[Dict[str, object]]],
+    share_depts_payload: Optional[List[Dict[str, object]]],
     actor_user_id: int,
 ):
-    schedule.share_users.clear()
-    schedule.share_departments.clear()
+    """share_users_payload / share_depts_payload 가 None 이면 해당 링크는 건드리지 않는다(부분 PUT).
+    SELECT 가 아니면 공유 링크를 모두 제거한다.
+    """
     if share_scope != 'SELECT':
+        schedule.share_users.clear()
+        schedule.share_departments.clear()
         return
-    user_ids = [item['user_id'] for item in share_users_payload]
-    if user_ids:
-        existing = {
-            row.id
-            for row in UserProfile.query.filter(UserProfile.id.in_(user_ids)).all()
-        }
-        missing = set(user_ids) - existing
-        if missing:
-            raise ValueError('공유 대상 사용자 정보를 확인할 수 없습니다.')
-        for payload in share_users_payload:
-            schedule.share_users.append(
-                CalScheduleShareUser(
-                    user_id=payload['user_id'],
+
+    if share_users_payload is not None:
+        schedule.share_users.clear()
+        user_ids = [item['user_id'] for item in share_users_payload]
+        if user_ids:
+            existing = {
+                row.id
+                for row in UserProfile.query.filter(UserProfile.id.in_(user_ids)).all()
+            }
+            missing = set(user_ids) - existing
+            if missing:
+                raise ValueError('공유 대상 사용자 정보를 확인할 수 없습니다.')
+            for payload in share_users_payload:
+                schedule.share_users.append(
+                    CalScheduleShareUser(
+                        user_id=payload['user_id'],
+                        can_edit=payload['can_edit'],
+                        notification_enabled=payload['notification_enabled'],
+                        created_by_user_id=actor_user_id,
+                    )
+                )
+
+    if share_depts_payload is not None:
+        schedule.share_departments.clear()
+        for payload in share_depts_payload or []:
+            schedule.share_departments.append(
+                CalScheduleShareDept(
+                    dept_id=payload['dept_id'],
                     can_edit=payload['can_edit'],
                     notification_enabled=payload['notification_enabled'],
                     created_by_user_id=actor_user_id,
                 )
             )
-    for payload in share_depts_payload:
-        schedule.share_departments.append(
-            CalScheduleShareDept(
-                dept_id=payload['dept_id'],
-                can_edit=payload['can_edit'],
-                notification_enabled=payload['notification_enabled'],
-                created_by_user_id=actor_user_id,
-            )
-        )
 
 
 def _serialize_calendar_schedule(
@@ -14592,6 +15074,10 @@ def _serialize_calendar_schedule(
         'sticker': meta.get('sticker') or '',
         'is_important': bool(meta.get('is_important')),
         'color_code': schedule.color_code or '',
+        'repeat_type': _normalize_repeat_type(getattr(schedule, 'repeat_type', None)),
+        'repeat_rule': _serialize_repeat_rule(getattr(schedule, 'repeat_rule', None)),
+        'repeatType': _normalize_repeat_type(getattr(schedule, 'repeat_type', None)),
+        'repeatRule': _serialize_repeat_rule(getattr(schedule, 'repeat_rule', None)),
         'created_at': _serialize_datetime(schedule.created_at),
         'created_by_user_id': schedule.created_by_user_id,
         'updated_at': _serialize_datetime(schedule.updated_at),
@@ -14687,7 +15173,7 @@ def _apply_schedule_payload(schedule: CalSchedule, payload: Dict[str, object], a
 
     share_scope_raw = payload.get('share_scope') or payload.get('shareScope')
     if share_scope_raw is None and not is_create:
-        share_scope = schedule.share_scope or 'ALL'
+        share_scope = schedule.share_scope or 'PRIVATE'
     else:
         share_scope = _normalize_share_scope(share_scope_raw)
     schedule.share_scope = share_scope
@@ -14708,6 +15194,24 @@ def _apply_schedule_payload(schedule: CalSchedule, payload: Dict[str, object], a
     elif is_create or not schedule.color_code:
         schedule.color_code = _calendar_color_for_type(event_type)
 
+    repeat_type_specified = ('repeat_type' in payload) or ('repeatType' in payload)
+    repeat_rule_specified = ('repeat_rule' in payload) or ('repeatRule' in payload)
+    if repeat_type_specified:
+        repeat_type = _normalize_repeat_type(payload.get('repeat_type') if 'repeat_type' in payload else payload.get('repeatType'))
+    elif is_create:
+        repeat_type = 'none'
+    else:
+        repeat_type = _normalize_repeat_type(getattr(schedule, 'repeat_type', None))
+    raw_repeat_rule = payload.get('repeat_rule') if 'repeat_rule' in payload else payload.get('repeatRule')
+    existing_repeat_rule = _serialize_repeat_rule(getattr(schedule, 'repeat_rule', None))
+    if repeat_type == 'none':
+        schedule.repeat_type = 'none'
+        schedule.repeat_rule = None
+    elif repeat_type_specified or repeat_rule_specified or is_create:
+        normalized_rule = _normalize_calendar_repeat_rule(raw_repeat_rule, repeat_type, start_dt, existing_repeat_rule)
+        schedule.repeat_type = repeat_type
+        schedule.repeat_rule = json.dumps(normalized_rule, ensure_ascii=False, separators=(',', ':'))
+
     now = datetime.utcnow()
     if is_create or not schedule.created_at:
         schedule.created_at = now
@@ -14717,12 +15221,26 @@ def _apply_schedule_payload(schedule: CalSchedule, payload: Dict[str, object], a
         schedule.created_by_user_id = actor_user_id
     schedule.updated_by_user_id = actor_user_id
 
-    share_users_payload = _extract_share_payload(payload.get('share_users') or payload.get('shareUsers'), 'user_id')
-    share_depts_payload = _extract_share_payload(payload.get('share_departments') or payload.get('shareDepartments'), 'dept_id')
+    share_users_specified = ('share_users' in payload) or ('shareUsers' in payload)
+    share_depts_specified = ('share_departments' in payload) or ('shareDepartments' in payload)
+    share_users_payload = (
+        _extract_share_payload(payload.get('share_users') or payload.get('shareUsers'), 'user_id')
+        if share_users_specified
+        else None
+    )
+    share_depts_payload = (
+        _extract_share_payload(payload.get('share_departments') or payload.get('shareDepartments'), 'dept_id')
+        if share_depts_specified
+        else None
+    )
     _replace_share_links(schedule, share_scope, share_users_payload, share_depts_payload, actor_user_id)
 
     if schedule.share_scope == 'DEPARTMENT' and not schedule.owner_dept_id:
         raise ValueError('부서공유를 사용하려면 사용자 부서 정보를 먼저 설정하세요.')
+
+    if schedule.share_scope == 'SELECT':
+        if not (schedule.share_users or schedule.share_departments):
+            raise ValueError('선택 공유에는 공유 대상(참석자)을 한 명 이상 지정해 주세요.')
 
 
 def _calendar_query(include_deleted: bool = False):
@@ -37078,14 +37596,21 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     has_pending = svc_has_web_access_pending_request(user_id, resource_id)
     grants = svc_list_web_access_grants(user_id=user_id, resource_id=resource_id)
     grant_row = grants[0] if grants else None
+    days_remaining = None
+    if grant_row and (grant_row.get('grant_end_date') or ''):
+        try:
+            end_date = datetime.strptime(str(grant_row.get('grant_end_date')), '%Y-%m-%d').date()
+            days_remaining = (end_date - datetime.now().date()).days
+        except Exception:
+            days_remaining = None
     if int(resource.get('active_flag') or 0) != 1:
         state = '차단'
     elif has_grant:
-        state = '사용 가능'
+        state = '만료 예정' if days_remaining is not None and 0 <= days_remaining <= 7 else '사용 가능'
     elif has_pending:
         state = '승인 대기'
     elif grant_row:
-        state = '만료'
+        state = '만료됨'
     else:
         state = '차단'
     return {
@@ -37093,10 +37618,32 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
         'can_access': bool(has_grant and int(resource.get('active_flag') or 0) == 1),
         'can_request': bool(not has_grant and not has_pending and int(resource.get('active_flag') or 0) == 1),
         'request_pending': bool(has_pending),
+        'grant_id': (grant_row or {}).get('id'),
+        'grant_status': (grant_row or {}).get('grant_status', ''),
+        'grant_start_date': (grant_row or {}).get('grant_start_date', ''),
         'grant_end_date': (grant_row or {}).get('grant_end_date', ''),
+        'granted_by_name': (grant_row or {}).get('granted_by_name', ''),
+        'granted_by_emp_no': (grant_row or {}).get('granted_by_emp_no', ''),
+        'approved_at': (grant_row or {}).get('created_at', ''),
         'last_accessed_at': (grant_row or {}).get('last_accessed_at', ''),
+        'days_remaining': days_remaining,
         'requested': bool(has_pending or grant_row),
     }
+
+
+def _web_access_request_resource_ids(item: Dict[str, Any]) -> set[int]:
+    raw = item.get('resource_ids') or [item.get('resource_id')]
+    if isinstance(raw, str):
+        raw = raw.strip('[]').replace('|', ',').split(',')
+    ids = set()
+    for value in raw or []:
+        try:
+            resource_id = int(str(value).strip())
+        except (TypeError, ValueError):
+            continue
+        if resource_id > 0:
+            ids.add(resource_id)
+    return ids
 
 
 @api_bp.route('/api/access-control/resources', methods=['GET'])
@@ -37111,9 +37658,13 @@ def api_access_control_resources():
         resource_type=(request.args.get('resource_type') or '').strip(),
     )
     items = []
+    scope = (request.args.get('scope') or '').strip().lower()
     for row in rows:
         merged = dict(row)
-        merged.update(_resource_access_state(row, actor))
+        access_state = _resource_access_state(row, actor)
+        merged.update(access_state)
+        if scope in ('accessible', 'access', 'mine_access') and not (access_state.get('can_access') or access_state.get('access_status') == '만료됨'):
+            continue
         items.append(merged)
     return jsonify({'success': True, 'rows': items, 'total': len(items)})
 
@@ -37128,9 +37679,16 @@ def api_access_control_resource_detail(resource_id: int):
     if not row:
         return jsonify({'success': False, 'message': '자원 정보를 찾을 수 없습니다.'}), 404
     detail = dict(row)
-    detail.update(_resource_access_state(row, actor))
+    access_state = _resource_access_state(row, actor)
+    if (request.args.get('scope') or '').strip().lower() in ('accessible', 'access', 'mine_access') and not (access_state.get('can_access') or access_state.get('access_status') == '만료됨'):
+        return jsonify({'success': False, 'message': '접속 정보 조회 권한이 없습니다.'}), 403
+    detail.update(access_state)
+    detail['access_log_summary'] = svc_get_web_access_activity(resource_id, actor['user_id'])
     my_requests = svc_list_web_access_requests(user_id=actor['user_id'])
-    detail['request_history'] = [item for item in my_requests if int(item.get('resource_id') or 0) == resource_id]
+    detail['request_history'] = [
+        item for item in my_requests
+        if resource_id in _web_access_request_resource_ids(item)
+    ]
     return jsonify({'success': True, 'item': detail})
 
 
@@ -37200,7 +37758,13 @@ def api_access_control_requests():
     scope = (request.args.get('scope') or 'mine').strip()
     status = (request.args.get('status') or '').strip()
     if scope == 'approvals':
-        rows = svc_list_web_access_requests(approver_emp_no=actor['emp_no'], status=status or WEB_ACCESS_REQUEST_PENDING)
+        if _is_admin_actor(actor):
+            rows = svc_list_web_access_requests(status=status or WEB_ACCESS_REQUEST_PENDING)
+        else:
+            rows = svc_list_web_access_requests(
+                approver_emp_no=actor['emp_no'],
+                status=status or WEB_ACCESS_REQUEST_PENDING,
+            )
     elif _is_admin_actor(actor) and scope == 'all':
         rows = svc_list_web_access_requests(status=status)
     else:
@@ -37220,6 +37784,8 @@ def api_access_control_create_request():
     payload = request.get_json(silent=True) or {}
     try:
         item = svc_create_web_access_request(payload, actor)
+    except WebAccessValidationError as exc:
+        return jsonify({'success': False, 'message': str(exc), 'item_errors': exc.item_errors}), 400
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
     return jsonify({'success': True, 'item': item})
@@ -37271,7 +37837,12 @@ def api_access_control_approve_request(request_id: int):
         return jsonify(body), code
     payload = request.get_json(silent=True) or {}
     try:
-        item = svc_approve_web_access_request(request_id, actor, opinion=(payload.get('opinion') or ''))
+        item = svc_approve_web_access_request(
+            request_id,
+            actor,
+            opinion=(payload.get('opinion') or ''),
+            item_ids=(payload.get('item_ids') or payload.get('itemIds')),
+        )
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
     if not item:
@@ -37290,11 +37861,46 @@ def api_access_control_reject_request(request_id: int):
         return jsonify(body), code
     payload = request.get_json(silent=True) or {}
     try:
-        item = svc_reject_web_access_request(request_id, actor, rejected_reason=(payload.get('rejected_reason') or ''))
+        item = svc_reject_web_access_request(
+            request_id,
+            actor,
+            rejected_reason=(payload.get('rejected_reason') or payload.get('reject_reason') or ''),
+            item_ids=(payload.get('item_ids') or payload.get('itemIds')),
+        )
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
     if not item:
         return jsonify({'success': False, 'message': '신청 정보를 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/approver-delegations', methods=['GET'])
+def api_access_control_delegations():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    scope = (request.args.get('scope') or 'mine').strip()
+    active_only = (request.args.get('active') or '').strip() in ('1', 'true', 'Y', 'y')
+    approver_id = None if (_is_admin_actor(actor) and scope == 'all') else actor['user_id']
+    rows = svc_list_web_access_delegations(approver_id=approver_id, active_only=active_only)
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/approver-delegations', methods=['POST'])
+def api_access_control_create_delegation():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_create_web_access_delegation(payload, actor, is_admin=_is_admin_actor(actor))
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
     return jsonify({'success': True, 'item': item})
 
 
@@ -37381,16 +37987,21 @@ def api_access_control_audit_logs():
         return jsonify(body), code
     if not _is_admin_actor(actor):
         return jsonify({'success': False, 'message': '관리자만 감사 로그를 조회할 수 있습니다.'}), 403
-    rows = svc_list_web_access_audit_logs(
+    page = _coerce_positive_int(request.args.get('page')) or 1
+    page_size = _coerce_positive_int(request.args.get('page_size')) or 20
+    page_size = min(page_size, 200)
+    result = svc_list_web_access_audit_logs(
         {
             'actor_name': request.args.get('actor_name') or '',
             'resource_name': request.args.get('resource_name') or '',
             'action_type': request.args.get('action_type') or '',
             'from_date': request.args.get('from_date') or '',
             'to_date': request.args.get('to_date') or '',
-        }
+        },
+        page=page,
+        page_size=page_size,
     )
-    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+    return jsonify({'success': True, **result})
 
 
 @api_bp.route('/api/access-control/notifications', methods=['GET'])

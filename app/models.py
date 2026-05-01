@@ -814,6 +814,7 @@ class CalSchedule(db.Model):
         db.Index('ix_cal_schedule_owner_user_id', 'owner_user_id'),
         db.Index('ix_cal_schedule_owner_dept_id', 'owner_dept_id'),
         db.Index('ix_cal_schedule_share_scope', 'share_scope'),
+        db.Index('ix_cal_schedule_repeat_type', 'repeat_type'),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -828,6 +829,8 @@ class CalSchedule(db.Model):
     share_scope = db.Column(db.String(20), nullable=False, default='ALL')
     description = db.Column(db.Text)
     color_code = db.Column(db.String(32))
+    repeat_type = db.Column(db.String(20), nullable=False, default='none', server_default=db.text("'none'"))
+    repeat_rule = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('org_user.id'), nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

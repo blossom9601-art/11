@@ -61,6 +61,8 @@ _KEY_MENU_CODE = {
     'access_control_status': 'access_control.status',
     'access_control_access': 'access_control.access',
     'access_control_request': 'access_control.request',
+    'access_control_audit': 'access_control.audit',
+    'access_control_delegation': 'access_control.delegation',
     'gov_backup': 'governance.backup', 'gov_package': 'governance.package',
     'gov_vulnerability': 'governance.vulnerability', 'gov_ip': 'governance.ip',
     'gov_vpn': 'governance.vpn', 'gov_leased': 'governance.leased_line',
@@ -363,6 +365,8 @@ TEMPLATE_MAP = {
     'access_control_status': '3.access_control/3-1.access_control/3-1-3.status/1.status_list.html',
     'access_control_access': '3.access_control/3-1.access_control/3-1-1.access/1.access_list.html',
     'access_control_request': '3.access_control/3-1.access_control/3-1-2.request/1.request_list.html',
+    'access_control_audit': '3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.html',
+    'access_control_delegation': '3.access_control/3-1.access_control/3-1-4.delegation/1.delegation_list.html',
     # High Availability Active-Active detail & tab pages (pattern identical to unix/security_etc)
     # High Availability Active-Passive detail & tab pages (unix pattern)
     # Governance

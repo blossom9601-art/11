@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260501w">
+	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260501b" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content access-audit-page">
+		<div class="content-wrapper">
+			<div class="ac-page-header">
+				<div>
+					<h1>접근제어 감사</h1>
+					<p>신청, 승인, 반려, 접속, 권한 회수 기록을 한 화면에서 확인합니다.</p>
+				</div>
+			</div>
+
+			<section class="audit-summary-grid" aria-label="감사 요약">
+				<div class="audit-summary-card"><span>전체 기록</span><strong id="audit-total-count">0</strong></div>
+				<div class="audit-summary-card"><span>접속</span><strong id="audit-access-count">0</strong></div>
+				<div class="audit-summary-card"><span>승인/반려</span><strong id="audit-decision-count">0</strong></div>
+				<div class="audit-summary-card"><span>실패</span><strong id="audit-fail-count">0</strong></div>
+			</section>
+
+			<section class="audit-panel" aria-label="감사 기록 목록">
+				<div class="audit-panel-head">
+					<div>
+						<h2>감사 기록</h2>
+						<p>필터를 조합해 사용자, 자원, 작업 유형별 이력을 추적합니다.</p>
+					</div>
+					<div class="audit-panel-tools">
+						<div class="page-size-selector compact audit-page-size-selector" id="audit-page-size-wrapper">
+							<label for="audit-page-size">보기</label>
+							<select id="audit-page-size" class="page-size-select" aria-controls="audit-table" aria-label="페이지 당 감사 기록 수">
+								<option value="10">10개</option>
+								<option value="20" selected>20개</option>
+								<option value="30">30개</option>
+								<option value="50">50개</option>
+								<option value="100">100개</option>
+								<option value="200">200개</option>
+							</select>
+						</div>
+						<div class="audit-count-badge" id="audit-visible-count">0건</div>
+					</div>
+				</div>
+
+				<form class="audit-filter" id="audit-filter-form">
+					<div class="audit-field">
+						<label for="audit-actor-filter">사용자</label>
+						<input id="audit-actor-filter" name="actor_name" type="text" placeholder="이름 또는 사번" autocomplete="off">
+					</div>
+					<div class="audit-field">
+						<label for="audit-resource-filter">자원</label>
+						<input id="audit-resource-filter" name="resource_name" type="text" placeholder="자원명" autocomplete="off">
+					</div>
+					<div class="audit-field">
+						<label for="audit-action-filter">작업</label>
+						<select id="audit-action-filter" name="action_type">
+							<option value="">전체</option>
+							<option value="접속">접속</option>
+							<option value="신청">신청</option>
+							<option value="승인">승인</option>
+							<option value="반려">반려</option>
+							<option value="신청취소">신청취소</option>
+							<option value="권한회수">권한회수</option>
+							<option value="대무자지정">대무자지정</option>
+						</select>
+					</div>
+					<div class="audit-field">
+						<label for="audit-from-date">시작일</label>
+						<input id="audit-from-date" class="request-date-input audit-date-input" name="from_date" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
+					</div>
+					<div class="audit-field">
+						<label for="audit-to-date">종료일</label>
+						<input id="audit-to-date" class="request-date-input audit-date-input" name="to_date" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
+					</div>
+					<div class="audit-filter-actions">
+						<button type="submit" class="action-chip action-primary" id="audit-search-btn">조회</button>
+						<button type="button" class="action-chip action-muted" id="audit-reset-btn">초기화</button>
+					</div>
+				</form>
+
+				<div class="audit-table-wrap" id="audit-table-wrap">
+					<table class="audit-table" id="audit-table">
+						<thead>
+							<tr>
+								<th class="audit-col-time">일시</th>
+								<th class="audit-col-action">작업</th>
+								<th class="audit-col-result">결과</th>
+								<th class="audit-col-actor">사용자</th>
+								<th class="audit-col-resource">자원</th>
+								<th class="audit-col-ip">IP</th>
+								<th class="audit-col-note">비고</th>
+							</tr>
+						</thead>
+						<tbody id="audit-table-body"></tbody>
+					</table>
+				</div>
+				<div class="audit-empty" id="audit-empty" hidden>조회된 감사 기록이 없습니다.</div>
+				<div class="modern-pagination audit-pagination" id="audit-pagination">
+					<div class="pagination-info"><span id="audit-page-info">0개 항목</span></div>
+					<div class="pagination-controls">
+						<button type="button" class="pagination-btn" id="audit-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
+						<button type="button" class="pagination-btn" id="audit-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
+						<div class="page-numbers" id="audit-page-numbers"></div>
+						<button type="button" class="pagination-btn" id="audit-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
+						<button type="button" class="pagination-btn" id="audit-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
+					</div>
+				</div>
+			</section>
+		</div>
+	</main>
+</body>
+</html>

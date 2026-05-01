@@ -10,11 +10,13 @@ RESOURCE_TABLE = 'web_access_resource'
 ENDPOINT_TABLE = 'web_access_resource_endpoint'
 POLICY_TABLE = 'web_access_policy'
 REQUEST_TABLE = 'web_access_request'
+REQUEST_ITEM_TABLE = 'web_access_request_item'
 APPROVAL_TABLE = 'web_access_approval'
 GRANT_TABLE = 'web_access_grant'
 AUDIT_TABLE = 'web_access_audit_log'
 ATTACHMENT_TABLE = 'web_access_request_attachment'
 NOTIFICATION_TABLE = 'web_access_notification'
+DELEGATION_TABLE = 'web_access_approver_delegation'
 
 RESOURCE_STATUS_ACTIVE = '사용 가능'
 RESOURCE_STATUS_BLOCKED = '차단'
@@ -44,18 +46,36 @@ REQUEST_STATUS_DRAFT = '임시저장'
 REQUEST_STATUS_SUBMITTED = '제출'
 REQUEST_STATUS_PENDING = '승인대기'
 REQUEST_STATUS_APPROVED = '승인'
+REQUEST_STATUS_PARTIAL_APPROVED = '부분 승인'
 REQUEST_STATUS_REJECTED = '반려'
 REQUEST_STATUS_CANCELLED = '취소'
 REQUEST_STATUS_EXPIRED = '만료'
+
+REQUEST_ITEM_STATUS_PENDING = '승인대기'
+REQUEST_ITEM_STATUS_APPROVED = '승인'
+REQUEST_ITEM_STATUS_REJECTED = '반려'
+REQUEST_ITEM_STATUS_CANCELLED = '취소'
 
 APPROVAL_STATUS_PENDING = '승인대기'
 APPROVAL_STATUS_APPROVED = '승인'
 APPROVAL_STATUS_REJECTED = '반려'
 
+DELEGATION_STATUS_ACTIVE = '활성'
+DELEGATION_STATUS_INACTIVE = '비활성'
+
 GRANT_STATUS_ACTIVE = '승인'
 GRANT_STATUS_PENDING = '승인대기'
 GRANT_STATUS_EXPIRED = '만료'
 GRANT_STATUS_BLOCKED = '차단'
+
+PERMANENT_ACCESS_END_DATE = '9999-12-31'
+REQUEST_REASON_MIN_LENGTH = 10
+
+
+class WebAccessValidationError(ValueError):
+    def __init__(self, message: str, item_errors: Optional[List[Dict[str, Any]]] = None):
+        super().__init__(message)
+        self.item_errors = item_errors or []
 
 
 def _resolve_db_path(app=None) -> str:
@@ -91,6 +111,15 @@ def _to_bool(value: Any) -> int:
     return 1 if str(value).strip().lower() in ('1', 'true', 'y', 'yes', 'on') else 0
 
 
+def _is_permanent_access_payload(payload: Dict[str, Any]) -> bool:
+    period_type = str(payload.get('request_period_type') or payload.get('period_type') or payload.get('periodMode') or '').strip().lower()
+    if period_type in ('permanent', 'always', 'forever', '영구'):
+        return True
+    if _to_bool(payload.get('permanent_access') or payload.get('permanentAccess') or 0):
+        return True
+    return str(payload.get('request_end_date') or '').strip() == PERMANENT_ACCESS_END_DATE
+
+
 def _to_int_or_none(value: Any) -> Optional[int]:
     if value is None or value == '':
         return None
@@ -115,6 +144,118 @@ def _ensure_resource_extra_columns(conn: sqlite3.Connection) -> None:
     for col, decl in spec:
         if col not in existing:
             conn.execute(f"ALTER TABLE {RESOURCE_TABLE} ADD COLUMN {col} {decl}")
+
+
+def _ensure_request_extra_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(f"PRAGMA table_info({REQUEST_TABLE})").fetchall()
+    existing = {row[1] for row in rows}
+    spec = (
+        ('delegated_from_user_id', 'INTEGER'),
+        ('delegated_from_emp_no', "TEXT NOT NULL DEFAULT ''"),
+        ('delegated_from_name', "TEXT NOT NULL DEFAULT ''"),
+        ('delegation_id', 'INTEGER'),
+    )
+    for col, decl in spec:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE {REQUEST_TABLE} ADD COLUMN {col} {decl}")
+
+
+def _create_request_item_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f'''
+        CREATE TABLE IF NOT EXISTS {REQUEST_ITEM_TABLE} (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id      INTEGER NOT NULL,
+            resource_id     INTEGER NOT NULL,
+            item_status     TEXT NOT NULL DEFAULT '{REQUEST_ITEM_STATUS_PENDING}',
+            reject_reason   TEXT NOT NULL DEFAULT '',
+            approved_at     TEXT,
+            rejected_at     TEXT,
+            created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      TEXT,
+            FOREIGN KEY(request_id) REFERENCES {REQUEST_TABLE}(id) ON DELETE CASCADE,
+            FOREIGN KEY(resource_id) REFERENCES {RESOURCE_TABLE}(id)
+        )
+        '''
+    )
+    conn.execute(
+        f'''CREATE UNIQUE INDEX IF NOT EXISTS idx_{REQUEST_ITEM_TABLE}_request_resource
+            ON {REQUEST_ITEM_TABLE}(request_id, resource_id)'''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{REQUEST_ITEM_TABLE}_resource_status
+            ON {REQUEST_ITEM_TABLE}(resource_id, item_status)'''
+    )
+
+
+def _create_delegation_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f'''
+        CREATE TABLE IF NOT EXISTS {DELEGATION_TABLE} (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            approver_id         INTEGER NOT NULL,
+            approver_emp_no     TEXT NOT NULL DEFAULT '',
+            approver_name       TEXT NOT NULL DEFAULT '',
+            delegate_id         INTEGER NOT NULL,
+            delegate_emp_no     TEXT NOT NULL DEFAULT '',
+            delegate_name       TEXT NOT NULL DEFAULT '',
+            start_date          TEXT NOT NULL,
+            end_date            TEXT NOT NULL,
+            reason              TEXT NOT NULL DEFAULT '',
+            status              TEXT NOT NULL DEFAULT '{DELEGATION_STATUS_ACTIVE}',
+            created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TEXT,
+            created_by          TEXT NOT NULL DEFAULT '',
+            updated_by          TEXT NOT NULL DEFAULT '',
+            is_deleted          INTEGER NOT NULL DEFAULT 0
+        )
+        '''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{DELEGATION_TABLE}_approver_period
+            ON {DELEGATION_TABLE}(approver_id, start_date, end_date, status, is_deleted)'''
+    )
+
+
+def _request_item_status_from_request(status: str) -> str:
+    if status == REQUEST_STATUS_APPROVED:
+        return REQUEST_ITEM_STATUS_APPROVED
+    if status == REQUEST_STATUS_REJECTED:
+        return REQUEST_ITEM_STATUS_REJECTED
+    if status == REQUEST_STATUS_CANCELLED:
+        return REQUEST_ITEM_STATUS_CANCELLED
+    return REQUEST_ITEM_STATUS_PENDING
+
+
+def _migrate_request_items(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        f'''SELECT id, resource_id, request_status, rejected_reason, approved_at, rejected_at, created_at
+              FROM {REQUEST_TABLE}
+             WHERE is_deleted = 0'''
+    ).fetchall()
+    for row in rows:
+        existing = conn.execute(
+            f'SELECT 1 FROM {REQUEST_ITEM_TABLE} WHERE request_id = ? LIMIT 1',
+            (row['id'],)
+        ).fetchone()
+        if existing:
+            continue
+        status = _request_item_status_from_request(row['request_status'])
+        conn.execute(
+            f'''INSERT OR IGNORE INTO {REQUEST_ITEM_TABLE}
+                (request_id, resource_id, item_status, reject_reason, approved_at, rejected_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                row['id'],
+                row['resource_id'],
+                status,
+                row['rejected_reason'] if status == REQUEST_ITEM_STATUS_REJECTED else '',
+                row['approved_at'] if status == REQUEST_ITEM_STATUS_APPROVED else None,
+                row['rejected_at'] if status == REQUEST_ITEM_STATUS_REJECTED else None,
+                row['created_at'],
+                _now(),
+            )
+        )
 
 
 def _validate_resource_payload(resource_type: str, host_address: str, port_number: Optional[int], login_account: str) -> None:
@@ -228,6 +369,7 @@ def init_web_access_control_tables(app=None) -> None:
             )
             '''
         )
+        _ensure_request_extra_columns(conn)
         conn.execute(
             f'''CREATE INDEX IF NOT EXISTS idx_{REQUEST_TABLE}_user_status
                 ON {REQUEST_TABLE}(requester_user_id, request_status)'''
@@ -236,6 +378,8 @@ def init_web_access_control_tables(app=None) -> None:
             f'''CREATE INDEX IF NOT EXISTS idx_{REQUEST_TABLE}_resource_status
                 ON {REQUEST_TABLE}(resource_id, request_status)'''
         )
+        _create_request_item_table(conn)
+        _migrate_request_items(conn)
         conn.execute(
             f'''
             CREATE TABLE IF NOT EXISTS {APPROVAL_TABLE} (
@@ -349,6 +493,7 @@ def init_web_access_control_tables(app=None) -> None:
         _seed_policy(conn)
         _seed_default_resource(conn)
         _create_endpoint_table(conn)
+        _create_delegation_table(conn)
         _migrate_endpoints_from_resource(conn)
         conn.commit()
 
@@ -1046,13 +1191,181 @@ def _next_request_no(conn: sqlite3.Connection) -> str:
     return prefix + str(seq).zfill(4)
 
 
-def has_active_grant(user_id: int, resource_id: int, app=None) -> bool:
-    expire_due_grants(app)
-    today = _today()
-    with _get_connection(app) as conn:
+def _normalize_resource_ids(payload: Dict[str, Any]) -> List[int]:
+    raw = payload.get('resource_ids')
+    if raw is None:
+        raw = payload.get('resourceIds')
+    if raw is None:
+        raw = payload.get('items')
+    if raw is None:
+        raw = payload.get('resource_id') or payload.get('resourceId')
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raw = [raw]
+    result: List[int] = []
+    seen = set()
+    for item in raw:
+        value = item
+        if isinstance(item, dict):
+            value = item.get('resource_id') or item.get('resourceId') or item.get('id')
+        rid = _to_int_or_none(value)
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        result.append(rid)
+    return result
+
+
+def _user_display_name(row: Dict[str, Any]) -> str:
+    return (row.get('name') or row.get('nickname') or row.get('emp_no') or '').strip()
+
+
+def _load_user_by_emp_no(conn: sqlite3.Connection, emp_no: str) -> Optional[Dict[str, Any]]:
+    emp = (emp_no or '').strip()
+    if not emp:
+        return None
+    row = conn.execute(
+        '''SELECT id, emp_no, name, nickname, department, department_id, role
+             FROM org_user
+            WHERE UPPER(COALESCE(emp_no, '')) = UPPER(?)
+            LIMIT 1''',
+        (emp,)
+    ).fetchone()
+    return _dict(row)
+
+
+def _load_user_by_id(conn: sqlite3.Connection, user_id: Any) -> Optional[Dict[str, Any]]:
+    uid = _to_int_or_none(user_id)
+    if not uid:
+        return None
+    row = conn.execute(
+        '''SELECT id, emp_no, name, nickname, department, department_id, role
+             FROM org_user
+            WHERE id = ?
+            LIMIT 1''',
+        (uid,)
+    ).fetchone()
+    return _dict(row)
+
+
+def _active_delegation_for_approver(conn: sqlite3.Connection, approver_id: int, on_date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    day = on_date or _today()
+    row = conn.execute(
+        f'''SELECT *
+              FROM {DELEGATION_TABLE}
+             WHERE is_deleted = 0
+               AND status = ?
+               AND approver_id = ?
+               AND start_date <= ?
+               AND end_date >= ?
+             ORDER BY start_date DESC, id DESC
+             LIMIT 1''',
+        (DELEGATION_STATUS_ACTIVE, approver_id, day, day)
+    ).fetchone()
+    return _dict(row)
+
+
+def _load_permanent_access_approver(conn: sqlite3.Connection) -> Optional[Dict[str, Any]]:
+    fallback = {
+        'id': None,
+        'emp_no': 'ADMIN',
+        'name': 'ADMIN',
+        'nickname': '',
+        'department': '',
+        'department_id': None,
+        'role': 'ADMIN',
+    }
+    security_roles = (
+        'SECURITY', 'SECURITY_ADMIN', 'SECURITY_MANAGER', 'SECURITY_OFFICER',
+        'SECURITY_LEAD', '보안', '보안담당', '보안담당자'
+    )
+    admin_roles = ('ADMIN', '관리자')
+    role_values = security_roles + admin_roles
+    placeholders = ','.join('?' for _ in role_values)
+    try:
         row = conn.execute(
-            f'''
-            SELECT id
+            f'''SELECT id, emp_no, name, nickname, department, NULL AS department_id, role
+                  FROM org_user
+                 WHERE COALESCE(emp_no, '') <> ''
+                   AND (
+                        UPPER(COALESCE(role, '')) IN ({placeholders})
+                        OR COALESCE(department, '') LIKE '%보안%'
+                        OR UPPER(COALESCE(emp_no, '')) = 'ADMIN'
+                   )
+                 ORDER BY CASE
+                        WHEN UPPER(COALESCE(role, '')) IN ({','.join('?' for _ in security_roles)}) THEN 0
+                        WHEN COALESCE(department, '') LIKE '%보안%' THEN 1
+                        WHEN UPPER(COALESCE(role, '')) IN ({','.join('?' for _ in admin_roles)}) THEN 2
+                        WHEN UPPER(COALESCE(emp_no, '')) = 'ADMIN' THEN 3
+                        ELSE 9
+                   END,
+                   id ASC
+                 LIMIT 1''',
+            tuple(role_values) + tuple(security_roles) + tuple(admin_roles)
+        ).fetchone()
+    except sqlite3.OperationalError as exc:
+        message = str(exc).lower()
+        if 'no such table' in message or 'no such column' in message:
+            return fallback
+        raise
+    data = _dict(row)
+    if data:
+        return data
+    return fallback
+
+
+def _resolve_request_approver(conn: sqlite3.Connection, payload: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
+    if _is_permanent_access_payload(payload):
+        approver = _load_permanent_access_approver(conn)
+        if not approver:
+            raise ValueError('영구 접근 승인자를 찾을 수 없습니다. 관리자 또는 보안 담당자를 먼저 지정하세요.')
+        return {
+            'approver_user_id': approver['id'],
+            'approver_emp_no': approver.get('emp_no') or '',
+            'approver_name': _user_display_name(approver),
+            'delegated_from_user_id': None,
+            'delegated_from_emp_no': '',
+            'delegated_from_name': '',
+            'delegation_id': None,
+            'delegated': False,
+            'permanent_access': True,
+        }
+    manager_emp_no = (actor.get('manager_emp_no') or '').strip()
+    manager = _load_user_by_emp_no(conn, manager_emp_no)
+    if not manager:
+        raise ValueError('팀장 부재 중이며 대무자가 지정되지 않았습니다')
+    delegation = _active_delegation_for_approver(conn, int(manager['id']))
+    if delegation:
+        delegate = _load_user_by_id(conn, delegation.get('delegate_id'))
+        if not delegate:
+            raise ValueError('팀장 부재 중이며 대무자가 지정되지 않았습니다')
+        return {
+            'approver_user_id': delegate['id'],
+            'approver_emp_no': delegate.get('emp_no') or '',
+            'approver_name': _user_display_name(delegate),
+            'delegated_from_user_id': manager['id'],
+            'delegated_from_emp_no': manager.get('emp_no') or '',
+            'delegated_from_name': _user_display_name(manager),
+            'delegation_id': delegation.get('id'),
+            'delegated': True,
+        }
+    return {
+        'approver_user_id': manager['id'],
+        'approver_emp_no': manager.get('emp_no') or '',
+        'approver_name': _user_display_name(manager),
+        'delegated_from_user_id': None,
+        'delegated_from_emp_no': '',
+        'delegated_from_name': '',
+        'delegation_id': None,
+        'delegated': False,
+    }
+
+
+def _has_active_grant_conn(conn: sqlite3.Connection, user_id: int, resource_id: int) -> bool:
+    today = _today()
+    row = conn.execute(
+        f'''SELECT id
               FROM {GRANT_TABLE}
              WHERE is_deleted = 0
                AND user_id = ?
@@ -1060,76 +1373,223 @@ def has_active_grant(user_id: int, resource_id: int, app=None) -> bool:
                AND grant_status = ?
                AND grant_start_date <= ?
                AND grant_end_date >= ?
-             LIMIT 1
-            ''',
-            (user_id, resource_id, GRANT_STATUS_ACTIVE, today, today)
-        ).fetchone()
+             LIMIT 1''',
+        (user_id, resource_id, GRANT_STATUS_ACTIVE, today, today)
+    ).fetchone()
     return row is not None
 
 
-def has_pending_request(user_id: int, resource_id: int, app=None) -> bool:
-    with _get_connection(app) as conn:
-        row = conn.execute(
-            f'''
-            SELECT id
+def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_id: int) -> bool:
+    row = conn.execute(
+        f'''SELECT ri.id
+              FROM {REQUEST_ITEM_TABLE} ri
+              JOIN {REQUEST_TABLE} r ON r.id = ri.request_id
+             WHERE r.is_deleted = 0
+               AND r.requester_user_id = ?
+               AND ri.resource_id = ?
+               AND r.request_status IN (?, ?)
+               AND ri.item_status = ?
+             LIMIT 1''',
+        (user_id, resource_id, REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_PENDING, REQUEST_ITEM_STATUS_PENDING)
+    ).fetchone()
+    if row:
+        return True
+    legacy = conn.execute(
+        f'''SELECT id
               FROM {REQUEST_TABLE}
              WHERE is_deleted = 0
                AND requester_user_id = ?
                AND resource_id = ?
                AND request_status IN (?, ?)
-             LIMIT 1
-            ''',
-            (user_id, resource_id, REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_PENDING)
-        ).fetchone()
-    return row is not None
+             LIMIT 1''',
+        (user_id, resource_id, REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_PENDING)
+    ).fetchone()
+    return legacy is not None
+
+
+def _load_request_items(conn: sqlite3.Connection, request_id: int) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        f'''SELECT ri.*, s.resource_name, s.resource_url, s.resource_type, s.category_name,
+                   s.description, s.caution_text, s.active_flag, s.host_address,
+                   s.port_number, s.protocol, s.login_account, s.tags
+              FROM {REQUEST_ITEM_TABLE} ri
+              JOIN {RESOURCE_TABLE} s ON s.id = ri.resource_id
+             WHERE ri.request_id = ?
+             ORDER BY ri.id ASC''',
+        (request_id,)
+    ).fetchall()
+    items: List[Dict[str, Any]] = []
+    for row in rows:
+        item = _dict(row) or {}
+        resource_id = int(item.get('resource_id') or 0)
+        endpoints = list_endpoints(resource_id, conn=conn) if resource_id else []
+        primary = next((ep for ep in endpoints if ep.get('is_primary')), endpoints[0] if endpoints else None)
+        item['endpoints'] = endpoints
+        item['endpoint_count'] = len(endpoints)
+        item['primary_endpoint'] = primary
+        item['primary_url'] = (primary or {}).get('url', '') if primary else (item.get('resource_url') or '')
+        item['primary_kind'] = (primary or {}).get('kind', '') if primary else ''
+        if not item['primary_kind'] and item.get('resource_type'):
+            legacy_kind = str(item.get('resource_type') or '').strip()
+            if legacy_kind == '웹':
+                item['primary_kind'] = ENDPOINT_KIND_WEB
+            elif legacy_kind.upper() == ENDPOINT_KIND_SSH:
+                item['primary_kind'] = ENDPOINT_KIND_SSH
+            else:
+                item['primary_kind'] = legacy_kind.upper() or legacy_kind
+        endpoint_kinds: List[str] = []
+        for endpoint in endpoints:
+            kind = str(endpoint.get('kind') or '').strip().upper()
+            if kind and kind not in endpoint_kinds:
+                endpoint_kinds.append(kind)
+        if item.get('primary_kind') and item['primary_kind'] not in endpoint_kinds:
+            endpoint_kinds.append(item['primary_kind'])
+        item['endpoint_kinds'] = endpoint_kinds
+        items.append(item)
+    return items
+
+
+def _decorate_request(conn: sqlite3.Connection, data: Dict[str, Any], include_history: bool = False) -> Dict[str, Any]:
+    items = _load_request_items(conn, int(data.get('id') or 0))
+    data['items'] = items
+    data['permanent_access'] = str(data.get('request_end_date') or '').strip() == PERMANENT_ACCESS_END_DATE
+    data['resource_count'] = len(items) if items else (1 if data.get('resource_id') else 0)
+    data['resource_ids'] = [item['resource_id'] for item in items]
+    if items:
+        names = [item.get('resource_name') or '-' for item in items]
+        data['resource_names'] = names
+        data['resource_name'] = names[0] if len(names) == 1 else f"{names[0]} 외 {len(names) - 1}개"
+        data['resource_url'] = items[0].get('resource_url') or ''
+        data['resource_type'] = items[0].get('resource_type') or ''
+    else:
+        data['resource_names'] = [data.get('resource_name') or '-']
+    data['delegated'] = bool(data.get('delegation_id'))
+    phase = conn.execute(
+        f'''SELECT phase_code, phase_name, approver_name, approval_status, acted_at, created_at
+              FROM {APPROVAL_TABLE}
+             WHERE request_id = ?
+             ORDER BY CASE WHEN approval_status = ? THEN 0 ELSE 1 END, id ASC
+             LIMIT 1''',
+        (int(data.get('id') or 0), APPROVAL_STATUS_PENDING)
+    ).fetchone()
+    phase_data = _dict(phase) or {}
+    data['current_approval_phase'] = phase_data
+    data['current_approval_phase_name'] = phase_data.get('phase_name') or data.get('approval_status') or ''
+    data['current_approval_phase_status'] = phase_data.get('approval_status') or data.get('approval_status') or ''
+    if include_history:
+        resource_ids = data.get('resource_ids') or ([data.get('resource_id')] if data.get('resource_id') else [])
+        placeholders = ','.join('?' for _ in resource_ids)
+        params: List[Any] = [data.get('requester_user_id')]
+        sql = f'''
+            SELECT DISTINCT r.id, r.request_no, r.request_status, r.approval_status,
+                   r.request_start_date, r.request_end_date, r.created_at, r.submitted_at,
+                   r.approved_at, r.rejected_at, r.rejected_reason
+              FROM {REQUEST_TABLE} r
+              LEFT JOIN {REQUEST_ITEM_TABLE} ri ON ri.request_id = r.id
+             WHERE r.requester_user_id = ? AND r.is_deleted = 0
+        '''
+        if resource_ids:
+            sql += f' AND (r.resource_id IN ({placeholders}) OR ri.resource_id IN ({placeholders}))'
+            params.extend(resource_ids)
+            params.extend(resource_ids)
+        sql += ' ORDER BY r.id DESC LIMIT 50'
+        history = conn.execute(sql, params).fetchall()
+        data['request_history'] = [_dict(item) for item in history]
+    return data
+
+
+def has_active_grant(user_id: int, resource_id: int, app=None) -> bool:
+    expire_due_grants(app)
+    with _get_connection(app) as conn:
+                return _has_active_grant_conn(conn, user_id, resource_id)
+
+
+def has_pending_request(user_id: int, resource_id: int, app=None) -> bool:
+    with _get_connection(app) as conn:
+                return _has_pending_request_conn(conn, user_id, resource_id)
 
 
 def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> Dict[str, Any]:
     user_id = int(actor['user_id'])
-    resource_id = int(payload.get('resource_id') or 0)
-    if not resource_id:
-        raise ValueError('resource_id는 필수입니다.')
-    if has_active_grant(user_id, resource_id, app):
-        raise ValueError('이미 유효한 승인 권한이 있어 신청할 수 없습니다.')
-    if has_pending_request(user_id, resource_id, app):
-        raise ValueError('동일 자원에 대한 승인 대기 신청이 이미 존재합니다.')
+    resource_ids = _normalize_resource_ids(payload)
+    if not resource_ids:
+        raise ValueError('신청 대상 자원을 한 개 이상 선택하세요.')
+    reason = (payload.get('reason') or '').strip()
+    if len(reason) < REQUEST_REASON_MIN_LENGTH:
+        raise ValueError(f'신청 사유는 {REQUEST_REASON_MIN_LENGTH}자 이상 입력하세요.')
+    permanent_access = _is_permanent_access_payload(payload)
     start_date = str(payload.get('request_start_date') or '').strip()
-    end_date = str(payload.get('request_end_date') or '').strip()
-    if not start_date or not end_date:
-        raise ValueError('사용 시작일과 종료일은 필수입니다.')
+    end_date = PERMANENT_ACCESS_END_DATE if permanent_access else str(payload.get('request_end_date') or '').strip()
+    if not start_date:
+        raise ValueError('사용 시작일은 필수입니다.')
+    if not permanent_access and not end_date:
+        raise ValueError('사용 종료일은 필수입니다.')
     if start_date > end_date:
         raise ValueError('시작일은 종료일보다 늦을 수 없습니다.')
 
     policy = get_default_policy(app)
-    approver_user_id = payload.get('approver_user_id')
-    approver_emp_no = (payload.get('approver_emp_no') or actor.get('manager_emp_no') or '').strip()
-    approver_name = (payload.get('approver_name') or actor.get('manager_name') or '').strip()
     now = _now()
     with _get_connection(app) as conn:
+        placeholders = ','.join('?' for _ in resource_ids)
+        rows = conn.execute(
+            f'''SELECT * FROM {RESOURCE_TABLE}
+                 WHERE id IN ({placeholders}) AND is_deleted = 0''',
+            resource_ids
+        ).fetchall()
+        resources = {int(row['id']): dict(row) for row in rows}
+        item_errors: List[Dict[str, Any]] = []
+        valid_ids: List[int] = []
+        for rid in resource_ids:
+            resource = resources.get(rid)
+            if not resource:
+                item_errors.append({'resource_id': rid, 'message': '자원 정보를 찾을 수 없습니다.'})
+                continue
+            if int(resource.get('active_flag') or 0) != 1:
+                item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '비활성화된 자원은 신청할 수 없습니다.'})
+                continue
+            if _has_active_grant_conn(conn, user_id, rid):
+                item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '이미 유효한 승인 권한이 있습니다.'})
+                continue
+            if _has_pending_request_conn(conn, user_id, rid):
+                item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '승인 대기 중인 동일 자원이 있습니다.'})
+                continue
+            valid_ids.append(rid)
+        if item_errors:
+            raise WebAccessValidationError('신청할 수 없는 자원이 포함되어 있습니다.', item_errors)
+        if not valid_ids:
+            raise ValueError('신청 가능한 자원이 없습니다.')
+
+        approver = _resolve_request_approver(conn, payload, actor)
         request_no = _next_request_no(conn)
+        first_resource_id = valid_ids[0]
         cur = conn.execute(
             f'''
             INSERT INTO {REQUEST_TABLE}
                 (request_no, resource_id, requester_user_id, requester_emp_no,
                  requester_name, requester_department_id, requester_department,
-                 approver_user_id, approver_emp_no, approver_name, reason,
-                 request_status, approval_status, request_start_date, request_end_date,
+                 approver_user_id, approver_emp_no, approver_name,
+                 delegated_from_user_id, delegated_from_emp_no, delegated_from_name, delegation_id,
+                 reason, request_status, approval_status, request_start_date, request_end_date,
                  emergency_flag, submitted_at, current_policy_id, created_at, updated_at,
                  created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
                 request_no,
-                resource_id,
+                first_resource_id,
                 user_id,
                 actor.get('emp_no', ''),
                 actor.get('name', ''),
                 actor.get('department_id'),
                 actor.get('department_name', ''),
-                approver_user_id,
-                approver_emp_no,
-                approver_name,
-                (payload.get('reason') or '').strip(),
+                approver['approver_user_id'],
+                approver['approver_emp_no'],
+                approver['approver_name'],
+                approver['delegated_from_user_id'],
+                approver['delegated_from_emp_no'],
+                approver['delegated_from_name'],
+                approver['delegation_id'],
+                reason,
                 REQUEST_STATUS_PENDING,
                 APPROVAL_STATUS_PENDING,
                 start_date,
@@ -1144,6 +1604,16 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
             )
         )
         request_id = cur.lastrowid
+        for rid in valid_ids:
+            conn.execute(
+                f'''INSERT INTO {REQUEST_ITEM_TABLE}
+                    (request_id, resource_id, item_status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)''',
+                (request_id, rid, REQUEST_ITEM_STATUS_PENDING, now, now)
+            )
+            _insert_audit(conn, actor, rid, request_id, '신청', '성공', reason, {'request_status': REQUEST_STATUS_PENDING, 'resource_count': len(valid_ids), 'permanent_access': permanent_access})
+        phase_name = '관리자/보안 승인' if permanent_access else ('팀장 승인(대무)' if approver.get('delegated') else '팀장 승인')
+        phase_code = 'SECURITY_ADMIN' if permanent_access else 'TEAM_LEAD'
         conn.execute(
             f'''
             INSERT INTO {APPROVAL_TABLE}
@@ -1153,17 +1623,16 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
             ''',
             (
                 request_id,
-                'TEAM_LEAD',
-                '팀장 승인',
-                approver_user_id,
-                approver_emp_no,
-                approver_name,
+                phase_code,
+                phase_name,
+                approver['approver_user_id'],
+                approver['approver_emp_no'],
+                approver['approver_name'],
                 APPROVAL_STATUS_PENDING,
                 now,
                 now,
             )
         )
-        _insert_audit(conn, actor, resource_id, request_id, '신청', '성공', (payload.get('reason') or '').strip(), {'request_status': REQUEST_STATUS_PENDING})
         conn.commit()
     return get_request(request_id, app) or {}
 
@@ -1188,18 +1657,7 @@ def get_request(request_id: int, app=None) -> Optional[Dict[str, Any]]:
             (request_id,)
         ).fetchall()
         data['approvals'] = [_dict(item) for item in approvals]
-        history = conn.execute(
-            f'''
-            SELECT id, request_no, request_status, approval_status, request_start_date, request_end_date,
-                   created_at, submitted_at, approved_at, rejected_at, rejected_reason
-              FROM {REQUEST_TABLE}
-             WHERE requester_user_id = ? AND resource_id = ? AND is_deleted = 0
-             ORDER BY id DESC
-            ''',
-            (data['requester_user_id'], data['resource_id'])
-        ).fetchall()
-        data['request_history'] = [_dict(item) for item in history]
-        return data
+        return _decorate_request(conn, data, include_history=True)
 
 
 def list_requests(user_id: Optional[int] = None, approver_emp_no: str = '', status: str = '', app=None) -> List[Dict[str, Any]]:
@@ -1219,12 +1677,105 @@ def list_requests(user_id: Optional[int] = None, approver_emp_no: str = '', stat
         sql += " AND UPPER(COALESCE(r.approver_emp_no, '')) = UPPER(?)"
         params.append(approver_emp_no)
     if status:
-        sql += ' AND r.request_status = ?'
-        params.append(status)
+        statuses = [s.strip() for s in str(status).split(',') if s.strip()]
+        if len(statuses) == 1:
+            sql += ' AND r.request_status = ?'
+            params.append(statuses[0])
+        elif statuses:
+            sql += ' AND r.request_status IN (' + ','.join('?' for _ in statuses) + ')'
+            params.extend(statuses)
     sql += ' ORDER BY r.id DESC'
     with _get_connection(app) as conn:
         rows = conn.execute(sql, params).fetchall()
-    return [_dict(row) for row in rows]
+        items = []
+        for row in rows:
+            data = _dict(row) or {}
+            items.append(_decorate_request(conn, data, include_history=False))
+    return items
+
+
+def _actor_is_admin(actor: Dict[str, Any]) -> bool:
+    return str(actor.get('role') or '').strip().upper() in ('ADMIN', '관리자')
+
+
+def _assert_request_approver(current: Dict[str, Any], actor: Dict[str, Any], action_name: str) -> None:
+    approver_emp_no = (current.get('approver_emp_no') or '').strip().upper()
+    actor_emp_no = str(actor.get('emp_no') or '').strip().upper()
+    if approver_emp_no and approver_emp_no != actor_emp_no and not _actor_is_admin(actor):
+        raise ValueError(f'지정된 승인자만 {action_name}할 수 있습니다.')
+
+
+def _normalize_item_ids(payload_item_ids: Optional[List[Any]], current: Dict[str, Any]) -> List[int]:
+    items = current.get('items') or []
+    pending_ids = [int(item['id']) for item in items if item.get('item_status') == REQUEST_ITEM_STATUS_PENDING]
+    if not payload_item_ids:
+        return pending_ids
+    requested = []
+    seen = set()
+    for raw in payload_item_ids:
+        iid = _to_int_or_none(raw)
+        if not iid or iid in seen:
+            continue
+        seen.add(iid)
+        requested.append(iid)
+    valid = set(pending_ids)
+    return [iid for iid in requested if iid in valid]
+
+
+def _sync_request_status_from_items(conn: sqlite3.Connection, request_id: int, actor: Dict[str, Any]) -> None:
+    rows = conn.execute(
+        f'''SELECT item_status, reject_reason
+              FROM {REQUEST_ITEM_TABLE}
+             WHERE request_id = ?''',
+        (request_id,)
+    ).fetchall()
+    statuses = [row['item_status'] for row in rows]
+    if not statuses:
+        return
+    now = _now()
+    if any(status == REQUEST_ITEM_STATUS_PENDING for status in statuses):
+        request_status = REQUEST_STATUS_PENDING
+        approval_status = APPROVAL_STATUS_PENDING
+        approved_at = None
+        rejected_at = None
+        rejected_reason = ''
+    elif all(status == REQUEST_ITEM_STATUS_APPROVED for status in statuses):
+        request_status = REQUEST_STATUS_APPROVED
+        approval_status = APPROVAL_STATUS_APPROVED
+        approved_at = now
+        rejected_at = None
+        rejected_reason = ''
+    elif any(status == REQUEST_ITEM_STATUS_APPROVED for status in statuses):
+        request_status = REQUEST_STATUS_PARTIAL_APPROVED
+        approval_status = APPROVAL_STATUS_APPROVED
+        approved_at = now
+        rejected_at = None
+        rejected_reason = ''
+    else:
+        request_status = REQUEST_STATUS_REJECTED
+        approval_status = APPROVAL_STATUS_REJECTED
+        approved_at = None
+        rejected_at = now
+        rejected_reason = next((row['reject_reason'] for row in rows if row['reject_reason']), '자원별 반려')
+    conn.execute(
+        f'''UPDATE {REQUEST_TABLE}
+               SET request_status = ?,
+                   approval_status = ?,
+                   approved_at = COALESCE(?, approved_at),
+                   rejected_at = COALESCE(?, rejected_at),
+                   rejected_reason = ?,
+                   updated_at = ?,
+                   updated_by = ?
+             WHERE id = ?''',
+        (request_status, approval_status, approved_at, rejected_at, rejected_reason, now, actor.get('emp_no', ''), request_id)
+    )
+    conn.execute(
+        f'''UPDATE {APPROVAL_TABLE}
+               SET approval_status = ?,
+                   updated_at = ?
+             WHERE request_id = ?''',
+        (approval_status, now, request_id)
+    )
 
 
 def cancel_request(request_id: int, actor: Dict[str, Any], app=None) -> Optional[Dict[str, Any]]:
@@ -1258,35 +1809,34 @@ def cancel_request(request_id: int, actor: Dict[str, Any], app=None) -> Optional
             ''',
             (APPROVAL_STATUS_REJECTED, now, request_id, APPROVAL_STATUS_PENDING)
         )
-        _insert_audit(conn, actor, current['resource_id'], request_id, '신청취소', '성공', '', {'request_status': REQUEST_STATUS_CANCELLED})
+        conn.execute(
+            f'''
+            UPDATE {REQUEST_ITEM_TABLE}
+               SET item_status = ?,
+                   updated_at = ?
+             WHERE request_id = ?
+               AND item_status = ?
+            ''',
+            (REQUEST_ITEM_STATUS_CANCELLED, now, request_id, REQUEST_ITEM_STATUS_PENDING)
+        )
+        for item in current.get('items') or [{'resource_id': current['resource_id']}]:
+            _insert_audit(conn, actor, item['resource_id'], request_id, '신청취소', '성공', '', {'request_status': REQUEST_STATUS_CANCELLED})
         conn.commit()
     return get_request(request_id, app)
 
 
-def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', app=None) -> Optional[Dict[str, Any]]:
+def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', item_ids: Optional[List[Any]] = None, app=None) -> Optional[Dict[str, Any]]:
     current = get_request(request_id, app)
     if not current:
         return None
     if current['request_status'] != REQUEST_STATUS_PENDING:
         raise ValueError('승인 대기 상태만 승인할 수 있습니다.')
-    approver_emp_no = (current.get('approver_emp_no') or '').strip().upper()
-    actor_emp_no = str(actor.get('emp_no') or '').strip().upper()
-    if approver_emp_no and approver_emp_no != actor_emp_no:
-        raise ValueError('지정된 팀장만 승인할 수 있습니다.')
+    _assert_request_approver(current, actor, '승인')
+    target_item_ids = _normalize_item_ids(item_ids, current)
+    if not target_item_ids:
+        raise ValueError('승인할 자원을 선택하세요.')
     now = _now()
     with _get_connection(app) as conn:
-        conn.execute(
-            f'''
-            UPDATE {REQUEST_TABLE}
-               SET request_status = ?,
-                   approval_status = ?,
-                   approved_at = ?,
-                   updated_at = ?,
-                   updated_by = ?
-             WHERE id = ?
-            ''',
-            (REQUEST_STATUS_APPROVED, APPROVAL_STATUS_APPROVED, now, now, actor.get('emp_no', ''), request_id)
-        )
         conn.execute(
             f'''
             UPDATE {APPROVAL_TABLE}
@@ -1310,38 +1860,56 @@ def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', a
                 request_id,
             )
         )
+        placeholders = ','.join('?' for _ in target_item_ids)
         conn.execute(
-            f'''
-            INSERT INTO {GRANT_TABLE}
-                (resource_id, user_id, department_id, source_request_id, grant_status,
-                 grant_start_date, grant_end_date, granted_by_user_id, granted_by_emp_no,
-                 granted_by_name, approval_required, created_at, updated_at, created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''',
-            (
-                current['resource_id'],
-                current['requester_user_id'],
-                current.get('requester_department_id'),
-                request_id,
-                GRANT_STATUS_ACTIVE,
-                current['request_start_date'],
-                current['request_end_date'],
-                actor.get('user_id'),
-                actor.get('emp_no', ''),
-                actor.get('name', ''),
-                int(current.get('approval_required') or 1),
-                now,
-                now,
-                actor.get('emp_no', ''),
-                actor.get('emp_no', ''),
-            )
+            f'''UPDATE {REQUEST_ITEM_TABLE}
+                   SET item_status = ?,
+                       approved_at = ?,
+                       updated_at = ?
+                 WHERE request_id = ?
+                   AND id IN ({placeholders})
+                   AND item_status = ?''',
+            [REQUEST_ITEM_STATUS_APPROVED, now, now, request_id] + target_item_ids + [REQUEST_ITEM_STATUS_PENDING]
         )
-        _insert_audit(conn, actor, current['resource_id'], request_id, '승인', '성공', opinion.strip(), {'grant_end_date': current['request_end_date']})
+        item_rows = conn.execute(
+            f'''SELECT * FROM {REQUEST_ITEM_TABLE}
+                 WHERE request_id = ? AND id IN ({placeholders})''',
+            [request_id] + target_item_ids
+        ).fetchall()
+        for item in item_rows:
+            conn.execute(
+                f'''
+                INSERT INTO {GRANT_TABLE}
+                    (resource_id, user_id, department_id, source_request_id, grant_status,
+                     grant_start_date, grant_end_date, granted_by_user_id, granted_by_emp_no,
+                     granted_by_name, approval_required, created_at, updated_at, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    item['resource_id'],
+                    current['requester_user_id'],
+                    current.get('requester_department_id'),
+                    request_id,
+                    GRANT_STATUS_ACTIVE,
+                    current['request_start_date'],
+                    current['request_end_date'],
+                    actor.get('user_id'),
+                    actor.get('emp_no', ''),
+                    actor.get('name', ''),
+                    int(current.get('approval_required') or 1),
+                    now,
+                    now,
+                    actor.get('emp_no', ''),
+                    actor.get('emp_no', ''),
+                )
+            )
+            _insert_audit(conn, actor, item['resource_id'], request_id, '승인', '성공', opinion.strip(), {'grant_end_date': current['request_end_date'], 'item_id': item['id']})
+        _sync_request_status_from_items(conn, request_id, actor)
         conn.commit()
     return get_request(request_id, app)
 
 
-def reject_request(request_id: int, actor: Dict[str, Any], rejected_reason: str, app=None) -> Optional[Dict[str, Any]]:
+def reject_request(request_id: int, actor: Dict[str, Any], rejected_reason: str, item_ids: Optional[List[Any]] = None, app=None) -> Optional[Dict[str, Any]]:
     current = get_request(request_id, app)
     if not current:
         return None
@@ -1349,25 +1917,12 @@ def reject_request(request_id: int, actor: Dict[str, Any], rejected_reason: str,
         raise ValueError('승인 대기 상태만 반려할 수 있습니다.')
     if not str(rejected_reason or '').strip():
         raise ValueError('반려 사유는 필수입니다.')
-    approver_emp_no = (current.get('approver_emp_no') or '').strip().upper()
-    actor_emp_no = str(actor.get('emp_no') or '').strip().upper()
-    if approver_emp_no and approver_emp_no != actor_emp_no:
-        raise ValueError('지정된 팀장만 반려할 수 있습니다.')
+    _assert_request_approver(current, actor, '반려')
+    target_item_ids = _normalize_item_ids(item_ids, current)
+    if not target_item_ids:
+        raise ValueError('반려할 자원을 선택하세요.')
     now = _now()
     with _get_connection(app) as conn:
-        conn.execute(
-            f'''
-            UPDATE {REQUEST_TABLE}
-               SET request_status = ?,
-                   approval_status = ?,
-                   rejected_at = ?,
-                   rejected_reason = ?,
-                   updated_at = ?,
-                   updated_by = ?
-             WHERE id = ?
-            ''',
-            (REQUEST_STATUS_REJECTED, APPROVAL_STATUS_REJECTED, now, rejected_reason.strip(), now, actor.get('emp_no', ''), request_id)
-        )
         conn.execute(
             f'''
             UPDATE {APPROVAL_TABLE}
@@ -1391,9 +1946,107 @@ def reject_request(request_id: int, actor: Dict[str, Any], rejected_reason: str,
                 request_id,
             )
         )
-        _insert_audit(conn, actor, current['resource_id'], request_id, '반려', '성공', rejected_reason.strip(), {})
+        placeholders = ','.join('?' for _ in target_item_ids)
+        conn.execute(
+            f'''UPDATE {REQUEST_ITEM_TABLE}
+                   SET item_status = ?,
+                       reject_reason = ?,
+                       rejected_at = ?,
+                       updated_at = ?
+                 WHERE request_id = ?
+                   AND id IN ({placeholders})
+                   AND item_status = ?''',
+            [REQUEST_ITEM_STATUS_REJECTED, rejected_reason.strip(), now, now, request_id] + target_item_ids + [REQUEST_ITEM_STATUS_PENDING]
+        )
+        item_rows = conn.execute(
+            f'''SELECT * FROM {REQUEST_ITEM_TABLE}
+                 WHERE request_id = ? AND id IN ({placeholders})''',
+            [request_id] + target_item_ids
+        ).fetchall()
+        for item in item_rows:
+            _insert_audit(conn, actor, item['resource_id'], request_id, '반려', '성공', rejected_reason.strip(), {'item_id': item['id']})
+        _sync_request_status_from_items(conn, request_id, actor)
         conn.commit()
     return get_request(request_id, app)
+
+
+def list_approver_delegations(approver_id: Optional[int] = None, active_only: bool = False, app=None) -> List[Dict[str, Any]]:
+    today = _today()
+    sql = f'''SELECT * FROM {DELEGATION_TABLE} WHERE is_deleted = 0'''
+    params: List[Any] = []
+    if approver_id:
+        sql += ' AND approver_id = ?'
+        params.append(approver_id)
+    if active_only:
+        sql += ' AND status = ? AND start_date <= ? AND end_date >= ?'
+        params.extend([DELEGATION_STATUS_ACTIVE, today, today])
+    sql += ' ORDER BY start_date DESC, id DESC'
+    with _get_connection(app) as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [_dict(row) for row in rows]
+
+
+def create_approver_delegation(payload: Dict[str, Any], actor: Dict[str, Any], is_admin: bool = False, app=None) -> Dict[str, Any]:
+    start_date = str(payload.get('start_date') or payload.get('startDate') or '').strip()
+    end_date = str(payload.get('end_date') or payload.get('endDate') or '').strip()
+    if not start_date or not end_date:
+        raise ValueError('부재 시작일과 종료일은 필수입니다.')
+    if start_date > end_date:
+        raise ValueError('부재 시작일은 종료일보다 늦을 수 없습니다.')
+    reason = (payload.get('reason') or '').strip()
+    with _get_connection(app) as conn:
+        approver_id = _to_int_or_none(payload.get('approver_id') or payload.get('approverId')) if is_admin else int(actor['user_id'])
+        approver = _load_user_by_id(conn, approver_id)
+        if not approver:
+            raise ValueError('승인자 정보를 확인할 수 없습니다.')
+        delegate = _load_user_by_id(conn, payload.get('delegate_id') or payload.get('delegateId'))
+        if not delegate:
+            raise ValueError('대무자는 유효한 사용자여야 합니다.')
+        if int(approver['id']) == int(delegate['id']):
+            raise ValueError('자기 자신을 대무자로 지정할 수 없습니다.')
+        overlap = conn.execute(
+            f'''SELECT id
+                  FROM {DELEGATION_TABLE}
+                 WHERE is_deleted = 0
+                   AND status = ?
+                   AND approver_id = ?
+                   AND start_date <= ?
+                   AND end_date >= ?
+                 LIMIT 1''',
+            (DELEGATION_STATUS_ACTIVE, approver['id'], end_date, start_date)
+        ).fetchone()
+        if overlap:
+            raise ValueError('부재 기간이 겹치는 대무자 지정이 이미 있습니다.')
+        now = _now()
+        cur = conn.execute(
+            f'''INSERT INTO {DELEGATION_TABLE}
+                (approver_id, approver_emp_no, approver_name,
+                 delegate_id, delegate_emp_no, delegate_name,
+                 start_date, end_date, reason, status,
+                 created_at, updated_at, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                approver['id'],
+                approver.get('emp_no') or '',
+                _user_display_name(approver),
+                delegate['id'],
+                delegate.get('emp_no') or '',
+                _user_display_name(delegate),
+                start_date,
+                end_date,
+                reason,
+                DELEGATION_STATUS_ACTIVE,
+                now,
+                now,
+                actor.get('emp_no', ''),
+                actor.get('emp_no', ''),
+            )
+        )
+        delegation_id = cur.lastrowid
+        _insert_audit(conn, actor, None, None, '대무자지정', '성공', reason, {'delegation_id': delegation_id, 'approver_id': approver['id'], 'delegate_id': delegate['id']})
+        conn.commit()
+    rows = list_approver_delegations(approver_id=int(approver['id']), app=app)
+    return next((row for row in rows if int(row.get('id') or 0) == int(delegation_id)), {})
 
 
 def list_grants(user_id: Optional[int] = None, department_id: Optional[int] = None, resource_id: Optional[int] = None, app=None) -> List[Dict[str, Any]]:
@@ -1474,34 +2127,109 @@ def touch_access(resource_id: int, user_id: int, actor: Dict[str, Any], ip_addre
     return {'grant_id': grant['id'], 'resource': _dict(resource), 'grant': _dict(grant)}
 
 
-def list_audit_logs(filters: Optional[Dict[str, Any]] = None, app=None) -> List[Dict[str, Any]]:
+def get_access_activity(resource_id: int, user_id: int, limit: int = 5, app=None) -> Dict[str, Any]:
+    limit = max(1, min(int(limit or 5), 20))
+    with _get_connection(app) as conn:
+        count_row = conn.execute(
+            f'''
+            SELECT COUNT(*) AS cnt
+              FROM {AUDIT_TABLE}
+             WHERE target_resource_id = ?
+               AND actor_user_id = ?
+               AND action_type = '접속'
+            ''',
+            (resource_id, user_id)
+        ).fetchone()
+        rows = conn.execute(
+            f'''
+            SELECT id, occurred_at, action_result, ip_address, note, extra_json
+              FROM {AUDIT_TABLE}
+             WHERE target_resource_id = ?
+               AND actor_user_id = ?
+               AND action_type = '접속'
+             ORDER BY id DESC
+             LIMIT ?
+            ''',
+            (resource_id, user_id, limit)
+        ).fetchall()
+    logs = [_dict(row) for row in rows]
+    return {
+        'access_count': int(count_row['cnt'] if count_row else 0),
+        'recent_accessed_at': (logs[0] or {}).get('occurred_at', '') if logs else '',
+        'recent_logs': logs,
+    }
+
+
+def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, page_size: int = 20, app=None) -> Dict[str, Any]:
     filters = filters or {}
-    sql = f'''
-        SELECT l.*, r.resource_name, r.resource_url
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = max(1, min(int(page_size or 20), 200))
+    except (TypeError, ValueError):
+        page_size = 20
+    where_sql = f'''
           FROM {AUDIT_TABLE} l
           LEFT JOIN {RESOURCE_TABLE} r ON r.id = l.target_resource_id
          WHERE 1 = 1
     '''
     params: List[Any] = []
     if filters.get('actor_name'):
-        sql += ' AND l.actor_name LIKE ?'
-        params.append(f"%{str(filters['actor_name']).strip()}%")
+        where_sql += ' AND (l.actor_name LIKE ? OR l.actor_emp_no LIKE ?)'
+        actor_keyword = f"%{str(filters['actor_name']).strip()}%"
+        params.extend([actor_keyword, actor_keyword])
     if filters.get('resource_name'):
-        sql += ' AND r.resource_name LIKE ?'
+        where_sql += ' AND r.resource_name LIKE ?'
         params.append(f"%{str(filters['resource_name']).strip()}%")
     if filters.get('action_type'):
-        sql += ' AND l.action_type = ?'
+        where_sql += ' AND l.action_type = ?'
         params.append(filters['action_type'])
     if filters.get('from_date'):
-        sql += ' AND substr(l.occurred_at, 1, 10) >= ?'
+        where_sql += ' AND substr(l.occurred_at, 1, 10) >= ?'
         params.append(filters['from_date'])
     if filters.get('to_date'):
-        sql += ' AND substr(l.occurred_at, 1, 10) <= ?'
+        where_sql += ' AND substr(l.occurred_at, 1, 10) <= ?'
         params.append(filters['to_date'])
-    sql += ' ORDER BY l.id DESC'
     with _get_connection(app) as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [_dict(row) for row in rows]
+        summary_row = conn.execute(
+            f'''
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN l.action_type = '접속' THEN 1 ELSE 0 END) AS access_count,
+                   SUM(CASE WHEN l.action_type IN ('승인', '반려') THEN 1 ELSE 0 END) AS decision_count,
+                   SUM(CASE WHEN l.action_result IS NOT NULL AND l.action_result <> '성공' THEN 1 ELSE 0 END) AS fail_count
+            {where_sql}
+            ''',
+            params
+        ).fetchone()
+        summary = _dict(summary_row) if summary_row else {}
+        total = int(summary.get('total') or 0)
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        offset = (page - 1) * page_size
+        rows = conn.execute(
+            f'''
+            SELECT l.*, r.resource_name, r.resource_url
+            {where_sql}
+             ORDER BY l.id DESC
+             LIMIT ? OFFSET ?
+            ''',
+            params + [page_size, offset]
+        ).fetchall()
+    return {
+        'rows': [_dict(row) for row in rows],
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': total_pages,
+        'summary': {
+            'total': total,
+            'access_count': int(summary.get('access_count') or 0),
+            'decision_count': int(summary.get('decision_count') or 0),
+            'fail_count': int(summary.get('fail_count') or 0),
+        },
+    }
 
 
 def _insert_audit(

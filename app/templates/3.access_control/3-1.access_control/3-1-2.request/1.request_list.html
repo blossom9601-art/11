@@ -7,51 +7,160 @@
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260422d">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260501q">
 	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260421b" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260501j" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
 	{% include 'layouts/_sidebar.html' %}
-	<main class="main-content">
+	<main class="main-content access-request-page">
 		<div class="content-wrapper">
 			<div class="ac-page-header">
 				<div>
 					<h1>접근제어 신청</h1>
-					<p>권한이 없는 자원은 신청서를 제출하고, 팀장 승인 현황과 본인 이력을 함께 확인합니다.</p>
+					<p>신청서 작성과 신청/승인 현황을 분리해 필요한 업무에만 집중합니다.</p>
 				</div>
 			</div>
-			<div class="request-layout">
-				<section class="request-card">
+			<div class="request-main-tabs" role="tablist" aria-label="접근제어 신청 화면">
+				<button type="button" class="request-main-tab active" id="request-main-tab-form" data-request-tab="form" role="tab" aria-selected="true" aria-controls="request-tab-form">
+					<span>신청서 작성</span>
+				</button>
+				<button type="button" class="request-main-tab" id="request-main-tab-status" data-request-tab="status" role="tab" aria-selected="false" aria-controls="request-tab-status">
+					<span>신청 및 승인 현황</span>
+				</button>
+			</div>
+			<div class="request-tab-panels">
+				<section class="request-card request-tab-panel active" id="request-tab-form" role="tabpanel" aria-labelledby="request-main-tab-form">
 					<div class="request-head">
 						<div>
 							<h2>신청서 작성</h2>
-							<p>팀장 승인 후 승인 종료일까지 접근 권한이 자동 부여됩니다.</p>
+							<p>여러 자원을 선택해 하나의 신청서로 제출합니다.</p>
 						</div>
 					</div>
 					<form class="request-form" id="request-form">
-						<div>
-							<label for="request-resource-id">신청 대상 자원명</label>
-							<select id="request-resource-id" name="resourceId"></select>
+						<div class="resource-picker">
+							<div class="resource-picker-toolbar">
+								<div>
+									<label for="request-resource-search">자원 검색</label>
+									<input id="request-resource-search" type="text" placeholder="자원명, URL, 호스트, IP 검색" autocomplete="off">
+								</div>
+								<div>
+									<label for="request-kind-filter">유형</label>
+									<select id="request-kind-filter">
+										<option value="">전체</option>
+										<option value="WEB">WEB</option>
+										<option value="SSH">SSH</option>
+									</select>
+								</div>
+								<div>
+									<label for="request-category-filter">그룹</label>
+									<select id="request-category-filter"><option value="">전체</option></select>
+								</div>
+								<div>
+									<label for="request-status-filter">상태</label>
+									<select id="request-status-filter">
+										<option value="">전체</option>
+										<option value="selectable">신청 가능</option>
+										<option value="accessible">권한 보유</option>
+										<option value="pending">승인 대기</option>
+										<option value="expired">권한 만료</option>
+										<option value="inactive">비활성</option>
+										<option value="blocked">신청 불가</option>
+									</select>
+								</div>
+								<label class="resource-filter-check" for="request-hide-owned">
+									<input id="request-hide-owned" type="checkbox">
+									<span>이미 승인된 자원 숨김</span>
+								</label>
+							</div>
+							<div class="resource-picker-bulkbar">
+								<div class="resource-picker-summary">
+									<strong id="request-available-count">0개</strong>
+									<span>신청 가능</span>
+									<span id="request-filtered-count">필터 결과 0개</span>
+								</div>
+								<div class="resource-bulk-actions">
+									<button type="button" class="action-chip action-muted" id="request-select-page">현재 페이지 선택</button>
+									<button type="button" class="action-chip action-muted" id="request-select-filtered">필터 결과 선택</button>
+									<button type="button" class="action-chip action-muted" id="request-select-recent">최근 신청</button>
+									<button type="button" class="action-chip action-muted" id="request-select-frequent">최근 사용</button>
+									<button type="button" class="action-chip action-muted" id="request-reset-filters">필터 초기화</button>
+								</div>
+							</div>
+							<div class="resource-picker-table-wrap">
+								<table class="request-resource-table" aria-label="접근 신청 자원 목록">
+									<thead>
+										<tr>
+											<th class="resource-check-col"><input id="request-select-page-check" type="checkbox" aria-label="현재 페이지 자원 선택"></th>
+											<th>자원명</th>
+											<th>유형</th>
+											<th>그룹</th>
+											<th>접속 정보</th>
+											<th>상태</th>
+											<th>신청 불가 사유</th>
+										</tr>
+									</thead>
+									<tbody id="request-resource-list"></tbody>
+								</table>
+							</div>
+							<div class="resource-picker-footer">
+								<span id="request-resource-page-info">0개 항목</span>
+								<div class="resource-page-actions">
+									<button type="button" class="action-chip action-muted" id="request-resource-prev">이전</button>
+									<button type="button" class="action-chip action-muted" id="request-resource-next">다음</button>
+								</div>
+							</div>
 						</div>
-						<div>
-							<label for="request-resource-url">URL</label>
-							<input id="request-resource-url" name="resourceUrl" type="text" readonly>
+						<div class="selected-resource-panel">
+							<div class="selected-resource-head">
+								<div>
+									<strong>선택된 자원</strong>
+									<span id="request-selected-summary">선택 없음</span>
+								</div>
+								<div class="selected-resource-actions">
+									<button type="button" class="action-chip action-muted" id="request-selected-toggle">접기</button>
+									<button type="button" class="action-chip action-danger" id="request-clear-selected">전체 제거</button>
+								</div>
+							</div>
+							<div class="selected-resource-list" id="request-selected-list"></div>
+							<div class="resource-error-list" id="request-resource-errors" hidden></div>
 						</div>
 						<div>
 							<label for="request-reason">신청 사유</label>
-							<textarea id="request-reason" name="reason" placeholder="업무 목적과 필요 기간을 구체적으로 입력하세요."></textarea>
+							<textarea id="request-reason" name="reason" minlength="10" placeholder="업무 목적과 필요 기간을 구체적으로 입력하세요."></textarea>
+						</div>
+						<div class="period-mode-panel" role="radiogroup" aria-label="사용 기간 유형">
+							<label class="period-mode-card" for="request-period-range">
+								<input id="request-period-range" type="radio" name="requestPeriodType" value="range" checked>
+								<span><strong>기간 지정</strong><em>시작일과 종료일 기준</em></span>
+							</label>
+							<label class="period-mode-card" for="request-period-permanent">
+								<input id="request-period-permanent" type="radio" name="requestPeriodType" value="permanent">
+								<span><strong>영구 접근</strong><em>관리자/보안 담당자 승인</em></span>
+							</label>
+						</div>
+						<div class="permanent-access-note" id="request-permanent-note" hidden>
+							영구 접근 신청은 종료일 없이 제출되며 승인자는 관리자/보안 담당자로 자동 지정됩니다.
 						</div>
 						<div class="request-grid-2">
-							<div>
+							<div class="request-date-field">
 								<label for="request-start-date">사용 시작일</label>
-								<input id="request-start-date" name="startDate" type="date">
+								<input id="request-start-date" class="request-date-input" name="startDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
 							</div>
-							<div>
+							<div class="request-date-field">
 								<label for="request-end-date">사용 종료일</label>
-								<input id="request-end-date" name="endDate" type="date">
+								<input id="request-end-date" class="request-date-input" name="endDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
 							</div>
+						</div>
+						<div class="quick-periods" aria-label="사용기간 빠른 선택">
+							<button type="button" class="action-chip action-muted" data-period-days="1">1일</button>
+							<button type="button" class="action-chip action-muted" data-period-days="7">7일</button>
+							<button type="button" class="action-chip action-muted" data-period-days="30">30일</button>
 						</div>
 						<div class="request-grid-2">
 							<div>
@@ -61,57 +170,86 @@
 									<option value="1">긴급</option>
 								</select>
 							</div>
-							<div>
-								<label for="request-attachment">첨부파일(선택)</label>
-								<input id="request-attachment" name="attachment" type="file">
+							<div class="approver-field">
+								<label for="request-approver">승인자</label>
+								<input id="request-approver" name="approver" type="text" readonly placeholder="부서 팀장이 자동 지정됩니다.">
 							</div>
 						</div>
-						<div>
-							<label for="request-approver">팀장(승인자)</label>
-							<input id="request-approver" name="approver" type="text" readonly placeholder="부서 팀장이 자동 지정됩니다.">
-						</div>
-						<div class="request-actions">
-							<div id="request-form-message" style="font-size:12px;color:#64748b;">동일 자원 승인 대기 건이 있거나 유효 권한이 있으면 제출할 수 없습니다.</div>
-							<button type="submit" class="action-chip action-primary">신청 제출</button>
+						<div class="request-actions request-submit-bar">
+							<div id="request-form-message">동일 자원 승인 대기 건이 있거나 유효 권한이 있으면 제출할 수 없습니다.</div>
+							<button type="submit" class="action-chip action-primary request-submit-button">신청 제출</button>
 						</div>
 					</form>
 				</section>
-				<section class="request-card">
+				<section class="request-card request-tab-panel" id="request-tab-status" role="tabpanel" aria-labelledby="request-main-tab-status" hidden>
 					<div class="request-head">
 						<div>
 							<h2>신청 및 승인 현황</h2>
-							<p>본인 신청 목록과 팀장 승인 대기 목록을 전환해서 확인합니다.</p>
+							<p>신청 리스트와 상세 보기에서 승인 단계, 자원별 상태, 승인 타임라인을 확인합니다.</p>
 						</div>
+						<a class="action-chip action-muted" href="{{ url_for('pages.show', key='access_control_delegation') }}">승인 대무자 관리</a>
 					</div>
 					<div class="segment-tabs">
 						<button type="button" class="segment-btn active" data-segment="mine">내 신청</button>
-						<button type="button" class="segment-btn" data-segment="approvals">팀장 승인</button>
+						<button type="button" class="segment-btn" data-segment="approvals">팀 승인 <span id="request-approval-badge" class="segment-badge">0</span></button>
 					</div>
 					<div class="request-table-wrap">
 						<div id="request-table-state" class="empty-state">신청 목록을 불러오는 중입니다.</div>
 						<table class="request-table" id="request-table" hidden>
 							<thead>
 								<tr>
-									<th>신청번호</th>
-									<th>자원명</th>
-									<th>URL</th>
-									<th>신청자</th>
 									<th>신청일</th>
-									<th>승인자</th>
+									<th>신청번호</th>
+									<th>자원 개수</th>
 									<th>상태</th>
-									<th>반려사유</th>
+									<th>승인 단계</th>
+									<th>신청자</th>
+									<th>긴급</th>
 									<th>액션</th>
 								</tr>
 							</thead>
 							<tbody id="request-table-body"></tbody>
 						</table>
 					</div>
-					<div class="panel-wrap" id="request-detail-panel">
+					<div class="panel-wrap" id="request-detail-panel" hidden>
 						<div class="empty-state">상세를 선택하면 신청 정보, 과거 이력, 승인 의견이 표시됩니다.</div>
 					</div>
 				</section>
 			</div>
 		</div>
 	</main>
+	<div class="modal-overlay-full" id="request-confirm-modal" aria-hidden="true">
+		<div class="request-confirm-content" role="dialog" aria-modal="true" aria-labelledby="request-confirm-title">
+			<div class="request-confirm-head">
+				<div>
+					<span class="request-confirm-kicker">신청 검토</span>
+					<h3 id="request-confirm-title">접근 신청 확인</h3>
+					<p>제출 후 승인 단계로 전달됩니다.</p>
+				</div>
+				<button type="button" class="close-btn" id="request-confirm-close" aria-label="닫기">×</button>
+			</div>
+			<div class="request-confirm-body" id="request-confirm-body"></div>
+			<div class="request-confirm-actions">
+				<button type="button" class="action-chip action-muted" id="request-confirm-cancel">취소</button>
+				<button type="button" class="action-chip action-primary" id="request-confirm-submit">신청 제출</button>
+			</div>
+		</div>
+	</div>
+	<div class="modal-overlay-full" id="request-detail-modal" aria-hidden="true">
+		<div class="request-confirm-content request-detail-modal-content" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
+			<div class="request-confirm-head">
+				<div>
+					<span class="request-confirm-kicker">신청 상세</span>
+					<h3 id="request-detail-title">신청 및 승인 상세</h3>
+					<p>상세 정보와 자원별 승인 상태를 확인합니다.</p>
+				</div>
+				<button type="button" class="close-btn" id="request-detail-close" aria-label="닫기">×</button>
+			</div>
+			<div class="request-detail-modal-body" id="request-detail-modal-body"></div>
+			<div class="request-confirm-actions request-detail-modal-actions">
+				<button type="button" class="action-chip action-muted" id="request-detail-dismiss">닫기</button>
+			</div>
+		</div>
+	</div>
 </body>
 </html>

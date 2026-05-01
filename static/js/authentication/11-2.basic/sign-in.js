@@ -24,7 +24,51 @@
     }
     function bindEmpNoAlphanumeric(el) {
         if (!el) return;
-        /* IME 한글·자모: insertCompositionText 는 data 없이 오는 경우가 많음 → 조합 삽입 전부 차단 */
+
+        function stopComposition(e) {
+            try {
+                if (e.cancelable !== false) e.preventDefault();
+            } catch (_x) {}
+        }
+
+        /* 조합(한글 등) 시작 차단 — 브라우저별로 cancel 동작이 다를 수 있음 */
+        el.addEventListener('compositionstart', stopComposition, true);
+
+        /* 키 입력 단계: IME(229)·비영숫자 문자는 필드에 도달하지 않게 */
+        el.addEventListener(
+            'keydown',
+            function (e) {
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                var nav = [
+                    'Backspace',
+                    'Delete',
+                    'Tab',
+                    'Escape',
+                    'Enter',
+                    'ArrowLeft',
+                    'ArrowRight',
+                    'ArrowUp',
+                    'ArrowDown',
+                    'Home',
+                    'End'
+                ];
+                if (nav.indexOf(e.key) >= 0) return;
+
+                if (e.key === 'Process' || e.keyCode === 229) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
+                if (e.key && e.key.length === 1 && !/[A-Za-z0-9]/.test(e.key)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            },
+            true
+        );
+
+        /* IME 한글·자모: 조합 삽입 전부 차단 + 일반 텍스트 삽입 시 필터 */
         el.addEventListener(
             'beforeinput',
             function (e) {
@@ -73,6 +117,19 @@
             e.preventDefault();
             var paste = (e.clipboardData || window.clipboardData).getData('text') || '';
             var filtered = alphanumericOnly(paste);
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            var cur = el.value;
+            el.value = cur.slice(0, start) + filtered + cur.slice(end);
+            var pos = start + filtered.length;
+            el.setSelectionRange(pos, pos);
+        });
+        el.addEventListener('drop', function (e) {
+            e.preventDefault();
+            var dt = e.dataTransfer;
+            var raw = (dt && dt.getData('text/plain')) || '';
+            if (!raw) return;
+            var filtered = alphanumericOnly(raw);
             var start = el.selectionStart;
             var end = el.selectionEnd;
             var cur = el.value;

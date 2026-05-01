@@ -63,8 +63,13 @@ Write-Host "[2/3] gradlew assembleDebug"
 .\gradlew.bat assembleDebug
 if ($LASTEXITCODE -ne 0) { Write-Host "[ERR] Gradle build failed" -ForegroundColor Red; exit $LASTEXITCODE }
 
-$apk = "$root\android\app\build\outputs\apk\debug\app-debug.apk"
-if (Test-Path $apk) {
+$apkCandidates = @(
+    "$root\android\app\build\outputs\apk\real\debug\app-real-debug.apk",
+    "$root\android\app\build\outputs\apk\demo\debug\app-demo-debug.apk",
+    "$root\android\app\build\outputs\apk\debug\app-debug.apk"
+)
+$apk = $apkCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($apk) {
     Write-Host "[3/3] APK ready: $apk" -ForegroundColor Green
 } else {
     Write-Host "[ERR] APK 산출물을 찾을 수 없습니다." -ForegroundColor Red

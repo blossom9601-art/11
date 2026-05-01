@@ -1,0 +1,14 @@
+---
+description: After desktop client changes, bump version and run Windows installer build
+alwaysApply: true
+---
+
+# Blossom desktop — 항상 빌드
+
+`clients/desktop/` 아래 파일(렌더러, main, `package.json` 등)을 **기능 변경**으로 수정한 작업이면, 같은 세션 안에서 마무리할 때:
+
+1. **`clients/desktop/package.json`의 `version`을 patch 단위로 올린다** (새 설치 파일과 이전 설치를 구분하기 위해).
+2. **`clients/desktop`에서 `npm run dist:win`을 실행**한다 (PowerShell이면 `Set-Location` 후 `npm run dist:win`; `&&` 대신 `;` 사용).
+3. 사용자에게 **`dist/Blossom-Chat-Setup-<version>.exe`** 전체 경로를 알려준다.
+
+사용자는 설치형(`Blossom-Chat-Setup-*.exe`)으로만 앱을 쓰는 경우가 많으므로, 렌더러만 고치고 빌드하지 않으면 변경이 반영되지 않는다.

@@ -1,78 +1,77 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" data-theme="auto">
 <head>
   <meta charset="UTF-8" />
-  <title>Blossom Chat</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Blossom Chat</title>
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' https: http: data: blob: capacitor: ; img-src 'self' data: blob: https: http: capacitor: ; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' capacitor: ; connect-src 'self' https: http: ws: wss: capacitor: ;">
+        content="default-src 'self' https: http: data: blob: capacitor: ; img-src 'self' data: blob: https: http: capacitor: ; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' capacitor: ; worker-src 'self' blob:; connect-src 'self' https: http: ws: wss: capacitor: ;">
   <link rel="icon" href="assets/app-icon.png" />
   <link rel="stylesheet" href="styles/app.css" />
-  <link rel="stylesheet" href="styles/mobile.css?v=11" />
-  <link rel="stylesheet" href="styles/mobile-login.css?v=1" />
+  <link rel="stylesheet" href="styles/mobile.css?v=13" />
+  <link rel="stylesheet" href="styles/mobile-login.css?v=2" />
   <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
 </head>
 <body>
-  <!-- 커스텀 타이틀 바 (Windows 오버레이 영역) -->
+  <!-- 而ㅼ뒪? ??댄? 諛?(Windows ?ㅻ쾭?덉씠 ?곸뿭) -->
   <header class="titlebar" id="titlebar">
     <img class="titlebar-logo" src="assets/app-icon.png" alt="Blossom Chat" />
     <span class="titlebar-name">Blossom Chat <span id="titlebarVersion" style="opacity:.65;font-weight:500;margin-left:6px;"></span></span>
     <span class="titlebar-spacer"></span>
   </header>
 
-  <!-- 메인 셸 -->
+  <!-- 硫붿씤 ??-->
   <div class="app-shell" id="appShell" hidden>
-    <!-- 좌측 워크스페이스 레일 -->
-    <nav class="rail" aria-label="워크스페이스">
+    <!-- 醫뚯륫 ?뚰겕?ㅽ럹?댁뒪 ?덉씪 -->
+    <nav class="rail" aria-label="?뚰겕?ㅽ럹?댁뒪">
       <button class="rail-btn rail-logo" id="railLogo" title="Blossom" aria-label="Blossom">
         <img src="assets/app-icon.png" alt="Blossom" />
       </button>
       <div class="rail-spacer"></div>
-      <button class="rail-btn" data-tab="chat" id="navChat" title="채팅" aria-label="채팅">
+      <button class="rail-btn" data-tab="chat" id="navChat" title="梨꾪똿" aria-label="梨꾪똿">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2zm2 4v2h12V8H6zm0 4v2h9v-2H6z"/></svg>
       </button>
-      <button class="rail-btn" data-tab="people" id="navPeople" title="동료" aria-label="동료">
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-2.7 0-8 1.3-8 4v3h10v-3a4.4 4.4 0 0 1 1.4-3.2A14 14 0 0 0 8 13zm8 0a13.6 13.6 0 0 0-1.6.1A4.5 4.5 0 0 1 16 17v3h8v-3c0-2.7-5.3-4-8-4z"/></svg>
+      <button class="rail-btn rail-icon-img" data-tab="people" id="navPeople" title="?숇즺" aria-label="?숇즺">
+        <img src="assets/svg/chat/free-icon-font-following.svg" alt="" />
       </button>
-      <button class="rail-btn rail-icon-img" id="btnCalendar" data-tab="calendar" title="달력" aria-label="달력">
+      <button class="rail-btn rail-icon-img" id="btnCalendar" data-tab="calendar" title="?щ젰" aria-label="?щ젰">
         <img src="assets/svg/chat/free-icon-font-calendar-clock.svg" alt="" />
       </button>
-      <button class="rail-btn rail-icon-img" id="btnMemo" data-tab="memo" title="메모" aria-label="메모">
+      <button class="rail-btn rail-icon-img" id="btnMemo" data-tab="memo" title="硫붾え" aria-label="硫붾え">
         <img src="assets/svg/chat/free-icon-font-edit.svg" alt="" />
       </button>
       <div class="rail-grow"></div>
-      <button class="rail-btn rail-icon-img" id="btnLock" title="잠금" aria-label="잠금">
+      <button class="rail-btn rail-icon-img" id="btnLock" title="?좉툑" aria-label="?좉툑">
         <img src="assets/svg/chat/free-icon-font-unlock.svg" alt="" />
       </button>
-      <button class="rail-btn rail-icon-img" id="btnTrayHide" title="트레이로 숨기기" aria-label="트레이로 숨기기">
+      <button class="rail-btn rail-icon-img" id="btnTrayHide" title="?몃젅?대줈 ?④린湲? aria-label="?몃젅?대줈 ?④린湲?>
         <img src="assets/svg/chat/free-icon-font-holding-hand-dinner.svg" alt="" />
       </button>
-      <button class="rail-btn rail-icon-img" id="btnQuit" title="종료" aria-label="종료">
+      <button class="rail-btn rail-icon-img" id="btnQuit" title="醫낅즺" aria-label="醫낅즺">
         <img src="assets/svg/chat/free-icon-font-exit-alt.svg" alt="" />
       </button>
-      <button class="rail-btn rail-icon-img" id="btnSettings" title="설정" aria-label="설정">
+      <button class="rail-btn rail-icon-img" id="btnSettings" title="?ㅼ젙" aria-label="?ㅼ젙">
         <img src="assets/svg/chat/free-icon-font-settings.svg" alt="" />
       </button>
-      <button class="rail-btn rail-me" id="btnProfile" title="내 프로필" aria-label="내 프로필">
+      <button class="rail-btn rail-me" id="btnProfile" title="???꾨줈?? aria-label="???꾨줈??>
         <span class="avatar avatar-sm" id="meAvatar"></span>
         <img class="rail-profile-fallback" src="assets/svg/chat/free-icon-font-circle-user.svg" alt="" hidden />
       </button>
     </nav>
 
-    <!-- 채널 사이드바 -->
+    <!-- 梨꾨꼸 ?ъ씠?쒕컮 -->
     <aside class="sidebar" id="sidebar" data-tab="chat">
       <header class="ws-header">
-        <img class="ws-logo" src="assets/app-icon.png" alt="Blossom" />
-        <h1 class="ws-title" id="wsTitle">Blossom Chat</h1>
-        <button class="icon-btn" id="btnNewChannel" title="채널 만들기" aria-label="채널 만들기">
+        <h1 class="ws-title" id="wsTitle">梨꾪똿</h1>
+        <button class="icon-btn" id="btnNewChannel" title="梨꾨꼸 留뚮뱾湲? aria-label="梨꾨꼸 留뚮뱾湲?>
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
         </button>
       </header>
 
-      <!-- 채팅 탭 -->
+      <!-- 梨꾪똿 ??-->
       <div class="sidebar-pane" data-pane="chat">
         <div class="side-search side-search-chat">
-          <input id="chatSearch" type="text" placeholder="채널·메시지 검색" autocomplete="off" />
+          <input id="chatSearch" type="text" placeholder="梨꾨꼸쨌硫붿떆吏 寃?? autocomplete="off" />
         </div>
         <section class="side-section">
           <div class="side-section-head">
@@ -80,7 +79,7 @@
               <img class="section-icon" src="assets/svg/chat/free-icon-font-channel.svg" alt="" aria-hidden="true" />
               Channel
             </button>
-            <button class="icon-btn-tiny" id="btnAddChannel" title="채널 추가" aria-label="채널 추가">
+            <button class="icon-btn-tiny" id="btnAddChannel" title="梨꾨꼸 異붽?" aria-label="梨꾨꼸 異붽?">
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
             </button>
           </div>
@@ -92,7 +91,7 @@
               <img class="section-icon" src="assets/svg/chat/free-icon-font-comment.svg" alt="" aria-hidden="true" />
               Direct Message
             </button>
-            <button class="icon-btn-tiny" id="btnAddDm" title="새 메시지" aria-label="새 메시지">
+            <button class="icon-btn-tiny" id="btnAddDm" title="??硫붿떆吏" aria-label="??硫붿떆吏">
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
             </button>
           </div>
@@ -100,244 +99,432 @@
         </section>
       </div>
 
-      <!-- 동료 탭 -->
+      <!-- ?숇즺 ??-->
       <div class="sidebar-pane" data-pane="people" hidden>
         <div class="side-search">
-          <input id="peopleSearch" type="text" placeholder="이름·사번·부서 검색" />
+          <input id="peopleSearch" type="text" placeholder="?대쫫쨌?щ쾲쨌遺??寃?? />
         </div>
         <ul id="peopleList" class="people-list"></ul>
       </div>
 
     </aside>
 
-    <!-- 메인 콘텐츠 -->
+    <!-- 硫붿씤 肄섑뀗痢?-->
     <section class="main-pane">
       <header class="conv-header" id="convHeader">
         <div class="conv-titlebar">
           <span class="conv-icon" id="convIcon">#</span>
-          <h2 class="conv-title" id="convTitle">대화를 선택하세요</h2>
+          <h2 class="conv-title" id="convTitle">??붾? ?좏깮?섏꽭??/h2>
         </div>
         <div class="conv-meta" id="convMeta"></div>
         <div class="conv-actions">
-          <button class="icon-btn" id="btnConvSearch" title="대화 내 검색 (Ctrl+F)" aria-label="대화 내 검색">
+          <button class="icon-btn" id="btnConvSearch" title="?????寃??(Ctrl+F)" aria-label="?????寃??>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
           </button>
-          <button class="icon-btn" id="btnConvMenu" title="더 보기" aria-label="더 보기">
+          <button class="icon-btn" id="btnConvMenu" title="??蹂닿린" aria-label="??蹂닿린">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
           </button>
         </div>
       </header>
-      <!-- 대화 내 검색 바 -->
+      <!-- ?????寃??諛?-->
       <div class="conv-search-bar" id="convSearchBar" hidden>
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="csb-icon"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
-        <input id="convSearchInput" type="text" placeholder="이 대화에서 검색…" autocomplete="off" />
+        <input id="convSearchInput" type="text" placeholder="????붿뿉??寃?됤? autocomplete="off" />
         <span class="csb-count" id="convSearchCount">0/0</span>
-        <button class="icon-btn csb-btn" id="convSearchPrev" title="이전 (Shift+Enter)" aria-label="이전">
+        <button class="icon-btn csb-btn" id="convSearchPrev" title="?댁쟾 (Shift+Enter)" aria-label="?댁쟾">
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 14l5-5 5 5z"/></svg>
         </button>
-        <button class="icon-btn csb-btn" id="convSearchNext" title="다음 (Enter)" aria-label="다음">
+        <button class="icon-btn csb-btn" id="convSearchNext" title="?ㅼ쓬 (Enter)" aria-label="?ㅼ쓬">
           <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
         </button>
-        <button class="icon-btn csb-btn" id="convSearchClose" title="닫기 (Esc)" aria-label="닫기">×</button>
+        <button class="icon-btn csb-btn" id="convSearchClose" title="?リ린 (Esc)" aria-label="?リ린">횞</button>
       </div>
-      <!-- v0.4.40: 고정 메시지 배너 -->
+      <!-- v0.4.40: 怨좎젙 硫붿떆吏 諛곕꼫 -->
       <div class="pinned-bar" id="pinnedBar" hidden>
-        <span class="pinned-icon" aria-hidden="true"><img src="assets/svg/chat/free-icon-font-thumbtack.svg" alt="" /></span>
-        <span class="pinned-text" id="pinnedBarText">고정된 메시지</span>
-        <button class="icon-btn pinned-more" id="pinnedBarMore" title="고정 메시지 모두 보기" aria-label="고정 메시지 모두 보기">›</button>
+        <span class="pinned-icon" aria-hidden="true"><img src="assets/svg/chat/free-icon-font-thumbtack2.svg" alt="" /></span>
+        <span class="pinned-text" id="pinnedBarText">怨좎젙??硫붿떆吏</span>
+        <button class="icon-btn pinned-more" id="pinnedBarMore" title="怨좎젙 硫붿떆吏 紐⑤몢 蹂닿린" aria-label="怨좎젙 硫붿떆吏 紐⑤몢 蹂닿린">??/button>
       </div>
-      <!-- v0.4.41: 채팅방 내부 탭 (대화/파일/아이디어/업무리스트) -->
+      <!-- v0.4.41: 梨꾪똿諛??대? ??(????뚯씪/?꾩씠?붿뼱/?낅Т由ъ뒪?? -->
       <nav class="room-tabs" id="roomTabs" role="tablist">
-        <button class="room-tab active" data-room-tab="chat" role="tab" aria-selected="true">대화</button>
-        <button class="room-tab" data-room-tab="files" role="tab" aria-selected="false">파일</button>
-        <button class="room-tab" data-room-tab="ideas" role="tab" aria-selected="false">아이디어</button>
-        <button class="room-tab" data-room-tab="tasks" role="tab" aria-selected="false">업무리스트</button>
-        <button class="room-tab room-tab-channel-only" data-room-tab="members" role="tab" aria-selected="false">참여자정보</button>
+        <button class="room-tab active" data-room-tab="chat" role="tab" aria-selected="true">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-meeting.svg" alt="" /></span><span class="rt-main">???/span>
+        </button>
+        <button class="room-tab" data-room-tab="files" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-folder.svg" alt="" /></span><span class="rt-main">?뚯씪</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab" data-room-tab="ideas" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-box-idea.svg" alt="" /></span><span class="rt-main">?꾩씠?붿뼱</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab" data-room-tab="tasks" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-business-time.svg" alt="" /></span><span class="rt-main">?낅Т怨듭쑀</span><span class="rt-dot" hidden></span>
+        </button>
+        <button class="room-tab room-tab-channel-only" data-room-tab="members" role="tab" aria-selected="false">
+          <span class="rt-ic"><img src="assets/svg/chat/free-icon-font-user-add.svg" alt="" /></span><span class="rt-main">李몄뿬???뺣낫</span><span class="rt-dot" hidden></span>
+        </button>
       </nav>
       <div class="room-body" id="roomBody">
         <div class="message-area room-pane room-pane-chat is-active" id="messageArea" data-room-pane="chat">
           <div class="empty-hint" id="emptyHint">
             <img class="empty-art" src="assets/app-icon.png" alt="" />
-            <div class="empty-title">대화를 시작하세요</div>
-            <div class="empty-sub">왼쪽에서 채널이나 동료를 선택하거나, 새 채널을 만들어 보세요.</div>
+            <div class="empty-title">??붾? ?쒖옉?섏꽭??/div>
+            <div class="empty-sub">?쇱そ?먯꽌 梨꾨꼸?대굹 ?숇즺瑜??좏깮?섍굅?? ??梨꾨꼸??留뚮뱾??蹂댁꽭??</div>
           </div>
         </div>
         <div class="room-pane room-pane-files" id="roomPaneFiles" data-room-pane="files" hidden>
           <div class="rp-head">
-            <h3 class="rp-title">공유된 파일</h3>
+            <h3 class="rp-title">怨듭쑀???뚯씪</h3>
             <span class="rp-meta" id="filesCount"></span>
           </div>
+          <div class="rp-toolbar">
+            <input id="filesSearchInput" class="form-input rp-search" type="search" placeholder="?뚯씪紐끒룹뾽濡쒕뱶 ?ъ슜??寃?? autocomplete="off" />
+            <div class="rp-filter-pills" id="filesTypeFilter" role="group" aria-label="?뚯씪 ?좏삎 ?꾪꽣">
+              <button type="button" class="rp-filter-pill active" data-file-type="all">?꾩껜</button>
+              <button type="button" class="rp-filter-pill" data-file-type="image">?대?吏</button>
+              <button type="button" class="rp-filter-pill" data-file-type="doc">臾몄꽌</button>
+              <button type="button" class="rp-filter-pill" data-file-type="archive">?뺤텞</button>
+              <button type="button" class="rp-filter-pill" data-file-type="etc">湲고?</button>
+            </div>
+            <button type="button" class="btn-danger-ghost rp-delete-selected" id="filesDeleteSelected" disabled>?좏깮 ??젣</button>
+          </div>
           <div class="rp-list" id="filesList"></div>
-          <div class="rp-empty" id="filesEmpty" hidden>아직 공유된 파일이 없습니다.</div>
+          <div class="rp-empty" id="filesEmpty" hidden>?꾩쭅 怨듭쑀???뚯씪???놁뒿?덈떎.</div>
         </div>
         <div class="room-pane room-pane-ideas" id="roomPaneIdeas" data-room-pane="ideas" hidden>
           <div class="rp-head">
-            <h3 class="rp-title">아이디어 보드</h3>
-            <button class="btn-primary rp-add" id="btnIdeaAdd">＋ 아이디어 추가</button>
+            <h3 class="rp-title">?꾩씠?붿뼱 蹂대뱶</h3>
+            <button class="btn-primary rp-add" id="btnIdeaAdd">竊??꾩씠?붿뼱 異붽?</button>
           </div>
           <div class="rp-list" id="ideasList"></div>
-          <div class="rp-empty" id="ideasEmpty" hidden>등록된 아이디어가 없습니다.</div>
+          <div class="rp-empty" id="ideasEmpty" hidden>?깅줉???꾩씠?붿뼱媛 ?놁뒿?덈떎.</div>
         </div>
         <div class="room-pane room-pane-tasks" id="roomPaneTasks" data-room-pane="tasks" hidden>
           <div class="rp-head">
-            <h3 class="rp-title">업무리스트</h3>
-            <button class="btn-primary rp-add" id="btnTaskAdd">＋ 업무 추가</button>
+            <h3 class="rp-title">?낅Т由ъ뒪??/h3>
+            <button class="btn-primary rp-add" id="btnTaskAdd">竊??낅Т 異붽?</button>
           </div>
           <div class="rp-list" id="tasksList"></div>
-          <div class="rp-empty" id="tasksEmpty" hidden>등록된 업무가 없습니다.</div>
+          <div class="rp-empty" id="tasksEmpty" hidden>?깅줉???낅Т媛 ?놁뒿?덈떎.</div>
         </div>
         <div class="room-pane room-pane-members" id="roomPaneMembers" data-room-pane="members" hidden>
           <div class="rp-head">
-            <h3 class="rp-title">참여자 <span class="rp-meta" id="membersCount"></span></h3>
-            <button class="btn-primary rp-add" id="btnMemberInvite" hidden>＋ 초대하기</button>
+            <h3 class="rp-title">李몄뿬??<span class="rp-meta" id="membersCount"></span></h3>
+            <button class="btn-secondary rp-add" id="btnRoomRename">?대쫫 蹂寃?/button>
+            <button class="btn-primary rp-add" id="btnMemberInvite">竊??ъ슜??異붽?</button>
           </div>
           <div class="rp-list" id="membersList"></div>
-          <div class="rp-empty" id="membersEmpty" hidden>참여자 정보를 불러올 수 없습니다.</div>
+          <div class="rp-empty" id="membersEmpty" hidden>李몄뿬???뺣낫瑜?遺덈윭?????놁뒿?덈떎.</div>
         </div>
       </div>
       <footer class="composer" id="composer">
-        <!-- v0.4.40: 답장 미리보기 -->
+        <!-- v0.4.40: ?듭옣 誘몃━蹂닿린 -->
         <div class="reply-preview" id="replyPreview" hidden>
-          <span class="reply-pre-icon" aria-hidden="true">↩</span>
+          <span class="reply-pre-icon" aria-hidden="true"><img src="assets/svg/chat/free-icon-font-hand-back-point-left.svg" alt="" /></span>
           <div class="reply-pre-body">
             <div class="reply-pre-name" id="replyPreName"></div>
             <div class="reply-pre-text" id="replyPreText"></div>
           </div>
-          <button class="icon-btn reply-pre-cancel" id="replyPreCancel" title="답장 취소" aria-label="답장 취소">×</button>
+          <button class="icon-btn reply-pre-cancel" id="replyPreCancel" title="?듭옣 痍⑥냼" aria-label="?듭옣 痍⑥냼">횞</button>
         </div>
-        <!-- 서식 툴바 -->
-        <div class="composer-toolbar" role="toolbar" aria-label="서식">
-          <button class="fmt-btn" data-fmt="bold" title="굵게 (Ctrl+B)" aria-label="굵게">
+        <!-- ?쒖떇 ?대컮 -->
+        <div class="composer-toolbar" role="toolbar" aria-label="?쒖떇">
+          <button class="fmt-btn" data-fmt="bold" title="援듦쾶 (Ctrl+B)" aria-label="援듦쾶">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M15.6 11.8a3.5 3.5 0 0 0 1.9-3.1c0-2.3-1.8-4-4-4H7v14h7c2.2 0 4-1.8 4-4 0-1.5-.9-2.8-2.4-2.9zM10 6.5h3a1.5 1.5 0 0 1 0 3h-3v-3zm3.5 9H10v-3h3.5a1.5 1.5 0 0 1 0 3z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="italic" title="기울임 (Ctrl+I)" aria-label="기울임">
+          <button class="fmt-btn" data-fmt="italic" title="湲곗슱??(Ctrl+I)" aria-label="湲곗슱??>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M10 4v3h2.2l-3.4 10H6v3h8v-3h-2.2l3.4-10H18V4z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="underline" title="밑줄 (Ctrl+U)" aria-label="밑줄">
+          <button class="fmt-btn" data-fmt="underline" title="諛묒쨪 (Ctrl+U)" aria-label="諛묒쨪">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 17a5 5 0 0 0 5-5V4h-2.5v8a2.5 2.5 0 0 1-5 0V4H7v8a5 5 0 0 0 5 5zm-7 2v2h14v-2z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="strike" title="취소선" aria-label="취소선">
+          <button class="fmt-btn" data-fmt="strike" title="痍⑥냼?? aria-label="痍⑥냼??>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 12h18v2H3z"/><path fill="currentColor" d="M16 6.4A4.7 4.7 0 0 0 12 5C9.5 5 7 6.5 7 9c0 .7.2 1.4.6 2h2.5C9.6 10.5 9 9.9 9 9c0-1.4 1.5-2 3-2 1.2 0 2.6.4 3.4 1.4zM7.7 16c.3 1.5 1.7 3 4.3 3 2.4 0 4-1.4 4-3 0-.3-.1-.7-.2-1h-2.4c.4.3.6.6.6 1 0 .8-.9 1-2 1-1.4 0-2-.5-2-1z"/></svg>
           </button>
           <span class="fmt-sep"></span>
-          <button class="fmt-btn fmt-color-btn" id="btnFmtColor" title="글자색" aria-label="글자색">
+          <button class="fmt-btn fmt-color-btn" id="btnFmtColor" title="湲?먯깋" aria-label="湲?먯깋">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M5 19h14v3H5zM12 3 5.5 17h2.4l1.4-3.4h5.4L16.1 17h2.4L12 3zm-1.8 8.7L12 7.4l1.8 4.3h-3.6z"/></svg>
             <span class="fmt-color-bar" id="fmtColorBar"></span>
           </button>
           <div class="color-popover" id="colorPopover" hidden></div>
           <span class="fmt-sep"></span>
-          <button class="fmt-btn" data-fmt="code" title="인라인 코드" aria-label="코드">
+          <button class="fmt-btn" data-fmt="code" title="?몃씪??肄붾뱶" aria-label="肄붾뱶">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6zM14.6 16.6l4.6-4.6-4.6-4.6L16 6l6 6-6 6z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="quote" title="인용" aria-label="인용">
+          <button class="fmt-btn" data-fmt="quote" title="?몄슜" aria-label="?몄슜">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="ul" title="글머리 기호 목록" aria-label="목록">
+          <button class="fmt-btn" data-fmt="ul" title="湲癒몃━ 湲고샇 紐⑸줉" aria-label="紐⑸줉">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 7a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 4 7zm0 6.5A1.5 1.5 0 1 1 5.5 12 1.5 1.5 0 0 1 4 13.5zm0 6.5a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 4 20zM8 5h13v1.5H8zm0 6.5h13V13H8zm0 6.5h13v1.5H8z"/></svg>
           </button>
-          <button class="fmt-btn" data-fmt="link" title="링크" aria-label="링크">
+          <button class="fmt-btn" data-fmt="link" title="留곹겕" aria-label="留곹겕">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3.9 12a3.1 3.1 0 0 1 3.1-3.1H11V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z"/></svg>
           </button>
           <span class="fmt-grow"></span>
-          <button class="fmt-btn" id="btnEmoji" title="이모지" aria-label="이모지">
+          <button class="fmt-btn fmt-img-btn" id="btnPoll" title="?ы몴?섍린" aria-label="?ы몴?섍린">
+            <img src="assets/svg/chat/free-icon-font-vote-yea.svg" alt="" />
+          </button>
+          <button class="fmt-btn" id="btnEmoji" title="?대え吏" aria-label="?대え吏">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-3.5-9a1.5 1.5 0 1 0-1.5-1.5A1.5 1.5 0 0 0 8.5 11zm7 0A1.5 1.5 0 1 0 14 9.5a1.5 1.5 0 0 0 1.5 1.5zm-3.5 6a5 5 0 0 0 4.6-3H7.4a5 5 0 0 0 4.6 3z"/></svg>
           </button>
           <div class="emoji-popover" id="emojiPopover" hidden></div>
         </div>
         <div class="composer-inner">
-          <button class="composer-btn" id="btnAttach" title="파일 첨부" aria-label="파일 첨부">
+          <button class="composer-btn" id="btnAttach" title="?뚯씪 泥⑤?" aria-label="?뚯씪 泥⑤?">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M16.5 6.5L8 15a3.5 3.5 0 0 0 5 5l9-9a5.5 5.5 0 0 0-7.8-7.8L4.6 12.8a7.5 7.5 0 0 0 10.6 10.6l8.3-8.3-1.4-1.4-8.3 8.3a5.5 5.5 0 0 1-7.8-7.8L15.6 4.6a3.5 3.5 0 0 1 5 5l-9 9a1.5 1.5 0 1 1-2.1-2.1L17.9 8z"/></svg>
           </button>
-          <button class="composer-btn" id="btnShareSchedule" title="일정 공유" aria-label="일정 공유">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5zm6 4h6v2h-6zm-4 0h2v2H7zm4 4h6v2h-6zm-4 0h2v2H7z"/></svg>
-          </button>
           <input type="file" id="fileInput" multiple hidden />
-          <textarea id="composerInput" rows="1" placeholder="메시지 보내기"></textarea>
-          <!-- v0.4.40: 멘션 자동완성 팝오버 -->
+          <textarea id="composerInput" rows="1" placeholder="硫붿떆吏 蹂대궡湲?></textarea>
+          <!-- v0.4.40: 硫섏뀡 ?먮룞?꾩꽦 ?앹삤踰?-->
           <div class="mention-popover" id="mentionPopover" hidden></div>
-          <button id="btnSend" class="composer-send" title="보내기 (Enter)" aria-label="보내기">
+          <button id="btnSend" class="composer-send" title="蹂대궡湲?(Enter)" aria-label="蹂대궡湲?>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
       </footer>
     </section>
 
-    <!-- v0.4.16: 달력 메인 뷰 -->
+    <!-- v0.4.16: ?щ젰 硫붿씤 酉?-->
     <section class="full-pane" id="calendarPane" hidden>
       <header class="full-pane-head">
-        <div class="fp-title"><img class="fp-logo" src="assets/app-icon.png" alt="" /></div>
+        <div class="fp-title">?щ젰</div>
         <div class="fp-actions">
-          <button class="icon-btn" id="calNavToday" title="오늘" aria-label="오늘">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2L4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm-1.2 14.2l-3.5-3.5 1.4-1.4 2.1 2.1 5-5 1.4 1.4-6.4 6.4z"/></svg>
-          </button>
+          <button class="icon-btn" id="calNavPrev" title="?댁쟾 ??>??/button>
+          <button class="btn-secondary" id="calNavToday">?ㅻ뒛</button>
+          <button class="icon-btn" id="calNavNext" title="?ㅼ쓬 ??>??/button>
           <span class="cal-current" id="calCurrentLabel"></span>
           <span class="fp-grow"></span>
-          <button class="icon-btn" id="calRefreshBtn" title="동기화" aria-label="동기화">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A8 8 0 1 0 19.7 14h-2.1a6 6 0 1 1-1.4-6.24L13 11h7V4z"/></svg>
+          <button class="btn-secondary cal-refresh-icon-btn" id="calRefreshBtn" title="?숆린?? aria-label="?숆린??>
+            <img src="assets/svg/chat/free-icon-font-cloud-stairs.svg" alt="" />
           </button>
-          <button class="icon-btn icon-btn-primary" id="calNewBtn" title="일정 추가" aria-label="일정 추가">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
-          </button>
+          <button class="btn-primary" id="calNewBtn">竊??쇱젙 異붽?</button>
         </div>
       </header>
       <div class="cal-month-grid" id="calMonthGrid"></div>
     </section>
 
-    <!-- v0.4.16: 메모 메인 뷰 -->
+    <!-- v0.4.16: 硫붾え 硫붿씤 酉?-->
     <section class="full-pane" id="memoPane" hidden>
       <header class="full-pane-head">
-        <div class="fp-title"><img class="fp-logo" src="assets/app-icon.png" alt="" /></div>
+        <div class="fp-title">硫붾え</div>
         <div class="fp-actions">
+          <select class="memo-sort-select" id="memoSortSelect" title="硫붾え ?뺣젹">
+            <option value="custom">吏곸젒 ?뺣젹</option>
+            <option value="updated-desc">理쒓렐 ?섏젙??/option>
+            <option value="updated-asc">?ㅻ옒???섏젙??/option>
+            <option value="created-desc">理쒓렐 ?앹꽦??/option>
+            <option value="created-asc">?ㅻ옒???앹꽦??/option>
+          </select>
+          <select class="memo-sort-select" id="memoGroupSortSelect" title="洹몃９ ?뺣젹">
+            <option value="custom">洹몃９ 吏곸젒 ?뺣젹</option>
+            <option value="name">洹몃９ ?대쫫??/option>
+          </select>
           <span class="fp-grow"></span>
-          <button class="icon-btn icon-btn-primary" id="memoNewBtn" title="새 메모" aria-label="새 메모">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
-          </button>
+          <button class="btn-primary" id="memoNewBtn">竊???硫붾え</button>
         </div>
       </header>
       <div class="memo-layout">
         <aside class="memo-groups">
           <div class="memo-groups-head">
-            <span>그룹</span>
-            <button class="icon-btn-tiny" id="memoNewGroupBtn" title="새 그룹">＋</button>
+            <span>洹몃９</span>
+            <button class="icon-btn-tiny" id="memoNewGroupBtn" title="??洹몃９">竊?/button>
           </div>
           <ul id="memoGroupList" class="memo-group-list"></ul>
         </aside>
         <ul class="memo-list" id="memoList"></ul>
         <section class="memo-editor">
-          <input class="memo-title-input" id="memoTitle" type="text" placeholder="제목" />
-          <textarea class="memo-body-input" id="memoBody" placeholder="여기에 내용을 작성하세요…"></textarea>
+          <input class="memo-title-input" id="memoTitle" type="text" placeholder="?쒕ぉ" />
+          <div class="memo-toolbar" id="memoToolbar" aria-label="硫붾え ?몄쭛 ?꾧뎄">
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="bold" title="援듦쾶"><img src="assets/svg/chat/free-icon-font-b.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="underline" title="諛묒쨪"><img src="assets/svg/chat/free-icon-font-highlighter-line.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-cmd="strikeThrough" title="痍⑥냼??><img src="assets/svg/chat/free-icon-font-strikethrough.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn memo-tool-highlight" data-action="highlight" title="?뺢킅??><img src="assets/svg/chat/free-icon-font-highlighter.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="checkbox" title="泥댄겕諛뺤뒪"><img src="assets/svg/chat/free-icon-font-checkbox.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="image" title="?대?吏 泥⑤?"><img src="assets/svg/chat/free-icon-font-add-image.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-icon-btn memo-color-trigger" id="memoColorBtn" data-action="color" title="湲?먯깋">
+              <img src="assets/svg/chat/free-icon-font-palette.svg" alt="" />
+              <span class="memo-color-dot" id="memoColorDot"></span>
+            </button>
+            <div class="memo-color-menu" id="memoColorMenu" hidden></div>
+            <button type="button" class="memo-tool-btn memo-icon-btn" data-action="box" title="?ㅻえ 諛뺤뒪"><img src="assets/svg/chat/free-icon-font-box-heart.svg" alt="" /></button>
+            <button type="button" class="memo-tool-btn memo-tool-star" id="memoStarBtn" data-action="star" title="利먭꺼李얘린" aria-pressed="false">
+              <img src="assets/svg/chat/free-icon-font-star.svg" alt="" />
+            </button>
+            <select class="memo-tool-select" id="memoFontSize" title="湲???ш린">
+              <option value="">?ш린</option>
+              <option value="12px">12</option>
+              <option value="14px">14</option>
+              <option value="16px">16</option>
+              <option value="18px">18</option>
+              <option value="22px">22</option>
+              <option value="28px">28</option>
+            </select>
+            <select class="memo-tool-select" id="memoFontFamily" title="湲瑗?>
+              <option value="">湲瑗?/option>
+              <option value="Malgun Gothic">留묒? 怨좊뵓</option>
+              <option value="Noto Sans KR">Noto Sans KR</option>
+              <option value="Segoe UI">Segoe UI</option>
+              <option value="Consolas, Console, monospace">Console</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+            <input id="memoImageInput" type="file" accept="image/*" hidden />
+          </div>
+          <textarea class="memo-body-input" id="memoBody" placeholder="?ш린???댁슜???묒꽦?섏꽭?붴?></textarea>
           <div class="memo-editor-foot">
             <span class="memo-status" id="memoStatus"></span>
-            <button class="icon-btn memo-foot-btn" id="memoDeleteBtn" title="삭제" aria-label="삭제" hidden>
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9 3v1H4v2h16V4h-5V3zm-3 6v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9zm3 2h2v9H9zm4 0h2v9h-2z"/></svg>
-            </button>
+            <button class="btn-secondary" id="memoDeleteBtn" hidden>??젣</button>
           </div>
         </section>
       </div>
     </section>
 
-    <!-- v0.4.16: 일정 추가/수정 모달 -->
+    <!-- v0.4.16: ?쇱젙 異붽?/?섏젙 紐⑤떖 -->
     <div class="modal" id="calEditModal" hidden>
       <div class="modal-card">
         <div class="modal-head">
-          <h2 id="calEditTitle">일정</h2>
-          <button class="icon-btn" data-close="calEditModal" aria-label="닫기">×</button>
+          <h2 id="calEditTitle">?쇱젙</h2>
+          <button class="icon-btn" data-close="calEditModal" aria-label="?リ린">횞</button>
         </div>
-        <label>제목 <input id="calFTitle" type="text" maxlength="200" /></label>
-        <label>시작 <input id="calFStart" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly /></label>
-        <label>종료 <input id="calFEnd" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly /></label>
-        <label>장소 <input id="calFLocation" type="text" maxlength="200" /></label>
-        <label>설명 <textarea id="calFDesc" rows="3"></textarea></label>
+        <label>?쒕ぉ
+          <div class="cal-title-row">
+            <input id="calFTitle" type="text" maxlength="200" />
+            <button class="cal-pill-toggle cal-important-toggle" id="calFImportant" type="button" aria-pressed="false" aria-label="以묒슂" title="以묒슂">
+              <img src="assets/svg/chat/free-icon-font-headache.svg" alt="" aria-hidden="true" class="cal-important-toggle-icon" />
+            </button>
+          </div>
+        </label>
+        <div class="cal-form-row cal-form-row-time">
+          <label>?쒖옉 <input id="calFStart" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" /></label>
+          <label>醫낅즺 <input id="calFEnd" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" /></label>
+          <label class="cal-inline-check"><input id="calFAllDay" type="checkbox" /> 醫낆씪</label>
+        </div>
+        <div class="cal-form-row cal-form-row-2">
+          <label>?쇱젙 ?좏삎
+            <select id="calFType">
+              <option value="?묒뾽">?묒뾽</option>
+              <option value="誘명똿">誘명똿</option>
+              <option value="援먯쑁">援먯쑁</option>
+              <option value="?닿?">?닿?</option>
+              <option value="?먭?">?먭?</option>
+              <option value="湲고?">湲고?</option>
+            </select>
+          </label>
+          <label>?쇱젙 怨듭쑀
+            <select id="calFShare">
+              <option value="PRIVATE">湲곕낯</option>
+              <option value="ALL">?꾩껜怨듭쑀</option>
+              <option value="DEPARTMENT">遺?쒓났??/option>
+              <option value="SELECT">?좏깮怨듭쑀</option>
+            </select>
+          </label>
+        </div>
+        <div class="cal-repeat-section">
+          <div class="cal-form-row cal-form-row-2">
+            <label>諛섎났
+              <select id="calFRepeat">
+                <option value="none">諛섎났 ????/option>
+                <option value="daily">留ㅼ씪</option>
+                <option value="weekly">留ㅼ＜</option>
+                <option value="monthly">留ㅼ썡</option>
+                <option value="yearly">留ㅻ뀈</option>
+                <option value="custom">?ъ슜??吏??/option>
+              </select>
+            </label>
+            <label id="calFRepeatEndBlock" hidden>諛섎났 醫낅즺
+              <select id="calFRepeatEndType">
+                <option value="never">醫낅즺 ?놁쓬</option>
+                <option value="until">?뱀젙 ?좎쭨源뚯?</option>
+                <option value="count">N??諛섎났</option>
+              </select>
+            </label>
+          </div>
+          <div id="calFRepeatEndDetail" class="cal-form-row cal-form-row-2" hidden>
+            <label id="calFRepeatUntilBlock" hidden>醫낅즺 ?좎쭨
+              <input id="calFRepeatUntilDate" type="text" placeholder="YYYY-MM-DD" />
+            </label>
+            <label id="calFRepeatCountBlock" hidden>諛섎났 ?잛닔
+              <input id="calFRepeatCount" type="number" min="1" step="1" value="10" />
+            </label>
+          </div>
+          <div id="calFRepeatCustomBlock" class="cal-repeat-custom" hidden>
+            <div class="cal-form-row cal-form-row-2">
+              <label>諛섎났 二쇨린
+                <input id="calFRepeatInterval" type="number" min="1" step="1" value="1" />
+              </label>
+              <label>?⑥쐞
+                <select id="calFRepeatFrequency">
+                  <option value="daily">??/option>
+                  <option value="weekly">二?/option>
+                  <option value="monthly">媛쒖썡</option>
+                  <option value="yearly">??/option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div id="calFRepeatWeekdays" class="cal-repeat-weekdays" hidden>
+            <label class="cal-weekday-chip"><input type="checkbox" value="SU" /> ??/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="MO" /> ??/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="TU" /> ??/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="WE" /> ??/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="TH" /> 紐?/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="FR" /> 湲?/label>
+            <label class="cal-weekday-chip"><input type="checkbox" value="SA" /> ??/label>
+          </div>
+          <div id="calFRepeatMonthPolicy" class="cal-repeat-policy" hidden>?붾쭚 蹂댁젙: ?녿뒗 ?좎쭨???대떦 ?붿쓽 留덉?留??좎쭨濡??쒖떆</div>
+        </div>
+        <label id="calFAttendeeBlock" class="cal-attendee-block" hidden>李몄꽍??          <div class="cal-token-field">
+            <div class="cal-token-row">
+              <input id="calFAttendeeInput" type="text" placeholder="異붽? 踰꾪듉?쇰줈 ?숇즺瑜??좏깮?섏꽭?? autocomplete="off" readonly />
+              <button class="btn-secondary" id="calFAttendeeAdd" type="button">異붽?</button>
+            </div>
+            <div class="cal-token-list" id="calFAttendeeList"></div>
+          </div>
+        </label>
+        <label>?뚮┝
+          <select id="calFReminder">
+            <option value="">?뚮┝ ?놁쓬</option>
+            <option value="10遺???>10遺???/option>
+            <option value="30遺???>30遺???/option>
+            <option value="1?쒓컙 ??>1?쒓컙 ??/option>
+            <option value="1????>1????/option>
+          </select>
+        </label>
+        <label>?쇱젙 ?됱긽
+          <input id="calFColor" class="cal-hidden-select" type="color" value="#6366f1" aria-hidden="true" tabindex="-1" />
+          <div class="cal-dropdown">
+            <button type="button" class="cal-dropdown-trigger" id="calFColorTrigger" aria-expanded="false">
+              <span class="cal-color-preview" id="calFColorPreview"></span>
+              <span id="calFColorLabel">#6366f1</span>
+              <span class="cal-dropdown-arrow"></span>
+            </button>
+            <div class="cal-dropdown-panel cal-color-menu" id="calFColorMenu" hidden></div>
+          </div>
+        </label>
+        <label>?μ냼 <input id="calFLocation" type="text" maxlength="200" /></label>
+        <label>?ㅻ챸 <textarea id="calFDesc" rows="3"></textarea></label>
         <div class="modal-actions">
-          <button class="btn-secondary" id="calFDelete" hidden>삭제</button>
-          <button class="btn-primary" id="calFSave">저장</button>
+          <button class="btn-secondary" id="calFDelete" hidden>??젣</button>
+          <button class="btn-primary" id="calFSave">???/button>
         </div>
         <div id="calFError" class="error" hidden></div>
       </div>
     </div>
+    <div class="modal" id="calRepeatScopeModal" hidden>
+      <div class="modal-card cal-repeat-scope-card">
+        <div class="modal-head">
+          <h2 id="calRepeatScopeTitle">諛섎났 ?쇱젙</h2>
+          <button class="icon-btn" data-repeat-scope="cancel" aria-label="?リ린">횞</button>
+        </div>
+        <div class="cal-repeat-scope-actions">
+          <button class="btn-secondary" type="button" data-repeat-scope="single">???쇱젙留?/button>
+          <button class="btn-secondary" type="button" data-repeat-scope="future">???쇱젙遺???댄썑 紐⑤몢</button>
+          <button class="btn-primary" type="button" data-repeat-scope="all">?꾩껜 諛섎났 ?쇱젙</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- 로그인 모달 -->
+  <!-- 濡쒓렇??紐⑤떖 -->
   <div class="modal" id="loginModal">
     <div class="modal-card login-card">
       <div class="brand-large">
@@ -347,19 +534,28 @@
           <div class="brand-sub">사내 메신저</div>
         </div>
       </div>
-      <div class="lock-profile" id="lockProfile" hidden>
-        <span class="avatar avatar-lg" id="lockAvatar"></span>
-        <div class="lock-info">
-          <div class="lock-name" id="lockName">-</div>
-          <div class="lock-sub">잠겨 있습니다. 비밀번호를 입력해 잠금 해제하세요.</div>
+      <!-- 잠금 전용: 로그인 모드에서는 숨김 -->
+      <div class="lock-screen" id="lockScreenBlock" hidden>
+        <div class="lock-screen-hero" aria-hidden="true">
+          <img src="assets/svg/chat/free-icon-font-unlock.svg" alt="" />
+        </div>
+        <h2 class="lock-screen-title">채팅 잠금</h2>
+        <p class="lock-screen-lead">보안을 위해 채팅 화면을 잠갔습니다.<br />비밀번호를 입력하여 다시 접근하세요.</p>
+        <p class="lock-screen-reason" id="lockReasonText" role="status"></p>
+        <div class="lock-user-row">
+          <span class="avatar avatar-lg" id="lockAvatar"></span>
+          <div class="lock-user-meta">
+            <div class="lock-user-name" id="lockName">-</div>
+          </div>
         </div>
       </div>
       <label id="loginEmpNoLabel">사번
         <input id="loginEmpNo" type="text" autocomplete="username" placeholder="사번을 입력하세요" autofocus />
       </label>
-      <label>비밀번호
+      <label class="login-password-label" id="loginPasswordLabel">비밀번호
         <input id="loginPassword" type="password" autocomplete="current-password" placeholder="비밀번호" />
       </label>
+      <div id="loginError" class="error" role="alert" hidden></div>
       <label class="check">
         <input id="loginRemember" type="checkbox" />
         다음에 자동으로 로그인
@@ -368,17 +564,24 @@
         <button id="btnLogin" class="btn-primary btn-block">로그인</button>
       </div>
       <div class="modal-actions" id="lockActions" hidden>
-        <button id="btnUnlock" class="btn-primary btn-block">잠금 해제</button>
-        <button id="btnLockSwitch" class="btn-block btn-ghost">다른 계정으로 로그인</button>
+        <button type="button" id="btnUnlock" class="btn-primary btn-block btn-unlock" aria-live="polite">
+          <span class="btn-unlock-default" aria-hidden="false">
+            <span class="btn-unlock-text">잠금 해제</span>
+          </span>
+          <span class="btn-unlock-working" id="btnUnlockWorking" hidden>
+            <span class="btn-unlock-spinner" aria-hidden="true"></span>
+            <span>잠금 해제 중...</span>
+          </span>
+        </button>
+        <button type="button" id="btnLockSwitch" class="btn-block btn-ghost lock-switch-account">다른 계정으로 로그인</button>
       </div>
-      <div id="loginError" class="error" hidden></div>
       <div class="login-reset-row">
         <button type="button" id="btnLoginConnSettings" class="btn-ghost-link" title="서버 주소 및 저장된 접속 정보 관리">서버 설정·접속 정보 관리</button>
       </div>
     </div>
   </div>
 
-  <!-- v0.4.36: 로그인 화면에서 서버 주소·초기화를 다루는 별도 다이얼로그 -->
+  <!-- v0.4.36: 濡쒓렇???붾㈃?먯꽌 ?쒕쾭 二쇱냼쨌珥덇린?붾? ?ㅻ（??蹂꾨룄 ?ㅼ씠?쇰줈洹?-->
   <div class="modal" id="connSettingsModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
@@ -399,26 +602,26 @@
         <button class="btn-primary" id="btnConnSettingsSave">저장</button>
       </div>
       <div class="login-reset-row">
-        <button type="button" id="btnConnReset" class="btn-ghost-link" title="저장된 서버 주소·자격증명·쿠키·캐시 전체를 지웁니다">저장된 접속 정보 전체 초기화</button>
+        <button type="button" id="btnConnReset" class="btn-ghost-link" title="저장된 서버 주소·인증서·쿠키·캐시 전체를 지웁니다">저장된 접속 정보 전체 초기화</button>
       </div>
     </div>
   </div>
 
-  <!-- 채널 만들기 모달 -->
+  <!-- 梨꾨꼸 留뚮뱾湲?紐⑤떖 -->
   <div class="modal" id="channelModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2>채널 만들기</h2>
-        <button class="icon-btn" data-close="channelModal" aria-label="닫기">×</button>
+        <h2>梨꾨꼸 留뚮뱾湲?/h2>
+        <button class="icon-btn" data-close="channelModal" aria-label="?リ린">횞</button>
       </div>
-      <label>채널 이름
-        <input id="newChannelName" type="text" placeholder="예: 마케팅, 일반" maxlength="80" />
+      <label>梨꾨꼸 ?대쫫
+        <input id="newChannelName" type="text" placeholder="?? 留덉??? ?쇰컲" maxlength="80" />
       </label>
-      <label>설명 (선택)
-        <input id="newChannelDesc" type="text" placeholder="이 채널의 목적" maxlength="200" />
+      <label>?ㅻ챸 (?좏깮)
+        <input id="newChannelDesc" type="text" placeholder="??梨꾨꼸??紐⑹쟻" maxlength="200" />
       </label>
       <fieldset class="radio-group seg-group">
-        <legend>공개 범위</legend>
+        <legend>怨듦컻 踰붿쐞</legend>
         <label class="seg-card">
           <input type="radio" name="newChannelType" value="public" checked />
           <span class="seg-card-body">
@@ -426,8 +629,8 @@
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.93 9h-3.02a15.6 15.6 0 00-1.18-5.32A8.03 8.03 0 0118.93 11zM12 4c.86 0 2.16 2.06 2.66 7H9.34C9.84 6.06 11.14 4 12 4zM4.07 13h3.02c.13 1.93.55 3.74 1.18 5.32A8.03 8.03 0 014.07 13zm0-2A8.03 8.03 0 019.27 5.68 15.6 15.6 0 008.09 11H4.07zM12 20c-.86 0-2.16-2.06-2.66-7h5.32C14.16 17.94 12.86 20 12 20zm2.73-.68c.63-1.58 1.05-3.39 1.18-5.32h3.02a8.03 8.03 0 01-4.2 5.32z"/></svg>
             </span>
             <span class="seg-card-text">
-              <span class="seg-card-title">공개</span>
-              <span class="seg-card-desc">누구나 참여 가능</span>
+              <span class="seg-card-title">怨듦컻</span>
+              <span class="seg-card-desc">?꾧뎄??李몄뿬 媛??/span>
             </span>
           </span>
         </label>
@@ -438,41 +641,96 @@
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M18 8h-1V6a5 5 0 10-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zM9 6a3 3 0 016 0v2H9V6zm9 14H6V10h12v10zm-6-3a2 2 0 100-4 2 2 0 000 4z"/></svg>
             </span>
             <span class="seg-card-text">
-              <span class="seg-card-title">비공개</span>
-              <span class="seg-card-desc">초대된 사람만</span>
+              <span class="seg-card-title">鍮꾧났媛?/span>
+              <span class="seg-card-desc">珥덈????щ엺留?/span>
             </span>
           </span>
         </label>
       </fieldset>
       <div class="modal-actions">
-        <button class="btn-secondary" data-close="channelModal">취소</button>
-        <button class="btn-primary" id="btnCreateChannel">만들기</button>
+        <button class="btn-secondary" data-close="channelModal">痍⑥냼</button>
+        <button class="btn-primary" id="btnCreateChannel">留뚮뱾湲?/button>
       </div>
       <div class="error" id="channelError" hidden></div>
     </div>
   </div>
 
-  <!-- 새 DM 모달 -->
+  <!-- ??DM 紐⑤떖 -->
   <div class="modal" id="dmModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2>새 메시지</h2>
-        <button class="icon-btn" data-close="dmModal" aria-label="닫기">×</button>
+        <h2>??硫붿떆吏</h2>
+        <button class="icon-btn" data-close="dmModal" aria-label="?リ린">횞</button>
       </div>
-      <label>받는 사람
-        <input id="dmSearchInput" type="text" placeholder="이름·사번·부서 검색" autocomplete="off" />
+      <label>諛쏅뒗 ?щ엺
+        <input id="dmSearchInput" type="text" placeholder="?대쫫쨌?щ쾲쨌遺??寃?? autocomplete="off" />
       </label>
       <ul id="dmSearchResults" class="people-list small"></ul>
       <div class="error" id="dmError" hidden></div>
     </div>
   </div>
 
-  <!-- 프로필 모달 -->
+  <!-- ?뚯씪 誘몃━蹂닿린 紐⑤떖 -->
+  <div class="modal" id="filePreviewModal" hidden>
+    <div class="modal-card file-preview-card">
+      <div class="modal-head">
+        <h2 id="filePreviewTitle">?뚯씪 誘몃━蹂닿린</h2>
+        <button class="icon-btn" data-close="filePreviewModal" aria-label="?リ린">횞</button>
+      </div>
+      <div class="file-preview-toolbar" id="filePreviewToolbar" hidden></div>
+      <div class="file-preview-body" id="filePreviewBody"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="filePreviewOpen">??李쎌쑝濡??닿린</button>
+        <button class="btn-secondary" id="filePreviewDownload">?ㅼ슫濡쒕뱶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ?ы몴 留뚮뱾湲?紐⑤떖 -->
+  <div class="modal" id="pollModal" hidden>
+    <div class="modal-card poll-modal-card">
+      <div class="modal-head">
+        <h2>?ы몴 留뚮뱾湲?/h2>
+        <button class="icon-btn" data-close="pollModal" aria-label="?リ린">횞</button>
+      </div>
+      <label>吏덈Ц
+        <input id="pollQuestion" type="text" placeholder="?ы몴 吏덈Ц???낅젰?섏꽭?? maxlength="120" />
+      </label>
+      <label>??ぉ
+        <textarea id="pollOptions" rows="5" placeholder="??ぉ??以꾨쭏???섎굹???낅젰?섏꽭??#10;?? 李ъ꽦&#10;?? 諛섎?"></textarea>
+      </label>
+      <label>湲곌컙?ㅼ젙
+        <input id="pollEndAt" type="text" class="dt-input" placeholder="YYYY-MM-DD HH:MM" readonly />
+      </label>
+      <div class="modal-actions">
+        <button class="btn-secondary" data-close="pollModal">痍⑥냼</button>
+        <button class="btn-primary" id="pollCreateBtn">?ы몴 ?꾩넚</button>
+      </div>
+      <div class="error" id="pollError" hidden></div>
+    </div>
+  </div>
+
+  <!-- ?쇱젙 李몄꽍???좏깮 紐⑤떖 -->
+  <div class="modal" id="calAttendeeModal" hidden>
+    <div class="modal-card cal-attendee-card">
+      <div class="modal-head">
+        <h2>李몄꽍???좏깮</h2>
+        <button class="icon-btn" data-close="calAttendeeModal" aria-label="?リ린">횞</button>
+      </div>
+      <div class="cal-attendee-modal-caption">?숇즺 由ъ뒪??/div>
+      <input id="calAttendeeSearchInput" type="text" class="cal-attendee-search" placeholder="?대쫫 / ?щ쾲 / 遺?쒕줈 寃?? autocomplete="off" autofocus />
+      <div id="calAttendeeModalCount" class="muted small" aria-live="polite"></div>
+      <ul id="calAttendeeModalList" class="people-list small cal-attendee-modal-list"></ul>
+      <div class="muted small">?숇즺瑜??좏깮?섎㈃ 李몄꽍??紐⑸줉??異붽??⑸땲??</div>
+    </div>
+  </div>
+
+  <!-- ?꾨줈??紐⑤떖 -->
   <div class="modal" id="profileModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2>내 프로필</h2>
-        <button class="icon-btn" data-close="profileModal" aria-label="닫기">×</button>
+        <h2>???꾨줈??/h2>
+        <button class="icon-btn" data-close="profileModal" aria-label="?リ린">횞</button>
       </div>
       <div class="profile-head">
         <span class="avatar avatar-xl" id="profileAvatar"></span>
@@ -482,32 +740,29 @@
           <div class="profile-sub" id="profileDept">-</div>
         </div>
       </div>
-      <label>닉네임
-        <input id="profNickname" type="text" />
+      <label>?됰꽕??        <input id="profNickname" type="text" />
       </label>
-      <label>이메일
-        <input id="profEmail" type="email" />
+      <label>?대찓??        <input id="profEmail" type="email" />
       </label>
-      <label>휴대폰
-        <input id="profMobile" type="text" />
+      <label>?대???        <input id="profMobile" type="text" />
       </label>
-      <label>한 줄 상태
-        <input id="profMotto" type="text" maxlength="120" placeholder="예: 외근 중" />
+      <label>??以??곹깭
+        <input id="profMotto" type="text" maxlength="120" placeholder="?? ?멸렐 以? />
       </label>
       <div class="modal-actions">
-        <button class="btn-secondary" data-close="profileModal">닫기</button>
-        <button class="btn-primary" id="btnSaveProfile">저장</button>
+        <button class="btn-secondary" data-close="profileModal">?リ린</button>
+        <button class="btn-primary" id="btnSaveProfile">???/button>
       </div>
       <div class="error" id="profileError" hidden></div>
     </div>
   </div>
 
-  <!-- 동료 프로필 보기 (읽기 전용) -->
+  <!-- ?숇즺 ?꾨줈??蹂닿린 (?쎄린 ?꾩슜) -->
   <div class="modal" id="userProfileModal" hidden>
     <div class="modal-card user-profile-card">
       <div class="modal-head">
-        <h2>프로필</h2>
-        <button class="icon-btn" data-close="userProfileModal" aria-label="닫기">×</button>
+        <h2>?꾨줈??/h2>
+        <button class="icon-btn" data-close="userProfileModal" aria-label="?リ린">횞</button>
       </div>
       <div class="up-hero">
         <span class="avatar avatar-xl" id="upAvatar"></span>
@@ -517,226 +772,714 @@
         </div>
       </div>
       <dl class="up-info">
-        <div class="up-row"><dt>사번</dt><dd id="upEmpNo">-</dd></div>
-        <div class="up-row"><dt>부서</dt><dd id="upDept">-</dd></div>
-        <div class="up-row"><dt>직책</dt><dd id="upJob">-</dd></div>
-        <div class="up-row"><dt>이메일</dt><dd id="upEmail">-</dd></div>
-        <div class="up-row"><dt>휴대폰</dt><dd id="upMobile">-</dd></div>
-        <div class="up-row"><dt>내선</dt><dd id="upExt">-</dd></div>
+        <div class="up-row"><dt>?щ쾲</dt><dd id="upEmpNo">-</dd></div>
+        <div class="up-row"><dt>遺??/dt><dd id="upDept">-</dd></div>
+        <div class="up-row"><dt>吏곸콉</dt><dd id="upJob">-</dd></div>
+        <div class="up-row"><dt>?대찓??/dt><dd id="upEmail">-</dd></div>
+        <div class="up-row"><dt>?대???/dt><dd id="upMobile">-</dd></div>
+        <div class="up-row"><dt>?댁꽑</dt><dd id="upExt">-</dd></div>
       </dl>
       <div class="modal-actions">
-        <button class="btn-secondary" data-close="userProfileModal">닫기</button>
-        <button class="btn-primary" id="btnUpStartChat">채팅하기</button>
+        <button class="btn-secondary" data-close="userProfileModal">?リ린</button>
+        <button class="btn-primary" id="btnUpStartChat">梨꾪똿?섍린</button>
       </div>
     </div>
   </div>
 
-  <!-- 설정 모달 -->
+  <!-- ?ㅼ젙 紐⑤떖 (v0.5: Slack/Discord/Enterprise 援ъ“) -->
   <div class="modal" id="settingsModal" hidden>
     <div class="modal-card settings-card">
-      <nav class="settings-tabs">
-        <button class="settings-tab active" data-settings-tab="general">일반</button>
-        <button class="settings-tab" data-settings-tab="notify">알림</button>
-        <button class="settings-tab" data-settings-tab="appearance">테마</button>
-        <button class="settings-tab" data-settings-tab="advanced">고급</button>
-        <button class="settings-tab" data-settings-tab="about">정보</button>
+      <nav class="settings-nav" aria-label="?ㅼ젙 ?뱀뀡">
+        <div class="settings-nav-title">?ㅼ젙</div>
+        <button type="button" class="settings-tab active" data-settings-tab="general" title="?쇰컲">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.6-.22l-2.39.96a7.17 7.17 0 0 0-1.69-.98l-.38-2.55A.488.488 0 0 0 12 2h-4a.49.49 0 0 0-.49.42l-.38 2.55c-.6.24-1.17.56-1.69.98l-2.39-.96a.49.49 0 0 0-.6.22L2.46 7.3c-.1.2-.05.45.12.61l2.03 1.58c-.04.31-.07.64-.07.96s.02.64.07.96l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.3.6.22l2.39-.97c.52.43 1.09.75 1.69.99l.38 2.55c.05.24.25.42.49.42h4c.24 0 .45-.18.49-.42l.38-2.55c.6-.24 1.16-.57 1.68-.99l2.4.97c.22.08.48 0 .6-.22l1.92-3.32c.1-.2.05-.45-.12-.61l-2.01-1.58zM12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5z"/></svg></span>
+          <span class="settings-tab-txt">?쇰컲</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="notify" title="?뚮┝">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 22a2.98 2.98 0 0 0 2.99-2h-5.98A2.98 2.98 0 0 0 12 22zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></span>
+          <span class="settings-tab-txt">?뚮┝</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="display" title="?붾㈃">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M21 2H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7v2H8v2h8v-2h-2v-2h7a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 14H3V4h18v12z"/></svg></span>
+          <span class="settings-tab-txt">?붾㈃</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="security" title="蹂댁븞">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 9.95 9 11 5.16-1.05 9-5.45 9-11V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg></span>
+          <span class="settings-tab-txt">蹂댁븞</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="retention" title="?먮룞??젣">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-2.34-5.66L15 9h7V2l-2.91 2.91A9.96 9.96 0 0 0 12 2zm1 5h-2v6l5 3 .95-1.58-3.95-2.34V7z"/></svg></span>
+          <span class="settings-tab-txt">?먮룞??젣</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="connection" title="?곌껐">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg></span>
+          <span class="settings-tab-txt">?곌껐</span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="data" title="?곗씠??>
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 3h18v4H3V3zm0 6h10v4H3V9zm0 6h10v4H3v-4zM16 9h5v10h-5V9z"/></svg></span>
+          <span class="settings-tab-txt">?곗씠??/span>
+        </button>
+        <button type="button" class="settings-tab" data-settings-tab="about" title="?뺣낫">
+          <span class="settings-tab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></span>
+          <span class="settings-tab-txt">?뺣낫</span>
+        </button>
       </nav>
       <div class="settings-body">
         <div class="settings-panes">
+          <!-- ?쇰컲 -->
           <section class="settings-pane" data-pane="general">
-            <h3>일반</h3>
-            <label>언어
-              <select id="setLanguage">
-                <option value="ko">한국어</option>
-                <option value="en">English</option>
-              </select>
-            </label>
+            <header class="st-head">
+              <h2 class="st-head-title">?쇰컲</h2>
+              <p class="st-head-desc">Blossom Chat???대뼸寃??ㅽ뻾?섍퀬 ?쒖떆?좎? ?쒖뼱?⑸땲??</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?먮룞 ?ㅽ뻾</div>
+                  <div class="st-row-desc">Windows 濡쒓렇?????깆씠 ?먮룞?쇰줈 ?쒖옉?⑸땲??</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_autoStart" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?몃젅?대줈 理쒖냼??/div>
+                  <div class="st-row-desc">李쎌쓣 ?レ쑝硫??섎떒 ?몃젅?대줈 ?④퉩?덈떎.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_minimizeToTray" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">?몄뼱</div>
+                  <div class="st-row-desc">?깆뿉 ?쒖떆?섎뒗 湲곕낯 ?몄뼱?낅땲??</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_language" class="st-select">
+                    <option value="ko">?쒓뎅??/option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </section>
 
+          <!-- ?뚮┝ -->
           <section class="settings-pane" data-pane="notify" hidden>
-            <h3>알림</h3>
-            <label class="check">
-              <input id="setNotifyFocus" type="checkbox" />
-              창이 활성화되어 있을 때도 알림 표시
-            </label>
-            <label class="check">
-              <input id="setNotifySound" type="checkbox" />
-              알림 소리
-            </label>
+            <header class="st-head">
+              <h2 class="st-head-title">?뚮┝</h2>
+              <p class="st-head-desc">梨꾨꼸쨌DM쨌硫섏뀡??????몄떆, ?뚮━, 諛⑺빐湲덉? 洹쒖튃???ㅼ젙?⑸땲??</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?꾩껜 ?뚮┝</div>
+                  <div class="st-row-desc">Blossom ?뚮┝(?좎뒪??諛곗?) 珥앷큵 on/off</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyMaster" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">硫섏뀡 ?뚮┝</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyMention" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">DM ?뚮┝</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyDm" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">?뱀젙 梨꾨꼸 ?뚮┝</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyChannel" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">?ㅼ썙??/h3>
+              <p class="st-muted st-gap">?쇳몴濡?援щ텇 (?? 湲닿툒, 諛고룷, outage)</p>
+              <textarea id="st_notifyKeywords" class="st-textarea" rows="2" placeholder=""></textarea>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">諛⑺빐 湲덉?</h3>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?쇱젙</div>
+                  <div class="st-row-desc">???쒓컙??먮뒗 OS ?뚮┝쨌?뚮━瑜??뺣땲?????????.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_dndEnabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-dnd-row" id="st_dndRow" hidden>
+                <label>?쒖옉 <input type="time" id="st_dndStart" class="st-input" /></label>
+                <span class="st-dnd-sep">~</span>
+                <label>醫낅즺 <input type="time" id="st_dndEnd" class="st-input" /></label>
+              </div>
+            </div>
+            <div class="st-group">
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">?뚮┝ ?ъ슫??/div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_notifySoundId" class="st-select">
+                    <option value="default">湲곕낯</option>
+                    <option value="subtle">???섍쾶</option>
+                    <option value="none">?놁쓬</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row" data-depends="st_notifyMaster">
+                <div class="st-row-text">
+                  <div class="st-row-title">?ъ빱??以묒뿉???뚮┝</div>
+                  <div class="st-row-desc">Blossom 李쎌씠 ?욎뿉 ?덉쓣 ?뚮룄 ?곗뒪?ы넲 ?뚮┝???꾩썎?덈떎.</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_notifyOnFocus" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
           </section>
 
-          <section class="settings-pane" data-pane="appearance" hidden>
-            <h3>테마</h3>
-            <fieldset class="seg-control" role="radiogroup" aria-label="모드">
-              <legend>모드</legend>
-              <label class="seg-pill">
-                <input type="radio" name="theme" value="light" />
-                <span class="seg-pill-body">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5a1 1 0 011 1v2a1 1 0 11-2 0V3a1 1 0 011-1zm0 17a1 1 0 011 1v2a1 1 0 11-2 0v-2a1 1 0 011-1zM4.22 4.22a1 1 0 011.42 0l1.41 1.42A1 1 0 015.64 7.05L4.22 5.64a1 1 0 010-1.42zm12.73 12.73a1 1 0 011.42 0l1.41 1.41a1 1 0 01-1.41 1.42l-1.42-1.41a1 1 0 010-1.42zM2 12a1 1 0 011-1h2a1 1 0 110 2H3a1 1 0 01-1-1zm17 0a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1zM4.22 19.78a1 1 0 010-1.42l1.42-1.41a1 1 0 011.41 1.41l-1.41 1.42a1 1 0 01-1.42 0zm12.73-12.73a1 1 0 010-1.42l1.41-1.41a1 1 0 111.42 1.41l-1.42 1.42a1 1 0 01-1.41 0z"/></svg>
-                  라이트
-                </span>
-              </label>
-              <label class="seg-pill">
-                <input type="radio" name="theme" value="dark" />
-                <span class="seg-pill-body">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
-                  다크
-                </span>
-              </label>
-              <label class="seg-pill">
-                <input type="radio" name="theme" value="auto" />
-                <span class="seg-pill-body">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M20 4H4a2 2 0 00-2 2v10a2 2 0 002 2h7v2H8v2h8v-2h-3v-2h7a2 2 0 002-2V6a2 2 0 00-2-2zm0 12H4V6h16v10z"/></svg>
-                  시스템
-                </span>
-              </label>
-            </fieldset>
-            <label>글자 크기
-              <select id="setFontSize">
-                <option value="14">작게</option>
-                <option value="15" selected>기본</option>
-                <option value="17">크게</option>
-              </select>
-            </label>
+          <!-- ?붾㈃ -->
+          <section class="settings-pane" data-pane="display" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">?붾㈃</h2>
+              <p class="st-head-desc">?뚮쭏, 媛?낆꽦, ?덉씠?꾩썐 諛?꾨? 議곗젙?⑸땲??</p>
+            </header>
+            <div class="st-group">
+              <h3 class="st-group-h">紐⑤뱶</h3>
+              <fieldset class="seg-control" role="radiogroup" aria-label="?뚮쭏 紐⑤뱶">
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="light" />
+                  <span class="seg-pill-body">?쇱씠??/span>
+                </label>
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="dark" />
+                  <span class="seg-pill-body">?ㅽ겕</span>
+                </label>
+                <label class="seg-pill">
+                  <input type="radio" name="theme" value="auto" />
+                  <span class="seg-pill-body">?쒖뒪??/span>
+                </label>
+              </fieldset>
+            </div>
+            <div class="st-group">
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">湲???ш린</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_fontSize" class="st-select">
+                    <option value="14">?묎쾶</option>
+                    <option value="15">湲곕낯</option>
+                    <option value="17">?ш쾶</option>
+                    <option value="19">?꾩＜ ?ш쾶</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">梨꾪똿 諛??/div>
+                  <div class="st-row-desc">硫붿떆吏 以?媛꾧꺽</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_chatDensity" class="st-select">
+                    <option value="cozy">?ъ쑀 (cozy)</option>
+                    <option value="comfortable">蹂댄넻 (comfortable)</option>
+                    <option value="compact">珥섏킌 (compact)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">UI ?좊땲硫붿씠??/div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_uiAnimations" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
           </section>
 
-          <section class="settings-pane" data-pane="advanced" hidden>
-            <h3>고급</h3>
-            <label>서버 주소
-              <input id="setServer" type="url" />
-            </label>
-            <p class="muted small">서버 주소는 시스템 관리자가 안내한 값을 사용하세요.</p>
-            <button class="btn-secondary" id="btnLogout">로그아웃</button>
-            <button class="btn-secondary" id="btnAdvReset" style="margin-left:8px">저장된 접속 정보 초기화</button>
+          <!-- 蹂댁븞 -->
+          <section class="settings-pane" data-pane="security" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">蹂댁븞</h2>
+              <p class="st-head-desc">?묎렐 ?쒗븳, ?뷀샇?? 媛먯궗瑜?援ъ꽦?⑸땲?? 誘쇨컧 ??ぉ? 愿由ъ옄 ?뺤콉???곗꽑?????덉뒿?덈떎.</p>
+            </header>
+            <div class="st-group">
+              <h3 class="st-group-h">?묎렐</h3>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">???좉툑 PIN <span class="st-badge st-badge--policy" id="st_pinPolicyBadge" hidden>?뺤콉</span></div>
+                  <div class="st-row-desc">梨꾪똿 ?좉툑 ?붾㈃??PIN???ъ슜 (蹂꾨룄 OS 蹂댁븞 ?곸뿭?????</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_appPinEnabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-pin-box" id="st_pinBox" hidden>
+                <input type="password" id="st_pinNew" class="st-input" placeholder="??PIN (?レ옄 6?먮━)" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" />
+                <input type="password" id="st_pinConfirm" class="st-input" placeholder="PIN ?뺤씤 (?レ옄 6?먮━)" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" />
+                <div class="st-pin-hint" id="st_pinHint"></div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">?먮룞 ?좉툑 ?쒓컙(遺?</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <input type="number" id="st_autoLockMin" class="st-input st-input--num" min="1" max="240" step="1" />
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-ctrl" style="flex:1;justify-content:flex-end">
+                  <button type="button" class="btn-secondary" id="btnLoginHistory">濡쒓렇??湲곕줉</button>
+                  <button type="button" class="btn-danger-ghost" id="btnRemoteLogout">?ㅻⅨ 怨녹뿉??濡쒓렇?꾩썐(?몄뀡)</button>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?뚯씪 ?ㅼ슫濡쒕뱶 ?쒗븳</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_fileDownloadRestrict" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field st-row--stack">
+                <div class="st-row-text">
+                  <div class="st-row-title">?덉슜 ?뚯씪 ?뺤떇</div>
+                  <div class="st-row-desc">?쇳몴濡?援щ텇?⑸땲?? ?? pdf, png, jpg, docx, zip</div>
+                </div>
+                <div class="st-row-ctrl st-row-ctrl--wide">
+                  <input type="text" id="st_allowedFileExtensions" class="st-input" placeholder="pdf,png,jpg,jpeg,gif,webp,txt,log,json,xml,doc,docx,hwp,hwpx,zip" />
+                </div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">?뚯씪 1媛쒕떦 理쒕? ?⑸웾(MB)</div>
+                  <div class="st-row-desc">??붿갹 ?뚯씪 泥⑤? ?꾩뿉 濡쒖뺄?먯꽌 李⑤떒?⑸땲??</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <input type="number" id="st_maxUploadMb" class="st-input st-input--num" min="1" max="500" step="1" />
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">蹂듭궗 ?쒗븳(?대┰蹂대뱶)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_copyRestrict" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+            <div class="st-group">
+              <h3 class="st-group-h">?뷀꽣?꾨씪?댁쫰 蹂댁븞</h3>
+              <p class="st-muted st-gap">濡쒖뺄?먯꽌 媛?ν븳 ?섏???蹂닿컯쨌湲곕줉???ㅼ젙?⑸땲???쇰????쒕쾭쨌?뺤콉怨??곕룞).</p>
+              <div class="st-row is-disabled" id="st_rowTls" title="HTTPS ?ъ슜 ???쒖뒪??猷⑦듃???섑빐 ?몄쬆">
+                <div class="st-row-text">
+                  <div class="st-row-title">TLS쨌?몄쬆??寃利?<span class="st-badge st-badge--ok">?쒖꽦</span></div>
+                </div>
+                <input type="checkbox" id="st_tlsEnforce" checked disabled />
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?몄쬆?쑣룻샇?ㅽ듃 Pinning(?좊ː)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_certPinning" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row is-disabled" title="?몄뀡/由ы봽?덉떆 ?좏겙? ?쒕쾭 ?뺤콉">
+                <div class="st-row-text">
+                  <div class="st-row-title">Refresh token rotation(湲곕?)</div>
+                </div>
+                <input type="checkbox" id="st_refreshTokenRotation" disabled />
+              </div>
+              <div class="st-row is-disabled" title="?먭꺽 利앸챸? OS safeStorage(Windows ?뷀샇??">
+                <div class="st-row-text">
+                  <div class="st-row-title">濡쒖뺄 ?좏겙/鍮꾨?踰덊샇 ?뷀샇?????<span class="st-badge st-badge--ok">OS</span></div>
+                </div>
+                <input type="checkbox" id="st_localTokenEncrypt" checked disabled />
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">媛먯궗 濡쒓렇(濡쒖뺄)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_auditLogLocal" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?ㅼ젙 蹂寃??대젰(濡쒖뺄)</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="st_settingsHistory" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
           </section>
 
+          <!-- ????먮룞??젣 ?뺤콉 -->
+          <section class="settings-pane" data-pane="retention" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">????먮룞??젣 ?뺤콉</h2>
+              <p class="st-head-desc">留덉?留?????댄썑 ?ㅼ젙???쒓컙 ?숈븞 ??硫붿떆吏媛 ?놁쑝硫?????댁슜???먮룞 ??젣?⑸땲?? 愿由ъ옄???꾩뿭, ?쇰컲 ?ъ슜?먮뒗 ??梨꾪똿?먮쭔 諛섏쁺?⑸땲??</p>
+            </header>
+            <div class="retention-admin-lock" id="retentionAdminLock" hidden>?꾩옱 怨꾩젙 踰붿쐞濡??먮룞??젣 ?뺤콉????ν빀?덈떎.</div>
+            <div class="retention-tabs" id="retentionTypeTabs">
+              <button type="button" class="active" data-retention-type="CHANNEL">梨꾨꼸</button>
+              <button type="button" data-retention-type="GROUP">洹몃９梨꾪똿</button>
+              <button type="button" data-retention-type="DIRECT">媛쒖씤梨꾪똿</button>
+            </div>
+            <div class="st-group retention-card">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?먮룞??젣 ?쒖꽦??/div>
+                  <div class="st-row-desc">鍮꾪솢???곹깭媛 蹂닿?湲곌컙???섏쑝硫?硫붿떆吏瑜?soft delete?⑸땲??</div>
+                </div>
+                <label class="st-switch">
+                  <input type="checkbox" id="rt_enabled" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">蹂닿?湲곌컙</div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="rt_period" class="st-input">
+                    <option value="3600">1?쒓컙</option>
+                    <option value="21600">6?쒓컙</option>
+                    <option value="43200">12?쒓컙</option>
+                    <option value="86400">24?쒓컙</option>
+                    <option value="259200">3??/option>
+                    <option value="604800">7??/option>
+                    <option value="2592000">30??/option>
+                    <option value="custom">吏곸젒 ?낅젰</option>
+                  </select>
+                  <input type="number" id="rt_customValue" class="st-input st-input--num" min="1" max="365" value="24" hidden />
+                  <select id="rt_customUnit" class="st-input" hidden>
+                    <option value="hours">?쒓컙</option>
+                    <option value="days">??/option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">??붽? ?댁뼱吏硫???젣 ?쒓컙 由ъ뀑</div>
+                  <div class="st-row-desc">留덉?留?硫붿떆吏 ?댄썑 ?ㅼ젙???쒓컙??吏?섎㈃ ????댁슜????젣?⑸땲??</div>
+                </div>
+                <label class="st-switch"><input type="checkbox" id="rt_resetOnNewActivity" checked disabled /><span class="st-switch-ui"></span></label>
+              </div>
+              <div class="st-row"><div class="st-row-text"><div class="st-row-title">泥⑤??뚯씪 ?④퍡 ??젣</div></div><label class="st-switch"><input type="checkbox" id="rt_deleteAttachments" /><span class="st-switch-ui"></span></label></div>
+              <div class="st-row"><div class="st-row-text"><div class="st-row-title">湲곗〈 ??붾갑?먮룄 ?곸슜</div></div><label class="st-switch"><input type="checkbox" id="rt_applyExisting" /><span class="st-switch-ui"></span></label></div>
+              <div class="retention-preview" id="retentionPreviewText"></div>
+              <div class="modal-actions retention-actions">
+                <button type="button" class="btn-secondary" id="btnRetentionReload">蹂寃?痍⑥냼</button>
+                <button type="button" class="btn-secondary" id="btnRetentionApplyExisting">湲곗〈 諛??곸슜</button>
+                <button type="button" class="btn-danger-ghost" id="btnRetentionCleanup">?뺣━ ?묒뾽 ?ㅽ뻾</button>
+                <button type="button" class="btn-primary" id="btnRetentionSave">?뺤콉 ???/button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ?곌껐 -->
+          <section class="settings-pane" data-pane="connection" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">?곌껐</h2>
+              <p class="st-head-desc">Blossom ?쒕쾭????듭떊, ?꾨줉?? ?뺤콉??愿由ы빀?덈떎.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row st-row--field" id="st_rowServer">
+                <div class="st-row-text">
+                  <div class="st-row-title">?쒕쾭 二쇱냼 <span class="st-badge st-badge--policy" id="st_serverLockBadge" hidden>愿由ъ옄</span></div>
+                </div>
+                <div class="st-row-ctrl st-row-ctrl--server">
+                  <input type="url" id="st_serverUrl" class="st-input" placeholder="https://..." />
+                </div>
+              </div>
+              <div class="st-row" style="align-items:flex-start">
+                <div class="st-row-text">
+                  <div class="st-row-title">?몄쬆?쑣톂LS ?곹깭</div>
+                </div>
+                <div class="st-cert-box" id="st_certStatus">-</div>
+              </div>
+              <div class="st-row st-row--field">
+                <div class="st-row-text">
+                  <div class="st-row-title">?꾨줉??/div>
+                </div>
+                <div class="st-row-ctrl">
+                  <select id="st_proxyMode" class="st-select">
+                    <option value="system">?쒖뒪??湲곕낯</option>
+                    <option value="none">吏곸젒(?꾨줉???놁쓬)</option>
+                    <option value="custom">?ъ슜???뺤쓽</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-row" id="st_proxyRow" hidden>
+                <input type="text" id="st_proxyUrl" class="st-input" placeholder="http://user:pass@host:port" style="width:100%" />
+              </div>
+              <div class="st-row">
+                <div class="st-row-ctrl" style="flex:1;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                  <button type="button" class="btn-secondary" id="st_btnConnTest">?쒕쾭 ?곌껐 ?뚯뒪??/button>
+                </div>
+              </div>
+              <p class="st-muted" id="st_connTestMsg" hidden></p>
+              <div class="st-row" id="st_rowAdminLock">
+                <div class="st-row-text">
+                  <div class="st-row-title">愿由ъ옄 ?뺤콉(?쒕쾭 ?좉툑) <span class="st-badge st-badge--policy">?쒖떆</span></div>
+                  <div class="st-row-desc">?쒖꽦???????쒕쾭/?꾨줉???쇰????뺤콉???섑빐 ?좉퉩?덈떎(?? adminPolicyServerLock).</div>
+                </div>
+                <label class="st-switch" title="?붾쾭洹? ?뺤콉 ?쒕?">
+                  <input type="checkbox" id="st_adminPolicyServerLock" />
+                  <span class="st-switch-ui"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- ?곗씠??-->
+          <section class="settings-pane" data-pane="data" hidden>
+            <header class="st-head">
+              <h2 class="st-head-title">?곗씠??/h2>
+              <p class="st-head-desc">罹먯떆쨌濡쒓렇쨌濡쒖뺄 ??μ냼瑜??뺣━?⑸땲?? ???묒뾽? 蹂듦뎄媛 ?대젮?????덉뒿?덈떎.</p>
+            </header>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">罹먯떆 ??젣</div>
+                </div>
+                <button type="button" class="btn-danger-outline" id="btnCacheClear">罹먯떆 吏?곌린</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">?ㅼ슫濡쒕뱶 ?곗씠??/div>
+                </div>
+                <button type="button" class="btn-secondary" id="btnDownloadOpen">?ㅼ슫濡쒕뱶 ?대뜑</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">濡쒓렇(濡쒖뺄) ??젣</div>
+                </div>
+                <button type="button" class="btn-danger-outline" id="btnLogClear">濡쒓렇 ??젣</button>
+              </div>
+              <div class="st-row">
+                <div class="st-row-text">
+                  <div class="st-row-title">濡쒖뺄 ???곗씠???몄뀡 珥덇린??/div>
+                </div>
+                <button type="button" class="btn-danger-solid" id="btnDataReset">???곗씠??珥덇린??/button>
+              </div>
+            </div>
+            <div class="st-group" style="margin-top:8px">
+              <p class="st-muted st-gap">珥덇린?붾뒗 ??PC????λ맂 ?묒냽 ?뺣낫쨌荑좏궎쨌罹먯떆쨌?꾩떆 ?곗씠?곕? 吏?곌퀬 ?깆쓣 ?ㅼ떆 ?쒖옉?⑸땲?? 梨꾪똿 ?곗씠?곗? 怨꾩젙 沅뚰븳? 以묒븰 ?쒕쾭?먯꽌 ?ㅼ떆 媛?몄샃?덈떎.</p>
+            </div>
+          </section>
+
+          <!-- ?뺣낫 -->
           <section class="settings-pane" data-pane="about" hidden>
-            <h3>정보</h3>
+            <header class="st-head">
+              <h2 class="st-head-title">?뺣낫</h2>
+            </header>
             <div class="about-block">
-              <img class="about-logo" src="assets/app-icon.png" alt="Blossom" />
+              <img class="about-logo" src="assets/app-icon.png" alt="Blossom" width="64" height="64" />
               <div>
                 <div class="about-name">Blossom Chat</div>
                 <div class="about-ver" id="aboutVersion">v0.0.0</div>
-                <div class="muted small">© Blossom Workspace</div>
+                <div class="muted small">짤 Blossom Workspace</div>
+              </div>
+            </div>
+            <div class="st-group about-actions">
+              <button type="button" class="btn-secondary" id="btnReleaseNotes">由대━利??명듃</button>
+              <button type="button" class="btn-secondary" id="btnLicense">?쇱씠?좎뒪</button>
+            </div>
+            <div class="st-group" id="releaseNotesPanel" hidden>
+              <h3 class="st-group-h">由대━利??명듃</h3>
+              <div id="releaseNotesView" class="st-note-box"></div>
+              <textarea id="releaseNotesEdit" class="st-textarea" rows="7" placeholder="admin ?ъ슜?먮쭔 由대━利??명듃瑜??묒꽦?????덉뒿?덈떎." hidden></textarea>
+              <div class="st-row" id="releaseNotesActions" hidden>
+                <span class="st-muted">admin ?ъ슜??沅뚰븳?쇰줈 ?묒꽦 以묒엯?덈떎.</span>
+                <button type="button" class="btn-primary" id="btnReleaseNotesSave">由대━利??명듃 ???/button>
+              </div>
+            </div>
+            <div class="st-group" id="licensePanel" hidden>
+              <h3 class="st-group-h">?쇱씠?좎뒪 ?뺣낫</h3>
+              <div class="st-license-box">
+                <strong>Blossom Chat Desktop</strong><br />
+                Copyright (c) Blossom Workspace. Internal distribution only.<br /><br />
+                This application bundles Electron, Chromium, Node.js, electron-builder,
+                flatpickr, and other open-source components. Each component remains
+                licensed under its respective license. Redistribution outside the
+                organization is not permitted without approval.
               </div>
             </div>
           </section>
         </div>
         <div class="settings-foot">
-          <button class="btn-secondary" data-close="settingsModal">취소</button>
-          <button class="btn-primary" id="btnSettingsSave">저장</button>
+          <span class="st-foot-dirty" id="st_footDirty" hidden>??λ릺吏 ?딆? 蹂寃쎌씠 ?덉뒿?덈떎</span>
+          <span class="st-foot-grow"></span>
+          <button type="button" class="btn-secondary" id="btnSettingsCancel" data-close="settingsModal">痍⑥냼</button>
+          <button type="button" class="btn-primary" id="btnSettingsSave" disabled>?꾩옱 ?섏씠吏 ???/button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 토스트 -->
+  <!-- ?좎뒪??-->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- v0.4.40: 고정 메시지 목록 모달 -->
+  <!-- v0.4.40: 怨좎젙 硫붿떆吏 紐⑸줉 紐⑤떖 -->
   <div class="modal" id="pinnedListModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2>고정 메시지</h2>
-        <button class="icon-btn" data-close="pinnedListModal" aria-label="닫기">×</button>
+        <h2>怨좎젙 硫붿떆吏</h2>
+        <button class="icon-btn" data-close="pinnedListModal" aria-label="?リ린">횞</button>
       </div>
       <div class="pinned-list" id="pinnedListBody"></div>
     </div>
   </div>
 
-  <!-- v0.4.41: 아이디어 추가/수정 모달 -->
+  <!-- v0.4.41: ?꾩씠?붿뼱 異붽?/?섏젙 紐⑤떖 -->
   <div class="modal" id="ideaFormModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2 id="ideaFormTitle">아이디어 추가</h2>
-        <button class="icon-btn" data-close="ideaFormModal" aria-label="닫기">×</button>
+        <h2 id="ideaFormTitle">?꾩씠?붿뼱 異붽?</h2>
+        <button class="icon-btn" data-close="ideaFormModal" aria-label="?リ린">횞</button>
       </div>
       <div class="modal-body">
-        <label class="form-label">제목</label>
-        <input type="text" id="ideaFormTitleInput" class="form-input" maxlength="200" placeholder="아이디어 제목" />
-        <label class="form-label">상세</label>
-        <textarea id="ideaFormBodyInput" class="form-input" rows="6" placeholder="자세한 내용을 입력하세요"></textarea>
-      </div>
-      <div class="modal-foot">
-        <button class="btn-secondary" data-close="ideaFormModal">취소</button>
-        <button class="btn-primary" id="btnIdeaSave">저장</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- v0.4.41: 업무 추가/수정 모달 -->
-  <div class="modal" id="taskFormModal" hidden>
-    <div class="modal-card">
-      <div class="modal-head">
-        <h2 id="taskFormTitle">업무 추가</h2>
-        <button class="icon-btn" data-close="taskFormModal" aria-label="닫기">×</button>
-      </div>
-      <div class="modal-body">
-        <label class="form-label">제목</label>
-        <input type="text" id="taskFormTitleInput" class="form-input" maxlength="200" placeholder="업무 제목" />
-        <label class="form-label">상세</label>
-        <textarea id="taskFormDescInput" class="form-input" rows="4" placeholder="업무 설명"></textarea>
-        <div class="form-row">
-          <div class="form-col">
-            <label class="form-label">상태</label>
-            <select id="taskFormStatus" class="form-input">
-              <option value="todo">대기</option>
-              <option value="in_progress">진행 중</option>
-              <option value="done">완료</option>
-            </select>
-          </div>
-          <div class="form-col">
-            <label class="form-label">우선순위</label>
-            <select id="taskFormPriority" class="form-input">
-              <option value="low">낮음</option>
-              <option value="normal" selected>보통</option>
-              <option value="high">높음</option>
-            </select>
-          </div>
-          <div class="form-col">
-            <label class="form-label">기한</label>
-            <input type="text" id="taskFormDue" class="form-input" placeholder="YYYY-MM-DD" autocomplete="off" />
-          </div>
-        </div>
-        <label class="form-label">담당자</label>
-        <select id="taskFormAssignee" class="form-input">
-          <option value="">담당자 없음</option>
+        <label class="form-label">?쒕ぉ</label>
+        <input type="text" id="ideaFormTitleInput" class="form-input" maxlength="200" placeholder="?꾩씠?붿뼱 ?쒕ぉ" />
+        <label class="form-label">?곸꽭</label>
+        <textarea id="ideaFormBodyInput" class="form-input" rows="6" placeholder="?먯꽭???댁슜???낅젰?섏꽭??></textarea>
+        <label class="form-label">?곹깭</label>
+        <select id="ideaFormStatus" class="form-input">
+          <option value="review">寃?좎쨷</option>
+          <option value="in_progress">吏꾪뻾以?/option>
+          <option value="done">?꾨즺</option>
+          <option value="hold">蹂대쪟</option>
         </select>
       </div>
       <div class="modal-foot">
-        <button class="btn-secondary" data-close="taskFormModal">취소</button>
-        <button class="btn-primary" id="btnTaskSave">저장</button>
+        <button class="btn-secondary" data-close="ideaFormModal">痍⑥냼</button>
+        <button class="btn-primary" id="btnIdeaSave">???/button>
       </div>
     </div>
   </div>
 
-  <!-- v0.4.44: 채널 초대 모달 -->
+  <!-- v0.4.41: ?낅Т 異붽?/?섏젙 紐⑤떖 -->
+  <div class="modal" id="taskFormModal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="taskFormTitle">?낅Т 異붽?</h2>
+        <button class="icon-btn" data-close="taskFormModal" aria-label="?リ린">횞</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">?쒕ぉ</label>
+        <input type="text" id="taskFormTitleInput" class="form-input" maxlength="200" placeholder="?낅Т ?쒕ぉ" />
+        <label class="form-label">?곸꽭</label>
+        <textarea id="taskFormDescInput" class="form-input" rows="4" placeholder="?낅Т ?ㅻ챸"></textarea>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">?곹깭</label>
+            <select id="taskFormStatus" class="form-input">
+              <option value="todo">?湲?/option>
+              <option value="in_progress">吏꾪뻾 以?/option>
+              <option value="done">?꾨즺</option>
+            </select>
+          </div>
+          <div class="form-col">
+            <label class="form-label">?곗꽑?쒖쐞</label>
+            <select id="taskFormPriority" class="form-input">
+              <option value="low">??쓬</option>
+              <option value="normal" selected>蹂댄넻</option>
+              <option value="high">?믪쓬</option>
+            </select>
+          </div>
+          <div class="form-col">
+            <label class="form-label">湲고븳</label>
+            <input type="text" id="taskFormDue" class="form-input" placeholder="YYYY-MM-DD" autocomplete="off" />
+          </div>
+        </div>
+        <label class="form-label">?대떦??/label>
+        <select id="taskFormAssignee" class="form-input">
+          <option value="">?대떦???놁쓬</option>
+        </select>
+        <label class="form-label">泥댄겕由ъ뒪??/label>
+        <textarea id="taskFormChecklist" class="form-input" rows="3" placeholder="??以꾩뿉 ?섎굹???낅젰"></textarea>
+        <label class="check">
+          <input id="taskFormApproval" type="checkbox" />
+          ?댁쁺/蹂댁븞 ?뱀씤 ?붿껌怨??곌퀎
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" data-close="taskFormModal">痍⑥냼</button>
+        <button class="btn-primary" id="btnTaskSave">???/button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.4.44: 梨꾨꼸 珥덈? 紐⑤떖 -->
   <div class="modal" id="inviteMembersModal" hidden>
     <div class="modal-card">
       <div class="modal-head">
-        <h2>참여자 초대</h2>
-        <button class="icon-btn" data-close="inviteMembersModal" aria-label="닫기">×</button>
+        <h2>李몄뿬??珥덈?</h2>
+        <button class="icon-btn" data-close="inviteMembersModal" aria-label="?リ린">횞</button>
       </div>
       <div class="modal-body">
-        <input type="text" id="inviteSearchInput" class="form-input" placeholder="이름·사번으로 검색" autocomplete="off" />
+        <input type="text" id="inviteSearchInput" class="form-input" placeholder="?대쫫쨌?щ쾲?쇰줈 寃?? autocomplete="off" />
         <div class="rp-list" id="inviteCandidateList" style="max-height:50vh;"></div>
-        <div class="rp-empty" id="inviteCandidateEmpty" hidden>일치하는 사용자가 없습니다.</div>
+        <div class="rp-empty" id="inviteCandidateEmpty" hidden>?쇱튂?섎뒗 ?ъ슜?먭? ?놁뒿?덈떎.</div>
       </div>
       <div class="modal-foot">
-        <button class="btn-secondary" data-close="inviteMembersModal">닫기</button>
+        <button class="btn-secondary" data-close="inviteMembersModal">?リ린</button>
       </div>
     </div>
   </div>
 
   <script src="vendor/flatpickr/flatpickr.min.js"></script>
   <script src="vendor/flatpickr/ko.js"></script>
+  <script src="vendor/fullcalendar/core.global.min.js"></script>
+  <script src="vendor/fullcalendar/daygrid.global.min.js"></script>
+  <script src="vendor/fullcalendar/interaction.global.min.js"></script>
+  <script src="vendor/fullcalendar/ko.global.min.js"></script>
   <script src="js/blossom-mobile-shim.js"></script>
-  <script src="js/api.js"></script>
   <script src="js/sse.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/mobile-shell.js?v=4"></script>
+  <script src="js/api.js?v=0.5.29-retention"></script>
 
-
+  <script src="js/app.js?v=0.5.29-retention"></script>
+  <script src="js/mobile-shell.js?v=6"></script>
+  <script src="js/mobile-polish.js?v=1"></script>
 
 </body>
 </html>
+
+

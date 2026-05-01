@@ -192,6 +192,59 @@ def test_calendar_schedule_full_crud_flow(app, client):
     assert deleted['is_deleted'] is True
 
 
+def test_calendar_schedule_repeat_rule_persist_query_and_validate(app, client):
+    with app.app_context():
+        owner = _make_user('EMP301', '반복 소유자')
+        owner_id = owner.id
+
+    with client.session_transaction() as session_tx:
+        session_tx['user_id'] = owner_id
+        session_tx['_login_at'] = __import__('datetime').datetime.utcnow().isoformat()
+
+    create_payload = {
+        'title': '매일 반복 점검',
+        'start_datetime': '2026-05-01T09:00:00',
+        'end_datetime': '2026-05-01T10:00:00',
+        'is_all_day': False,
+        'event_type': '점검',
+        'owner_user_id': owner_id,
+        'share_scope': 'PRIVATE',
+        'repeat_type': 'daily',
+        'repeat_rule': {
+            'interval': 1,
+            'endType': 'until',
+            'untilDate': '2026-05-10',
+        },
+    }
+    resp = client.post('/api/calendar/schedules', json=create_payload)
+    assert resp.status_code == 201
+    created = resp.get_json()['item']
+    schedule_id = created['id']
+    assert created['repeat_type'] == 'daily'
+    assert created['repeatType'] == 'daily'
+    assert created['repeat_rule']['frequency'] == 'daily'
+    assert created['repeat_rule']['untilDate'] == '2026-05-10'
+
+    resp = client.get('/api/calendar/schedules?start=2026-05-05T00:00:00&end=2026-05-05T23:59:59')
+    assert resp.status_code == 200
+    items = resp.get_json()['items']
+    assert any(item['id'] == schedule_id for item in items)
+
+    resp = client.post(
+        '/api/calendar/schedules',
+        json=dict(create_payload, title='잘못된 종료일', repeat_rule={'interval': 1, 'endType': 'until', 'untilDate': '2026-04-30'}),
+    )
+    assert resp.status_code == 400
+    assert '반복 종료일' in resp.get_json()['message']
+
+    resp = client.post(
+        '/api/calendar/schedules',
+        json=dict(create_payload, title='잘못된 반복 횟수', repeat_rule={'interval': 1, 'endType': 'count', 'count': 0}),
+    )
+    assert resp.status_code == 400
+    assert '반복 횟수' in resp.get_json()['message']
+
+
 def test_calendar_schedule_attachments_upload_persist_download(app, client):
     with app.app_context():
         owner = _make_user('EMP101', '첨부 소유자')

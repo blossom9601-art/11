@@ -6,7 +6,9 @@
 
   // v0.4.32: 하드코딩 서버 주소 제거 — 최초 로그인 시 사용자가 입력
   const DEFAULT_SERVER_URL = '';
+  const BROWSER_DEV_SERVER_URL = 'http://127.0.0.1:8080';
   const POLL_INTERVAL_MS = 1000;
+  const RETENTION_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
   const IDLE_LOCK_EVENTS = ['pointerdown', 'keydown', 'scroll', 'click', 'touchstart', 'wheel'];
   function getIdleLockMs() {
     let m = parseInt((state.settings && state.settings.autoLockMin) || 30, 10);
@@ -22,6 +24,132 @@
   };
   const PIN_MASK = '******';
 
+  function normalizeLanguage(language) {
+    return String(language || '').toLowerCase().indexOf('en') === 0 ? 'en' : 'ko';
+  }
+
+  function t(key, params) {
+    if (window.BlossomI18n && typeof window.BlossomI18n.t === 'function') {
+      return window.BlossomI18n.t(key, params);
+    }
+    return key;
+  }
+
+  function currentLanguage() {
+    return normalizeLanguage(state.uiLanguage || (state.settings && state.settings.language));
+  }
+
+  function currentLocale() {
+    return currentLanguage() === 'en' ? 'en-US' : 'ko-KR';
+  }
+
+  function monthName(monthIndex) {
+    return new Date(2020, monthIndex, 1).toLocaleString('en-US', { month: 'long' });
+  }
+
+  function formatCalendarMonthLabel(dateOrYear, maybeMonth) {
+    const date = dateOrYear instanceof Date ? dateOrYear : new Date(Number(dateOrYear), Number(maybeMonth) - 1, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    if (currentLanguage() === 'en') return t('calendar.monthLabel', { year: year, month: month, monthName: monthName(date.getMonth()) });
+    return t('calendar.monthLabel', { year: year, month: month, monthName: monthName(date.getMonth()) });
+  }
+
+  function flatpickrLocale() {
+    if (currentLanguage() === 'ko') return (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || 'ko';
+    return undefined;
+  }
+
+  function applyLanguage(language, opts) {
+    const lang = normalizeLanguage(language || (state.settings && state.settings.language) || 'ko');
+    const previewOnly = !!(opts && opts.preview);
+    state.uiLanguage = lang;
+    if (state.settings && !previewOnly) state.settings.language = lang;
+    if ($('st_language')) $('st_language').value = lang;
+    if (window.i18n && typeof window.i18n.changeLanguage === 'function') {
+      try { window.i18n.changeLanguage(lang); } catch (_) {}
+    } else if (window.BlossomI18n && typeof window.BlossomI18n.apply === 'function') {
+      try { window.BlossomI18n.apply(document.body || document); } catch (_) {}
+    }
+    try { document.documentElement.setAttribute('lang', lang); } catch (_) {}
+    if (state.calendar && typeof state.calendar.setOption === 'function') {
+      try { state.calendar.setOption('locale', lang === 'ko' ? 'ko' : 'en'); } catch (_) {}
+      try { state.calendar.setOption('moreLinkText', function (n) { return t('calendar.moreLink', { count: n }); }); } catch (_) {}
+      try { state.calendar.render(); } catch (_) {}
+    }
+    if (window.CalendarView && typeof window.CalendarView.refreshLanguage === 'function') {
+      try { window.CalendarView.refreshLanguage(lang); } catch (_) {}
+    }
+    if (state.ym) {
+      const parts = state.ym.split('-').map(Number);
+      const lbl = $('calCurrentLabel');
+      if (lbl && parts.length >= 2) lbl.textContent = formatCalendarMonthLabel(parts[0], parts[1]);
+    }
+    const calModal = $('calEditModal');
+    if (calModal && !calModal.hidden) {
+      configureCalPickers(!!($('calFAllDay') && $('calFAllDay').checked));
+      configureCalRepeatPicker();
+    }
+    updateRetentionPreview();
+    if (opts && opts.persist && window.blossom && blossom.settings && blossom.settings.set) {
+      try { blossom.settings.set('language', lang); } catch (_) {}
+    }
+    return lang;
+  }
+
+  function readBrowserSetting(key) {
+    try {
+      const raw = window.localStorage && window.localStorage.getItem('blossom.setting.' + key);
+      return raw == null ? undefined : JSON.parse(raw);
+    } catch (_) { return undefined; }
+  }
+
+  function writeBrowserSetting(key, value) {
+    try {
+      if (window.localStorage) window.localStorage.setItem('blossom.setting.' + key, JSON.stringify(value));
+    } catch (_) {}
+    return true;
+  }
+
+  if (!window.blossom) {
+    window.__blossomBrowserBridge = true;
+    window.blossom = {
+      settings: {
+        get: (key) => Promise.resolve(key === 'serverUrl'
+          ? (readBrowserSetting(key) || BROWSER_DEV_SERVER_URL)
+          : readBrowserSetting(key)),
+        set: (key, value) => Promise.resolve(writeBrowserSetting(key, value)),
+      },
+      credentials: {
+        save: () => Promise.resolve(true),
+        load: () => Promise.resolve(null),
+        clear: () => Promise.resolve(true),
+      },
+      app: {
+        getVersion: () => Promise.resolve('0.5.29-dev'),
+        openExternal: (url) => { try { window.open(url, '_blank', 'noopener'); } catch (_) {} return Promise.resolve(true); },
+        setAutoStart: () => Promise.resolve(false),
+        getAutoStart: () => Promise.resolve(false),
+        quit: () => Promise.resolve(false),
+        hideToTray: () => Promise.resolve(false),
+        minimize: () => Promise.resolve(false),
+        resetAll: () => { try { window.localStorage && window.localStorage.clear(); } catch (_) {} window.location.reload(); return Promise.resolve(true); },
+        clearCache: () => Promise.resolve(true),
+        openDownloads: () => Promise.resolve(false),
+      },
+      net: { trustHost: () => Promise.resolve(true) },
+      preview: { fetchArrayBuffer: () => Promise.resolve(null) },
+      security: {
+        setAppPin: () => Promise.resolve({ ok: true }),
+        getAppPinStatus: () => Promise.resolve({ enabled: false, hasPin: false }),
+        verifyAppPin: () => Promise.resolve({ ok: false, error: 'not_enabled' }),
+      },
+      notify: () => {},
+      badge: () => {},
+      onNavigate: () => {},
+    };
+  }
+
   const state = {
     serverUrl: '',
     me: null,
@@ -34,6 +162,8 @@
     lastMessageIdByRoom: {}, // roomId → max id
     pollTimer: null,
     polling: false,
+    retentionCleanupTimer: null,
+    retentionCleanupRunning: false,
     openRoomGen: 0,          // 방 전환 세대 카운터 (in-flight reload 방지)
     directoryCache: null,
     favorites: new Set(),
@@ -108,6 +238,7 @@
     $('toastContainer').appendChild(t);
     setTimeout(() => t.remove(), 3500);
   }
+  try { window.__blossomToast = toast; } catch (_) {}
 
   // ── 설정 ──
   async function loadSettings() {
@@ -123,6 +254,7 @@
     applyTheme();
     applyFontSize();
     applyDisplayPreferences();
+    applyLanguage(state.settings.language || 'ko');
   }
   function applyTheme() {
     document.documentElement.setAttribute('data-theme', state.settings.theme || 'auto');
@@ -214,7 +346,7 @@
     const label = $('loginPasswordLabel');
     const input = $('loginPassword');
     if (label) {
-      const text = usePin ? '잠금 PIN' : '비밀번호';
+      const text = usePin ? t('login.pin') : t('login.password');
       let changed = false;
       Array.from(label.childNodes || []).forEach((n) => {
         if (n.nodeType === Node.TEXT_NODE && !changed) {
@@ -226,7 +358,7 @@
     }
     if (!input) return;
     input.value = '';
-    input.placeholder = usePin ? '6자리 숫자 PIN' : '';
+    input.placeholder = usePin ? t('login.pinPlaceholder') : '';
     input.autocomplete = usePin ? 'one-time-code' : 'current-password';
     input.inputMode = usePin ? 'numeric' : '';
     if (usePin) {
@@ -432,6 +564,7 @@
   if (_btnLockSwitch) _btnLockSwitch.addEventListener('click', async () => {
     try { await Api.logout(); } catch (_) {}
     stopPolling();
+    stopRetentionCleanupTimer();
     stopIdleLockMonitor();
     const m = $('loginModal');
     m.classList.remove('locked');
@@ -481,6 +614,7 @@
     await loadRooms();
     setTab('chat');
     startPolling();
+    startRetentionCleanupTimer();
     startIdleLockMonitor();
     try {
       const log = JSON.parse(localStorage.getItem('blossom_login_log') || '[]');
@@ -498,6 +632,34 @@
 
   function renderMe() {
     setAvatar($('meAvatar'), (state.profile && state.profile.profile_image) || null, state.currentUserId, state.profile && (state.profile.name || state.profile.nickname));
+  }
+
+  async function runRetentionCleanupQuiet() {
+    if (state.retentionCleanupRunning || !state.profile) return;
+    state.retentionCleanupRunning = true;
+    try {
+      const res = await Api.runRetentionCleanup();
+      const r = (res && res.result) || {};
+      if ((r.rooms || 0) > 0 || (r.messages || 0) > 0) {
+        await loadRooms();
+      }
+    } catch (_) {
+    } finally {
+      state.retentionCleanupRunning = false;
+    }
+  }
+
+  function startRetentionCleanupTimer() {
+    if (state.retentionCleanupTimer) return;
+    runRetentionCleanupQuiet();
+    state.retentionCleanupTimer = setInterval(runRetentionCleanupQuiet, RETENTION_CLEANUP_INTERVAL_MS);
+  }
+
+  function stopRetentionCleanupTimer() {
+    if (state.retentionCleanupTimer) {
+      clearInterval(state.retentionCleanupTimer);
+      state.retentionCleanupTimer = null;
+    }
   }
 
   // ── 아바타 ──
@@ -560,6 +722,9 @@
       renderFallback();
     }
   }
+  // CalendarView 등 다른 IIFE 에서 동일 아바타 로직을 쓰기 위해 노출 (미노출 시 ReferenceError: setAvatar is not defined).
+  try { window.setAvatar = setAvatar; } catch (_) {}
+  try { window.__blossomInitialsFor = initialsFor; } catch (_) {}
 
   // ── 사이드바 탭 ──
   // v0.4.55: composer 가시성은 body.no-active-room 클래스로만 제어. 
@@ -580,7 +745,20 @@
       if (title) title.textContent = name === 'people' ? '동료' : '채팅';
       if (name === 'people' && !state.directoryCache) loadDirectoryInto('peopleList', '');
     }
-    if (name === 'calendar') { try { CalendarView.open(); } catch (e) { console.warn(e); } }
+    if (name === 'calendar') {
+      let calendarOpenQueued = false;
+      const openCalendar = () => {
+        if (calendarOpenQueued) return;
+        try {
+          if (!window.CalendarView || typeof window.CalendarView.open !== 'function') return;
+          calendarOpenQueued = true;
+          const opened = window.CalendarView.open();
+          if (opened && typeof opened.catch === 'function') opened.catch((e) => console.warn(e));
+        } catch (e) { console.warn(e); }
+      };
+      window.setTimeout(openCalendar, 0);
+      if (window.requestAnimationFrame) window.requestAnimationFrame(() => window.requestAnimationFrame(openCalendar));
+    }
     if (name === 'memo') { try { MemoView.open(); } catch (e) { console.warn(e); } }
   }
   $$('.rail-btn[data-tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
@@ -1144,7 +1322,7 @@
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'msg-sched-add';
-      addBtn.textContent = '＋ 내 일정에 추가';
+      addBtn.textContent = t('calendar.addToMine');
       addBtn.addEventListener('click', async () => {
         addBtn.disabled = true;
         try {
@@ -1157,7 +1335,7 @@
             share_scope: 'PRIVATE',
             event_type: '기타',
           });
-          addBtn.textContent = '✓ 내 일정에 추가됨';
+          addBtn.textContent = t('calendar.addedToMine');
           if (window.CalendarView && window.CalendarView.reload) {
             try { await window.CalendarView.reload(); } catch (_) {}
           }
@@ -2780,7 +2958,7 @@
     try {
       _taskDueFp = window.flatpickr(el, {
         dateFormat: 'Y-m-d',
-        locale: (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || undefined,
+        locale: flatpickrLocale(),
         disableMobile: true,
         allowInput: true,
         position: 'auto center',
@@ -3058,21 +3236,23 @@
   // v0.4.22: 일정 공유 — 현재 채팅방을 컨텍스트로 일정 등록 모달을 열고, 저장 후 카드 메시지 전송
   window.__shareScheduleToChat = async function (roomId, payload, savedItem) {
     if (!roomId || !state.currentUserId) return;
-    const fmt = (iso) => {
+    const fmt = (iso, dateOnly) => {
       try {
         const d = new Date(iso);
         const y = d.getFullYear(), m = d.getMonth()+1, dd = d.getDate();
         const h = d.getHours(), mi = d.getMinutes();
         const dow = ['일','월','화','수','목','금','토'][d.getDay()];
         const pad2 = (n) => String(n).padStart(2,'0');
+        if (dateOnly) return `${y}-${pad2(m)}-${pad2(dd)} (${dow})`;
         return `${y}-${pad2(m)}-${pad2(dd)} (${dow}) ${pad2(h)}:${pad2(mi)}`;
       } catch (_) { return iso || ''; }
     };
+    const allDayShare = !!payload.is_all_day;
     const lines = [
       '📅 일정이 등록되었습니다',
       '• 제목: ' + (payload.title || '-'),
-      '• 시작: ' + fmt(payload.start_datetime),
-      '• 종료: ' + fmt(payload.end_datetime),
+      '• 시작: ' + fmt(payload.start_datetime, allDayShare),
+      '• 종료: ' + fmt(payload.end_datetime, allDayShare),
     ];
     if (payload.location) lines.push('• 장소: ' + payload.location);
     if (payload.description && String(payload.description).trim()) {
@@ -3188,7 +3368,7 @@
       time_24hr: true,
       minuteIncrement: 5,
       dateFormat: 'Y-m-d H:i',
-      locale: (window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || 'ko',
+      locale: flatpickrLocale(),
       allowInput: false,
       disableMobile: true,
     };
@@ -4142,6 +4322,7 @@
       .map((v) => String(v || '').trim())
       .filter((v) => v && v !== '-' && v !== '－');
   }
+  try { window.__blossomCleanMetaParts = cleanMetaParts; } catch (_) {}
 
   function buildPeopleItem(u) {
     const li = document.createElement('li');
@@ -4248,6 +4429,30 @@
     });
   }
 
+  // v0.5.11: 동료 데이터 단일 소스 — 동료 화면(`peopleList`)·DM 검색·캘린더 참석자 선택이 모두 이 함수를 사용.
+  // 이전(v0.5.10) 에는 이 함수가 CalendarView IIFE 안에만 정의돼 있어 outer scope의 loadDirectoryInto 가
+  // 호출할 때 `ReferenceError: loadAllCoworkers is not defined` 가 매 키 입력마다 발생했고, 동료 검색·캘린더
+  // picker 가 통째로 멈춰 보이는 원인이었다.
+  async function loadAllCoworkers(opts) {
+    const o = opts || {};
+    const q = String(o.q || '').trim();
+    const rows = await Api.fetchCoworkers({ q, limit: 1000 });
+    let users = Array.isArray(rows) ? rows.slice() : [];
+    if (state.currentUserId) {
+      users = users.filter((u) => u.id !== state.currentUserId);
+    }
+    return users;
+  }
+  // CalendarView IIFE 등 다른 모듈에서 같은 fetch 경로를 공유하기 위해 window 에 노출.
+  try { window.loadAllCoworkers = loadAllCoworkers; } catch (_) {}
+  // v0.5.12: 동료 화면에서 이미 받아둔 캐시를 picker 가 즉시 표시할 수 있도록 노출.
+  // 네트워크 한 번 깜빡여도 화면이 통째로 깨지지 않게 하기 위함.
+  try {
+    window.__blossomGetDirectoryCache = function () {
+      return Array.isArray(state.lastDirectoryUsers) ? state.lastDirectoryUsers.slice() : [];
+    };
+  } catch (_) {}
+
   async function loadDirectoryInto(listId, q, asDm) {
     try {
       // v0.5.10: peopleList 와 DM 검색·캘린더 picker 가 같은 동료 fetch 경로를 공유한다.
@@ -4324,6 +4529,7 @@
     try { await Api.logout(); } catch (_) {}
     try { await blossom.credentials.clear(); } catch (_) {}
     stopPolling();
+    stopRetentionCleanupTimer();
     location.reload();
   }
 
@@ -4658,9 +4864,9 @@
     const el = $('st_certStatus');
     if (!el) return;
     const u = (state.serverUrl || '').trim();
-    if (!u) { el.textContent = '서버 주소가 없습니다. 연결 탭에서 설정하세요.'; return; }
-    if (!/^https:\/\//i.test(u)) { el.textContent = 'HTTP — TLS(암호화) 미사용. 사내망·테스트에 한해 사용하세요.'; return; }
-    el.textContent = 'TLS(HTTPS) — 브라우저/Electron이 시스템 신뢰 저장소로 인증서를 검증합니다.';
+    if (!u) { el.textContent = t('settings.serverNoUrl'); return; }
+    if (!/^https:\/\//i.test(u)) { el.textContent = t('settings.httpNoTls'); return; }
+    el.textContent = t('settings.httpsTls');
   }
   function renderReleaseNotesPanel(open) {
     const admin = isAdminUser();
@@ -4668,7 +4874,7 @@
     const view = $('releaseNotesView');
     const edit = $('releaseNotesEdit');
     const actions = $('releaseNotesActions');
-    const notes = state.settings.releaseNotes || '등록된 릴리즈 노트가 없습니다.';
+    const notes = state.settings.releaseNotes || t('settings.noReleaseNotes');
     if (panel) panel.hidden = open === false ? true : panel.hidden;
     if (view) view.textContent = notes;
     if (edit) {
@@ -4680,8 +4886,9 @@
 
   let _retentionActiveType = 'CHANNEL';
   let _retentionPolicies = {};
+  let _retentionScope = 'USER';
   function retentionLabel(type) {
-    return ({ CHANNEL: '채널', GROUP: '그룹채팅', DIRECT: '개인채팅' })[type] || '대화방';
+    return ({ CHANNEL: t('settings.channel'), GROUP: t('settings.groupChat'), DIRECT: t('settings.directChat') })[type] || t('retention.roomFallback');
   }
   function retentionSecondsFromForm() {
     const period = ($('rt_period') && $('rt_period').value) || '86400';
@@ -4697,18 +4904,20 @@
   }
   function retentionSecondsLabel(sec) {
     sec = parseInt(sec || 86400, 10) || 86400;
-    if (sec % 86400 === 0) return (sec / 86400) + '일';
-    if (sec % 3600 === 0) return (sec / 3600) + '시간';
-    return Math.round(sec / 3600) + '시간';
+    if (sec % 86400 === 0) return currentLanguage() === 'en' ? (sec / 86400) + ' days' : (sec / 86400) + '일';
+    if (sec % 3600 === 0) return currentLanguage() === 'en' ? (sec / 3600) + ' hours' : (sec / 3600) + '시간';
+    return currentLanguage() === 'en' ? Math.round(sec / 3600) + ' hours' : Math.round(sec / 3600) + '시간';
   }
   function updateRetentionPreview() {
     const type = _retentionActiveType;
+    const admin = isAdminUser();
     const enabled = !!($('rt_enabled') && $('rt_enabled').checked);
     const sec = retentionSecondsFromForm();
     const label = retentionLabel(type);
+    const scopeText = admin ? t('retention.scopeGlobal') : t('retention.scopeMine');
     const text = enabled
-      ? label + '은 마지막 대화 후 ' + retentionSecondsLabel(sec) + ' 동안 새 메시지가 없으면 대화 내용이 자동 삭제됩니다. 대화가 이어질 때마다 삭제 예정 시간이 연장됩니다.'
-      : label + ' 자동삭제가 비활성화되어 있습니다.';
+      ? t('retention.previewEnabled', { scope: scopeText, label: label, duration: retentionSecondsLabel(sec) })
+      : t('retention.previewDisabled', { scope: scopeText, label: label });
     if ($('retentionPreviewText')) $('retentionPreviewText').textContent = text;
   }
   function writeRetentionPolicyToForm(policy) {
@@ -4725,34 +4934,40 @@
     setRetentionCustomVisibility();
     const admin = isAdminUser();
     const lock = $('retentionAdminLock');
-    if (lock) lock.hidden = admin;
-    ['rt_enabled', 'rt_period', 'rt_customValue', 'rt_customUnit', 'rt_deleteAttachments', 'rt_applyExisting', 'btnRetentionSave', 'btnRetentionApplyExisting', 'btnRetentionCleanup'].forEach((id) => {
-      if ($(id)) $(id).disabled = !admin;
+    if (lock) {
+      lock.hidden = false;
+      lock.textContent = admin
+        ? t('retention.globalAdmin')
+        : t('retention.userScope');
+    }
+    ['rt_enabled', 'rt_period', 'rt_customValue', 'rt_customUnit', 'rt_applyExisting', 'btnRetentionSave', 'btnRetentionApplyExisting', 'btnRetentionCleanup'].forEach((id) => {
+      if ($(id)) $(id).disabled = false;
     });
+    if ($('rt_deleteAttachments')) {
+      $('rt_deleteAttachments').disabled = !admin;
+      $('rt_deleteAttachments').title = admin ? '' : '첨부파일 서버 삭제는 관리자 전역 정책에서만 적용됩니다.';
+    }
     updateRetentionPreview();
   }
   async function loadRetentionPolicies() {
-    if (!isAdminUser()) {
-      writeRetentionPolicyToForm(_retentionPolicies[_retentionActiveType] || { enabled: false, retention_seconds: 86400 });
-      return;
-    }
     try {
       const res = await Api.listRetentionPolicies();
+      _retentionScope = (res && res.scope) || (isAdminUser() ? 'GLOBAL' : 'USER');
       const items = (res && res.items) || [];
       _retentionPolicies = {};
       items.forEach((p) => { _retentionPolicies[p.room_type] = p; });
       writeRetentionPolicyToForm(_retentionPolicies[_retentionActiveType]);
     } catch (e) {
-      toast('자동삭제 정책을 불러오지 못했습니다: ' + (e.message || ''), 'error');
+      toast(t('retention.loadFailed', { message: e.message || '' }), 'error');
       writeRetentionPolicyToForm(_retentionPolicies[_retentionActiveType] || { enabled: false, retention_seconds: 86400 });
     }
   }
   async function saveRetentionPolicy() {
-    if (!isAdminUser()) { toast('관리자만 수정할 수 있습니다.', 'error'); return; }
+    const admin = isAdminUser();
     const payload = {
       enabled: !!($('rt_enabled') && $('rt_enabled').checked),
       retention_seconds: retentionSecondsFromForm(),
-      delete_attachments: !!($('rt_deleteAttachments') && $('rt_deleteAttachments').checked),
+      delete_attachments: admin && !!($('rt_deleteAttachments') && $('rt_deleteAttachments').checked),
       exclude_pinned: false,
       exclude_notice: false,
       exclude_important: false,
@@ -4760,9 +4975,10 @@
       apply_existing: !!($('rt_applyExisting') && $('rt_applyExisting').checked),
     };
     const res = await Api.updateRetentionPolicy(_retentionActiveType, payload);
+    _retentionScope = (res && res.scope) || _retentionScope;
     if (res && res.item) _retentionPolicies[_retentionActiveType] = res.item;
     writeRetentionPolicyToForm(_retentionPolicies[_retentionActiveType]);
-    toast('자동삭제 정책을 저장했습니다.', 'success');
+    toast(admin ? t('retention.savedGlobal') : t('retention.savedUser'), 'success');
   }
 
   $('btnSettings').addEventListener('click', openSettingsModal);
@@ -4815,6 +5031,11 @@
     });
     root.addEventListener('input', on);
     root.addEventListener('change', (e) => {
+      if (e.target && e.target.id === 'st_language') {
+        applyLanguage(e.target.value || 'ko', { preview: true });
+        markSettingsFormDirty();
+        return;
+      }
       if (e.target && e.target.id === 'st_dndEnabled') setSettingsDndRow();
       if (e.target && e.target.id === 'st_proxyMode') setSettingsProxyRow();
       if (e.target && String(e.target.id || '').indexOf('rt_') === 0) {
@@ -4840,19 +5061,19 @@
       writeRetentionPolicyToForm(_retentionPolicies[_retentionActiveType] || { enabled: false, retention_seconds: 86400 });
     });
   });
-  if ($('btnRetentionSave')) $('btnRetentionSave').addEventListener('click', () => saveRetentionPolicy().catch((e) => toast('정책 저장 실패: ' + (e.message || ''), 'error')));
+  if ($('btnRetentionSave')) $('btnRetentionSave').addEventListener('click', () => saveRetentionPolicy().catch((e) => toast(t('retention.saveFailed', { message: e.message || '' }), 'error')));
   if ($('btnRetentionReload')) $('btnRetentionReload').addEventListener('click', () => loadRetentionPolicies());
   if ($('btnRetentionApplyExisting')) $('btnRetentionApplyExisting').addEventListener('click', async () => {
-    try { await Api.applyRetentionPoliciesToExisting(); toast('기존 대화방에 정책을 적용했습니다.', 'success'); }
-    catch (e) { toast('기존 방 적용 실패: ' + (e.message || ''), 'error'); }
+    try { await Api.applyRetentionPoliciesToExisting(); toast(isAdminUser() ? t('retention.applyGlobalDone') : t('retention.applyUserDone'), 'success'); }
+    catch (e) { toast(t('retention.applyFailed', { message: e.message || '' }), 'error'); }
   });
   if ($('btnRetentionCleanup')) $('btnRetentionCleanup').addEventListener('click', async () => {
-    if (!confirm('지금 자동삭제 정리 작업을 실행하시겠습니까?')) return;
+    if (!confirm(isAdminUser() ? t('retention.cleanupConfirmGlobal') : t('retention.cleanupConfirmUser'))) return;
     try {
       const res = await Api.runRetentionCleanup();
       const r = (res && res.result) || {};
-      toast('정리 완료: 방 ' + (r.rooms || 0) + '개, 메시지 ' + (r.messages || 0) + '개', 'success');
-    } catch (e) { toast('정리 작업 실패: ' + (e.message || ''), 'error'); }
+      toast(t('retention.cleanupDone', { rooms: r.rooms || 0, messages: r.messages || 0 }), 'success');
+    } catch (e) { toast(t('retention.cleanupFailed', { message: e.message || '' }), 'error'); }
   });
   const btnCancel = document.getElementById('btnSettingsCancel');
   if (btnCancel) {
@@ -4865,6 +5086,7 @@
       ['general', 'notify', 'display', 'security', 'retention', 'connection', 'data', 'about'].forEach((tab) => {
         state._settingsTabSnaps[tab] = serializeSettingsTab(tab);
       });
+      applyLanguage(state.settings.language || 'ko');
       markSettingsFormDirty();
       closeModal('settingsModal');
     });
@@ -4899,7 +5121,7 @@
     const serverChanged = activeTab === 'connection' && newServer && newServer !== prev.serverUrl && !nextSettings.adminPolicyServerLock;
     const onlyPin = activeTab === 'security' && enPin && pinHasNew;
     if (changed.length === 0 && !serverChanged && !onlyPin) {
-      toast('현재 페이지에 저장할 변경 사항이 없습니다.', 'info');
+      toast(t('settings.noChanges'), 'info');
       return;
     }
     for (let j = 0; j < changed.length; j++) {
@@ -4918,7 +5140,7 @@
     }
     if (activeTab === 'general' && blossom.app && blossom.app.setAutoStart) blossom.app.setAutoStart(!!state.settings.autoStart);
     appendLocalSettingsHistory(changed);
-    if (changed.length) appendLocalAudit('설정 변경: ' + changed.join(', '));
+    if (changed.length) appendLocalAudit(t('settings.changeAudit', { keys: changed.join(', ') }));
     if (activeTab === 'security' && blossom.security && blossom.security.setAppPin) {
       const en = !!$('st_appPinEnabled') && $('st_appPinEnabled').checked;
       const p1 = ($('st_pinNew') && $('st_pinNew').value) || '';
@@ -4943,6 +5165,7 @@
     applyTheme();
     applyFontSize();
     applyDisplayPreferences();
+    applyLanguage(state.settings.language || 'ko');
     try {
       stopIdleLockMonitor();
       startIdleLockMonitor();
@@ -4951,7 +5174,7 @@
     if (!state._settingsTabSnaps) state._settingsTabSnaps = {};
     state._settingsTabSnaps[activeTab] = serializeSettingsTab(activeTab);
     markSettingsFormDirty();
-    toast('현재 페이지 설정을 저장했습니다', 'success');
+    toast(t('settings.changedSaved'), 'success');
   });
 
   const _stTest = document.getElementById('st_btnConnTest');
@@ -4979,6 +5202,7 @@
       try { await Api.logout(); } catch (_) {}
       try { await blossom.credentials.clear(); } catch (_) {}
       stopPolling();
+      stopRetentionCleanupTimer();
       closeModal('settingsModal');
       location.reload();
     });
@@ -5156,8 +5380,209 @@
 // === CalendarView v1: 웹 Blossom /api/calendar/schedules 동기화 ===
 window.CalendarView = (function () {
   const $ = (id) => document.getElementById(id);
-  const state = { ym: null, items: [], me: null };
+  const state = { ym: null, schedules: [], items: [], me: null, calendar: null };
   let initialized = false;
+
+  function normalizeLanguage(language) {
+    return String(language || '').toLowerCase().indexOf('en') === 0 ? 'en' : 'ko';
+  }
+  function t(key, params) {
+    if (window.BlossomI18n && typeof window.BlossomI18n.t === 'function') return window.BlossomI18n.t(key, params);
+    return key;
+  }
+  function currentLanguage() {
+    const active = window.BlossomI18n && typeof window.BlossomI18n.getLanguage === 'function'
+      ? window.BlossomI18n.getLanguage()
+      : (document.documentElement && document.documentElement.getAttribute('lang'));
+    return normalizeLanguage(active || 'ko');
+  }
+  function monthName(monthIndex) {
+    return new Date(2020, monthIndex, 1).toLocaleString('en-US', { month: 'long' });
+  }
+  function formatCalendarMonthLabel(dateOrYear, maybeMonth) {
+    const date = dateOrYear instanceof Date ? dateOrYear : new Date(Number(dateOrYear), Number(maybeMonth) - 1, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    return t('calendar.monthLabel', { year: year, month: month, monthName: monthName(date.getMonth()) });
+  }
+  function flatpickrLocale() {
+    if (currentLanguage() === 'ko') return (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || 'ko';
+    return undefined;
+  }
+
+  function refreshCalendarSize() {
+    if (!state.calendar) return;
+    const pane = $('calendarPane');
+    if (pane && pane.hidden) return;
+    const update = function () {
+      try { state.calendar.render(); } catch (_) {}
+      try { state.calendar.updateSize(); } catch (_) {}
+    };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(function () { window.requestAnimationFrame(update); });
+    else window.setTimeout(update, 0);
+  }
+
+  function refreshLanguage(language) {
+    const lang = normalizeLanguage(language || currentLanguage());
+    if (state.calendar && typeof state.calendar.setOption === 'function') {
+      try { state.calendar.setOption('locale', lang === 'ko' ? 'ko' : 'en'); } catch (_) {}
+      try { state.calendar.setOption('moreLinkText', function (n) { return t('calendar.moreLink', { count: n }); }); } catch (_) {}
+    }
+    if (state.ym) {
+      const parts = state.ym.split('-').map(Number);
+      const lbl = $('calCurrentLabel');
+      if (lbl && parts.length >= 2) lbl.textContent = formatCalendarMonthLabel(parts[0], parts[1]);
+    }
+    refreshCalendarSize();
+  }
+
+  function calendarLog(stage, detail, level) {
+    try {
+      const fn = (level === 'error') ? console.error : (level === 'warn' ? console.warn : console.log);
+      fn('[CalendarSchedule] ' + stage, detail || {});
+    } catch (_) {}
+  }
+  function calendarResponseMetaBox() {
+    const box = { value: null };
+    box.options = {
+      __onResponse: function (meta) { box.value = meta || null; },
+    };
+    return box;
+  }
+  async function callCalendarApi(stage, requestPayload, runner) {
+    const metaBox = calendarResponseMetaBox();
+    calendarLog(stage + ':request', { requestPayload: requestPayload || null });
+    try {
+      const responseBody = await runner(metaBox.options);
+      const meta = metaBox.value || {};
+      calendarLog(stage + ':response', {
+        status: meta.status != null ? meta.status : 'unknown',
+        requestPayload: requestPayload || null,
+        responseBody: meta.body != null ? meta.body : responseBody,
+      });
+      return responseBody;
+    } catch (e) {
+      const meta = metaBox.value || {};
+      calendarLog(stage + ':error', {
+        status: e && e.status != null ? e.status : (meta.status != null ? meta.status : 'unknown'),
+        requestPayload: requestPayload || null,
+        responseBody: e && e.payload != null ? e.payload : meta.body,
+        message: e && e.message,
+        error: e,
+      }, 'error');
+      throw e;
+    }
+  }
+  function scheduleFromRenderItem(item) {
+    return item && (item.schedule || item.evt || item.event || item.originalEvent) || item;
+  }
+  function scheduleId(evt) { return evt && evt.id; }
+  function scheduleTitle(evt) { return evt && (evt.title || evt.name) || ''; }
+  function scheduleStartRaw(evt) { return evt && (evt.start_datetime || evt.startDate || evt.start) || ''; }
+  function scheduleEndRaw(evt) { return evt && (evt.end_datetime || evt.endDate || evt.end) || ''; }
+  function scheduleAllDay(evt) { return !!(evt && (evt.is_all_day || evt.allDay)); }
+  function scheduleShareScope(evt) { return String(evt && (evt.share_scope || evt.shareType) || 'PRIVATE').toUpperCase(); }
+  function scheduleRepeatType(evt) {
+    const token = String(evt && (evt.repeat_type || evt.repeatType) || 'none').toLowerCase();
+    return ['daily', 'weekly', 'monthly', 'yearly', 'custom'].includes(token) ? token : 'none';
+  }
+  function scheduleRepeatRule(evt) {
+    const raw = evt && (evt.repeat_rule || evt.repeatRule);
+    if (!raw) return {};
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (_) { return {}; }
+    }
+    return (raw && typeof raw === 'object') ? Object.assign({}, raw) : {};
+  }
+  function isRecurringSchedule(evt) { return scheduleRepeatType(evt) !== 'none'; }
+  function cloneRepeatRule(rule) {
+    try { return JSON.parse(JSON.stringify(rule || {})); } catch (_) { return Object.assign({}, rule || {}); }
+  }
+  function repeatFrequency(evtOrType, rule) {
+    const type = typeof evtOrType === 'string' ? evtOrType : scheduleRepeatType(evtOrType);
+    const src = rule || (typeof evtOrType === 'string' ? {} : scheduleRepeatRule(evtOrType));
+    const raw = String(src.frequency || src.freq || src.unit || type || 'none').toLowerCase();
+    if (type !== 'custom') return type;
+    return ['daily', 'weekly', 'monthly', 'yearly'].includes(raw) ? raw : 'daily';
+  }
+  function scheduleDebugShape(evt) {
+    const original = scheduleFromRenderItem(evt);
+    return {
+      id: scheduleId(original),
+      title: scheduleTitle(original),
+      startDate: scheduleStartRaw(original),
+      endDate: scheduleEndRaw(original),
+      allDay: scheduleAllDay(original),
+      repeatType: scheduleRepeatType(original),
+      hasSegmentFields: !!(original && (original.segment || original.colStart || original.weekIndex || original.lane)),
+    };
+  }
+  function setSchedules(rows, reason) {
+    state.schedules = (Array.isArray(rows) ? rows : []).filter(Boolean).map((row) => Object.assign({}, row));
+    state.items = state.schedules;
+    calendarLog('state:schedules', {
+      reason: reason || '',
+      count: state.schedules.length,
+      sample: state.schedules.slice(0, 5).map(scheduleDebugShape),
+    });
+  }
+  function calendarRowsFromResponse(resp) {
+    if (Array.isArray(resp)) return resp;
+    if (!resp || typeof resp !== 'object') return [];
+    if (Array.isArray(resp.items)) return resp.items;
+    if (Array.isArray(resp.rows)) return resp.rows;
+    if (Array.isArray(resp.schedules)) return resp.schedules;
+    return [];
+  }
+  function upsertSchedule(row, reason) {
+    const schedule = scheduleFromRenderItem(row);
+    const id = scheduleId(schedule);
+    if (!schedule || id == null || id === '') return false;
+    const next = Object.assign({}, schedule);
+    const idx = state.schedules.findIndex((item) => String(scheduleId(item)) === String(id));
+    if (idx >= 0) state.schedules.splice(idx, 1, next);
+    else state.schedules.push(next);
+    state.items = state.schedules;
+    calendarLog('state:upsertSchedule', {
+      reason: reason || '',
+      id,
+      count: state.schedules.length,
+      schedule: scheduleDebugShape(next),
+    });
+    return true;
+  }
+  function exposeCalendarDebugState() {
+    try {
+      window.__blossomCalendarState = state;
+      window.__blossomCalendarDebug = function () {
+        return {
+          schedules: state.schedules.slice(),
+          scheduleShapes: state.schedules.map(scheduleDebugShape),
+        };
+      };
+    } catch (_) {}
+  }
+  exposeCalendarDebugState();
+
+  // 메인 앱 IIFE 밖이라 동료 화면 헬퍼에 직접 접근 불가 — window 경유 + 동일 로직 fallback.
+  function cleanMetaForPicker(values) {
+    if (typeof window !== 'undefined' && typeof window.__blossomCleanMetaParts === 'function') {
+      return window.__blossomCleanMetaParts(values);
+    }
+    return (values || [])
+      .map((v) => String(v || '').trim())
+      .filter((v) => v && v !== '-' && v !== '－');
+  }
+  function notifyToast(msg, type) {
+    try {
+      if (typeof window !== 'undefined' && typeof window.__blossomToast === 'function') {
+        window.__blossomToast(msg, type);
+      }
+    } catch (_) {}
+  }
 
   function openLocalModal(id) {
     const modal = $(id);
@@ -5172,6 +5597,38 @@ window.CalendarView = (function () {
   function pad(n) { return String(n).padStart(2, '0'); }
   function ymKey(d) { return d.getFullYear() + '-' + pad(d.getMonth()+1); }
   function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+  /** YYYY-MM-DD → 로컬 자정 Date */
+  function parseDateKey(ks) {
+    const p = String(ks || '').split('-').map((n) => parseInt(n, 10));
+    if (p.length !== 3 || p.some((x) => isNaN(x))) return new Date(NaN);
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+  /** 일정이 차지하는 달력 날짜 범위 (종일은 로컬 날짜만, 기간 종료일 포함) */
+  function eventDateRangeKeys(evt) {
+    evt = scheduleFromRenderItem(evt);
+    if (!evt) return null;
+    const startRaw = scheduleStartRaw(evt);
+    const endRaw = scheduleEndRaw(evt);
+    const sd = new Date(startRaw);
+    const ed = new Date(endRaw);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return null;
+    if (scheduleAllDay(evt)) {
+      let startKey = dateKey(sd);
+      let endKey = dateKey(ed);
+      const sStr = String(startRaw || '');
+      const eStr = String(endRaw || '');
+      const sm = sStr.match(/^(\d{4}-\d{2}-\d{2})/);
+      const em = eStr.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (sm) startKey = sm[1];
+      if (em) endKey = em[1];
+      return startKey <= endKey ? { startKey, endKey } : { startKey, endKey: startKey };
+    }
+    const sDay = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
+    const eDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const startKey = dateKey(sDay);
+    const endKey = dateKey(eDay);
+    return startKey <= endKey ? { startKey, endKey } : { startKey, endKey: startKey };
+  }
   function isoLocal(d) {
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':00';
   }
@@ -5207,153 +5664,542 @@ window.CalendarView = (function () {
     initialized = true;
     if (!state.ym) state.ym = ymKey(new Date());
     render();
+    refreshCalendarSize();
     try { await ensureMe(); } catch (e) { console.warn('calendar profile failed', e); }
     await reload();
   }
 
-  async function reload() {
+  async function reload(reason, options) {
+    options = options || {};
+    if (!state.ym) state.ym = ymKey(new Date());
     const [y, m] = state.ym.split('-').map(Number);
-    const start = new Date(y, m-1, 1);
-    const end = new Date(y, m, 0, 23, 59, 59);
+    const visible = visibleRangeForYm(state.ym);
+    const start = visible && visible.startDate ? new Date(visible.startDate) : new Date(y, m-1, 1);
+    const end = visible && visible.endDate ? new Date(visible.endDate) : new Date(y, m, 0);
+    end.setHours(23, 59, 59, 0);
+    const query = { start: isoLocal(start), end: isoLocal(end) };
+    const previousSchedules = state.schedules.slice();
     try {
-      const resp = await Api.listCalendarSchedules({
-        start: isoLocal(start), end: isoLocal(end),
+      const resp = await callCalendarApi('fetchSchedules', query, function (metaOptions) {
+        return Api.listCalendarSchedules(query, metaOptions);
       });
-      state.items = (resp && resp.items) || [];
+      const rows = calendarRowsFromResponse(resp);
+      if (options.keepOnEmpty && !rows.length && previousSchedules.length) {
+        setSchedules(previousSchedules, (reason || 'reload') + '-empty-fallback');
+      } else {
+        setSchedules(rows, reason || 'reload');
+      }
     } catch (e) {
       console.warn('cal load failed', e);
-      state.items = [];
+      if (options.keepOnFailure && previousSchedules.length) {
+        setSchedules(previousSchedules, (reason || 'reload') + '-failed-fallback');
+      } else {
+        setSchedules([], 'reload-failed');
+      }
     }
     render();
   }
 
   async function moveScheduleToDate(evt, targetDate) {
-    if (!evt || !evt.id || !targetDate) return;
-    const start = new Date(evt.start_datetime);
-    const end = new Date(evt.end_datetime);
+    evt = scheduleFromRenderItem(evt);
+    if (!evt || !scheduleId(evt) || !targetDate) return;
+    const start = new Date(scheduleStartRaw(evt));
+    const end = new Date(scheduleEndRaw(evt));
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
     const duration = end.getTime() - start.getTime();
     const nextStart = new Date(targetDate);
-    nextStart.setHours(evt.is_all_day ? 0 : start.getHours(), evt.is_all_day ? 0 : start.getMinutes(), 0, 0);
-    const nextEnd = evt.is_all_day
-      ? new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate(), 23, 59, 0, 0)
-      : new Date(nextStart.getTime() + Math.max(duration, 30 * 60 * 1000));
+    nextStart.setHours(scheduleAllDay(evt) ? 0 : start.getHours(), scheduleAllDay(evt) ? 0 : start.getMinutes(), 0, 0);
+    let nextEnd;
+    if (scheduleAllDay(evt)) {
+      const range = eventDateRangeKeys(evt);
+      const span = range
+        ? Math.max(1, Math.round((parseDateKey(range.endKey) - parseDateKey(range.startKey)) / 86400000) + 1)
+        : 1;
+      nextEnd = new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() + span - 1, 23, 59, 0, 0);
+    } else {
+      nextEnd = new Date(nextStart.getTime() + Math.max(duration, 30 * 60 * 1000));
+    }
     try {
-      await Api.updateCalendarSchedule(evt.id, {
-        title: evt.title || '',
+      const scope = scheduleShareScope(evt);
+      const patch = {
+        title: scheduleTitle(evt) || '',
         start_datetime: isoLocal(nextStart),
         end_datetime: isoLocal(nextEnd),
         location: evt.location || '',
         description: evt.description || '',
-        share_scope: evt.share_scope || 'PRIVATE',
+        share_scope: scope,
         event_type: evt.event_type || '기타',
-        is_all_day: !!evt.is_all_day,
-        attendees: evt.attendees || [],
+        is_all_day: scheduleAllDay(evt),
+        attendees: scope === 'SELECT' ? (evt.attendees || []) : [],
         reminders: evt.reminders || [],
-        sticker: '',
+        sticker: evt.sticker || '',
         is_important: !!evt.is_important,
         color_code: evt.color_code || '#6366f1',
+      };
+      if (scope === 'SELECT') {
+        if (evt.share_users && evt.share_users.length) {
+          patch.share_users = evt.share_users.map((su) => ({ user_id: su.user_id }));
+        }
+        if (evt.share_departments && evt.share_departments.length) {
+          patch.share_departments = evt.share_departments.map((sd) => ({ dept_id: sd.dept_id }));
+        }
+      }
+      const updated = await callCalendarApi('updateSchedule:move', patch, function (metaOptions) {
+        return Api.updateCalendarSchedule(scheduleId(evt), patch, metaOptions);
       });
-      await reload();
+      const moved = (updated && updated.item) || Object.assign({}, evt, patch);
+      if (upsertSchedule(moved, 'after-move-optimistic')) render();
+      await reload('after-move', { keepOnEmpty: true, keepOnFailure: true });
+      if (upsertSchedule(moved, 'after-move-response')) render();
+      return true;
     } catch (e) {
       alert('일정 이동 실패: ' + ((e && e.payload && e.payload.message) || (e && e.message) || ''));
+      return false;
     }
   }
 
-  function render() {
-    const [y, m] = state.ym.split('-').map(Number);
-    const lbl = $('calCurrentLabel'); if (lbl) lbl.textContent = y + '년 ' + m + '월';
-    const grid = $('calMonthGrid'); if (!grid) return;
-    grid.innerHTML = '';
-    const dows = ['일','월','화','수','목','금','토'];
-    dows.forEach((d, idx) => {
-      const el = document.createElement('div');
-      el.className = 'cal-mh' + (idx === 0 ? ' dow-sun' : (idx === 6 ? ' dow-sat' : ''));
-      el.textContent = d;
-      grid.appendChild(el);
-    });
-    const first = new Date(y, m-1, 1);
-    const startDow = first.getDay();
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const prevDays = new Date(y, m-1, 0).getDate();
-    const today = dateKey(new Date());
-    // 일정을 날짜별로 그룹핑
-    const byDate = {};
-    state.items.forEach((evt) => {
-      const sd = new Date(evt.start_datetime);
-      const ed = new Date(evt.end_datetime);
-      // 멀티데이는 시작일에만 표시 (간단화)
-      const k = dateKey(sd);
-      if (!byDate[k]) byDate[k] = [];
-      byDate[k].push(evt);
-    });
-    function makeCell(d, monthOffset) {
-      const realDate = new Date(y, m-1 + monthOffset, d);
-      const key = dateKey(realDate);
-      const dow = realDate.getDay();
-      const cell = document.createElement('div');
-      cell.className = 'cal-mc' + (monthOffset !== 0 ? ' other' : '');
-      if (key === today) cell.classList.add('today');
-      if (dow === 0) cell.classList.add('dow-sun');
-      if (dow === 6) cell.classList.add('dow-sat');
-      const num = document.createElement('div');
-      num.className = 'cal-mc-num';
-      num.textContent = String(d);
-      cell.appendChild(num);
-      const evts = byDate[key] || [];
-      const MAX = 3;
-      evts.slice(0, MAX).forEach((e) => {
-        const b = document.createElement('button');
-        b.className = 'cal-evt';
-        b.type = 'button';
-        b.draggable = true;
-        b.style.background = e.color_code || '#6366f1';
-        b.textContent = (e.is_all_day ? '' : '') + (e.title || '(제목 없음)');
-        b.addEventListener('click', (ev) => { ev.stopPropagation(); openEdit(e); });
-        b.addEventListener('dragstart', (ev) => {
-          ev.stopPropagation();
-          ev.dataTransfer.effectAllowed = 'move';
-          ev.dataTransfer.setData('text/plain', String(e.id));
-        });
-        cell.appendChild(b);
-      });
-      if (evts.length > MAX) {
-        const more = document.createElement('div');
-        more.className = 'cal-evt more';
-        more.textContent = '+' + (evts.length - MAX) + ' 더보기';
-        cell.appendChild(more);
+  async function resizeScheduleToEvent(evt, calendarEvent) {
+    evt = scheduleFromRenderItem(evt);
+    if (!evt || !scheduleId(evt) || !calendarEvent || !calendarEvent.start) return false;
+    const originalStart = new Date(scheduleStartRaw(evt));
+    const originalEnd = new Date(scheduleEndRaw(evt));
+    if (isNaN(originalStart.getTime()) || isNaN(originalEnd.getTime())) return false;
+    const isAllDay = scheduleAllDay(evt) || !!calendarEvent.allDay;
+    let nextStart = new Date(calendarEvent.start);
+    let nextEnd;
+    if (isAllDay) {
+      nextStart = new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate(), 0, 0, 0, 0);
+      const exclusiveEnd = calendarEvent.end ? new Date(calendarEvent.end) : new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() + 1, 0, 0, 0, 0);
+      nextEnd = new Date(exclusiveEnd.getFullYear(), exclusiveEnd.getMonth(), exclusiveEnd.getDate() - 1, 23, 59, 0, 0);
+      if (isNaN(nextEnd.getTime()) || nextEnd < nextStart) {
+        nextEnd = new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate(), 23, 59, 0, 0);
       }
-      cell.addEventListener('dragover', (ev) => {
-        if (ev.dataTransfer && ev.dataTransfer.types && Array.from(ev.dataTransfer.types).includes('text/plain')) {
-          ev.preventDefault();
-          cell.classList.add('is-drag-over');
+    } else {
+      nextEnd = calendarEvent.end ? new Date(calendarEvent.end) : new Date(originalEnd);
+      if (isNaN(nextEnd.getTime()) || nextEnd <= nextStart) {
+        nextEnd = new Date(nextStart.getTime() + Math.max(originalEnd.getTime() - originalStart.getTime(), 30 * 60 * 1000));
+      }
+    }
+    try {
+      const patch = buildPayloadFromSchedule(evt, {
+        start_datetime: isoLocal(nextStart),
+        end_datetime: isoLocal(nextEnd),
+        is_all_day: isAllDay,
+      });
+      const updated = await callCalendarApi('updateSchedule:resize', patch, function (metaOptions) {
+        return Api.updateCalendarSchedule(scheduleId(evt), patch, metaOptions);
+      });
+      const resized = (updated && updated.item) || Object.assign({}, evt, patch);
+      if (upsertSchedule(resized, 'after-resize-optimistic')) render();
+      await reload('after-resize', { keepOnEmpty: true, keepOnFailure: true });
+      if (upsertSchedule(resized, 'after-resize-response')) render();
+      return true;
+    } catch (e) {
+      alert('일정 기간 변경 실패: ' + ((e && e.payload && e.payload.message) || (e && e.message) || ''));
+      return false;
+    }
+  }
+
+  function addDaysToDateKey(key, days) {
+    const d = parseDateKey(key);
+    if (isNaN(d.getTime())) return key;
+    d.setDate(d.getDate() + days);
+    return dateKey(d);
+  }
+
+  const CAL_REPEAT_WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const CAL_DAY_MS = 24 * 60 * 60 * 1000;
+
+  function daysBetweenKeys(a, b) {
+    const ad = parseDateKey(a);
+    const bd = parseDateKey(b);
+    if (isNaN(ad.getTime()) || isNaN(bd.getTime())) return 0;
+    return Math.round((bd.getTime() - ad.getTime()) / CAL_DAY_MS);
+  }
+
+  function visibleRangeForYm(ym) {
+    const parts = String(ym || ymKey(new Date())).split('-').map((n) => parseInt(n, 10));
+    const first = new Date(parts[0], parts[1] - 1, 1);
+    const start = new Date(first);
+    start.setDate(first.getDate() - first.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 41);
+    return { startKey: dateKey(start), endKey: dateKey(end), startDate: start, endDate: end };
+  }
+
+  function repeatInterval(rule) {
+    const n = parseInt(String(rule && rule.interval || 1), 10);
+    return (!isNaN(n) && n > 0) ? n : 1;
+  }
+
+  function repeatEndType(rule) {
+    const endType = String(rule && (rule.endType || rule.end_type) || 'never').toLowerCase();
+    return ['never', 'until', 'count'].includes(endType) ? endType : 'never';
+  }
+
+  function repeatUntilKey(rule) {
+    const raw = String(rule && (rule.untilDate || rule.until_date) || '').trim();
+    const m = raw.match(/^\d{4}-\d{2}-\d{2}/);
+    return m ? m[0] : '';
+  }
+
+  function repeatCount(rule) {
+    const n = parseInt(String(rule && rule.count || 0), 10);
+    return (!isNaN(n) && n > 0) ? n : 0;
+  }
+
+  function repeatExdateSet(rule) {
+    const raw = (rule && (rule.exdates || rule.exceptionDates)) || [];
+    const arr = Array.isArray(raw) ? raw : [raw];
+    const out = new Set();
+    arr.forEach((item) => {
+      const m = String(item || '').match(/^\d{4}-\d{2}-\d{2}/);
+      if (m) out.add(m[0]);
+    });
+    return out;
+  }
+
+  function lastDayOfMonth(year, monthIndex) {
+    return new Date(year, monthIndex + 1, 0).getDate();
+  }
+
+  function clampedMonthDate(base, offsetMonths) {
+    const totalMonth = base.getMonth() + offsetMonths;
+    const year = base.getFullYear() + Math.floor(totalMonth / 12);
+    const month = ((totalMonth % 12) + 12) % 12;
+    const day = Math.min(base.getDate(), lastDayOfMonth(year, month));
+    return new Date(year, month, day);
+  }
+
+  function clampedYearDate(base, offsetYears) {
+    const year = base.getFullYear() + offsetYears;
+    const month = base.getMonth();
+    const day = Math.min(base.getDate(), lastDayOfMonth(year, month));
+    return new Date(year, month, day);
+  }
+
+  function buildOccurrenceSchedule(schedule, occurrenceKey, occurrenceIndex) {
+    const baseStart = new Date(scheduleStartRaw(schedule));
+    const baseEnd = new Date(scheduleEndRaw(schedule));
+    if (isNaN(baseStart.getTime()) || isNaN(baseEnd.getTime())) return null;
+    const occStartDay = parseDateKey(occurrenceKey);
+    if (isNaN(occStartDay.getTime())) return null;
+    let occStart;
+    let occEnd;
+    if (scheduleAllDay(schedule)) {
+      const range = eventDateRangeKeys(schedule);
+      const spanDays = range ? Math.max(1, daysBetweenKeys(range.startKey, range.endKey) + 1) : 1;
+      occStart = new Date(occStartDay.getFullYear(), occStartDay.getMonth(), occStartDay.getDate(), 0, 0, 0, 0);
+      occEnd = new Date(occStartDay.getFullYear(), occStartDay.getMonth(), occStartDay.getDate() + spanDays - 1, 23, 59, 0, 0);
+    } else {
+      occStart = new Date(
+        occStartDay.getFullYear(), occStartDay.getMonth(), occStartDay.getDate(),
+        baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds(), 0
+      );
+      occEnd = new Date(occStart.getTime() + Math.max(baseEnd.getTime() - baseStart.getTime(), 30 * 60 * 1000));
+    }
+    return Object.assign({}, schedule, {
+      start_datetime: isoLocal(occStart),
+      end_datetime: isoLocal(occEnd),
+      __repeatInstance: true,
+      __repeatMaster: schedule,
+      __repeatMasterId: scheduleId(schedule),
+      __repeatOccurrenceDate: occurrenceKey,
+      __repeatOccurrenceStart: isoLocal(occStart),
+      __repeatOccurrenceEnd: isoLocal(occEnd),
+      __repeatIndex: occurrenceIndex,
+    });
+  }
+
+  function occurrenceOverlapsVisible(occurrence, visible) {
+    const range = eventDateRangeKeys(occurrence);
+    if (!range) return false;
+    return range.startKey <= visible.endKey && range.endKey >= visible.startKey;
+  }
+
+  function shouldStopRepeat(rule, occurrenceKey, producedCount, visibleEndKey) {
+    const endType = repeatEndType(rule);
+    const untilKey = repeatUntilKey(rule);
+    const count = repeatCount(rule);
+    if (endType === 'until' && untilKey && occurrenceKey > untilKey) return true;
+    if (endType === 'count' && count && producedCount >= count) return true;
+    return endType !== 'count' && !untilKey && occurrenceKey > visibleEndKey;
+  }
+
+  function expandRecurringSchedule(schedule, visible) {
+    if (!isRecurringSchedule(schedule)) return [schedule];
+    const baseRange = eventDateRangeKeys(schedule);
+    if (!baseRange) return [];
+    const baseStart = parseDateKey(baseRange.startKey);
+    if (isNaN(baseStart.getTime())) return [];
+    const rule = scheduleRepeatRule(schedule);
+    const type = scheduleRepeatType(schedule);
+    const frequency = repeatFrequency(type, rule);
+    const interval = repeatInterval(rule);
+    const exdates = repeatExdateSet(rule);
+    const untilKey = repeatUntilKey(rule);
+    const loopEndKey = untilKey && untilKey < visible.endKey ? untilKey : visible.endKey;
+    const out = [];
+    let produced = 0;
+    let guard = 0;
+
+    function maybeAdd(occurrenceKey) {
+      if (shouldStopRepeat(rule, occurrenceKey, produced, visible.endKey)) return false;
+      produced += 1;
+      if (!exdates.has(occurrenceKey)) {
+        const occ = buildOccurrenceSchedule(schedule, occurrenceKey, produced - 1);
+        if (occ && occurrenceOverlapsVisible(occ, visible)) out.push(occ);
+      }
+      return true;
+    }
+
+    if (frequency === 'daily') {
+      const cursor = new Date(baseStart);
+      while (guard++ < 20000) {
+        const key = dateKey(cursor);
+        if (!maybeAdd(key)) break;
+        if (repeatEndType(rule) !== 'count' && key > loopEndKey) break;
+        cursor.setDate(cursor.getDate() + interval);
+      }
+      return out;
+    }
+
+    if (frequency === 'weekly') {
+      const selected = Array.isArray(rule.daysOfWeek) && rule.daysOfWeek.length
+        ? rule.daysOfWeek.map((d) => String(d).toUpperCase())
+        : [CAL_REPEAT_WEEKDAYS[baseStart.getDay()]];
+      const cursor = new Date(baseStart);
+      while (guard++ < 20000) {
+        const key = dateKey(cursor);
+        const diff = daysBetweenKeys(baseRange.startKey, key);
+        const weekOffset = Math.floor(diff / 7);
+        if (diff >= 0 && weekOffset % interval === 0 && selected.includes(CAL_REPEAT_WEEKDAYS[cursor.getDay()])) {
+          if (!maybeAdd(key)) break;
         }
-      });
-      cell.addEventListener('dragleave', () => cell.classList.remove('is-drag-over'));
-      cell.addEventListener('drop', (ev) => {
-        ev.preventDefault();
-        cell.classList.remove('is-drag-over');
-        const id = parseInt(ev.dataTransfer.getData('text/plain') || '0', 10);
-        const evt = state.items.find((item) => Number(item.id) === id);
-        if (evt) moveScheduleToDate(evt, realDate);
-      });
-      cell.addEventListener('click', () => openEdit(null, realDate));
-      return cell;
+        if (repeatEndType(rule) !== 'count' && key > loopEndKey) break;
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return out;
     }
-    // 앞쪽 이전달
-    for (let i = startDow - 1; i >= 0; i--) {
-      grid.appendChild(makeCell(prevDays - i, -1));
+
+    if (frequency === 'monthly' || frequency === 'yearly') {
+      let index = 0;
+      while (guard++ < 20000) {
+        const occDate = frequency === 'monthly'
+          ? clampedMonthDate(baseStart, index * interval)
+          : clampedYearDate(baseStart, index * interval);
+        const key = dateKey(occDate);
+        if (!maybeAdd(key)) break;
+        if (repeatEndType(rule) !== 'count' && key > loopEndKey) break;
+        index += 1;
+      }
+      return out;
     }
-    // 이번달
-    for (let d = 1; d <= daysInMonth; d++) {
-      grid.appendChild(makeCell(d, 0));
+
+    return [schedule];
+  }
+
+  function calendarRenderItems() {
+    const visible = visibleRangeForYm(state.ym);
+    return state.schedules.reduce((items, schedule) => {
+      return items.concat(expandRecurringSchedule(schedule, visible));
+    }, []);
+  }
+
+  function getFullCalendarPlugins() {
+    if (!window.FullCalendar) return [];
+    const plugins = [];
+    if (window.FullCalendar.DayGrid && window.FullCalendar.DayGrid.default) plugins.push(window.FullCalendar.DayGrid.default);
+    if (window.FullCalendar.Interaction && window.FullCalendar.Interaction.default) plugins.push(window.FullCalendar.Interaction.default);
+    return plugins;
+  }
+
+  function toFullCalendarEvent(evt) {
+    const schedule = scheduleFromRenderItem(evt);
+    if (!schedule) return null;
+    const id = scheduleId(schedule);
+    const allDay = scheduleAllDay(schedule);
+    const color = schedule.color_code || '#6366f1';
+    const title = scheduleTitle(schedule) || '(제목 없음)';
+    const repeatInstance = !!schedule.__repeatInstance;
+    const fcId = repeatInstance ? (String(id) + '::' + String(schedule.__repeatOccurrenceDate || '')) : (id == null ? '' : String(id));
+    const event = {
+      id: fcId,
+      title,
+      allDay,
+      editable: !repeatInstance,
+      backgroundColor: color,
+      borderColor: color,
+      textColor: '#ffffff',
+      extendedProps: Object.assign({}, schedule, {
+        schedule,
+        scheduleId: id,
+        repeatInstance,
+        repeatMasterId: schedule.__repeatMasterId || id,
+        repeatOccurrenceDate: schedule.__repeatOccurrenceDate || '',
+        repeatOccurrenceStart: schedule.__repeatOccurrenceStart || '',
+        repeatOccurrenceEnd: schedule.__repeatOccurrenceEnd || '',
+        color_code: color,
+        is_important: !!schedule.is_important,
+        share_scope: scheduleShareScope(schedule),
+        repeat_type: scheduleRepeatType(schedule),
+        repeat_rule: scheduleRepeatRule(schedule),
+      }),
+    };
+    if (allDay) {
+      const range = eventDateRangeKeys(schedule);
+      if (!range) return null;
+      event.start = range.startKey;
+      event.end = addDaysToDateKey(range.endKey, 1);
+    } else {
+      event.start = scheduleStartRaw(schedule);
+      event.end = scheduleEndRaw(schedule) || scheduleStartRaw(schedule);
     }
-    // 6주 채움
-    const filled = startDow + daysInMonth;
-    const trailing = (42 - filled);
-    for (let d = 1; d <= trailing; d++) {
-      grid.appendChild(makeCell(d, 1));
+    return event;
+  }
+
+  function renderCalendarEventContent(arg) {
+    const props = arg.event.extendedProps || {};
+    const wrap = document.createElement('span');
+    wrap.className = 'cal-fc-event-inner';
+    if (props.is_important) {
+      const badge = document.createElement('span');
+      badge.className = 'cal-fc-important';
+      const icon = document.createElement('img');
+      icon.src = window.blossomAssetSrc
+        ? window.blossomAssetSrc('/static/image/svg/chat/free-icon-font-location-exclamation.svg')
+        : 'assets/svg/chat/free-icon-font-location-exclamation.svg';
+      icon.alt = '';
+      badge.appendChild(icon);
+      wrap.appendChild(badge);
     }
+    if (arg.timeText) {
+      const time = document.createElement('span');
+      time.className = 'cal-fc-time';
+      time.textContent = arg.timeText;
+      wrap.appendChild(time);
+    }
+    const title = document.createElement('span');
+    title.className = 'cal-fc-title';
+    title.textContent = arg.event.title || t('common.noTitle');
+    wrap.appendChild(title);
+    return { domNodes: [wrap] };
+  }
+
+  function ensureFullCalendar(grid) {
+    if (state.calendar) return state.calendar;
+    if (!window.FullCalendar || !window.FullCalendar.Calendar) {
+      grid.innerHTML = '<div class="cal-library-error">' + t('calendar.libraryMissing') + '</div>';
+      calendarLog('fullcalendar:missing', {}, 'error');
+      return null;
+    }
+    const plugins = getFullCalendarPlugins();
+    state.calendar = new window.FullCalendar.Calendar(grid, {
+      plugins,
+      initialView: 'dayGridMonth',
+      initialDate: state.ym ? (state.ym + '-01') : new Date(),
+      locale: currentLanguage() === 'ko' ? 'ko' : 'en',
+      firstDay: 0,
+      fixedWeekCount: true,
+      showNonCurrentDates: true,
+      headerToolbar: false,
+      height: '100%',
+      expandRows: true,
+      dayMaxEventRows: 4,
+      moreLinkText: function (n) { return t('calendar.moreLink', { count: n }); },
+      displayEventEnd: false,
+      nowIndicator: false,
+      editable: true,
+      eventStartEditable: true,
+      eventDurationEditable: true,
+      eventOrder: 'allDay,-duration,title',
+      dateClick: function (info) {
+        openEdit(null, parseDateKey(info.dateStr));
+      },
+      eventClick: function (info) {
+        if (info.jsEvent) info.jsEvent.preventDefault();
+        const props = info.event.extendedProps || {};
+        const schedule = props.schedule || state.schedules.find((item) => String(scheduleId(item)) === String(info.event.id));
+        openEdit(scheduleFromRenderItem(schedule));
+      },
+      eventDrop: function (info) {
+        const props = info.event.extendedProps || {};
+        const schedule = props.schedule || state.schedules.find((item) => String(scheduleId(item)) === String(info.event.id));
+        if (!schedule || !info.event.start) {
+          info.revert();
+          return;
+        }
+        moveScheduleToDate(scheduleFromRenderItem(schedule), info.event.start).then((ok) => {
+          if (!ok) info.revert();
+        });
+      },
+      eventResize: function (info) {
+        const props = info.event.extendedProps || {};
+        const schedule = props.schedule || state.schedules.find((item) => String(scheduleId(item)) === String(props.scheduleId || info.event.id));
+        if (!schedule || !info.event.start) {
+          info.revert();
+          return;
+        }
+        resizeScheduleToEvent(scheduleFromRenderItem(schedule), info.event).then((ok) => {
+          if (!ok) info.revert();
+        });
+      },
+      eventContent: renderCalendarEventContent,
+      eventDidMount: function (info) {
+        const props = info.event.extendedProps || {};
+        const eventColor = props.color_code || info.event.backgroundColor || '#6366f1';
+        info.el.style.backgroundColor = eventColor;
+        info.el.style.borderColor = eventColor;
+        info.el.style.color = '#ffffff';
+        const main = info.el.querySelector('.fc-event-main');
+        if (main) main.style.color = '#ffffff';
+        info.el.dataset.eventId = String(props.scheduleId || info.event.id || '');
+        info.el.dataset.shareScope = String(props.share_scope || 'PRIVATE');
+        info.el.dataset.repeatInstance = props.repeatInstance ? '1' : '0';
+        info.el.classList.toggle('is-important', !!props.is_important);
+        info.el.classList.toggle('is-repeat-instance', !!props.repeatInstance);
+        info.el.title = info.event.title || '';
+      },
+      datesSet: function (info) {
+        const current = info.view && info.view.currentStart;
+        if (current) {
+          state.ym = ymKey(current);
+          const lbl = $('calCurrentLabel');
+          if (lbl) lbl.textContent = formatCalendarMonthLabel(current);
+        }
+      },
+    });
+    state.calendar.render();
+    refreshCalendarSize();
+    return state.calendar;
+  }
+
+  function render() {
+    if (!state.ym) state.ym = ymKey(new Date());
+    const [y, m] = state.ym.split('-').map(Number);
+    const lbl = $('calCurrentLabel'); if (lbl) lbl.textContent = formatCalendarMonthLabel(y, m);
+    const grid = $('calMonthGrid'); if (!grid) return;
+    const calendar = ensureFullCalendar(grid);
+    if (!calendar) return;
+    const renderItems = calendarRenderItems();
+    const events = renderItems.map(toFullCalendarEvent).filter(Boolean);
+    calendar.batchRendering(function () {
+      calendar.gotoDate(state.ym + '-01');
+      calendar.removeAllEvents();
+      calendar.addEventSource(events);
+    });
+    try { calendar.updateSize(); } catch (_) {}
+    calendarLog('state:fullCalendarEvents', {
+      count: events.length,
+      sample: events.slice(0, 5).map((event) => ({
+        id: event.id,
+        title: event.title,
+        start: event.start,
+        end: event.end,
+        allDay: event.allDay,
+        repeatInstance: !!(event.extendedProps && event.extendedProps.repeatInstance),
+      })),
+    });
   }
 
   function fmtDT(d) {
@@ -5362,7 +6208,81 @@ window.CalendarView = (function () {
   function fmtDateOnly(d) {
     return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   }
-  let calAttendees = [];
+  let calAttendeeRefs = [];
+  function _coerceCalUserId(v) {
+    const n = parseInt(String(v == null ? '' : v), 10);
+    return (!isNaN(n) && n > 0) ? n : null;
+  }
+  function normalizeCalAttendeeRefs(items) {
+    const seen = new Set();
+    const out = [];
+    if (!Array.isArray(items)) return out;
+    for (const item of items) {
+      if (item && typeof item === 'object') {
+        const label = String(item.label != null ? item.label : item.name || '').trim();
+        const userId = _coerceCalUserId(item.userId != null ? item.userId : item.user_id);
+        if (!label && !userId) continue;
+        const key = userId ? 'id:' + userId : 'l:' + label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ userId: userId || null, label: label || ('user#' + userId) });
+      } else {
+        const label = String(item || '').trim();
+        if (!label) continue;
+        const lk = 'l:' + label.toLowerCase();
+        if (seen.has(lk)) continue;
+        seen.add(lk);
+        out.push({ userId: null, label });
+      }
+    }
+    return out;
+  }
+  function buildCalAttendeeRefsFromEvent(evt) {
+    if (!evt) return [];
+    const sus = Array.isArray(evt.share_users) ? evt.share_users : [];
+    if (sus.length) {
+      return sus.map((su) => {
+        const usr = su.user || {};
+        const uid = _coerceCalUserId(su.user_id != null ? su.user_id : usr.id);
+        return {
+          userId: uid,
+          label: calAttendeeLabel({
+            id: uid,
+            name: usr.name,
+            nickname: usr.nickname,
+            department: usr.department,
+            emp_no: usr.emp_no,
+          }),
+        };
+      }).filter((r) => r.label);
+    }
+    if (scheduleShareScope(evt) === 'SELECT' && Array.isArray(evt.attendees)) {
+      return normalizeCalAttendeeRefs(evt.attendees);
+    }
+    return [];
+  }
+  function renderCalAttendees(items) {
+    calAttendeeRefs = normalizeCalAttendeeRefs(items);
+    const list = $('calFAttendeeList');
+    if (!list) return;
+    list.innerHTML = '';
+    calAttendeeRefs.forEach((ref, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cal-token';
+      btn.dataset.index = String(idx);
+      if (ref.userId) btn.dataset.userId = String(ref.userId);
+      const lab = document.createElement('span');
+      lab.className = 'cal-token-label';
+      lab.textContent = ref.label;
+      const rm = document.createElement('span');
+      rm.className = 'cal-token-x';
+      rm.textContent = '\u00D7';
+      btn.appendChild(lab);
+      btn.appendChild(rm);
+      list.appendChild(btn);
+    });
+  }
   let calSelectedSticker = '';
   const CAL_COLOR_PALETTE = [
     '#6366f1', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e',
@@ -5392,30 +6312,6 @@ window.CalendarView = (function () {
     ['019-bath.svg', '휴식'],
     ['020-reading.svg', '독서 2'],
   ].map(([file, label]) => ({ path: `/static/image/svg/search/${file}`, label }));
-  function normalizeCalTokens(items) {
-    const seen = new Set();
-    return (Array.isArray(items) ? items : [])
-      .map((item) => String(item || '').trim())
-      .filter((item) => {
-        if (!item || seen.has(item)) return false;
-        seen.add(item);
-        return true;
-      });
-  }
-  function renderCalAttendees(items) {
-    calAttendees = normalizeCalTokens(items);
-    const list = $('calFAttendeeList');
-    if (!list) return;
-    list.innerHTML = '';
-    calAttendees.forEach((name) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'cal-token';
-      btn.dataset.name = name;
-      btn.textContent = name + ' ×';
-      list.appendChild(btn);
-    });
-  }
   function setCalImportant(flag) {
     const btn = $('calFImportant');
     if (!btn) return;
@@ -5439,46 +6335,61 @@ window.CalendarView = (function () {
   // 이미 참석자에 추가됐는지 여부 — 라벨/사번 어느 한쪽이라도 매칭되면 중복으로 본다.
   function isAttendeeAlreadyAdded(u) {
     if (!u) return false;
+    const uid = _coerceCalUserId(u.id);
+    if (uid) {
+      return calAttendeeRefs.some((r) => r.userId === uid);
+    }
     const empNo = String((u && u.emp_no) || '').trim().toLowerCase();
     const targetLabel = calAttendeeLabel(u);
-    return calAttendees.some((label) => {
-      const lab = String(label || '').toLowerCase();
+    return calAttendeeRefs.some((r) => {
+      const lab = String(r.label || '').toLowerCase();
       if (lab === targetLabel.toLowerCase()) return true;
       if (empNo && lab.includes('(' + empNo + ')')) return true;
       return false;
     });
   }
 
-  // v0.5.10: 동료 데이터 단일 소스. 동료 화면(`peopleList`)·캘린더 참석자 선택·DM 검색이 동일한 fetch 경로를 공유한다.
-  // - 항상 신선한 결과를 가져온다 (검색어 캐시로 인한 stale 표시 방지).
-  // - 실패 시 명시적으로 throw → 호출부가 에러 메시지를 그릴 수 있다.
-  async function loadAllCoworkers(opts) {
-    const o = opts || {};
-    const q = String(o.q || '').trim();
-    const rows = await Api.fetchCoworkers({ q, limit: 1000 });
-    let users = Array.isArray(rows) ? rows.slice() : [];
-    if (state.currentUserId) {
-      users = users.filter((u) => u.id !== state.currentUserId);
-    }
-    return users;
-  }
-
   // 캘린더 참석자 모달 상태
+  const CAL_ATTENDEE_DEBOUNCE_MS = 300;
   const calAttendeePickerState = {
     fullList: [],
     loaded: false,
     error: null,
     keyword: '',
+    isDebouncing: false,
     requestId: 0,
   };
 
-  function _matchCoworker(u, lower) {
-    if (!lower) return true;
-    return [u.name, u.nickname, u.department, u.emp_no, u.email, u.company]
-      .some((v) => String(v || '').toLowerCase().includes(lower));
+  /** 한글 1글자 또는 길이 2+ 일 때만 검색 실행 (숫자·영문 1글자는 부족한 것으로 보고 안내만) */
+  function _calAttendeeQueryReady(q) {
+    const s = String(q || '').trim();
+    if (!s) return false;
+    if (s.length >= 2) return true;
+    return s.length === 1 && /[\uac00-\ud7af]/.test(s);
   }
 
-  function _renderCalAttendeePickerStatus(message, kind) {
+  function _matchCoworker(u, lower) {
+    if (!lower) return true;
+    return [
+      u.name, u.nickname, u.department, u.emp_no, u.email, u.company,
+      u.team_name, u.teamName, u.team, u.dept_name, u.deptName,
+    ].some((v) => String(v || '').toLowerCase().includes(lower));
+  }
+
+  function _getCalAttendeeMatches() {
+    const kw = String(calAttendeePickerState.keyword || '').trim();
+    if (!_calAttendeeQueryReady(kw)) return [];
+    const lower = kw.toLowerCase();
+    const seen = new Set();
+    return (calAttendeePickerState.fullList || []).filter((u) => {
+      const key = String(u.id || u.emp_no || u.name || u.nickname || '').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return _matchCoworker(u, lower);
+    });
+  }
+
+  function _renderCalAttendeePickerStatus(message, kind, opts) {
     const list = $('calAttendeeModalList');
     const count = $('calAttendeeModalCount');
     if (count) count.textContent = '';
@@ -5486,120 +6397,275 @@ window.CalendarView = (function () {
     list.innerHTML = '';
     const li = document.createElement('li');
     li.className = 'people-item muted' + (kind === 'error' ? ' is-error' : '');
-    li.textContent = message;
+    const msgWrap = document.createElement('div');
+    msgWrap.style.display = 'flex';
+    msgWrap.style.flexDirection = 'column';
+    msgWrap.style.gap = '6px';
+    msgWrap.style.width = '100%';
+    const msg = document.createElement('div');
+    msg.textContent = message;
+    msgWrap.appendChild(msg);
+    if (opts && opts.retry) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.style.alignSelf = 'flex-start';
+      btn.style.padding = '4px 10px';
+      btn.style.fontSize = '12px';
+      btn.textContent = '다시 시도';
+      btn.addEventListener('click', () => { _loadCalAttendeePickerList(); });
+      msgWrap.appendChild(btn);
+    }
+    li.appendChild(msgWrap);
     list.appendChild(li);
   }
 
-  function _renderCalAttendeePickerResults() {
+  function _appendCalAttendeeHintRow(list, text) {
+    const li = document.createElement('li');
+    li.className = 'people-item muted cal-attendee-hint';
+    li.textContent = text;
+    list.appendChild(li);
+  }
+
+  function _appendCalAttendeePickerRow(list, u) {
+    const li = document.createElement('li');
+    li.className = 'people-item cal-attendee-row';
+    li.setAttribute('role', 'button');
+    const av = document.createElement('span');
+    av.className = 'avatar avatar-md';
+    const dispName = u && (u.name || u.nickname);
+    try {
+      const setAv =
+        typeof window !== 'undefined' && typeof window.setAvatar === 'function'
+          ? window.setAvatar
+          : null;
+      if (setAv) {
+        setAv(av, u && u.profile_image, u && u.id, dispName);
+      } else {
+        throw new Error('setAvatar is not available');
+      }
+    } catch (_) {
+      av.innerHTML = '';
+      av.style.background = '#64748b';
+      av.style.color = '#ffffff';
+      const span = document.createElement('span');
+      span.className = 'avatar-initials';
+      const seed = dispName || u.emp_no || '';
+      let ini =
+        typeof window !== 'undefined' && typeof window.__blossomInitialsFor === 'function'
+          ? window.__blossomInitialsFor(seed)
+          : '';
+      if (!ini) ini = String(seed || u.id || '').trim().slice(0, 2);
+      span.textContent = ini || '?';
+      av.appendChild(span);
+    }
+    const info = document.createElement('div');
+    info.className = 'info';
+    const nm = document.createElement('div');
+    nm.className = 'name';
+    nm.textContent = dispName || ('user#' + u.id);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = cleanMetaForPicker([u.emp_no, u.department]).join(' · ');
+    info.appendChild(nm);
+    info.appendChild(meta);
+    li.appendChild(av);
+    li.appendChild(info);
+
+    const already = isAttendeeAlreadyAdded(u);
+    if (already) {
+      li.classList.add('is-disabled');
+      li.tabIndex = -1;
+      li.setAttribute('aria-disabled', 'true');
+    } else {
+      li.tabIndex = 0;
+    }
+
+    li.addEventListener('click', () => {
+      if (li.classList.contains('is-disabled')) return;
+      if (isAttendeeAlreadyAdded(u)) {
+        notifyToast('이미 참석자에 추가된 동료입니다.', 'info');
+        return;
+      }
+      renderCalAttendees(calAttendeeRefs.concat([{ userId: _coerceCalUserId(u && u.id), label: calAttendeeLabel(u) }]));
+      closeLocalModal('calAttendeeModal');
+    });
+    li.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      li.click();
+    });
+    list.appendChild(li);
+  }
+
+  function _renderCalAttendeePicker() {
     const list = $('calAttendeeModalList');
     const count = $('calAttendeeModalCount');
+    const modal = $('calAttendeeModal');
     if (!list) return;
-    const lower = String(calAttendeePickerState.keyword || '').toLowerCase().trim();
-    const seen = new Set();
-    const matched = (calAttendeePickerState.fullList || []).filter((u) => {
-      const key = String(u.id || u.emp_no || u.name || u.nickname || '').trim();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return _matchCoworker(u, lower);
-    });
+    if (modal && modal.hidden) return;
 
-    list.innerHTML = '';
-    if (!matched.length) {
-      const li = document.createElement('li');
-      li.className = 'people-item muted';
-      li.textContent = lower
-        ? '검색어와 일치하는 동료가 없습니다'
-        : '조회된 동료가 없습니다';
-      list.appendChild(li);
-      if (count) count.textContent = '';
+    if (calAttendeePickerState.error && !calAttendeePickerState.loaded) {
+      _renderCalAttendeePickerStatus('동료 목록을 불러오지 못했습니다.', 'error', { retry: true });
       return;
     }
 
-    if (count) {
-      count.textContent = lower
-        ? (matched.length + '명 검색됨 (전체 ' + (calAttendeePickerState.fullList || []).length + '명)')
-        : (matched.length + '명');
+    list.innerHTML = '';
+
+    if (!calAttendeePickerState.loaded) {
+      if (count) count.textContent = '';
+      _appendCalAttendeeHintRow(list, '동료 목록을 불러오는 중…');
+      return;
     }
 
+    if (calAttendeePickerState.isDebouncing) {
+      if (count) count.textContent = '';
+      _appendCalAttendeeHintRow(list, '검색 중...');
+      return;
+    }
+
+    const kw = String(calAttendeePickerState.keyword || '').trim();
+    if (!_calAttendeeQueryReady(kw)) {
+      if (count) count.textContent = '';
+      _appendCalAttendeeHintRow(list, '이름, 사번, 부서명으로 동료를 검색해 주세요.');
+      return;
+    }
+
+    const matched = _getCalAttendeeMatches();
+    if (!matched.length) {
+      if (count) count.textContent = '';
+      _appendCalAttendeeHintRow(list, '검색 결과가 없습니다.');
+      return;
+    }
+
+    if (count) count.textContent = matched.length + '명 검색됨';
+
     matched.forEach((u) => {
-      const li = document.createElement('li');
-      li.className = 'people-item';
-      const av = document.createElement('span');
-      av.className = 'avatar avatar-md';
-      setAvatar(av, u.profile_image, u.id, u.name || u.nickname);
-      const info = document.createElement('div');
-      info.className = 'info';
-      const nm = document.createElement('div');
-      nm.className = 'name';
-      nm.textContent = u.name || u.nickname || ('user#' + u.id);
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = cleanMetaParts([u.emp_no, u.department]).join(' · ');
-      info.appendChild(nm);
-      info.appendChild(meta);
-      li.appendChild(av);
-      li.appendChild(info);
-
-      const already = isAttendeeAlreadyAdded(u);
-      if (already) li.classList.add('is-disabled');
-
-      li.addEventListener('click', () => {
-        if (li.classList.contains('is-disabled')) return;
-        if (isAttendeeAlreadyAdded(u)) {
-          toast('이미 참석자에 추가된 동료입니다.', 'info');
-          return;
-        }
-        renderCalAttendees([].concat(calAttendees, [calAttendeeLabel(u)]));
-        closeLocalModal('calAttendeeModal');
-      });
-      list.appendChild(li);
+      try {
+        _appendCalAttendeePickerRow(list, u);
+      } catch (rowErr) {
+        try { console.warn('[calAttendee] row render failed', rowErr, u); } catch (_) {}
+      }
     });
   }
 
+  // v0.5.12: 동료 fetch 는 outer IIFE 의 loadAllCoworkers 와 동일 엔드포인트(/api/chat/directory)를 공유한다.
+  // 동료 화면이 한 번이라도 로드되었다면 그 캐시를 즉시 반영하고 백그라운드로 fresh fetch 를 시도한다.
   async function _loadCalAttendeePickerList() {
     calAttendeePickerState.requestId += 1;
     const reqId = calAttendeePickerState.requestId;
-    calAttendeePickerState.loaded = false;
     calAttendeePickerState.error = null;
-    _renderCalAttendeePickerStatus('동료 리스트를 불러오는 중…');
+
+    let cached = [];
     try {
-      const users = await loadAllCoworkers({ q: '' });
+      cached = (typeof window !== 'undefined' && typeof window.__blossomGetDirectoryCache === 'function')
+        ? (window.__blossomGetDirectoryCache() || [])
+        : [];
+    } catch (_) { cached = []; }
+
+    if (cached.length) {
+      calAttendeePickerState.fullList = cached;
+      calAttendeePickerState.loaded = true;
+      _renderCalAttendeePicker();
+    } else {
+      calAttendeePickerState.loaded = false;
+      _renderCalAttendeePicker();
+    }
+
+    try {
+      const fetcher = (typeof window !== 'undefined' && typeof window.loadAllCoworkers === 'function')
+        ? window.loadAllCoworkers
+        : null;
+      let users = [];
+      if (fetcher) {
+        users = await fetcher({ q: '' });
+      } else {
+        const rows = await Api.fetchCoworkers({ q: '', limit: 1000 });
+        users = Array.isArray(rows) ? rows.slice() : [];
+      }
       if (reqId !== calAttendeePickerState.requestId) return;
-      calAttendeePickerState.fullList = users || [];
+      calAttendeePickerState.fullList = Array.isArray(users) ? users : [];
       calAttendeePickerState.loaded = true;
       calAttendeePickerState.error = null;
-      _renderCalAttendeePickerResults();
+      _renderCalAttendeePicker();
     } catch (e) {
       if (reqId !== calAttendeePickerState.requestId) return;
-      try { console.warn('[calAttendee] coworker fetch failed', e); } catch (_) {}
+      const status = (e && e.status) != null ? e.status : 'n/a';
+      const url = (e && e.url) || ((Api && Api.serverUrl ? Api.serverUrl : '') + '/api/chat/directory');
+      const method = (e && e.method) || 'GET';
+      const payload = e && e.payload;
+      const message = e && e.message;
+      try {
+        console.error('[calAttendee] coworker fetch failed', {
+          method, url, status, message, payload, error: e,
+        });
+      } catch (_) {}
+
+      if (cached.length) {
+        calAttendeePickerState.fullList = cached;
+        calAttendeePickerState.loaded = true;
+        calAttendeePickerState.error = null;
+        try {
+          console.info('[calAttendee] fresh fetch 실패, 동료 화면 캐시 ' + cached.length + '명으로 대체');
+        } catch (_) {}
+        _renderCalAttendeePicker();
+        return;
+      }
+
       calAttendeePickerState.fullList = [];
       calAttendeePickerState.loaded = false;
       calAttendeePickerState.error = e;
-      _renderCalAttendeePickerStatus('동료 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+      _renderCalAttendeePickerStatus('동료 목록을 불러오지 못했습니다.', 'error', { retry: true });
     }
+  }
+
+  function _pickFirstCalAttendeeSearchResult() {
+    if (calAttendeePickerState.isDebouncing) return;
+    if (!calAttendeePickerState.loaded) return;
+    const kw = String(calAttendeePickerState.keyword || '').trim();
+    if (!_calAttendeeQueryReady(kw)) return;
+    const list = $('calAttendeeModalList');
+    if (!list) return;
+    const first = list.querySelector('.cal-attendee-row:not(.is-disabled)');
+    if (first) first.click();
   }
 
   function _bindCalAttendeeSearchOnce() {
     const input = $('calAttendeeSearchInput');
-    if (!input || input.dataset.bound === '1') return;
-    input.dataset.bound = '1';
-    let t = null;
-    input.addEventListener('input', (e) => {
-      clearTimeout(t);
-      const v = (e.target.value || '').trim();
-      t = setTimeout(() => {
-        calAttendeePickerState.keyword = v;
-        if (calAttendeePickerState.loaded) {
-          _renderCalAttendeePickerResults();
+    const modal = $('calAttendeeModal');
+    if (input && input.dataset.bound !== '1') {
+      input.dataset.bound = '1';
+      let t = null;
+      input.addEventListener('input', () => {
+        clearTimeout(t);
+        calAttendeePickerState.isDebouncing = true;
+        _renderCalAttendeePicker();
+        t = setTimeout(() => {
+          calAttendeePickerState.isDebouncing = false;
+          calAttendeePickerState.keyword = String(input.value || '').trim();
+          _renderCalAttendeePicker();
+        }, CAL_ATTENDEE_DEBOUNCE_MS);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeLocalModal('calAttendeeModal');
+          return;
         }
-      }, 80);
-    });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          _pickFirstCalAttendeeSearchResult();
+        }
+      });
+    }
+    if (modal && modal.dataset.calAttendeeKeybound !== '1') {
+      modal.dataset.calAttendeeKeybound = '1';
+      modal.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
         e.preventDefault();
         closeLocalModal('calAttendeeModal');
-      }
-    });
+      }, true);
+    }
   }
 
   function openCalAttendeeModal() {
@@ -5607,8 +6673,18 @@ window.CalendarView = (function () {
     const input = $('calAttendeeSearchInput');
     if (input) input.value = '';
     calAttendeePickerState.keyword = '';
+    calAttendeePickerState.isDebouncing = false;
+    calAttendeePickerState.error = null;
     openLocalModal('calAttendeeModal');
-    setTimeout(() => { try { input && input.focus(); } catch (_) {} }, 30);
+    _renderCalAttendeePicker();
+    setTimeout(() => {
+      try {
+        if (input) {
+          input.focus();
+          if (typeof input.select === 'function') input.select();
+        }
+      } catch (_) {}
+    }, 30);
     _loadCalAttendeePickerList();
   }
   function stickerImageSrc(path) {
@@ -5686,7 +6762,7 @@ window.CalendarView = (function () {
     none.type = 'button';
     none.className = 'cal-sticker-option is-active';
     none.dataset.sticker = '';
-    none.textContent = '선택 안 함';
+    none.textContent = t('calendar.noSticker');
     wrap.appendChild(none);
     CAL_STICKERS.forEach((item) => {
       const btn = document.createElement('button');
@@ -5716,16 +6792,18 @@ window.CalendarView = (function () {
     toggleCalDropdown('calFStickerMenu', 'calFStickerTrigger', false);
     toggleCalDropdown('calFColorMenu', 'calFColorTrigger', false);
   }
-  function initCalDatePickers() {
+  function configureCalPickers(allDay) {
     if (!window.flatpickr) return;
-    const opts = {
+    const localeOpts = {
+      locale: flatpickrLocale(),
+      allowInput: true,
+      disableMobile: true,
+    };
+    const optsDatetime = Object.assign({}, localeOpts, {
       enableTime: true,
       time_24hr: true,
       minuteIncrement: 5,
       dateFormat: 'Y-m-d H:i',
-      locale: (window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || 'ko',
-      allowInput: false,
-      disableMobile: true,
       onChange: function (_selectedDates, dateStr, inst) {
         const startEl = $('calFStart');
         const endEl = $('calFEnd');
@@ -5738,12 +6816,51 @@ window.CalendarView = (function () {
           if (endEl._flatpickr) endEl._flatpickr.setDate(endEl.value, false, 'Y-m-d H:i');
         }
       },
+    });
+    const syncAllDayRange = function (inst) {
+      const startEl = $('calFStart');
+      const endEl = $('calFEnd');
+      if (!startEl || !endEl) return;
+      const sk = (startEl.value || '').trim().slice(0, 10);
+      const ek = (endEl.value || '').trim().slice(0, 10);
+      const sd = parseDateKey(sk);
+      const ed = parseDateKey(ek);
+      if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return;
+      if (ed < sd) {
+        if (inst && inst.input === endEl) {
+          startEl.value = ek;
+          if (startEl._flatpickr) startEl._flatpickr.setDate(ek, false, 'Y-m-d');
+        } else {
+          endEl.value = sk;
+          if (endEl._flatpickr) endEl._flatpickr.setDate(sk, false, 'Y-m-d');
+        }
+      }
     };
+    const optsDate = Object.assign({}, localeOpts, {
+      enableTime: false,
+      dateFormat: 'Y-m-d',
+      onChange: function (_selectedDates, _dateStr, inst) {
+        syncAllDayRange(inst);
+      },
+    });
     ['calFStart', 'calFEnd'].forEach((id) => {
       const el = $(id);
       if (!el) return;
-      if (!el._flatpickr) window.flatpickr(el, opts);
-      else if (el.value) el._flatpickr.setDate(el.value, false, 'Y-m-d H:i');
+      const cur = (el.value || '').trim();
+      if (el._flatpickr) {
+        try { el._flatpickr.destroy(); } catch (_) {}
+        try { delete el._flatpickr; } catch (_) { el._flatpickr = undefined; }
+      }
+      const picker = window.flatpickr(el, allDay ? optsDate : optsDatetime);
+      if (cur) {
+        if (allDay) {
+          const k = (cur.match(/^\d{4}-\d{2}-\d{2}/) || [cur.slice(0, 10)])[0];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(k) && picker && typeof picker.setDate === 'function') picker.setDate(k, false, 'Y-m-d');
+        } else {
+          const normalized = normalizeDateTimeInput(cur.replace('T', ' '));
+          if (picker && typeof picker.setDate === 'function') picker.setDate(normalized, false, 'Y-m-d H:i');
+        }
+      }
     });
   }
   function syncCalAllDayInputs() {
@@ -5753,51 +6870,349 @@ window.CalendarView = (function () {
       const el = $(id);
       if (!el) return;
       if (locked) {
-        if (!el.dataset.fullValue && el.value) el.dataset.fullValue = el.value;
-        const d = new Date(fromLocalInputValue(el.value || el.dataset.fullValue || ''));
+        if (!el.dataset.fullValue && el.value) {
+          const raw = String(el.value).trim();
+          if (raw.length > 10 || /\d{2}:\d{2}/.test(raw)) {
+            el.dataset.fullValue = normalizeDateTimeInput(raw.replace('T', ' '));
+          }
+        }
+        const raw = String(el.value || el.dataset.fullValue || '').trim();
+        let d;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) d = parseDateKey(raw);
+        else d = new Date(fromLocalInputValue(raw));
         if (!isNaN(d.getTime())) el.value = fmtDateOnly(d);
       } else if (el.dataset.fullValue) {
         el.value = el.dataset.fullValue;
         delete el.dataset.fullValue;
-      }
-      el.disabled = locked;
-      el.classList.toggle('is-locked', locked);
-      try {
-        if (el._flatpickr) {
-          if (locked) el._flatpickr.close();
-          el._flatpickr.set('clickOpens', !locked);
+      } else {
+        const raw = String(el.value || '').trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const d = parseDateKey(raw);
+          if (!isNaN(d.getTime())) {
+            const hh = id === 'calFStart' ? 9 : 10;
+            el.value = fmtDT(new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, 0, 0, 0));
+          }
         }
-      } catch (_) {}
+      }
+      el.disabled = false;
+      el.classList.remove('is-locked');
     });
   }
+  /** 일정 공유 모드에 따라 참석자 블록 표시. skipClear: 폼 초기화(openEdit) 시 true */
+  function syncCalShareAttendanceUi(opts) {
+    const o = opts || {};
+    const shareEl = $('calFShare');
+    const share = (shareEl && shareEl.value) || 'PRIVATE';
+    const block = $('calFAttendeeBlock');
+    if (block) block.hidden = share !== 'SELECT';
+    if (!o.skipClear && share !== 'SELECT') {
+      calAttendeeRefs = [];
+      renderCalAttendees([]);
+    }
+  }
+
+  function repeatWeekdayForInput(value) {
+    const d = parseDateKey(String(value || '').slice(0, 10));
+    if (isNaN(d.getTime())) return CAL_REPEAT_WEEKDAYS[new Date().getDay()];
+    return CAL_REPEAT_WEEKDAYS[d.getDay()];
+  }
+
+  function setRepeatWeekdays(days) {
+    const selected = new Set((Array.isArray(days) ? days : []).map((d) => String(d).toUpperCase()));
+    document.querySelectorAll('#calFRepeatWeekdays input[type="checkbox"]').forEach((input) => {
+      input.checked = selected.has(input.value);
+    });
+  }
+
+  function selectedRepeatWeekdays() {
+    return Array.from(document.querySelectorAll('#calFRepeatWeekdays input[type="checkbox"]:checked'))
+      .map((input) => input.value);
+  }
+
+  function effectiveRepeatFrequencyFromForm() {
+    const type = ($('calFRepeat') && $('calFRepeat').value) || 'none';
+    if (type === 'custom') return (($('calFRepeatFrequency') && $('calFRepeatFrequency').value) || 'daily');
+    return type;
+  }
+
+  function syncCalRepeatUi(opts) {
+    const o = opts || {};
+    const repeatEl = $('calFRepeat');
+    const repeat = (repeatEl && repeatEl.value) || 'none';
+    const endBlock = $('calFRepeatEndBlock');
+    const endDetail = $('calFRepeatEndDetail');
+    const untilBlock = $('calFRepeatUntilBlock');
+    const countBlock = $('calFRepeatCountBlock');
+    const customBlock = $('calFRepeatCustomBlock');
+    const weekdays = $('calFRepeatWeekdays');
+    const monthPolicy = $('calFRepeatMonthPolicy');
+    const endType = ($('calFRepeatEndType') && $('calFRepeatEndType').value) || 'never';
+    const frequency = effectiveRepeatFrequencyFromForm();
+    const enabled = repeat !== 'none';
+    if (endBlock) endBlock.hidden = !enabled;
+    if (endDetail) endDetail.hidden = !enabled || endType === 'never';
+    if (untilBlock) untilBlock.hidden = !enabled || endType !== 'until';
+    if (countBlock) countBlock.hidden = !enabled || endType !== 'count';
+    if (customBlock) customBlock.hidden = repeat !== 'custom';
+    if (weekdays) weekdays.hidden = !enabled || frequency !== 'weekly';
+    if (monthPolicy) monthPolicy.hidden = !enabled || (frequency !== 'monthly' && frequency !== 'yearly');
+    if (enabled && frequency === 'weekly' && !o.keepWeekdays && !selectedRepeatWeekdays().length) {
+      setRepeatWeekdays([repeatWeekdayForInput(($('calFStart') && $('calFStart').value) || '')]);
+    }
+  }
+
+  function configureCalRepeatPicker() {
+    if (!window.flatpickr) return;
+    const el = $('calFRepeatUntilDate');
+    if (!el) return;
+    const cur = (el.value || '').trim();
+    if (el._flatpickr) {
+      try { el._flatpickr.destroy(); } catch (_) {}
+      try { delete el._flatpickr; } catch (_) { el._flatpickr = undefined; }
+    }
+    const picker = window.flatpickr(el, {
+      enableTime: false,
+      dateFormat: 'Y-m-d',
+      allowInput: true,
+      disableMobile: true,
+      locale: flatpickrLocale(),
+    });
+    if (cur && picker && typeof picker.setDate === 'function') picker.setDate(cur, false, 'Y-m-d');
+  }
+
+  function setCalRepeatFields(evt) {
+    const repeatEl = $('calFRepeat');
+    const endEl = $('calFRepeatEndType');
+    const intervalEl = $('calFRepeatInterval');
+    const frequencyEl = $('calFRepeatFrequency');
+    const untilEl = $('calFRepeatUntilDate');
+    const countEl = $('calFRepeatCount');
+    const type = evt ? scheduleRepeatType(evt) : 'none';
+    const rule = evt ? scheduleRepeatRule(evt) : {};
+    if (repeatEl) repeatEl.value = type;
+    if (endEl) endEl.value = repeatEndType(rule);
+    if (intervalEl) intervalEl.value = String(repeatInterval(rule));
+    if (frequencyEl) frequencyEl.value = repeatFrequency(type, rule);
+    if (untilEl) untilEl.value = repeatUntilKey(rule) || '';
+    if (countEl) countEl.value = String(repeatCount(rule) || 10);
+    const defaultWeekday = repeatWeekdayForInput(($('calFStart') && $('calFStart').value) || '');
+    setRepeatWeekdays(Array.isArray(rule.daysOfWeek) && rule.daysOfWeek.length ? rule.daysOfWeek : [defaultWeekday]);
+    syncCalRepeatUi({ keepWeekdays: true });
+    configureCalRepeatPicker();
+  }
+
+  function buildRepeatPayloadFromForm(startValue, existingRule) {
+    const repeatType = (($('calFRepeat') && $('calFRepeat').value) || 'none').toLowerCase();
+    if (repeatType === 'none') return { repeat_type: 'none', repeat_rule: {} };
+    const frequency = effectiveRepeatFrequencyFromForm();
+    const interval = repeatType === 'custom'
+      ? parseInt(String(($('calFRepeatInterval') && $('calFRepeatInterval').value) || '1'), 10)
+      : 1;
+    if (isNaN(interval) || interval < 1) throw new Error('반복 주기는 1 이상이어야 합니다.');
+    const endType = (($('calFRepeatEndType') && $('calFRepeatEndType').value) || 'never').toLowerCase();
+    const startKey = String(startValue || '').slice(0, 10);
+    const rule = {
+      interval,
+      frequency,
+      endType,
+    };
+    const prevExdates = existingRule && (existingRule.exdates || existingRule.exceptionDates);
+    if (Array.isArray(prevExdates) && prevExdates.length) rule.exdates = prevExdates.slice();
+    if (frequency === 'weekly') {
+      const days = selectedRepeatWeekdays();
+      if (!days.length) throw new Error('매주 반복 요일을 한 개 이상 선택하세요.');
+      rule.daysOfWeek = days;
+    }
+    if (frequency === 'monthly' || frequency === 'yearly') rule.monthDayPolicy = 'clamp';
+    if (endType === 'until') {
+      const until = (($('calFRepeatUntilDate') && $('calFRepeatUntilDate').value) || '').trim().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) throw new Error('반복 종료 날짜를 입력하세요.');
+      if (until < startKey) throw new Error('반복 종료일은 시작일보다 빠를 수 없습니다.');
+      rule.untilDate = until;
+    } else if (endType === 'count') {
+      const count = parseInt(String(($('calFRepeatCount') && $('calFRepeatCount').value) || '0'), 10);
+      if (isNaN(count) || count < 1) throw new Error('반복 횟수는 1 이상이어야 합니다.');
+      rule.count = count;
+    }
+    return { repeat_type: repeatType, repeat_rule: rule };
+  }
+
+  function masterScheduleForRepeatContext() {
+    const m = $('calEditModal');
+    const rawId = m && (m.dataset.repeatMasterId || m.dataset.editId);
+    if (!rawId) return null;
+    return state.schedules.find((item) => String(scheduleId(item)) === String(rawId)) || null;
+  }
+
+  function buildPayloadFromSchedule(evt, overrides) {
+    const schedule = scheduleFromRenderItem(evt);
+    const scope = scheduleShareScope(schedule);
+    const payload = {
+      title: scheduleTitle(schedule) || '',
+      start_datetime: scheduleStartRaw(schedule),
+      end_datetime: scheduleEndRaw(schedule),
+      location: schedule.location || '',
+      description: schedule.description || '',
+      share_scope: scope,
+      event_type: schedule.event_type || '기타',
+      is_all_day: scheduleAllDay(schedule),
+      attendees: scope === 'SELECT' ? (schedule.attendees || []) : [],
+      reminders: schedule.reminders || [],
+      sticker: schedule.sticker || '',
+      is_important: !!schedule.is_important,
+      color_code: schedule.color_code || '#6366f1',
+      repeat_type: scheduleRepeatType(schedule),
+      repeat_rule: scheduleRepeatRule(schedule),
+    };
+    if (scope === 'SELECT') {
+      if (schedule.share_users && schedule.share_users.length) {
+        payload.share_users = schedule.share_users.map((su) => ({
+          user_id: su.user_id,
+          can_edit: !!su.can_edit,
+          notification_enabled: su.notification_enabled !== false,
+        }));
+      }
+      if (schedule.share_departments && schedule.share_departments.length) {
+        payload.share_departments = schedule.share_departments.map((sd) => ({
+          dept_id: sd.dept_id,
+          can_edit: !!sd.can_edit,
+          notification_enabled: sd.notification_enabled !== false,
+        }));
+      }
+    }
+    return Object.assign(payload, overrides || {});
+  }
+
+  function payloadForRepeatAllScope(payload, master, modal) {
+    const occStart = modal && modal.dataset.repeatOccurrenceStart;
+    const occEnd = modal && modal.dataset.repeatOccurrenceEnd;
+    if (occStart && occEnd && payload.start_datetime === occStart && payload.end_datetime === occEnd) {
+      return Object.assign({}, payload, {
+        start_datetime: scheduleStartRaw(master),
+        end_datetime: scheduleEndRaw(master),
+      });
+    }
+    return payload;
+  }
+
+  function addRepeatExceptionRule(master, occurrenceDate) {
+    const rule = cloneRepeatRule(scheduleRepeatRule(master));
+    const exdates = Array.isArray(rule.exdates) ? rule.exdates.slice() : [];
+    if (!exdates.includes(occurrenceDate)) exdates.push(occurrenceDate);
+    exdates.sort();
+    rule.exdates = exdates;
+    return rule;
+  }
+
+  function repeatRuleEndingBefore(master, occurrenceDate) {
+    const baseRange = eventDateRangeKeys(master);
+    const until = addDaysToDateKey(occurrenceDate, -1);
+    if (!baseRange || until < baseRange.startKey) return null;
+    const rule = cloneRepeatRule(scheduleRepeatRule(master));
+    rule.endType = 'until';
+    rule.untilDate = until;
+    delete rule.count;
+    return rule;
+  }
+
+  let repeatScopeResolver = null;
+  function chooseRepeatScope(action) {
+    const modal = $('calRepeatScopeModal');
+    const title = $('calRepeatScopeTitle');
+    if (!modal) {
+      const answer = window.prompt((action === 'delete' ? t('common.delete') : t('common.edit')) + ' scope: 1 ' + t('calendar.scopeSingle') + ', 2 ' + t('calendar.scopeFuture') + ', 3 ' + t('calendar.scopeAll'), '1');
+      return Promise.resolve(answer === '2' ? 'future' : (answer === '3' ? 'all' : (answer === '1' ? 'single' : null)));
+    }
+    if (title) title.textContent = action === 'delete' ? t('calendar.repeatDelete') : t('calendar.repeatEdit');
+    modal.hidden = false;
+    return new Promise((resolve) => { repeatScopeResolver = resolve; });
+  }
+
+  function resolveRepeatScope(value) {
+    const modal = $('calRepeatScopeModal');
+    if (modal) modal.hidden = true;
+    const resolver = repeatScopeResolver;
+    repeatScopeResolver = null;
+    if (resolver) resolver(value && value !== 'cancel' ? value : null);
+  }
+
   function openEdit(evt, defaultDate) {
+    evt = scheduleFromRenderItem(evt);
     // v0.4.27: 채팅에서 직접 호출 시에도 저장/삭제 버튼이 동작하도록 bind 보장
     if (!initialized) { try { bind(); } catch (_) {} initialized = true; }
-    const m = $('calEditModal'); if (!m) return;
+    const m = $('calEditModal');
+    if (!m) {
+      calendarLog('modal:missing', { id: 'calEditModal' }, 'error');
+      return;
+    }
+    calendarLog(evt ? 'modal:openUpdate' : 'modal:openCreate', {
+      editId: evt ? scheduleId(evt) : null,
+      defaultDate: defaultDate ? dateKey(defaultDate) : null,
+      modalHiddenBefore: !!m.hidden,
+    });
     const titleEl = $('calEditTitle');
     const fT = $('calFTitle'), fS = $('calFStart'), fE = $('calFEnd'), fL = $('calFLocation'), fD = $('calFDesc'), fErr = $('calFError');
     const fAll = $('calFAllDay');
     const fSave = $('calFSave'), fDel = $('calFDelete');
     fErr.hidden = true; fErr.textContent = '';
+    [
+      fT, fS, fE, fL, fD, $('calFType'), $('calFShare'), $('calFReminder'), $('calFColor'),
+      $('calFRepeat'), $('calFRepeatEndType'), $('calFRepeatUntilDate'), $('calFRepeatCount'),
+      $('calFRepeatInterval'), $('calFRepeatFrequency'),
+    ].forEach((el) => {
+      if (!el) return;
+      el.disabled = false;
+      el.readOnly = false;
+    });
+    if (fAll) fAll.disabled = false;
+    if (fSave) fSave.disabled = false;
+    if (fS) delete fS.dataset.fullValue;
+    if (fE) delete fE.dataset.fullValue;
+    delete m.dataset.repeatMasterId;
+    delete m.dataset.repeatOccurrenceDate;
+    delete m.dataset.repeatOccurrenceStart;
+    delete m.dataset.repeatOccurrenceEnd;
     if (evt) {
-      titleEl.textContent = '일정 수정';
-      fT.value = evt.title || '';
-      fS.value = evt.start_datetime ? fmtDT(new Date(evt.start_datetime)) : '';
-      fE.value = evt.end_datetime ? fmtDT(new Date(evt.end_datetime)) : '';
+      titleEl.textContent = t('calendar.edit');
+      fT.value = scheduleTitle(evt) || '';
+      if (scheduleAllDay(evt)) {
+        const rng = eventDateRangeKeys(evt);
+        if (rng) {
+          fS.value = rng.startKey;
+          fE.value = rng.endKey;
+        } else {
+          fS.value = scheduleStartRaw(evt) ? fmtDateOnly(new Date(scheduleStartRaw(evt))) : '';
+          fE.value = scheduleEndRaw(evt) ? fmtDateOnly(new Date(scheduleEndRaw(evt))) : '';
+        }
+      } else {
+        fS.value = scheduleStartRaw(evt) ? fmtDT(new Date(scheduleStartRaw(evt))) : '';
+        fE.value = scheduleEndRaw(evt) ? fmtDT(new Date(scheduleEndRaw(evt))) : '';
+      }
       fL.value = evt.location || '';
       fD.value = evt.description || '';
-      if (fAll) fAll.checked = !!evt.is_all_day;
+      if (fAll) fAll.checked = scheduleAllDay(evt);
       setSelectValue('calFType', evt.event_type, '기타');
       setSelectValue('calFShare', evt.share_scope, 'PRIVATE');
       setSelectValue('calFReminder', Array.isArray(evt.reminders) ? evt.reminders[0] : '', '');
       setCalSticker(evt.sticker || '');
       setCalColor(evt.color_code || '#6366f1');
-      renderCalAttendees(evt.attendees || []);
+      if (scheduleShareScope(evt) === 'SELECT') {
+        renderCalAttendees(buildCalAttendeeRefsFromEvent(evt));
+      } else {
+        calAttendeeRefs = [];
+        renderCalAttendees([]);
+      }
       setCalImportant(!!evt.is_important);
       fDel.hidden = false;
-      m.dataset.editId = String(evt.id);
+      m.dataset.editId = String(scheduleId(evt));
+      if (evt.__repeatInstance) {
+        m.dataset.repeatMasterId = String(evt.__repeatMasterId || scheduleId(evt));
+        m.dataset.repeatOccurrenceDate = evt.__repeatOccurrenceDate || '';
+        m.dataset.repeatOccurrenceStart = evt.__repeatOccurrenceStart || scheduleStartRaw(evt) || '';
+        m.dataset.repeatOccurrenceEnd = evt.__repeatOccurrenceEnd || scheduleEndRaw(evt) || '';
+      }
     } else {
-      titleEl.textContent = '일정 추가';
+      titleEl.textContent = t('calendar.addPlain');
       const base = defaultDate || new Date();
       const s = new Date(base); s.setHours(9, 0, 0, 0);
       const e = new Date(base); e.setHours(10, 0, 0, 0);
@@ -5814,14 +7229,24 @@ window.CalendarView = (function () {
       fDel.hidden = true;
       delete m.dataset.editId;
     }
+    setCalRepeatFields(evt || null);
+    syncCalShareAttendanceUi({ skipClear: true });
     renderCalColorPalette();
     renderCalStickerMenu();
     setCalColor(($('calFColor') && $('calFColor').value) || '#6366f1');
     setCalSticker(($('calFSticker') && $('calFSticker').value) || '');
-    initCalDatePickers();
     syncCalAllDayInputs();
     m.hidden = false;
-    setTimeout(() => fT.focus(), 30);
+    configureCalPickers(!!(fAll && fAll.checked));
+    calendarLog(evt ? 'modal:updateReady' : 'modal:createReady', {
+      editId: m.dataset.editId || null,
+      hidden: !!m.hidden,
+      schedule: evt ? scheduleDebugShape(evt) : null,
+    });
+    setTimeout(() => {
+      const active = document.activeElement;
+      if (fT && (!active || active === document.body || active === m || !m.contains(active))) fT.focus();
+    }, 30);
   }
 
   function closeEdit() {
@@ -5835,30 +7260,154 @@ window.CalendarView = (function () {
     const startV = ($('calFStart').value || '').trim();
     const endV = ($('calFEnd').value || '').trim();
     const allDay = !!($('calFAllDay') && $('calFAllDay').checked);
-    if (!title) { fErr.textContent = '제목을 입력하세요.'; fErr.hidden = false; return; }
-    if (!startV || !endV) { fErr.textContent = '시작/종료 일시를 입력하세요.'; fErr.hidden = false; return; }
+    if (!title) { fErr.textContent = t('calendar.validateTitle'); fErr.hidden = false; return; }
+    if (!startV || !endV) { fErr.textContent = t('calendar.validateTime'); fErr.hidden = false; return; }
+    await ensureMe();
+    const meItem = state.me && (state.me.item || state.me);
+    const share = ($('calFShare') && $('calFShare').value) || 'PRIVATE';
+
+    if (share === 'DEPARTMENT') {
+      const did = meItem && meItem.department_id;
+      if (did == null || did === '' || Number(did) <= 0) {
+        fErr.textContent = t('calendar.validateDepartment');
+        fErr.hidden = false;
+        return;
+      }
+    }
+    const selRefs = share === 'SELECT' ? calAttendeeRefs.filter((r) => r.userId) : [];
+    if (share === 'SELECT' && !selRefs.length) {
+      fErr.textContent = t('calendar.validateSelectAttendee');
+      fErr.hidden = false;
+      return;
+    }
+    if (share === 'SELECT' && selRefs.length < calAttendeeRefs.length) {
+      fErr.textContent = t('calendar.validateBadAttendee');
+      fErr.hidden = false;
+      return;
+    }
+    if (allDay) {
+      const sk = startV.slice(0, 10);
+      const ek = endV.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(sk) || !/^\d{4}-\d{2}-\d{2}$/.test(ek) || ek < sk) {
+        fErr.textContent = t('calendar.validateAllDay');
+        fErr.hidden = false;
+        return;
+      }
+    }
+
+    let repeatPayload;
+    try {
+      const masterForRepeat = masterScheduleForRepeatContext();
+      repeatPayload = buildRepeatPayloadFromForm(startV, masterForRepeat ? scheduleRepeatRule(masterForRepeat) : {});
+    } catch (repeatErr) {
+      fErr.textContent = (repeatErr && repeatErr.message) || t('calendar.validateRepeat');
+      fErr.hidden = false;
+      return;
+    }
+
     const startISO = allDay ? (startV.slice(0, 10) + 'T00:00:00') : fromLocalInputValue(startV);
     const endISO = allDay ? (endV.slice(0, 10) + 'T23:59:00') : fromLocalInputValue(endV);
+    const stickerVal = (($('calFSticker') && $('calFSticker').value) || '').trim();
+    const attendeeLabels = share === 'SELECT' ? calAttendeeRefs.map((r) => r.label) : [];
     const payload = {
       title: title,
       start_datetime: startISO,
       end_datetime: endISO,
       location: $('calFLocation').value.trim(),
       description: $('calFDesc').value,
-      share_scope: ($('calFShare') && $('calFShare').value) || 'PRIVATE',
+      share_scope: share,
       event_type: ($('calFType') && $('calFType').value) || '기타',
       is_all_day: allDay,
-      attendees: calAttendees,
+      attendees: attendeeLabels,
       reminders: ($('calFReminder') && $('calFReminder').value) ? [$('calFReminder').value] : [],
-      sticker: '',
+      sticker: stickerVal,
       is_important: isCalImportant(),
       color_code: ($('calFColor') && $('calFColor').value) || '#6366f1',
+      repeat_type: repeatPayload.repeat_type,
+      repeat_rule: repeatPayload.repeat_rule,
     };
+    if (share === 'SELECT') {
+      payload.share_users = selRefs.map((r) => ({
+        user_id: r.userId,
+        can_edit: false,
+        notification_enabled: true,
+      }));
+    }
+    calendarLog('save:payloadReady', {
+      action: m && m.dataset.editId ? 'updateSchedule' : 'createSchedule',
+      payload,
+      attendeeRefs: calAttendeeRefs.slice(),
+    });
+    const fSave = $('calFSave');
     try {
+      if (fSave) fSave.disabled = true;
       const editId = m.dataset.editId;
+      const repeatOccurrenceDate = m.dataset.repeatOccurrenceDate || '';
       let saved = null;
-      if (editId) saved = await Api.updateCalendarSchedule(parseInt(editId, 10), payload);
-      else saved = await Api.createCalendarSchedule(payload);
+      if (editId && repeatOccurrenceDate) {
+        const master = masterScheduleForRepeatContext();
+        if (!master) throw new Error('반복 원본 일정을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.');
+        const scope = await chooseRepeatScope('edit');
+        if (!scope) return;
+        if (scope === 'single') {
+          const singlePayload = Object.assign({}, payload, { repeat_type: 'none', repeat_rule: {} });
+          saved = await callCalendarApi('createSchedule:repeat-single', singlePayload, function (metaOptions) {
+            return Api.createCalendarSchedule(singlePayload, metaOptions);
+          });
+          const exceptionRule = addRepeatExceptionRule(master, repeatOccurrenceDate);
+          const masterPayload = buildPayloadFromSchedule(master, {
+            repeat_type: scheduleRepeatType(master),
+            repeat_rule: exceptionRule,
+          });
+          await callCalendarApi('updateSchedule:repeat-exception', masterPayload, function (metaOptions) {
+            return Api.updateCalendarSchedule(scheduleId(master), masterPayload, metaOptions);
+          });
+        } else if (scope === 'future') {
+          const masterRange = eventDateRangeKeys(master);
+          if (!masterRange || repeatOccurrenceDate <= masterRange.startKey) {
+            saved = await callCalendarApi('updateSchedule:repeat-future-first', payload, function (metaOptions) {
+              return Api.updateCalendarSchedule(scheduleId(master), payload, metaOptions);
+            });
+          } else {
+            const endingRule = repeatRuleEndingBefore(master, repeatOccurrenceDate);
+            if (endingRule) {
+              const masterPayload = buildPayloadFromSchedule(master, {
+                repeat_type: scheduleRepeatType(master),
+                repeat_rule: endingRule,
+              });
+              await callCalendarApi('updateSchedule:repeat-split-master', masterPayload, function (metaOptions) {
+                return Api.updateCalendarSchedule(scheduleId(master), masterPayload, metaOptions);
+              });
+            }
+            saved = await callCalendarApi('createSchedule:repeat-future', payload, function (metaOptions) {
+              return Api.createCalendarSchedule(payload, metaOptions);
+            });
+          }
+        } else {
+          const allPayload = payloadForRepeatAllScope(payload, master, m);
+          saved = await callCalendarApi('updateSchedule:repeat-all', allPayload, function (metaOptions) {
+            return Api.updateCalendarSchedule(scheduleId(master), allPayload, metaOptions);
+          });
+        }
+      } else if (editId) {
+        saved = await callCalendarApi('updateSchedule', payload, function (metaOptions) {
+          return Api.updateCalendarSchedule(parseInt(editId, 10), payload, metaOptions);
+        });
+      } else {
+        saved = await callCalendarApi('createSchedule', payload, function (metaOptions) {
+          return Api.createCalendarSchedule(payload, metaOptions);
+        });
+      }
+      const savedId = saved && saved.item && saved.item.id;
+      const savedStartRaw = scheduleStartRaw(saved && saved.item) || payload.start_datetime;
+      const savedStartDate = new Date(savedStartRaw);
+      if (!isNaN(savedStartDate.getTime())) {
+        const savedYm = ymKey(savedStartDate);
+        if (savedYm && savedYm !== state.ym) {
+          calendarLog('save:monthChanged', { previousYm: state.ym, nextYm: savedYm, savedId });
+          state.ym = savedYm;
+        }
+      }
       // 채팅방으로 공유 모드인 경우, 일정 카드 메시지를 현재 방에 전송
       const shareRoomId = m.dataset.shareRoomId ? parseInt(m.dataset.shareRoomId, 10) : 0;
       if (shareRoomId && window.__shareScheduleToChat) {
@@ -5867,10 +7416,31 @@ window.CalendarView = (function () {
       }
       delete m.dataset.shareRoomId;
       closeEdit();
-      await reload();
+      const schedulesBeforeSave = state.schedules.slice();
+      const ymBeforeSave = state.ym;
+      await reload(editId ? 'after-update' : 'after-create');
+      let refreshed = savedId ? state.schedules.find((item) => Number(scheduleId(item)) === Number(savedId)) : null;
+      if (saved && saved.item) {
+        if (!refreshed && !state.schedules.length && ymBeforeSave === state.ym && schedulesBeforeSave.length) {
+          setSchedules(schedulesBeforeSave, (editId ? 'after-update' : 'after-create') + '-fallback-base');
+        }
+        if (upsertSchedule(saved.item, editId ? 'after-update-response' : 'after-create-response')) {
+          refreshed = savedId ? state.schedules.find((item) => Number(scheduleId(item)) === Number(savedId)) : scheduleFromRenderItem(saved.item);
+          render();
+        }
+      }
+      calendarLog((editId ? 'updateSchedule' : 'createSchedule') + ':state', {
+        savedId,
+        fetchedAgain: true,
+        inSchedules: !!refreshed,
+        schedulesCount: state.schedules.length,
+        schedule: refreshed ? scheduleDebugShape(refreshed) : null,
+      });
     } catch (e) {
       fErr.textContent = (e && e.payload && e.payload.message) || (e && e.message) || '저장 실패';
       fErr.hidden = false;
+    } finally {
+      if (fSave) fSave.disabled = false;
     }
   }
 
@@ -5878,11 +7448,56 @@ window.CalendarView = (function () {
     const m = $('calEditModal');
     const editId = m.dataset.editId;
     if (!editId) return;
-    if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+    const repeatOccurrenceDate = m.dataset.repeatOccurrenceDate || '';
+    if (!repeatOccurrenceDate && !confirm(t('calendar.confirmDelete'))) return;
     try {
-      await Api.deleteCalendarSchedule(parseInt(editId, 10));
+      if (repeatOccurrenceDate) {
+        const master = masterScheduleForRepeatContext();
+        if (!master) throw new Error('반복 원본 일정을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.');
+        const scope = await chooseRepeatScope('delete');
+        if (!scope) return;
+        if (scope === 'single') {
+          const exceptionRule = addRepeatExceptionRule(master, repeatOccurrenceDate);
+          const masterPayload = buildPayloadFromSchedule(master, {
+            repeat_type: scheduleRepeatType(master),
+            repeat_rule: exceptionRule,
+          });
+          await callCalendarApi('deleteSchedule:repeat-single', masterPayload, function (metaOptions) {
+            return Api.updateCalendarSchedule(scheduleId(master), masterPayload, metaOptions);
+          });
+        } else if (scope === 'future') {
+          const masterRange = eventDateRangeKeys(master);
+          if (!masterRange || repeatOccurrenceDate <= masterRange.startKey) {
+            await callCalendarApi('deleteSchedule:repeat-future-all', { id: scheduleId(master) }, function (metaOptions) {
+              return Api.deleteCalendarSchedule(scheduleId(master), metaOptions);
+            });
+          } else {
+            const endingRule = repeatRuleEndingBefore(master, repeatOccurrenceDate);
+            const masterPayload = buildPayloadFromSchedule(master, {
+              repeat_type: scheduleRepeatType(master),
+              repeat_rule: endingRule,
+            });
+            await callCalendarApi('deleteSchedule:repeat-future', masterPayload, function (metaOptions) {
+              return Api.updateCalendarSchedule(scheduleId(master), masterPayload, metaOptions);
+            });
+          }
+        } else {
+          await callCalendarApi('deleteSchedule:repeat-all', { id: scheduleId(master) }, function (metaOptions) {
+            return Api.deleteCalendarSchedule(scheduleId(master), metaOptions);
+          });
+        }
+      } else {
+        await callCalendarApi('deleteSchedule', { id: parseInt(editId, 10) }, function (metaOptions) {
+          return Api.deleteCalendarSchedule(parseInt(editId, 10), metaOptions);
+        });
+      }
       closeEdit();
-      await reload();
+      await reload('after-delete');
+      calendarLog('deleteSchedule:state', {
+        deletedId: parseInt(editId, 10),
+        stillInSchedules: state.schedules.some((item) => Number(scheduleId(item)) === Number(editId)),
+        schedulesCount: state.schedules.length,
+      });
     } catch (e) {
       const fErr = $('calFError');
       fErr.textContent = (e && e.payload && e.payload.message) || '삭제 실패';
@@ -5909,7 +7524,10 @@ window.CalendarView = (function () {
       reload();
     });
     const btnNew = $('calNewBtn');
-    if (btnNew) btnNew.addEventListener('click', () => openEdit(null));
+    if (btnNew) btnNew.addEventListener('click', () => {
+      calendarLog('newButton:click', { buttonId: 'calNewBtn' });
+      openEdit(null);
+    });
     // v0.4.28: 동기화 버튼 — 서버에서 최신 일정 다시 불러오기
     const btnRefresh = $('calRefreshBtn');
     if (btnRefresh) btnRefresh.addEventListener('click', async () => {
@@ -5925,6 +7543,10 @@ window.CalendarView = (function () {
       ? window.blossomAssetSrc('/static/image/svg/chat/free-icon-font-cloud-stairs.svg')
       : 'assets/svg/chat/free-icon-font-cloud-stairs.svg';
     const important = $('calFImportant');
+    const importantIcon = important && important.querySelector('img');
+    if (importantIcon) importantIcon.src = window.blossomAssetSrc
+      ? window.blossomAssetSrc('/static/image/svg/chat/free-icon-font-headache.svg')
+      : 'assets/svg/chat/free-icon-font-headache.svg';
     if (important && important.dataset.bound !== '1') {
       important.dataset.bound = '1';
       important.addEventListener('click', () => setCalImportant(!isCalImportant()));
@@ -5939,7 +7561,39 @@ window.CalendarView = (function () {
     const allDay = $('calFAllDay');
     if (allDay && allDay.dataset.bound !== '1') {
       allDay.dataset.bound = '1';
-      allDay.addEventListener('change', syncCalAllDayInputs);
+      allDay.addEventListener('change', () => {
+        syncCalAllDayInputs();
+        configureCalPickers(!!allDay.checked);
+      });
+    }
+    const fShare = $('calFShare');
+    if (fShare && fShare.dataset.bound !== '1') {
+      fShare.dataset.bound = '1';
+      fShare.addEventListener('change', () => syncCalShareAttendanceUi());
+    }
+    ['calFRepeat', 'calFRepeatEndType', 'calFRepeatFrequency'].forEach((id) => {
+      const el = $(id);
+      if (el && el.dataset.bound !== '1') {
+        el.dataset.bound = '1';
+        el.addEventListener('change', () => syncCalRepeatUi());
+      }
+    });
+    const repeatUntil = $('calFRepeatUntilDate');
+    if (repeatUntil && repeatUntil.dataset.bound !== '1') {
+      repeatUntil.dataset.bound = '1';
+      repeatUntil.addEventListener('focus', configureCalRepeatPicker);
+    }
+    const repeatScopeModal = $('calRepeatScopeModal');
+    if (repeatScopeModal && repeatScopeModal.dataset.bound !== '1') {
+      repeatScopeModal.dataset.bound = '1';
+      repeatScopeModal.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-repeat-scope]');
+        if (btn) {
+          resolveRepeatScope(btn.dataset.repeatScope || null);
+          return;
+        }
+        if (e.target === repeatScopeModal) resolveRepeatScope(null);
+      });
     }
     const stickerTrigger = $('calFStickerTrigger');
     if (stickerTrigger && stickerTrigger.dataset.bound !== '1') {
@@ -6000,9 +7654,12 @@ window.CalendarView = (function () {
     if (attendeeList && attendeeList.dataset.bound !== '1') {
       attendeeList.dataset.bound = '1';
       attendeeList.addEventListener('click', (e) => {
-        const token = e.target.closest('.cal-token[data-name]');
+        const token = e.target.closest('.cal-token[data-index]');
         if (!token) return;
-        renderCalAttendees(calAttendees.filter((item) => item !== token.dataset.name));
+        const idx = parseInt(token.dataset.index, 10);
+        if (isNaN(idx)) return;
+        calAttendeeRefs = calAttendeeRefs.filter((_, i) => i !== idx);
+        renderCalAttendees(calAttendeeRefs);
       });
     }
     document.addEventListener('click', (e) => {
@@ -6015,7 +7672,7 @@ window.CalendarView = (function () {
     if (closeBtn) closeBtn.addEventListener('click', closeEdit);
   }
 
-  return { open: open, reload: reload, openEdit: openEdit };
+  return { open: open, reload: reload, openEdit: openEdit, refreshLanguage: refreshLanguage, debug: function () { return window.__blossomCalendarDebug && window.__blossomCalendarDebug(); } };
 })();
 
 // === MemoView v1: 웹 Blossom /api/memo/groups 동기화 ===

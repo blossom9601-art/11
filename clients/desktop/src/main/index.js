@@ -67,6 +67,11 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 
+function getAppIconPath() {
+  const buildDir = path.join(__dirname, '..', '..', 'build');
+  return path.join(buildDir, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+}
+
 function createWindow() {
   const bounds = store.get('bounds');
   mainWindow = new BrowserWindow({
@@ -75,7 +80,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'Blossom Chat',
-    icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
+    icon: getAppIconPath(),
     backgroundColor: '#4F46E5',
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
