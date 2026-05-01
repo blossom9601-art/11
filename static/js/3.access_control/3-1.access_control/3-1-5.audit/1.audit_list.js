@@ -4,11 +4,12 @@
 	var state = {
 		rows: [],
 		total: 0,
-		summary: {},
+		scope: 'access',
 		page: 1,
 		pageSize: 20
 	};
 	var PAGE_SIZE_LIMIT = 200;
+	var searchTimer = null;
 
 	function qs(id) { return document.getElementById(id); }
 	function esc(value) {
@@ -44,12 +45,60 @@
 	}
 	function actionClass(value) {
 		if (value === '접속') return 'audit-action-access';
+		if (value === '신청') return 'audit-action-request';
 		if (value === '승인') return 'audit-action-approve';
 		if (value === '반려') return 'audit-action-reject';
+		if (value === '신청취소') return 'audit-action-cancel';
+		if (value === '권한회수') return 'audit-action-revoke';
+		if (value === '대무자지정') return 'audit-action-delegate';
 		return '';
 	}
 	function resultClass(value) {
 		return value === '성공' ? 'audit-result-success' : 'audit-result-fail';
+	}
+	function scopeTitle(scope) {
+		return scope === 'fail' ? '실패 감사' : '접속 감사';
+	}
+	function normalizeKind(row) {
+		var kind = String((row && (row.endpoint_kind || row.primary_kind || row.resource_kind)) || '').trim().toUpperCase();
+		var type = String((row && row.resource_type) || '').trim().toUpperCase();
+		var url = String((row && row.resource_url) || '').trim().toLowerCase();
+		if (kind === 'WEB' || kind === 'SSH') return kind;
+		if (type === 'SSH' || type === '서버' || type === 'DB' || url.indexOf('ssh://') === 0) return 'SSH';
+		if (row && (row.resource_name || row.resource_url || row.target_resource_id)) return 'WEB';
+		return '';
+	}
+	function kindCell(row) {
+		var kind = normalizeKind(row);
+		if (!kind) return '<span class="audit-kind-badge audit-kind-empty">-</span>';
+		return '<span class="audit-kind-badge audit-kind-' + esc(kind) + '">' + esc(kind) + '</span>';
+	}
+	function avatarInitial(name, empNo) {
+		var source = String(name || empNo || '?').trim();
+		return source ? source.charAt(0).toUpperCase() : '?';
+	}
+	function actorCell(row) {
+		var name = row.actor_display_name || row.actor_name || row.actor_emp_no || '-';
+		var empNo = row.actor_display_emp_no || row.actor_emp_no || '-';
+		var department = row.actor_department || '부서 미지정';
+		var image = row.actor_profile_image || '';
+		var avatar = image ? '<img src="' + esc(image) + '" alt="">' : '<span>' + esc(avatarInitial(name, empNo)) + '</span>';
+		return '<div class="audit-user-cell">' +
+			'<span class="audit-user-avatar">' + avatar + '</span>' +
+			'<span class="audit-user-info">' +
+				'<strong>' + esc(name) + '</strong>' +
+				'<span class="audit-user-emp">' + esc(empNo) + '</span>' +
+				'<span class="audit-user-dept">' + esc(department) + '</span>' +
+			'</span>' +
+		'</div>';
+	}
+	function syncSelectAll() {
+		var selectAll = qs('audit-select-all');
+		var checks = document.querySelectorAll('.audit-row-check');
+		var checked = document.querySelectorAll('.audit-row-check:checked');
+		if (!selectAll) return;
+		selectAll.checked = checks.length > 0 && checked.length === checks.length;
+		selectAll.indeterminate = checked.length > 0 && checked.length < checks.length;
 	}
 	function safePageSize(value) {
 		var size = parseInt(value, 10);
@@ -59,9 +108,8 @@
 	function buildQuery() {
 		var params = new URLSearchParams();
 		[
-			['actor_name', qs('audit-actor-filter').value],
-			['resource_name', qs('audit-resource-filter').value],
-			['action_type', qs('audit-action-filter').value],
+			['audit_scope', state.scope],
+			['keyword', qs('audit-keyword-filter').value],
 			['from_date', qs('audit-from-date').value],
 			['to_date', qs('audit-to-date').value]
 		].forEach(function (pair) {
@@ -78,13 +126,24 @@
 	function totalPages() {
 		return Math.max(1, Math.ceil(state.total / state.pageSize));
 	}
-	function setSummary() {
-		var summary = state.summary || {};
-		qs('audit-total-count').textContent = summary.total || state.total || 0;
-		qs('audit-access-count').textContent = summary.access_count || 0;
-		qs('audit-decision-count').textContent = summary.decision_count || 0;
-		qs('audit-fail-count').textContent = summary.fail_count || 0;
-		qs('audit-visible-count').textContent = (state.total || 0) + '건';
+	function setCount() {
+		var countEl = qs('audit-count');
+		var titleEl = qs('audit-current-title');
+		var next = state.total || 0;
+		var prev;
+		if (titleEl) titleEl.textContent = scopeTitle(state.scope);
+		if (!countEl) return;
+		prev = parseInt(countEl.getAttribute('data-count') || countEl.textContent || '0', 10) || 0;
+		countEl.textContent = String(next);
+		countEl.setAttribute('data-count', String(next));
+		countEl.classList.remove('large-number', 'very-large-number');
+		if (next >= 1000) countEl.classList.add('very-large-number');
+		else if (next >= 100) countEl.classList.add('large-number');
+		if (prev !== next) {
+			countEl.classList.remove('is-updating');
+			void countEl.offsetWidth;
+			countEl.classList.add('is-updating');
+		}
 	}
 	function pageNumberList(pages, current) {
 		var out = [];
@@ -130,58 +189,84 @@
 		var body = qs('audit-table-body');
 		var tableWrap = qs('audit-table-wrap');
 		var empty = qs('audit-empty');
-		setSummary();
+		setCount();
 		if (!state.rows.length) {
 			body.innerHTML = '';
 			tableWrap.hidden = true;
 			empty.hidden = false;
-			empty.textContent = '조회된 감사 기록이 없습니다.';
+			setEmptyState('감사 기록이 없습니다.', '조건을 변경해 다시 조회하세요.');
 			renderPagination();
 			return;
 		}
 		tableWrap.hidden = false;
 		empty.hidden = true;
 		body.innerHTML = pageRows().map(function (row) {
-			var actor = row.actor_name || row.actor_emp_no || '-';
 			var resource = row.resource_name || (row.target_resource_id ? ('자원 #' + row.target_resource_id) : '-');
 			return '<tr>' +
+				'<td class="audit-col-check"><input type="checkbox" class="audit-row-check" value="' + esc(row.id || '') + '" aria-label="감사 기록 선택"></td>' +
 				'<td class="audit-col-time">' + esc(formatDateTime(row.occurred_at)) + '</td>' +
-				'<td class="audit-col-action"><span class="audit-action-pill ' + actionClass(row.action_type) + '">' + esc(row.action_type || '-') + '</span></td>' +
-				'<td class="audit-col-result"><span class="audit-result-pill ' + resultClass(row.action_result) + '">' + esc(row.action_result || '-') + '</span></td>' +
-				'<td class="audit-col-actor"><strong>' + esc(actor) + '</strong><span class="ac-meta">' + esc(row.actor_emp_no || '-') + '</span></td>' +
+				'<td class="audit-col-kind">' + kindCell(row) + '</td>' +
+				'<td class="audit-col-action"><span class="audit-dot-label ' + actionClass(row.action_type) + '">' + esc(row.action_type || '-') + '</span></td>' +
+				'<td class="audit-col-result"><span class="audit-dot-label ' + resultClass(row.action_result) + '">' + esc(row.action_result || '-') + '</span></td>' +
+				'<td class="audit-col-actor">' + actorCell(row) + '</td>' +
 				'<td class="audit-col-resource"><strong>' + esc(resource) + '</strong><span class="ac-meta">' + esc(row.resource_url || '-') + '</span></td>' +
 				'<td class="audit-col-ip">' + esc(row.ip_address || '-') + '</td>' +
 				'<td class="audit-col-note">' + esc(row.note || '-') + '</td>' +
 			'</tr>';
 		}).join('');
+		syncSelectAll();
 		renderPagination();
+	}
+	function setEmptyState(title, desc) {
+		var titleEl = qs('audit-empty-title');
+		var descEl = qs('audit-empty-desc');
+		if (titleEl) titleEl.textContent = title || '감사 기록이 없습니다.';
+		if (descEl) descEl.textContent = desc || '';
+	}
+	function setSearchLoading(isLoading) {
+		var wrapper = qs('audit-search-wrapper');
+		if (!wrapper) return;
+		if (isLoading) wrapper.classList.add('active-searching');
+		else wrapper.classList.remove('active-searching');
+	}
+	function setSearchClearVisible() {
+		var input = qs('audit-keyword-filter');
+		var clear = qs('audit-search-clear');
+		if (!input || !clear) return;
+		if (String(input.value || '').trim()) clear.classList.add('visible');
+		else clear.classList.remove('visible');
 	}
 	function setLoading(message) {
 		qs('audit-table-body').innerHTML = '';
 		qs('audit-table-wrap').hidden = true;
 		qs('audit-empty').hidden = false;
-		qs('audit-empty').textContent = message;
+		setEmptyState(message, '잠시만 기다려 주세요.');
 	}
 	function loadRows(resetPage) {
 		if (resetPage) state.page = 1;
 		var query = buildQuery();
 		setLoading('감사 기록을 불러오는 중입니다.');
+		setSearchLoading(true);
 		return fetchJson('/api/access-control/audit-logs' + (query ? '?' + query : '')).then(function (data) {
 			state.rows = data.rows || [];
 			state.total = data.total || 0;
-			state.summary = data.summary || {};
 			state.page = data.page || state.page;
 			state.pageSize = safePageSize(data.page_size || state.pageSize);
 			if (qs('audit-page-size')) qs('audit-page-size').value = String(state.pageSize);
+			setSearchLoading(false);
 			renderRows();
 		}).catch(function (err) {
 			state.rows = [];
 			state.total = 0;
-			state.summary = {};
-			setSummary();
-			qs('audit-empty').textContent = err.message || '감사 기록을 불러오지 못했습니다.';
+			setSearchLoading(false);
+			setCount();
+			setEmptyState(err.message || '감사 기록을 불러오지 못했습니다.', '잠시 후 다시 시도하세요.');
 			renderPagination();
 		});
+	}
+	function loadRowsDebounced() {
+		if (searchTimer) window.clearTimeout(searchTimer);
+		searchTimer = window.setTimeout(function () { loadRows(true); }, 220);
 	}
 	function syncDateConstraints() {
 		var start = qs('audit-from-date');
@@ -223,26 +308,56 @@
 			monthSelectorType: 'static',
 			onReady: function (_, __, instance) { ensureTodayButton(instance); },
 			onOpen: function (_, __, instance) { ensureTodayButton(instance); },
-			onChange: syncDateConstraints
+			onChange: function () {
+				syncDateConstraints();
+				loadRows(true);
+			}
 		};
 		window.flatpickr(start, opts);
 		window.flatpickr(end, opts);
 	}
 	function resetFilters() {
-		qs('audit-actor-filter').value = '';
-		qs('audit-resource-filter').value = '';
-		qs('audit-action-filter').value = '';
+		qs('audit-keyword-filter').value = '';
+		setSearchClearVisible();
 		clearDateField(qs('audit-from-date'));
 		clearDateField(qs('audit-to-date'));
 		loadRows(true);
 	}
 	function bindEvents() {
 		var pageSize = qs('audit-page-size');
-		qs('audit-filter-form').addEventListener('submit', function (event) {
-			event.preventDefault();
-			loadRows(true);
-		});
+		var selectAll = qs('audit-select-all');
+		var keyword = qs('audit-keyword-filter');
+		var clear = qs('audit-search-clear');
 		qs('audit-reset-btn').addEventListener('click', resetFilters);
+		if (keyword) {
+			keyword.addEventListener('input', function () {
+				setSearchClearVisible();
+				loadRowsDebounced();
+			});
+			keyword.addEventListener('keydown', function (event) {
+				if (event.key === 'Escape') resetFilters();
+			});
+		}
+		if (clear) {
+			clear.addEventListener('click', function () {
+				qs('audit-keyword-filter').value = '';
+				setSearchClearVisible();
+				loadRows(true);
+			});
+		}
+		Array.prototype.forEach.call(document.querySelectorAll('.audit-tabs [data-audit-scope]'), function (button) {
+			button.addEventListener('click', function () {
+				var nextScope = button.getAttribute('data-audit-scope') || 'access';
+				if (nextScope === state.scope) return;
+				state.scope = nextScope;
+				Array.prototype.forEach.call(document.querySelectorAll('.audit-tabs [data-audit-scope]'), function (tab) {
+					var active = tab.getAttribute('data-audit-scope') === state.scope;
+					tab.classList.toggle('active', active);
+					tab.setAttribute('aria-selected', active ? 'true' : 'false');
+				});
+				loadRows(true);
+			});
+		});
 		if (pageSize) {
 			pageSize.addEventListener('change', function () {
 				state.pageSize = safePageSize(pageSize.value);
@@ -268,6 +383,17 @@
 			if (!button) return;
 			page = parseInt(button.getAttribute('data-page'), 10);
 			if (page && page !== state.page) { state.page = page; loadRows(false); }
+		});
+		if (selectAll) {
+			selectAll.addEventListener('change', function () {
+				Array.prototype.forEach.call(document.querySelectorAll('.audit-row-check'), function (check) {
+					check.checked = selectAll.checked;
+				});
+				syncSelectAll();
+			});
+		}
+		qs('audit-table-body').addEventListener('change', function (event) {
+			if (event.target && event.target.classList.contains('audit-row-check')) syncSelectAll();
 		});
 	}
 	document.addEventListener('DOMContentLoaded', function () {

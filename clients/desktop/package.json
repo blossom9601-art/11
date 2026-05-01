@@ -1,6 +1,6 @@
 {
   "name": "blossom-desktop",
-  "version": "0.5.39",
+  "version": "0.5.40",
   "private": true,
   "description": "Blossom 사내 메신저 데스크탑 앱 (Electron)",
   "main": "src/main/index.js",

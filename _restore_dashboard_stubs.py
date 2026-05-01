@@ -17,27 +17,19 @@ errorlog  = '/var/log/blossom/lumina/web/error.log'
 loglevel  = 'info'
 '''
 
-WSGI = '''from web.app import create_app
+WSGI = '''from app import create_app
 application = create_app()
 '''
 
-INIT = '''"""Blossom Lumina WEB \xe2\x80\x94 Flask dashboard app factory (stub)."""
-from flask import Flask
+INIT = '''"""Blossom Lumina WEB - Flask dashboard app factory."""
+from .app_factory import create_app
 
-def create_app(config=None):
-    app = Flask(__name__)
-    app.config['DEBUG'] = False
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    @app.route('/health')
-    def health():
-        return {'status': 'ok'}, 200
-    return app
+__all__ = ["create_app"]
 '''
 
 CLI_API = '''from flask import Blueprint, jsonify
 cli_api = Blueprint('cli_api', __name__, url_prefix='/api/cli')
+cli_bp = cli_api
 @cli_api.route('/ping', methods=['GET'])
 def ping():
     return jsonify({'status': 'ok'}), 200

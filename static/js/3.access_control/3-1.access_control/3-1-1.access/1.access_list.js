@@ -149,6 +149,7 @@
 	function setStateMessage(html) {
 		var box = qs('access-state');
 		box.innerHTML = html;
+		box.style.display = '';
 		box.hidden = false;
 		qs('access-resource-list').innerHTML = '';
 		qs('access-pagination').hidden = true;
@@ -196,6 +197,7 @@
 			return;
 		}
 		qs('access-state').hidden = true;
+		qs('access-state').style.display = 'none';
 		qs('access-resource-list').innerHTML = currentRows().map(function (row) {
 			var ep = firstEndpoint(row);
 			var epIndex = Math.max(0, (row.endpoints || []).indexOf(ep));

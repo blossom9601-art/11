@@ -6,14 +6,14 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260501q">
-	<script src="/static/js/blossom.js?v=20260412_admintabs1" defer></script>
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260501y">
+	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260501j" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260501k" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -38,12 +38,29 @@
 				<section class="request-card request-tab-panel active" id="request-tab-form" role="tabpanel" aria-labelledby="request-main-tab-form">
 					<div class="request-head">
 						<div>
-							<h2>신청서 작성</h2>
-							<p>여러 자원을 선택해 하나의 신청서로 제출합니다.</p>
+							<h2 id="request-form-title">사용 신청서 작성</h2>
+							<p id="request-form-desc">여러 자원을 선택해 하나의 신청서로 제출합니다.</p>
 						</div>
 					</div>
 					<form class="request-form" id="request-form">
+						<div class="request-type-panel" role="radiogroup" aria-label="신청 유형">
+							<label class="request-type-card is-active" for="request-type-use">
+								<input id="request-type-use" type="radio" name="requestType" value="use" checked>
+								<span><strong>사용 신청</strong><em>접근 권한을 새로 요청합니다.</em></span>
+							</label>
+							<label class="request-type-card" for="request-type-delete">
+								<input id="request-type-delete" type="radio" name="requestType" value="delete">
+								<span><strong>삭제 신청</strong><em>보유 중인 접근 권한 삭제를 요청합니다.</em></span>
+							</label>
+						</div>
 						<div class="resource-picker">
+							<div class="system-tabs request-category-tabs" role="tablist" aria-label="자원 분류">
+								<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
+								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="내부 서비스">내부 서비스</button>
+								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="외부 서비스">외부 서비스</button>
+								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리 콘솔">관리 콘솔</button>
+								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="기타">기타</button>
+							</div>
 							<div class="resource-picker-toolbar">
 								<div>
 									<label for="request-resource-search">자원 검색</label>
@@ -58,8 +75,14 @@
 									</select>
 								</div>
 								<div>
-									<label for="request-category-filter">그룹</label>
-									<select id="request-category-filter"><option value="">전체</option></select>
+									<label for="request-category-filter">분류</label>
+									<select id="request-category-filter">
+										<option value="">전체</option>
+										<option value="내부 서비스">내부 서비스</option>
+										<option value="외부 서비스">외부 서비스</option>
+										<option value="관리 콘솔">관리 콘솔</option>
+										<option value="기타">기타</option>
+									</select>
 								</div>
 								<div>
 									<label for="request-status-filter">상태</label>
@@ -99,8 +122,8 @@
 											<th class="resource-check-col"><input id="request-select-page-check" type="checkbox" aria-label="현재 페이지 자원 선택"></th>
 											<th>자원명</th>
 											<th>유형</th>
-											<th>그룹</th>
-											<th>접속 정보</th>
+											<th>분류</th>
+											<th>접속점</th>
 											<th>상태</th>
 											<th>신청 불가 사유</th>
 										</tr>
@@ -134,7 +157,7 @@
 							<label for="request-reason">신청 사유</label>
 							<textarea id="request-reason" name="reason" minlength="10" placeholder="업무 목적과 필요 기간을 구체적으로 입력하세요."></textarea>
 						</div>
-						<div class="period-mode-panel" role="radiogroup" aria-label="사용 기간 유형">
+						<div class="period-mode-panel" id="request-period-mode-panel" role="radiogroup" aria-label="사용 기간 유형">
 							<label class="period-mode-card" for="request-period-range">
 								<input id="request-period-range" type="radio" name="requestPeriodType" value="range" checked>
 								<span><strong>기간 지정</strong><em>시작일과 종료일 기준</em></span>
@@ -147,7 +170,7 @@
 						<div class="permanent-access-note" id="request-permanent-note" hidden>
 							영구 접근 신청은 종료일 없이 제출되며 승인자는 관리자/보안 담당자로 자동 지정됩니다.
 						</div>
-						<div class="request-grid-2">
+						<div class="request-grid-2" id="request-period-date-grid">
 							<div class="request-date-field">
 								<label for="request-start-date">사용 시작일</label>
 								<input id="request-start-date" class="request-date-input" name="startDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
@@ -157,7 +180,7 @@
 								<input id="request-end-date" class="request-date-input" name="endDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
 							</div>
 						</div>
-						<div class="quick-periods" aria-label="사용기간 빠른 선택">
+						<div class="quick-periods" id="request-quick-periods" aria-label="사용기간 빠른 선택">
 							<button type="button" class="action-chip action-muted" data-period-days="1">1일</button>
 							<button type="button" class="action-chip action-muted" data-period-days="7">7일</button>
 							<button type="button" class="action-chip action-muted" data-period-days="30">30일</button>
@@ -177,7 +200,7 @@
 						</div>
 						<div class="request-actions request-submit-bar">
 							<div id="request-form-message">동일 자원 승인 대기 건이 있거나 유효 권한이 있으면 제출할 수 없습니다.</div>
-							<button type="submit" class="action-chip action-primary request-submit-button">신청 제출</button>
+							<button type="submit" class="action-chip action-primary request-submit-button" id="request-submit-button">사용 신청 제출</button>
 						</div>
 					</form>
 				</section>
@@ -200,6 +223,7 @@
 								<tr>
 									<th>신청일</th>
 									<th>신청번호</th>
+									<th>유형</th>
 									<th>자원 개수</th>
 									<th>상태</th>
 									<th>승인 단계</th>

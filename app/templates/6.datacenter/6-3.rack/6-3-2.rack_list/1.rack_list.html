@@ -8,8 +8,9 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/detail6.css?v=1.4">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -125,9 +126,9 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260413_dc_tab_silent"></script>
-    <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
-    <script src="/static/js/6.datacenter/6-3.rack/6-3-2.rack_list/1.rack_list.js"></script>
+        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
+    <script src="/static/js/6.datacenter/6-3.rack/6-3-2.rack_list/1.rack_list.js?v=1.12"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -139,12 +140,13 @@
                     </button>
                 </div>
                 <div class="server-add-body">
-                    <form id="system-add-form">
+                    <!-- fk_select.js 가 vendor/model input 을 FK select 로 바꾸지 않도록 차단 -->
+                    <form id="system-add-form" data-fk-ignore="1">
                         <!-- 비즈니스 -->
                         <div class="form-section">
                             <div class="section-header"><h4>비즈니스</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>업무 상태 <span class="required">*</span></label><input name="business_status" class="form-input search-select" data-search-source="businessStatus" placeholder="검색 선택" data-placeholder="검색 선택" required></div>
+                                <div class="form-row"><label>업무 상태 <span class="required">*</span></label><input type="text" name="business_status" class="form-input search-select" data-search-source="rackBusinessStatus" data-placeholder="업무 상태 검색" placeholder="업무 상태 검색" data-searchable="true" required></div>
                                 <div class="form-row"><label>업무 이름 <span class="required">*</span></label><input name="business_name" class="form-input" placeholder="필수" required></div>
                             </div>
                         </div>
@@ -152,8 +154,8 @@
                         <div class="form-section">
                             <div class="section-header"><h4>시스템</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>시스템 제조사</label><input name="vendor" class="form-input" placeholder="입력"></div>
-                                <div class="form-row"><label>시스템 모델명</label><input name="model" class="form-input" placeholder="모델 입력"></div>
+                                <div class="form-row"><label>시스템 제조사</label><input type="text" name="vendor" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력"></div>
+                                <div class="form-row"><label>시스템 모델명</label><input type="text" name="model" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력"></div>
                                 <div class="form-row"><label>시스템 일련번호</label><input name="serial" class="form-input"></div>
                                 <div class="form-row"><label>시스템 장소 <span class="required">*</span></label><input name="place" class="form-input search-select" data-search-source="centers" placeholder="검색 선택" data-placeholder="검색 선택" required></div>
                                 <div class="form-row"><label>시스템 위치 <span class="required">*</span></label><input name="location" class="form-input" placeholder="입력" required></div>
@@ -186,7 +188,7 @@
                     <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                 </div>
                 <div class="server-edit-body">
-                    <form id="system-edit-form"><!-- 동적 채움 --></form>
+                    <form id="system-edit-form" data-fk-ignore="1"><!-- 동적 채움 --></form>
                 </div>
                 <div class="server-edit-actions align-right">
                     <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>
@@ -247,6 +249,38 @@
                 <div class="server-add-actions align-right">
                     <div class="action-buttons right">
                         <button type="button" class="btn-primary" id="system-duplicate-confirm">복제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 삭제처리 확인 모달 (blossom.js 공통 삭제 모달 정규화 대상) -->
+        <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+            <div class="server-add-content">
+                <div class="server-add-header">
+                    <div class="server-add-title dispose-title">
+                        <h3>삭제처리</h3>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 RACK 시스템을 정말 삭제처리하시겠습니까?</p>
+                    </div>
+                    <button class="close-btn" type="button" id="system-delete-close" title="닫기">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div class="server-add-body">
+                    <div class="dispose-content">
+                        <div class="dispose-text">
+                            <p>삭제처리는 선택한 자산을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
+                            <p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
+                            <p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+                        </div>
+                        <div class="dispose-illust">
+                            <img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+                        </div>
+                    </div>
+                </div>
+                <div class="server-add-actions align-right">
+                    <div class="action-buttons right">
+                        <button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
                     </div>
                 </div>
             </div>

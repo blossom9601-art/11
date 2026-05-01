@@ -184,6 +184,46 @@
     if(el) el.textContent = (val == null) ? '' : String(val);
   }
 
+  function escHtmlLite(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /** RACK 업무 상태는 활성 계열 / 비활성만 구분 (라벨·코드 모두 허용) */
+  function rackDetailStatusDotClass(statusCode, displayLabel){
+    const labelRaw = String(displayLabel || '').trim();
+    const codeRaw = String(statusCode || '').trim();
+    const norm = labelRaw.replace(/\s+/g, '');
+    const codeUpper = codeRaw.toUpperCase();
+    const isActive =
+      norm === '활성' ||
+      norm === '사용' ||
+      norm === '가동' ||
+      codeUpper === '활성' ||
+      codeUpper === 'ACTIVE' ||
+      codeUpper === 'USE';
+    return isActive ? 'rack-detail-status-dot--active' : 'rack-detail-status-dot--inactive';
+  }
+
+  function setRackBusinessStatusDisplay(statusCode, displayLabel){
+    const el = document.getElementById('rk-status');
+    if(!el) return;
+    const text = String(displayLabel != null ? displayLabel : '').trim()
+      || String(statusCode || '').trim();
+    if(!text){
+      el.innerHTML = '';
+      return;
+    }
+    const dotCls = rackDetailStatusDotClass(statusCode, text);
+    el.innerHTML =
+      '<span class="rack-detail-status-dot ' + dotCls + '" aria-hidden="true"></span>' +
+      '<span class="rack-detail-status-label">' + escHtmlLite(text) + '</span>';
+  }
+
   // rack_code: 세션 기반 (data 속성에서 읽기, URL fallback)
   function detectRackCode(){
     try{
@@ -250,7 +290,8 @@
     // 참조값 라벨 매핑(가능한 경우만)
     const statusCode = rack.business_status_code || '';
     loadStatusMap().then(function(map){
-      setText('rk-status', map[statusCode] || statusCode || '');
+      const label = map[statusCode] || statusCode || '';
+      setRackBusinessStatusDisplay(statusCode, label);
     });
 
     const centerCode = rack.center_code || '';
@@ -262,27 +303,6 @@
   // expose for other modules (edit modal)
   window.__rackDetailApplyRackToUi = applyRackToHeaderAndBasic;
   window.__rackDetailDetectRackCode = detectRackCode;
-
-  function sampleData(){
-    const statuses = ['운영','대기','점검','장애'];
-    const vendors = ['Dell','HPE','IBM','Cisco','Lenovo'];
-    const models = ['42U','45U','48U','NetShelter','Rack-Std'];
-    const rows = ['A','B','C','D','E','F'];
-    const arr = [];
-    for (let i=1;i<=52;i++){
-      arr.push({
-        rack_name: `FC5F-R${String(i).padStart(2,'0')}`,
-        rack_business: `${rows[(i-1)%rows.length]}열-${String(((i-1)%20)+1).padStart(2,'0')}번`,
-        rack_vendor: vendors[i%vendors.length],
-        rack_model: models[i%models.length],
-        status: statuses[i%statuses.length],
-        height_u: [42,45,48][i%3],
-        device_count: (i*3)%40 + 1,
-        power_panel: `PP-${(i%6)+1}`
-      });
-    }
-    return arr;
-  }
 
   // (legacy) URL 또는 페이지 헤더에서 랙명 추론
   function detectRackName(){
@@ -673,11 +693,17 @@
     state.__didInit = true;
     const rackCode = detectRackCode();
     if(!rackCode){
-      // fallback demo
-      const racks = sampleData();
       const rackName = detectRackName();
-      const row = racks.find(r => r.rack_name === rackName) || racks[0];
-      state.row = { ...row, rack_name: rackName };
+      state.row = {
+        rack_name: rackName,
+        rack_business: '',
+        rack_vendor: '',
+        rack_model: '',
+        status: '',
+        height_u: 42,
+        device_count: 0,
+        power_panel: ''
+      };
       const h1 = document.querySelector('.page-header h1');
       if (h1 && !h1.textContent.trim()) h1.textContent = rackName;
       fillRackInfo(state.row);
@@ -726,11 +752,17 @@
         updateDeviceCountUI(state.row.rack_name);
       });
     }).catch(function(_e){
-      // fallback demo if API fails
-      const racks = sampleData();
-      const rackName = detectRackName();
-      const row = racks.find(r => r.rack_name === rackName) || racks[0];
-      state.row = { ...row, rack_name: rackName };
+      const rackName = detectRackCode() || detectRackName();
+      state.row = {
+        rack_name: rackName,
+        rack_business: '',
+        rack_vendor: '',
+        rack_model: '',
+        status: '',
+        height_u: 42,
+        device_count: 0,
+        power_panel: ''
+      };
       renderElevation('rack-front', state.row, 'front');
       renderElevation('rack-rear', state.row, 'rear');
       updateDeviceCountUI(state.row.rack_name);

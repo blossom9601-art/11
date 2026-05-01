@@ -17,8 +17,6 @@
 
 	// Persist records in localStorage and interop with 등록 page handoff
 	const ACCESS_RECORDS_KEY = 'access:records';
-	const ACCESS_RECORDS_SEED_VERSION_KEY = 'access:records:seedver';
-	const ACCESS_RECORDS_SEED_VERSION = 'seed-600-v1';
 	function loadAccessRecords() {
 		try {
 			const raw = localStorage.getItem(ACCESS_RECORDS_KEY);
@@ -29,67 +27,6 @@
 		try { localStorage.setItem(ACCESS_RECORDS_KEY, JSON.stringify(arr || [])); } catch (_) {}
 	}
 
-	function sampleData() {
-		// Deterministic sample generator: 112 records across 2024-01 .. 2025-08
-		const companies = ['AST글로벌','IT운영팀','네오시스','한빛보안','클라우드팀','데이타링크','보안팀','굿서버','DBA팀','에이치네트','플랫폼팀','테크윈','블로썸','퓨처소프트','라온테크','지니시스'];
-		const names = ['김하늘','박철웅','최민수','오지훈','박지훈','서유리','유재석','강호동','이나영','이광수','김유정','박보검','문정한','송철수','정하나','김도훈','이수진','박상민'];
-		const purposes = ['정기 점검','서버 점검','디스크 교체','네트워크 점검','DB 점검','방화벽 정책 변경','스토리지 점검','가상화 점검','APM 설정','보안 점검'];
-		const places = ['퓨처센터(5층)','퓨처센터(6층)','을지트윈타워(15층)','재해복구센터(4층)'];
-		const YN = ['No','Yes'];
-		const managers = ['문정한','이수진','정하나'];
-		const accessManagers = ['송철수','박상민','김도훈'];
-		const ioTypes = ['반입','반출','교체'];
-		const goodsTypes = ['구매','임대','교체'];
-		const goodsNames = ['HPE SAS 300GB DISK','NVMe 1TB','DDR4 32GB','외장 SSD','콘솔 케이블','패치 케이블','테스터','KVM','RFID 카드','SAS 600GB'];
-
-		function pick(arr, seed) { return arr[seed % arr.length]; }
-		function fmt(dt) {
-			return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
-		}
-
-		// Build month buckets from 2024-01 to 2025-08 inclusive (20 months)
-		const months = [];
-		for (let i = 0; i < 20; i++) {
-			const d = new Date(2024, 0 + i, 1);
-			months.push({ y: d.getFullYear(), m: d.getMonth() });
-		}
-		const total = 600; const base = Math.floor(total / months.length); // 30
-		let extra = total % months.length; // remainder distribution
-
-		const out = [];
-		months.forEach((mm, idx) => {
-			const count = base + (extra > 0 ? 1 : 0);
-			if (extra > 0) extra--;
-			for (let j = 0; j < count; j++) {
-				// Deterministic day/hour/minute so samples look natural and spread
-				const day = 1 + ((j * 3 + idx * 2) % 28); // 1..28
-				const hour = 9 + ((j * 2 + idx) % 8); // 9..16
-				const minuteTable = [0,5,10,15,20,25,30,35,40,45,50,55];
-				const min = minuteTable[(j + idx) % minuteTable.length];
-				const dtIn = new Date(mm.y, mm.m, day, hour, min);
-				// 45..164 minutes later
-				const offsetMin = 45 + ((j * 17 + idx * 13) % 120);
-				const dtOut = new Date(dtIn.getTime() + offsetMin * 60000);
-				out.push({
-					date_in: fmt(dtIn),
-					date_out: fmt(dtOut),
-					company: pick(companies, idx + j),
-					person_name: pick(names, idx * j + j),
-					purpose: pick(purposes, idx + j * 2),
-					place: pick(places, idx + j * 3),
-					laptop: pick(YN, idx + j),
-					task_link: pick(YN, idx + j + 1),
-					manager: pick(managers, idx + j),
-					access_manager: pick(accessManagers, j + idx * 2),
-					io_type: pick(ioTypes, idx + j),
-					goods_type: pick(goodsTypes, idx + 2 * j),
-					goods_name: pick(goodsNames, idx * 3 + j),
-					goods_qty: 1 + ((idx + j) % 6)
-				});
-			}
-		});
-		return out;
-	}
 
 	function by(a, b, key, dir) {
 		const av = a[key] ?? '';
@@ -637,16 +574,8 @@
 	// Delete action removed from Records (관리 열)
 
 	document.addEventListener('DOMContentLoaded', function() {
-		let stored = loadAccessRecords();
-		// Versioned seeding: if data is missing or outdated, seed 600 samples
-		const currentSeed = localStorage.getItem(ACCESS_RECORDS_SEED_VERSION_KEY);
-		if (!stored || stored.length < 600 || currentSeed !== ACCESS_RECORDS_SEED_VERSION) {
-			const seeded = sampleData();
-			saveAccessRecords(seeded);
-			localStorage.setItem(ACCESS_RECORDS_SEED_VERSION_KEY, ACCESS_RECORDS_SEED_VERSION);
-			stored = seeded;
-		}
-		state.data = stored.length ? stored : sampleData();
+		const stored = loadAccessRecords();
+		state.data = Array.isArray(stored) ? stored : [];
 		state.filtered = [...state.data];
 		const search = document.getElementById('physical-search');
 		if (search) {

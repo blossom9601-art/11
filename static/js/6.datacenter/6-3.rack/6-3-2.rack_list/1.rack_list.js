@@ -147,14 +147,12 @@
                 };
             },
         },
-        vendors: {
-            url: '/api/vendor-manufacturers',
-            normalize: (item)=> ({
-                value: item?.manufacturer_code || '',
-                label: safeText(item?.manufacturer_name || item?.manufacturer_code),
-                meta: safeText(item?.address || item?.call_center),
-                badge: safeText(item?.manufacturer_code),
-            }),
+        /** RACK 목록 모달 전용: 업무 상태 활성/비활성 (API FK 없음, 검색형 드롭다운과 동일 UX) */
+        rackBusinessStatus: {
+            loader: ()=> Promise.resolve([
+                { value: '활성', label: '활성' },
+                { value: '비활성', label: '비활성' },
+            ]),
         },
         centers: {
             url: '/api/org-centers',
@@ -408,15 +406,20 @@
         if(row.business_status_code){
             row.business_status_color = '';
             row.business_status_token = '';
-            const entry = getReferenceEntry('businessStatus', row.business_status_code);
-            if(entry){
-                row.business_status = entry.label;
-                if(entry.extra){
-                    row.business_status_color = entry.extra.colorHex || '';
-                    row.business_status_token = entry.extra.token || '';
+            const rackSt = getReferenceEntry('rackBusinessStatus', row.business_status_code);
+            if(rackSt){
+                row.business_status = rackSt.label;
+            } else {
+                const entry = getReferenceEntry('businessStatus', row.business_status_code);
+                if(entry){
+                    row.business_status = entry.label;
+                    if(entry.extra){
+                        row.business_status_color = entry.extra.colorHex || '';
+                        row.business_status_token = entry.extra.token || '';
+                    }
+                } else if(!row.business_status){
+                    row.business_status = row.business_status_code;
                 }
-            } else if(!row.business_status){
-                row.business_status = row.business_status_code;
             }
         } else if(!row.business_status){
             row.business_status = '';
@@ -467,8 +470,11 @@
     const EDIT_CLOSE_ID = 'system-edit-close';
     const EDIT_SAVE_ID = 'system-edit-save';
 
-    // Delete (삭제처리)
+    // Delete (삭제처리) — #system-delete-modal + blossom.js 공통 삭제 모달 정규화
     const DELETE_BTN_ID = 'system-delete-btn';
+    const DELETE_MODAL_ID = 'system-delete-modal';
+    const DELETE_CLOSE_ID = 'system-delete-close';
+    const DELETE_CONFIRM_ID = 'system-delete-confirm';
 
     // Bulk Edit (일괄변경)
     const BULK_BTN_ID = 'system-bulk-btn';
@@ -507,7 +513,9 @@
         '시스템 담당부서':'system_owner_dept','시스템 담당자':'system_owner',
         '서비스 담당부서':'service_owner_dept','서비스 담당자':'service_owner'
     };
-    const ENUM_SETS = { };
+    /** RACK 업무 상태: FK 없이 저장되는 고정값 (레거시 업무상태 코드는 엑셀/일괄에서 제외하지 않음) */
+    const RACK_BUSINESS_STATUS_FIXED = ['활성', '비활성'];
+    const ENUM_SETS = { business_status: new Set(RACK_BUSINESS_STATUS_FIXED) };
     function isEmptyRow(arr){ return !arr || arr.every(v=> String(v??'').trim()===''); }
     function isIntegerLike(val){ if(val==null) return false; const s=String(val).trim(); if(s==='') return false; return /^-?\d+$/.test(s); }
     function toIntOrBlank(val){ const s=String(val??'').trim(); if(s==='') return ''; return parseInt(s,10); }
@@ -547,13 +555,24 @@
     };
 
     const SEARCH_FIELD_META = {
-        business_status: { source: 'businessStatus', codeProp: 'business_status_code', placeholder: '업무 상태 선택' },
+        business_status: { source: 'rackBusinessStatus', codeProp: 'business_status_code', placeholder: '업무 상태 검색' },
         place: { source: 'centers', codeProp: 'place_code' },
         system_owner_dept: { source: 'departments', codeProp: 'system_owner_dept_code', placeholder: '부서 선택' },
         service_owner_dept: { source: 'departments', codeProp: 'service_owner_dept_code', placeholder: '부서 선택' },
         system_owner: { source: 'users', codeProp: 'system_owner_id', placeholder: '담당자 선택', dependsOn: 'system_owner_dept' },
         service_owner: { source: 'users', codeProp: 'service_owner_id', placeholder: '담당자 선택', dependsOn: 'service_owner_dept' },
     };
+
+    function rackListSanitizeHexColor(c){
+        const s = String(c || '').trim();
+        if(/^#[0-9a-fA-F]{6}$/.test(s) || /^#[0-9a-fA-F]{3}$/.test(s)){ return s; }
+        return '';
+    }
+    function rackListBusinessStatusDotClass(displayLabel){
+        const norm = String(displayLabel || '').replace(/\s+/g, '');
+        if(norm === '활성' || norm === '사용' || norm === '가동'){ return 'rack-detail-status-dot--active'; }
+        return 'rack-detail-status-dot--inactive';
+    }
 
     let state = {
         data: [],
@@ -571,10 +590,6 @@
         isLoading: true,
         loadError: null,
     };
-
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
 
     // RACK 시스템 데이터 로드
     async function loadRackData(options){
@@ -1397,23 +1412,17 @@
                         }
                     }
 
-                    // 업무 상태 배지 표시 (가동/유휴/대기)
+                    // 업무 상태: pill 없이 채워진 색점 + 라벨 (상세 기본정보와 동일 패턴)
                     if(col === 'business_status'){
                         const v = String(displayVal);
                         const normalized = v.replace(/\s+/g,'');
-                        const customColor = row.business_status_color;
-                        const tokenClass = row.business_status_token;
-                        if(customColor){
-                            const styleAttr = ` style="--status-dot-color:${customColor}"`;
-                            cellValue = `<span class="status-pill colored"${styleAttr}><span class="status-dot" aria-hidden="true"></span><span class="status-text">${highlight(displayVal, col)}</span></span>`;
+                        const labelForDot = normalized === '-' ? '' : normalized;
+                        const dotCls = rackListBusinessStatusDotClass(labelForDot);
+                        const safeHex = rackListSanitizeHexColor(row.business_status_color);
+                        if(safeHex){
+                            cellValue = `<span class="rack-detail-status-wrap"><span class="rack-detail-status-dot" style="background-color:${safeHex}" aria-hidden="true"></span><span class="rack-detail-status-label">${highlight(displayVal, col)}</span></span>`;
                         } else {
-                            const map = { '가동':'ws-run', '예약':'ws-idle', '유휴':'ws-wait', '대기':'ws-wait' };
-                            let cls = map[normalized] || tokenClass || '';
-                            if(!cls){
-                                cls = 'ws-wait';
-                            }
-                            const dotClass = cls || 'ws-wait';
-                            cellValue = `<span class="status-pill"><span class="status-dot ${dotClass}" aria-hidden="true"></span><span class="status-text">${highlight(displayVal, col)}</span></span>`;
+                            cellValue = `<span class="rack-detail-status-wrap"><span class="rack-detail-status-dot ${dotCls}" aria-hidden="true"></span><span class="rack-detail-status-label">${highlight(displayVal, col)}</span></span>`;
                         }
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
@@ -1429,9 +1438,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -1680,6 +1688,15 @@
         return data;
     }
 
+    /** 일괄변경: search-select는 저장값이 dataset.value에 있음 */
+    function readBulkControlValue(el){
+        if(!el || !el.getAttribute) return '';
+        if(el.classList?.contains('search-select') && Object.prototype.hasOwnProperty.call(el.dataset || {}, 'value')){
+            return (el.dataset.value ?? '').trim();
+        }
+        return String(el.value ?? '').trim();
+    }
+
     function parsePositiveInt(val){
         if(val == null) return null;
         const normalized = String(val).replace(/[^0-9]/g,'').trim();
@@ -1875,8 +1892,29 @@
                 wrap.innerHTML=`<label>${labelText}${req}</label>${generateFieldInput(c,row[c],row)}`; grid.appendChild(wrap); });
             section.appendChild(grid); form.appendChild(section);
         });
+        augmentRackBusinessStatusForEditRow(row);
         syncSearchSelectDisplays(form);
         wireSystemHeightInput(form);
+    }
+
+    /** 수정 모달: DB 레거시 업무상태 코드가 활성/비활성 외일 때 검색 목록에 한 줄 추가 */
+    function augmentRackBusinessStatusForEditRow(row){
+        if(!row) return;
+        const code = safeText(row.business_status_code);
+        if(!code) return;
+        const store = referenceStore.rackBusinessStatus;
+        if(!store || !store.byValue) return;
+        if(store.byValue.has(code)) return;
+        const label = safeText(row.business_status || code);
+        const entry = createReferenceEntry({
+            value: code,
+            label: label || code,
+            meta: '',
+            badge: '',
+        });
+        if(!entry) return;
+        store.items.push(entry);
+        store.byValue.set(entry.value, entry);
     }
 
     function generateFieldInput(col,value='',row){
@@ -1888,16 +1926,17 @@
             const placeholder = searchMeta.placeholder || '검색 선택';
             const safePlaceholder = escapeHTML(placeholder);
             const dependsAttr = searchMeta.dependsOn ? ` data-parent-field="${escapeHTML(searchMeta.dependsOn)}"` : '';
-            return `<input name="${col}" class="form-input search-select" placeholder="${safePlaceholder}" data-placeholder="${safePlaceholder}" data-search-source="${searchMeta.source}" data-value="${escapeHTML(resolvedCode)}" value="${escapeHTML(value ?? '')}"${dependsAttr}${requiredAttr}>`;
+            const searchableAttr = col === 'business_status' ? ' data-searchable="true"' : '';
+            return `<input type="text" name="${col}" class="form-input search-select" placeholder="${safePlaceholder}" data-placeholder="${safePlaceholder}" data-search-source="${searchMeta.source}" data-value="${escapeHTML(resolvedCode)}" value="${escapeHTML(value ?? '')}"${dependsAttr}${requiredAttr}${searchableAttr}>`;
         }
         if(col==='vendor'){
-            return `<input name="vendor" class="form-input" placeholder="입력" value="${escapeHTML(value??'')}">`;
+            return `<input type="text" name="vendor" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력" value="${escapeHTML(value??'')}">`;
         }
         if(col==='business_name'){
             return `<input name="business_name" class="form-input" placeholder="필수" value="${escapeHTML(value??'')}" required>`;
         }
         if(col==='model'){
-            return `<input name="model" class="form-input" placeholder="모델 입력" value="${escapeHTML(value??'')}">`;
+            return `<input type="text" name="model" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력" value="${escapeHTML(value??'')}">`;
         }
         if(col==='serial'){
             return `<input name="serial" class="form-input" value="${escapeHTML(value??'')}">`;
@@ -2470,7 +2509,7 @@
                     ['작성 규칙'],
                     ['- 첫 행의 컬럼 제목은 아래 순서와 완전히 일치해야 합니다. (순서/이름 변경 불가)'],
                     ['- "시스템 높이"는 예: 2U 형태로 기입하세요.'],
-                    ['- 그 외 항목은 자유롭게 입력하되, 필요 시 공란으로 둘 수 있습니다.'],
+                    ['- "업무 상태"는 반드시 "활성" 또는 "비활성"으로 입력하세요.'],
                     [''],
                     ['컬럼 순서 (복사/참고용)'],
                     [UPLOAD_HEADERS_KO.join(', ')],
@@ -2517,6 +2556,13 @@
                             const label = header[c]; const key = HEADER_KO_TO_KEY[label];
                             rec[key] = String(row[c]??'').trim();
                         }
+                        const bs = rec.business_status ? String(rec.business_status).trim() : '';
+                        if(!bs){
+                            errors.push(`${r + 1}행: 업무 상태는 필수입니다. ("활성" 또는 "비활성")`);
+                        } else if(!ENUM_SETS.business_status.has(bs)){
+                            errors.push(`${r + 1}행: 업무 상태는 "활성" 또는 "비활성"만 허용됩니다.`);
+                        }
+                        rec.business_status_code = bs;
                         // RACK 시스템: 별도 숫자 필드 검증 없음 (system_height는 자유 형식)
                         imported.push(rec);
                     }
@@ -2572,28 +2618,26 @@
             closeModal('system-duplicate-modal');
             showMessage(clones.length + '개 행이 복제되었습니다.', '완료');
         });
-        // delete (삭제처리) — BlsAlert 공통 모달 사용
+        // delete (삭제처리) — 공통 삭제 모달(#system-delete-modal, blossom.js 정규화)
         document.getElementById(DELETE_BTN_ID)?.addEventListener('click', ()=>{
             const count = state.selected.size;
             if(count===0){ showMessage('삭제처리할 행을 먼저 선택하세요.', '안내'); return; }
-            BlsAlert.confirmDelete(
-                '선택된 ' + count + '개의 시스템을 완전히 삭제합니다.\n이 작업은 되돌릴 수 없습니다.',
-                {
-                    title: '삭제 확인',
-                    confirmText: '삭제',
-                    onConfirm: async function(){
-                        var ids = [].concat(Array.from(state.selected)).map(function(id){ return Number(id); }).filter(function(id){ return Number.isFinite(id); });
-                        if(!ids.length) return;
-                        try {
-                            await requestJSON(ORG_RACK_BULK_DELETE_API, { method:'POST', body: { ids: ids } });
-                            await loadRackData();
-                            showMessage(ids.length + '개 항목이 삭제되었습니다.', '완료');
-                        } catch(error){
-                            showMessage(error.message || '랙 삭제 중 오류가 발생했습니다.', '오류');
-                        }
-                    }
-                }
-            );
+            const subtitle = document.getElementById('delete-subtitle');
+            if(subtitle){ subtitle.textContent = `선택된 ${count}개의 RACK 시스템을 정말 삭제처리하시겠습니까?`; }
+            openModal(DELETE_MODAL_ID);
+        });
+        document.getElementById(DELETE_CLOSE_ID)?.addEventListener('click', ()=> closeModal(DELETE_MODAL_ID));
+        document.getElementById(DELETE_CONFIRM_ID)?.addEventListener('click', async ()=>{
+            const ids = [].concat(Array.from(state.selected)).map(function(id){ return Number(id); }).filter(function(id){ return Number.isFinite(id); });
+            if(!ids.length){ closeModal(DELETE_MODAL_ID); return; }
+            closeModal(DELETE_MODAL_ID);
+            try {
+                await requestJSON(ORG_RACK_BULK_DELETE_API, { method:'POST', body: { ids: ids } });
+                await loadRackData();
+                showMessage(ids.length + '개 항목이 삭제되었습니다.', '완료');
+            } catch(error){
+                showMessage(error.message || '랙 삭제 중 오류가 발생했습니다.', '오류');
+            }
         });
         // bulk (일괄변경): 1개 선택 시에는 수정 모달로 전환
         document.getElementById(BULK_BTN_ID)?.addEventListener('click', ()=>{
@@ -2621,7 +2665,7 @@
         document.getElementById(BULK_APPLY_ID)?.addEventListener('click', ()=>{
             const form = document.getElementById(BULK_FORM_ID); if(!form) return;
             const entries = [...form.querySelectorAll('[data-bulk-field]')]
-                .map(el=>({ field: el.getAttribute('data-bulk-field'), value: el.value }))
+                .map(el=>({ field: el.getAttribute('data-bulk-field'), value: readBulkControlValue(el) }))
                 .filter(p=> p.value !== '');
             if(!entries.length){ showMessage('변경할 값을 1개 이상 입력하세요.', '안내'); return; }
             const ids = new Set(state.selected);
@@ -2629,7 +2673,12 @@
             state.data = state.data.map(row=>{
                 if(!ids.has(row.id)) return row;
                 const updated = { ...row };
-                entries.forEach(({field, value})=>{ updated[field] = value; });
+                entries.forEach(({field, value})=>{
+                    updated[field] = value;
+                    if(field === 'business_status'){
+                        updated.business_status_code = value;
+                    }
+                });
                 return updated;
             });
             applyFilter();
@@ -2637,7 +2686,7 @@
             setTimeout(()=> showMessage(`${ids.size}개 항목에 일괄 변경이 적용되었습니다.`, '완료'), 0);
         });
         // esc close
-    document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ [ADD_MODAL_ID,EDIT_MODAL_ID,COLUMN_MODAL_ID,BULK_MODAL_ID,UPLOAD_MODAL_ID,'system-download-modal','system-message-modal','system-duplicate-modal'].forEach(closeModal); }});
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ [ADD_MODAL_ID,EDIT_MODAL_ID,COLUMN_MODAL_ID,DELETE_MODAL_ID,BULK_MODAL_ID,UPLOAD_MODAL_ID,'system-download-modal','system-message-modal','system-duplicate-modal'].forEach(closeModal); }});
     // include stats modal in esc close
     document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(STATS_MODAL_ID); }});
 
@@ -2650,12 +2699,7 @@
         const EXCLUDE = new Set([]);
         function inputFor(col){
             if(col === 'business_status'){
-                return `<select class="form-input" data-bulk-field="business_status">
-                    <option value="">선택</option>
-                    <option value="가동">가동</option>
-                    <option value="유휴">유휴</option>
-                    <option value="대기">대기</option>
-                </select>`;
+                return `<input type="text" class="form-input search-select" data-bulk-field="business_status" data-search-source="rackBusinessStatus" data-placeholder="업무 상태 검색" placeholder="업무 상태 검색" data-searchable="true">`;
             }
             if(col === 'system_height'){
                 return `<input class="form-input" data-bulk-field="system_height" placeholder="숫자 입력" inputmode="numeric">`;
@@ -2682,6 +2726,7 @@
         }).join('');
 
         wireBulkSystemHeightInput(form);
+        syncSearchSelectDisplays(form);
     }
 
     // ----- Stats helpers -----
@@ -2705,7 +2750,7 @@
         // 대상 데이터: 현재 필터/정렬 적용 전부를 기준으로 통계 (state.filtered)
         const rows = state.filtered.length ? state.filtered : state.data;
         // RACK 시스템 통계
-        renderStatBlock('stats-software', '업무 상태', countBy(rows, 'business_status', ['가동','유휴','대기']), ['가동','유휴','대기']);
+        renderStatBlock('stats-software', '업무 상태', countBy(rows, 'business_status', RACK_BUSINESS_STATUS_FIXED), RACK_BUSINESS_STATUS_FIXED);
         renderStatBlock('stats-software', '시스템 제조사', countBy(rows, 'vendor'));
     }
     }
@@ -2713,21 +2758,6 @@
     // (조건 필터 관련 함수 제거됨)
 
     function init(){
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
         ensureReferenceData().catch(()=>{});
         loadColumnSelection();
         // Load persisted page size (allowed values only)

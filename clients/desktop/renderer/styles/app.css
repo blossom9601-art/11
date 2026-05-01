@@ -731,15 +731,15 @@ input:focus, textarea:focus, select:focus {
   color: #111827;
 }
 .file-preview-pdf-scroll {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  display: block;
+  text-align: center;
   padding: 24px;
   box-sizing: border-box;
 }
 .file-preview-pdf-page {
   display: block;
   flex: 0 0 auto;
+  margin: 0 auto;
   max-width: none;
   max-height: none;
   box-shadow: 0 8px 28px rgba(15,23,42,.16);

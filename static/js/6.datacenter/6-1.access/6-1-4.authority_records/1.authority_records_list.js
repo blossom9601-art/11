@@ -250,15 +250,11 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
     columnFilters: {} // { col: value | [values...] } (조건 필터 기능 제거 예정 - 빈 유지)
     };
-
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
 
     // ---- Server API helpers ----
     async function apiFetch(url, options){
@@ -485,9 +481,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -1691,21 +1686,6 @@
     // (조건 필터 관련 함수 제거됨)
 
     function init(){
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
     loadColumnSelection();
     // Enforce first render equals "초기화" state
     resetColumnSelection();

@@ -27,22 +27,6 @@
 		try { localStorage.setItem(ACCESS_RECORDS_KEY, JSON.stringify(arr || [])); } catch (_) {}
 	}
 
-	function sampleData() {
-		return [
-			{ date_in: '2025-08-18 09:17', person_type:'외부', company:'AST글로벌', person_name:'박철웅', purpose:'빅데이터 AP#1 디스크 교체', place:'퓨처센터(5층)', laptop:'No', task_link:'Yes', manager:'문정한', access_manager:'송철수', io_type:'교체', goods_type:'교체', goods_name:'HPE SAS 300GB DISK', goods_qty:1 },
-			{ date_in: '2025-08-18 10:05', person_type:'내부', company:'IT운영팀', person_name:'김하늘', purpose:'정기 점검', place:'퓨처센터(6층)', laptop:'Yes', task_link:'No', manager:'이수진', access_manager:'박상민', io_type:'반입', goods_type:'임대', goods_name:'테스트 노트북', goods_qty:1 },
-			{ date_in: '2025-08-18 10:30', person_type:'외부', company:'네오시스', person_name:'최민수', purpose:'서버 메모리 증설', place:'을지트윈타워(15층)', laptop:'No', task_link:'Yes', manager:'문정한', access_manager:'송철수', io_type:'반입', goods_type:'구매', goods_name:'DDR4 32GB', goods_qty:4 },
-			{ date_in: '2025-08-18 11:00', person_type:'외부', company:'한빛보안', person_name:'오지훈', purpose:'방화벽 정책 변경', place:'재해복구센터(4층)', laptop:'Yes', task_link:'Yes', manager:'정하나', access_manager:'김도훈', io_type:'반출', goods_type:'임대', goods_name:'USB 시리얼', goods_qty:1 },
-			{ date_in: '2025-08-18 11:45', person_type:'내부', company:'클라우드팀', person_name:'박지훈', purpose:'가상화 호스트 점검', place:'퓨처센터(5층)', laptop:'Yes', task_link:'No', manager:'이수진', access_manager:'박상민', io_type:'교체', goods_type:'교체', goods_name:'NVMe 1TB', goods_qty:2 },
-			{ date_in: '2025-08-18 12:20', person_type:'외부', company:'데이타링크', person_name:'서유리', purpose:'스위치 펌웨어 업그레이드', place:'퓨처센터(6층)', laptop:'Yes', task_link:'Yes', manager:'문정한', access_manager:'송철수', io_type:'반입', goods_type:'임대', goods_name:'콘솔 케이블', goods_qty:2 },
-			{ date_in: '2025-08-18 13:10', person_type:'내부', company:'보안팀', person_name:'유재석', purpose:'접근 제어 점검', place:'을지트윈타워(15층)', laptop:'No', task_link:'No', manager:'정하나', access_manager:'김도훈', io_type:'반입', goods_type:'구매', goods_name:'RFID 카드', goods_qty:10 },
-			{ date_in: '2025-08-18 14:02', person_type:'외부', company:'굿서버', person_name:'강호동', purpose:'스토리지 디스크 교체', place:'퓨처센터(5층)', laptop:'No', task_link:'Yes', manager:'문정한', access_manager:'송철수', io_type:'교체', goods_type:'교체', goods_name:'SAS 600GB', goods_qty:2 },
-			{ date_in: '2025-08-18 14:40', person_type:'내부', company:'DBA팀', person_name:'이나영', purpose:'DB 서버 점검', place:'재해복구센터(4층)', laptop:'Yes', task_link:'No', manager:'이수진', access_manager:'박상민', io_type:'반입', goods_type:'임대', goods_name:'외장 SSD', goods_qty:1 },
-			{ date_in: '2025-08-18 15:15', person_type:'외부', company:'에이치네트', person_name:'이광수', purpose:'L4 점검', place:'퓨처센터(6층)', laptop:'Yes', task_link:'Yes', manager:'정하나', access_manager:'김도훈', io_type:'반출', goods_type:'임대', goods_name:'테스터', goods_qty:1 },
-			{ date_in: '2025-08-18 15:50', person_type:'내부', company:'플랫폼팀', person_name:'김유정', purpose:'APM 설정 변경', place:'을지트윈타워(15층)', laptop:'No', task_link:'No', manager:'이수진', access_manager:'박상민', io_type:'반입', goods_type:'구매', goods_name:'패치 케이블', goods_qty:5 },
-			{ date_in: '2025-08-18 16:30', person_type:'외부', company:'테크윈', person_name:'박보검', purpose:'서버 점검', place:'퓨처센터(5층)', laptop:'Yes', task_link:'Yes', manager:'문정한', access_manager:'송철수', io_type:'반입', goods_type:'임대', goods_name:'KVM', goods_qty:1 }
-		];
-	}
 
 	let charts = { group: null, name: null, version: null, nameVersion: null };
 
@@ -508,7 +492,7 @@
 	};
 
 	document.addEventListener('DOMContentLoaded', function() {
-		state.data = sampleData();
+		state.data = [];
 		state.filtered = [...state.data];
 		const search = document.getElementById('physical-search');
 		if (search) {

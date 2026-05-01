@@ -718,7 +718,7 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
     columnFilters: {}, // { col: value | [values...] } (조건 필터 기능 제거 예정 - 빈 유지)
@@ -861,11 +861,9 @@
             applyRemoteItems(payload.items || [], payload.total);
         } catch(err){
             console.error(err);
-            if(opts.fallbackMock){
-                state.data = mockData(5);
-                state.nextId = state.data.length + 1;
-                applyFilter();
-            }
+            state.data = [];
+            state.nextId = 1;
+            applyFilter();
             showMessage(err.message || '출입 내역 조회 중 오류가 발생했습니다.', '오류');
         } finally {
             isFetchingEntries = false;
@@ -934,25 +932,8 @@
         });
     }
 
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
-
-    // 출입 등록 페이지: 샘플 데이터 5개 제공
-    function mockData(count=5){
-        const rows = [
-            { id: 1, status: '입실', name: '홍길동', affiliation: '인프라팀', id_number: 'ID-001', entry_datetime: '2025-08-18 09:17', exit_datetime: '2025-08-18 18:00', entry_purpose: '장비 점검', entry_area: '퓨처센터(5층)', laptop_use: 'O', usb_lock_use: 'O', work_management_dept: '인프라팀', work_assignee: '홍길동', access_management_dept: '보안팀', access_assignee: '최관리자', in_out_type: '반입', goods_type: '교체', goods_item: 'SSD 2TB', goods_qty: 2, note: '' },
-            { id: 2, status: '대기', name: '김철수', affiliation: '개발1팀', id_number: 'ID-002', entry_datetime: '2025-08-19 10:00', exit_datetime: '2025-08-19 17:30', entry_purpose: '소프트웨어 설치', entry_area: '퓨처센터(6층)', laptop_use: 'O', usb_lock_use: 'X', work_management_dept: '개발1팀', work_assignee: '김철수', access_management_dept: '보안팀', access_assignee: '박관리자', in_out_type: '반출', goods_type: '구매', goods_item: '네트워크 스위치', goods_qty: 1, note: '' },
-            { id: 3, status: '입실', name: '이영희', affiliation: '플랫폼팀', id_number: 'ID-003', entry_datetime: '2025-08-20 09:30', exit_datetime: '2025-08-20 19:00', entry_purpose: '장비 교체', entry_area: '퓨처센터(5/6층)', laptop_use: 'X', usb_lock_use: 'X', work_management_dept: '플랫폼팀', work_assignee: '이영희', access_management_dept: '출입관리팀', access_assignee: '조관리자', in_out_type: '반입', goods_type: '임대', goods_item: '서버 메모리', goods_qty: 8, note: '' },
-            { id: 4, status: '대기', name: '박보라', affiliation: '보안팀', id_number: 'ID-004', entry_datetime: '2025-08-21 08:50', exit_datetime: '2025-08-21 18:10', entry_purpose: '보안 점검', entry_area: '을지트윈타워(15층)', laptop_use: 'O', usb_lock_use: 'O', work_management_dept: '보안팀', work_assignee: '박보라', access_management_dept: '보안팀', access_assignee: '권관리자', in_out_type: '반출', goods_type: '교체', goods_item: '방화벽 모듈', goods_qty: 1, note: '' },
-            { id: 5, status: '입실', name: '최가을', affiliation: 'DB운영팀', id_number: 'ID-005', entry_datetime: '2025-08-22 09:10', exit_datetime: '2025-08-22 18:30', entry_purpose: 'DB 점검', entry_area: '재해복구센터(4층)', laptop_use: 'O', usb_lock_use: 'X', work_management_dept: 'DB운영팀', work_assignee: '최가을', access_management_dept: '출입관리팀', access_assignee: '유관리자', in_out_type: '반입', goods_type: '구매', goods_item: 'HDD 8TB', goods_qty: 4, note: '' }
-        ];
-        // 만약 다른 개수를 명시했다면 상위 count개만 반환
-        return rows.slice(0, Math.max(0, count|0));
-    }
-
     async function initData(){
-        await loadEntriesFromServer({ showSpinner: true, fallbackMock: true });
+        await loadEntriesFromServer({ showSpinner: true });
     }
 
     function applyFilter(){
@@ -1139,9 +1120,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -2762,21 +2742,6 @@
     // (조건 필터 관련 함수 제거됨)
 
     async function init(){
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
     loadColumnSelection();
     // Enforce first render equals "초기화" state
     resetColumnSelection();

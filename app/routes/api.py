@@ -187,6 +187,8 @@ from app.services.org_department_service import (
 from app.services.web_access_control_service import (
     REQUEST_STATUS_PENDING as WEB_ACCESS_REQUEST_PENDING,
     REQUEST_STATUS_PARTIAL_APPROVED as WEB_ACCESS_REQUEST_PARTIAL_APPROVED,
+    REQUEST_TYPE_DELETE as WEB_ACCESS_REQUEST_TYPE_DELETE,
+    REQUEST_TYPE_USE as WEB_ACCESS_REQUEST_TYPE_USE,
     WebAccessValidationError,
     approve_request as svc_approve_web_access_request,
     cancel_request as svc_cancel_web_access_request,
@@ -37593,7 +37595,9 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     resource_id = int(resource.get('id') or 0)
     user_id = int(actor.get('user_id') or 0)
     has_grant = svc_has_web_access_grant(user_id, resource_id)
-    has_pending = svc_has_web_access_pending_request(user_id, resource_id)
+    has_pending_use = svc_has_web_access_pending_request(user_id, resource_id, request_type=WEB_ACCESS_REQUEST_TYPE_USE)
+    has_pending_delete = svc_has_web_access_pending_request(user_id, resource_id, request_type=WEB_ACCESS_REQUEST_TYPE_DELETE)
+    has_pending = has_pending_use or has_pending_delete
     grants = svc_list_web_access_grants(user_id=user_id, resource_id=resource_id)
     grant_row = grants[0] if grants else None
     days_remaining = None
@@ -37606,8 +37610,8 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     if int(resource.get('active_flag') or 0) != 1:
         state = '차단'
     elif has_grant:
-        state = '만료 예정' if days_remaining is not None and 0 <= days_remaining <= 7 else '사용 가능'
-    elif has_pending:
+        state = '삭제 승인 대기' if has_pending_delete else ('만료 예정' if days_remaining is not None and 0 <= days_remaining <= 7 else '사용 가능')
+    elif has_pending_use:
         state = '승인 대기'
     elif grant_row:
         state = '만료됨'
@@ -37616,8 +37620,11 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     return {
         'access_status': state,
         'can_access': bool(has_grant and int(resource.get('active_flag') or 0) == 1),
-        'can_request': bool(not has_grant and not has_pending and int(resource.get('active_flag') or 0) == 1),
+        'can_request': bool(not has_grant and not has_pending_use and not has_pending_delete and int(resource.get('active_flag') or 0) == 1),
+        'can_delete_request': bool(has_grant and not has_pending_delete),
         'request_pending': bool(has_pending),
+        'use_request_pending': bool(has_pending_use),
+        'delete_request_pending': bool(has_pending_delete),
         'grant_id': (grant_row or {}).get('id'),
         'grant_status': (grant_row or {}).get('grant_status', ''),
         'grant_start_date': (grant_row or {}).get('grant_start_date', ''),
@@ -37992,6 +37999,8 @@ def api_access_control_audit_logs():
     page_size = min(page_size, 200)
     result = svc_list_web_access_audit_logs(
         {
+            'audit_scope': request.args.get('audit_scope') or '',
+            'keyword': request.args.get('keyword') or '',
             'actor_name': request.args.get('actor_name') or '',
             'resource_name': request.args.get('resource_name') or '',
             'action_type': request.args.get('action_type') or '',

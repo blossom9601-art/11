@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/capex_executive.css?v=20260316a">
     <link rel="stylesheet" href="/static/css/dashboard_add.css?v=20251109-1">
     <style>
@@ -23,6 +23,8 @@
 
         #work-dashboard-root .work-dash-grid > .exec-card {
             min-width: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         #work-dashboard-root .work-dash-grid > .work-group-card {
@@ -40,6 +42,45 @@
                 grid-column: auto !important;
                 grid-row: auto !important;
             }
+        }
+
+        /* 메인 대시보드와 동일한 빈 데이터 일러스트(캔버스가 비어 있을 때 배경으로 보임) */
+        #work-dashboard-root .chart-wrap-inner { position: relative; }
+        #work-dashboard-root .wd-empty-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 0;
+        }
+        #work-dashboard-root .chart-wrap-inner canvas {
+            position: relative;
+            z-index: 1;
+            background: transparent;
+        }
+        #work-dashboard-root .wd-treemap-host {
+            position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 280px;
+        }
+        #work-dashboard-root .wd-treemap-host .treemap-wrap {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            min-height: 240px;
+        }
+        #work-dashboard-root .wd-treemap-host .wd-empty-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 0;
         }
     </style>
 </head>
@@ -77,23 +118,48 @@
                 <section class="work-dash-grid" id="work-dash-grid" aria-label="업무 대시보드">
                     <article class="exec-card analysis-card card chart" id="wd-card-classification">
                         <div class="exec-card-title">업무 분류</div>
-                        <div class="chart-wrap-inner"><canvas id="chart-classification"></canvas></div>
+                        <div class="chart-wrap-inner">
+                            <div class="wd-empty-placeholder">
+                                <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90" style="object-fit:contain;max-width:100%;opacity:.95;">
+                            </div>
+                            <canvas id="chart-classification"></canvas>
+                        </div>
                     </article>
                     <article class="exec-card analysis-card card chart" id="wd-card-division">
                         <div class="exec-card-title">업무 구분</div>
-                        <div class="chart-wrap-inner"><canvas id="chart-division"></canvas></div>
+                        <div class="chart-wrap-inner">
+                            <div class="wd-empty-placeholder">
+                                <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90" style="object-fit:contain;max-width:100%;opacity:.95;">
+                            </div>
+                            <canvas id="chart-division"></canvas>
+                        </div>
                     </article>
                     <article class="exec-card analysis-card card chart work-group-card" id="wd-card-group">
                         <div class="exec-card-title">업무 그룹</div>
-                        <div class="treemap-wrap" id="chart-group"></div>
+                        <div class="wd-treemap-host">
+                            <div class="wd-empty-placeholder wd-empty-treemap">
+                                <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90" style="object-fit:contain;max-width:100%;opacity:.95;">
+                            </div>
+                            <div class="treemap-wrap" id="chart-group"></div>
+                        </div>
                     </article>
                     <article class="exec-card analysis-card card chart" id="wd-card-operation">
                         <div class="exec-card-title">업무 운영</div>
-                        <div class="chart-wrap-inner"><canvas id="chart-operation"></canvas></div>
+                        <div class="chart-wrap-inner">
+                            <div class="wd-empty-placeholder">
+                                <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90" style="object-fit:contain;max-width:100%;opacity:.95;">
+                            </div>
+                            <canvas id="chart-operation"></canvas>
+                        </div>
                     </article>
                     <article class="exec-card analysis-card card chart" id="wd-card-status">
                         <div class="exec-card-title">업무 상태</div>
-                        <div class="chart-wrap-inner"><canvas id="chart-status"></canvas></div>
+                        <div class="chart-wrap-inner">
+                            <div class="wd-empty-placeholder">
+                                <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90" style="object-fit:contain;max-width:100%;opacity:.95;">
+                            </div>
+                            <canvas id="chart-status"></canvas>
+                        </div>
                     </article>
                 </section>
 
@@ -103,12 +169,12 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260415_cat_dup_remove2"></script>
+    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
     <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
-    <script src="/static/js/9.category/9-1.business/9-1-0.work_dashboard/1.work_dashboard.js?v=1.4.0"></script>
+    <script src="/static/js/9.category/9-1.business/9-1-0.work_dashboard/1.work_dashboard.js?v=1.4.2"></script>
     <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

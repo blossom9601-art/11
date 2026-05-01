@@ -9,6 +9,14 @@
   const SHARE_SUGGEST_USER_BLOCKLIST = ['ADMIN'];
   const MODE_BY_SCOPE = { ALL: 'all', PRIVATE: 'basic', DEPARTMENT: 'department', SELECT: 'custom' };
   const DEFAULT_FETCH_LIMIT = 500;
+  const SCHEDULE_COLOR_PALETTE = [
+    '#6366f1', '#60a5fa', '#3b82f6', '#0ea5e9', '#06b6d4',
+    '#14b8a6', '#34d399', '#10b981', '#a3e635', '#f59e0b',
+    '#f97316', '#ef4444', '#f472b6', '#f43f5e', '#ec4899',
+    '#d946ef', '#c4b5fd', '#a855f7', '#64748b', '#111827',
+  ];
+  const CAL_REPEAT_WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const CAL_REPEAT_TYPES = ['none', 'daily', 'weekly', 'monthly', 'yearly', 'custom'];
   const shareSearchCache = new Map();
   const shareUserDirectory = new Map();
   const shareDeptDirectory = new Map();
@@ -33,6 +41,31 @@
   let isSyncing = false;
   let calendarConfigCache = null;
   let modalButtons = { save: null, delete: null };
+
+  function getEventPermission(event, key) {
+    const props = event && event.extendedProps ? event.extendedProps : null;
+    if (!props || !(key in props)) return null;
+    return props[key] === true;
+  }
+
+  function isCurrentUserOwnerOfEvent(event) {
+    const props = event && event.extendedProps ? event.extendedProps : null;
+    const currentId = getCurrentProfileId();
+    const ownerId = Number(props && props.ownerUserId);
+    return !!(currentId && ownerId && currentId === ownerId);
+  }
+
+  function canCurrentUserEditEvent(event) {
+    const permission = getEventPermission(event, 'viewerCanEdit');
+    if (permission !== null) return permission;
+    return isCurrentUserOwnerOfEvent(event);
+  }
+
+  function canCurrentUserDeleteEvent(event) {
+    const permission = getEventPermission(event, 'viewerCanDelete');
+    if (permission !== null) return permission;
+    return isCurrentUserOwnerOfEvent(event);
+  }
 
   function resolveCalendarConfig() {
     if (calendarConfigCache) {
@@ -362,6 +395,16 @@
   const reminderSelect = document.getElementById('sch-reminder');
   const stickerSelect = document.getElementById('sch-sticker');
   const colorInput = document.getElementById('sch-color');
+  const colorPalette = document.getElementById('sch-color-palette');
+  const repeatSelect = document.getElementById('sch-repeat');
+  const repeatEndTypeSelect = document.getElementById('sch-repeat-end-type');
+  const repeatUntilInput = document.getElementById('sch-repeat-until');
+  const repeatCountInput = document.getElementById('sch-repeat-count');
+  const repeatCustomWrap = document.getElementById('sch-repeat-custom');
+  const repeatIntervalInput = document.getElementById('sch-repeat-interval');
+  const repeatFrequencySelect = document.getElementById('sch-repeat-frequency');
+  const repeatWeekdaysWrap = document.getElementById('sch-repeat-weekdays');
+  const repeatMonthPolicy = document.getElementById('sch-repeat-month-policy');
   const inputLocation = document.getElementById('sch-location');
   const btnSave = document.getElementById('sch-save-btn');
   const btnCancel = document.getElementById('sch-cancel-btn');
@@ -381,6 +424,7 @@
   const viewLocation = document.getElementById('view-sch-location');
   const viewType = document.getElementById('view-sch-type');
   const viewShare = document.getElementById('view-sch-share');
+  const viewRepeat = document.getElementById('view-sch-repeat');
   const viewDesc = document.getElementById('view-sch-description');
   const viewAttachmentsWrap = document.getElementById('view-sch-attachments-wrap');
   const viewAttachments = document.getElementById('view-sch-attachments');
@@ -410,6 +454,7 @@
     existingAttachments: [],
     attendees: [],
     important: false,
+    canDelete: false,
   };
   // Preserve last explicit time range when toggling 종일 on/off
   let lastTimeRange = { start: '', end: '' };
@@ -428,6 +473,213 @@
       '점검': '#34d399',    // emerald
       '기타': '#c4b5fd'     // purple
     }[t] || '#a5b4fc');
+
+    function normalizePaletteColor(value) {
+      const color = String(value || '').trim();
+      return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : SCHEDULE_COLOR_PALETTE[0];
+    }
+
+    function setColorValue(value) {
+      const color = normalizePaletteColor(value);
+      if (colorInput) {
+        colorInput.value = color;
+      }
+      if (colorPalette) {
+        colorPalette.querySelectorAll('.schedule-color-swatch').forEach((button) => {
+          const selected = String(button.getAttribute('data-color') || '').toLowerCase() === color;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-checked', selected ? 'true' : 'false');
+        });
+      }
+    }
+
+    function renderColorPalette() {
+      if (!colorPalette || colorPalette.dataset.rendered === '1') return;
+      colorPalette.innerHTML = SCHEDULE_COLOR_PALETTE.map((color) => `
+        <button type="button" class="schedule-color-swatch" role="radio" aria-label="${escapeHtml(color)}" aria-checked="false" data-color="${escapeHtml(color)}" style="background:${escapeHtml(color)}"></button>
+      `).join('');
+      colorPalette.dataset.rendered = '1';
+      colorPalette.addEventListener('click', (event) => {
+        if (modalCtx.mode === 'view') return;
+        const button = event.target.closest('.schedule-color-swatch[data-color]');
+        if (!button) return;
+        setColorValue(button.getAttribute('data-color') || '#6366f1');
+      });
+      setColorValue(colorInput?.value || SCHEDULE_COLOR_PALETTE[0]);
+    }
+
+    function normalizeRepeatType(raw) {
+      const token = String(raw || 'none').toLowerCase();
+      return CAL_REPEAT_TYPES.includes(token) ? token : 'none';
+    }
+
+    function normalizeRepeatRule(raw) {
+      if (!raw) return {};
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_) {
+          return {};
+        }
+      }
+      return raw && typeof raw === 'object' ? { ...raw } : {};
+    }
+
+    function repeatRuleEndType(rule) {
+      const token = String((rule && rule.endType) || (rule && rule.end_type) || 'never').toLowerCase();
+      return ['never', 'until', 'count'].includes(token) ? token : 'never';
+    }
+
+    function repeatRuleInterval(rule) {
+      const value = parseInt(String((rule && rule.interval) || '1'), 10);
+      return Number.isFinite(value) && value > 0 ? value : 1;
+    }
+
+    function repeatRuleCount(rule) {
+      const value = parseInt(String((rule && rule.count) || '10'), 10);
+      return Number.isFinite(value) && value > 0 ? value : 10;
+    }
+
+    function repeatRuleFrequency(repeatType, rule) {
+      if (repeatType !== 'custom') return repeatType;
+      const token = String((rule && (rule.frequency || rule.freq || rule.unit)) || 'daily').toLowerCase();
+      return ['daily', 'weekly', 'monthly', 'yearly'].includes(token) ? token : 'daily';
+    }
+
+    function repeatRuleUntil(rule) {
+      const raw = String((rule && (rule.untilDate || rule.until_date || rule.until)) || '').trim();
+      const match = raw.match(/^\d{4}-\d{2}-\d{2}/);
+      return match ? match[0] : '';
+    }
+
+    function repeatWeekdayForInput(value) {
+      const parsed = parseDateTimeInput(value);
+      const date = parsed || new Date();
+      return CAL_REPEAT_WEEKDAYS[date.getDay()];
+    }
+
+    function selectedRepeatWeekdays() {
+      if (!repeatWeekdaysWrap) return [];
+      return Array.from(repeatWeekdaysWrap.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    }
+
+    function setRepeatWeekdays(days) {
+      const selected = new Set((Array.isArray(days) ? days : []).map((day) => String(day || '').toUpperCase()));
+      if (!repeatWeekdaysWrap) return;
+      repeatWeekdaysWrap.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+        input.checked = selected.has(input.value);
+      });
+    }
+
+    function effectiveRepeatFrequencyFromForm() {
+      const repeatType = normalizeRepeatType(repeatSelect?.value || 'none');
+      if (repeatType === 'custom') {
+        const frequency = String(repeatFrequencySelect?.value || 'daily').toLowerCase();
+        return ['daily', 'weekly', 'monthly', 'yearly'].includes(frequency) ? frequency : 'daily';
+      }
+      return repeatType;
+    }
+
+    function syncRepeatUi(options) {
+      const opts = options || {};
+      const repeatType = normalizeRepeatType(repeatSelect?.value || 'none');
+      const endType = String(repeatEndTypeSelect?.value || 'never').toLowerCase();
+      const frequency = effectiveRepeatFrequencyFromForm();
+      const enabled = repeatType !== 'none';
+      if (repeatEndTypeSelect) repeatEndTypeSelect.hidden = !enabled;
+      if (repeatUntilInput) repeatUntilInput.hidden = !enabled || endType !== 'until';
+      if (repeatCountInput) repeatCountInput.hidden = !enabled || endType !== 'count';
+      if (repeatCustomWrap) repeatCustomWrap.hidden = repeatType !== 'custom';
+      if (repeatWeekdaysWrap) repeatWeekdaysWrap.hidden = !enabled || frequency !== 'weekly';
+      if (repeatMonthPolicy) repeatMonthPolicy.hidden = !enabled || (frequency !== 'monthly' && frequency !== 'yearly');
+      if (enabled && frequency === 'weekly' && !opts.keepWeekdays && !selectedRepeatWeekdays().length) {
+        setRepeatWeekdays([repeatWeekdayForInput(inputStartTime?.value || '')]);
+      }
+    }
+
+    function setRepeatFields(event) {
+      const props = event && event.extendedProps ? event.extendedProps : {};
+      const repeatType = normalizeRepeatType(props.repeatType || props.repeat_type || 'none');
+      const rule = normalizeRepeatRule(props.repeatRule || props.repeat_rule || {});
+      if (repeatSelect) repeatSelect.value = repeatType;
+      if (repeatEndTypeSelect) repeatEndTypeSelect.value = repeatRuleEndType(rule);
+      if (repeatIntervalInput) repeatIntervalInput.value = String(repeatRuleInterval(rule));
+      if (repeatFrequencySelect) repeatFrequencySelect.value = repeatRuleFrequency(repeatType, rule);
+      if (repeatUntilInput) repeatUntilInput.value = repeatRuleUntil(rule);
+      if (repeatCountInput) repeatCountInput.value = String(repeatRuleCount(rule));
+      const defaultWeekday = repeatWeekdayForInput(inputStartTime?.value || '');
+      const ruleDays = Array.isArray(rule.daysOfWeek) ? rule.daysOfWeek : (Array.isArray(rule.days_of_week) ? rule.days_of_week : []);
+      setRepeatWeekdays(ruleDays.length ? ruleDays : [defaultWeekday]);
+      syncRepeatUi({ keepWeekdays: true });
+    }
+
+    function buildRepeatPayloadFromForm(startValue, existingRule) {
+      const repeatType = normalizeRepeatType(repeatSelect?.value || 'none');
+      if (repeatType === 'none') {
+        return { repeat_type: 'none', repeat_rule: {} };
+      }
+      const frequency = effectiveRepeatFrequencyFromForm();
+      const interval = repeatType === 'custom'
+        ? parseInt(String(repeatIntervalInput?.value || '1'), 10)
+        : 1;
+      if (!Number.isFinite(interval) || interval < 1) {
+        throw new Error('반복 주기는 1 이상이어야 합니다.');
+      }
+      const endType = String(repeatEndTypeSelect?.value || 'never').toLowerCase();
+      const startKey = String(startValue || '').slice(0, 10);
+      const rule = { interval, frequency, endType };
+      const previousRule = normalizeRepeatRule(existingRule || {});
+      const previousExceptions = previousRule.exdates || previousRule.exceptionDates;
+      if (Array.isArray(previousExceptions) && previousExceptions.length) {
+        rule.exdates = previousExceptions.slice();
+      }
+      if (frequency === 'weekly') {
+        const days = selectedRepeatWeekdays();
+        if (!days.length) throw new Error('매주 반복 요일을 한 개 이상 선택하세요.');
+        rule.daysOfWeek = days;
+      }
+      if (frequency === 'monthly' || frequency === 'yearly') {
+        rule.monthDayPolicy = 'clamp';
+      }
+      if (endType === 'until') {
+        const until = String(repeatUntilInput?.value || '').trim().slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) throw new Error('반복 종료 날짜를 입력하세요.');
+        if (startKey && until < startKey) throw new Error('반복 종료일은 시작일보다 빠를 수 없습니다.');
+        rule.untilDate = until;
+      } else if (endType === 'count') {
+        const count = parseInt(String(repeatCountInput?.value || '0'), 10);
+        if (!Number.isFinite(count) || count < 1) throw new Error('반복 횟수는 1 이상이어야 합니다.');
+        rule.count = count;
+      }
+      return { repeat_type: repeatType, repeat_rule: rule };
+    }
+
+    function repeatLabel(repeatType, rule) {
+      const type = normalizeRepeatType(repeatType);
+      if (type === 'none') return '반복 안 함';
+      const normalizedRule = normalizeRepeatRule(rule || {});
+      const frequency = repeatRuleFrequency(type, normalizedRule);
+      const base = {
+        daily: '매일',
+        weekly: '매주',
+        monthly: '매월',
+        yearly: '매년',
+      }[type] || '사용자 지정';
+      let label = base;
+      if (type === 'custom') {
+        const unit = { daily: '일', weekly: '주', monthly: '개월', yearly: '년' }[frequency] || '일';
+        label = `${repeatRuleInterval(normalizedRule)}${unit}마다`;
+      }
+      const endType = repeatRuleEndType(normalizedRule);
+      if (endType === 'until') {
+        const until = repeatRuleUntil(normalizedRule);
+        if (until) label += ` · ${until}까지`;
+      } else if (endType === 'count') {
+        label += ` · ${repeatRuleCount(normalizedRule)}회`;
+      }
+      return label;
+    }
 
     const DEFAULT_PROFILE_IMAGE = '/static/image/svg/profil/free-icon-bussiness-man.svg';
 
@@ -501,7 +753,7 @@
       return s || e;
     }
 
-    function populateViewFromModalState({ typeLabel, shareModeLabel, shareTargetsLabel, startDate, endDate }) {
+    function populateViewFromModalState({ typeLabel, shareModeLabel, shareTargetsLabel, repeatModeLabel, startDate, endDate }) {
       function setViewValue(el, value, opts) {
         if (!el) return;
         const useHtml = !!(opts && opts.html);
@@ -520,6 +772,7 @@
       setViewValue(viewTime, formatViewDateTimeRange(startDate, endDate, !!modalCtx.allDay));
       setViewValue(viewLocation, (inputLocation?.value || '').trim());
       setViewValue(viewType, typeLabel || '-');
+      setViewValue(viewRepeat, repeatModeLabel || '-');
       if (viewShare) {
         const base = shareModeLabel || '-';
         const combined = shareTargetsLabel ? `${base} · ${shareTargetsLabel}` : base;
@@ -668,6 +921,12 @@
         reminderSelect,
         stickerSelect,
         colorInput,
+        repeatSelect,
+        repeatEndTypeSelect,
+        repeatUntilInput,
+        repeatCountInput,
+        repeatIntervalInput,
+        repeatFrequencySelect,
       ].filter(Boolean);
       controls.forEach((el) => {
         try { el.disabled = isReadOnly; } catch (_) {}
@@ -680,6 +939,16 @@
       }
       if (attendeeAddBtn) {
         attendeeAddBtn.disabled = isReadOnly;
+      }
+      if (colorPalette) {
+        colorPalette.querySelectorAll('button').forEach((btn) => {
+          btn.disabled = isReadOnly;
+        });
+      }
+      if (repeatWeekdaysWrap) {
+        repeatWeekdaysWrap.querySelectorAll('input').forEach((input) => {
+          input.disabled = isReadOnly;
+        });
       }
       if (typeDropdownTrigger) {
         typeDropdownTrigger.disabled = isReadOnly;
@@ -696,7 +965,7 @@
         btnSave.style.display = isReadOnly ? 'none' : 'inline-flex';
       }
       if (btnDelete) {
-        btnDelete.style.display = (!isReadOnly && modalCtx.mode === 'edit') ? 'inline-flex' : 'none';
+        btnDelete.style.display = modalCtx.canDelete ? 'inline-flex' : 'none';
       }
       if (attachmentDrop) {
         attachmentDrop.setAttribute('aria-disabled', isReadOnly ? 'true' : 'false');
@@ -732,6 +1001,7 @@
       const defaultShareMode = event ? (event.extendedProps?.shareMode || shareScopeToMode(event.extendedProps?.shareScope)) : getShareModeValue();
       const hasCustomShares = shareUsers.length || shareDepts.length;
       const resolvedShareMode = defaultShareMode || (hasCustomShares ? 'custom' : 'basic');
+      const canDeleteSchedule = canCurrentUserDeleteEvent(event);
       shareSelectionSeq = 0;
       shareDepts.forEach((entry) => { if (entry) entry.__addedAt = ++shareSelectionSeq; });
       shareUsers.forEach((entry) => { if (entry) entry.__addedAt = ++shareSelectionSeq; });
@@ -740,7 +1010,7 @@
         startStr,
         endStr,
         allDay,
-        eventId: event?.id || null,
+        eventId: getScheduleIdFromEvent(event),
         shares: [],
         shareUsersPayload: shareUsers,
         shareDepartmentsPayload: shareDepts,
@@ -751,6 +1021,7 @@
         existingAttachments: Array.isArray(event?.extendedProps?.attachments) ? event.extendedProps.attachments.slice() : [],
         attendees: normalizeTokenList(event?.extendedProps?.attendees || []),
         important: !!event?.extendedProps?.isImportant,
+        canDelete: !!(event && canDeleteSchedule),
       };
       syncShareLabelsFromPayload();
       modalTitle.textContent = mode === 'edit' ? '일정 수정' : (mode === 'view' ? '일정 보기' : '일정 등록');
@@ -773,6 +1044,13 @@
             try {
               const res = await apiGetSchedule(scheduleId);
               const item = res && res.item;
+              const detailEvent = item ? scheduleToEvent(item) : null;
+              if (detailEvent) {
+                modalCtx.canDelete = canCurrentUserDeleteEvent(detailEvent);
+                if (btnDelete) {
+                  btnDelete.style.display = modalCtx.canDelete ? 'inline-flex' : 'none';
+                }
+              }
               if (item && item.owner) {
                 setOwnerDisplay(item.owner);
               }
@@ -788,6 +1066,7 @@
                     typeLabel: selectType?.value || type || '-',
                     shareModeLabel,
                     shareTargetsLabel,
+                    repeatModeLabel: repeatLabel(detailEvent?.extendedProps?.repeatType || 'none', detailEvent?.extendedProps?.repeatRule || {}),
                     startDate: parseDateTimeInput(inputStartTime?.value) || derivedStart,
                     endDate: parseDateTimeInput(inputEndTime?.value) || derivedEnd,
                   });
@@ -846,7 +1125,8 @@
     reminderSelect.value = Array.isArray(reminders) && reminders.length ? String(reminders[0] || '') : '';
   }
   if (stickerSelect) stickerSelect.value = event?.extendedProps?.sticker || '';
-  if (colorInput) colorInput.value = event?.backgroundColor || event?.extendedProps?.color || typeToColor(type || '미팅');
+  setColorValue(event?.backgroundColor || event?.extendedProps?.color || typeToColor(type || '미팅'));
+  setRepeatFields(event || null);
   // set all-day UI state (after potential override)
   setAllDayUI(!!(event ? event.allDay : allDay));
   if (!modalCtx.allDay) {
@@ -863,7 +1143,9 @@
     modal.removeAttribute('inert');
     modal.inert = false;
   } catch (_) {}
-      btnDelete.style.display = mode === 'edit' ? 'inline-flex' : 'none';
+      if (btnDelete) {
+        btnDelete.style.display = modalCtx.canDelete ? 'inline-flex' : 'none';
+      }
       setModalReadOnly(mode === 'view');
       setModalViewMode(mode === 'view');
 
@@ -882,6 +1164,7 @@
           typeLabel: selectType?.value || type || '-',
           shareModeLabel,
           shareTargetsLabel,
+          repeatModeLabel: repeatLabel(event?.extendedProps?.repeatType || 'none', event?.extendedProps?.repeatRule || {}),
           startDate: parseDateTimeInput(inputStartTime?.value) || derivedStart,
           endDate: parseDateTimeInput(inputEndTime?.value) || derivedEnd,
         });
@@ -1793,7 +2076,14 @@
       });
     }
 
+    renderColorPalette();
     setTypeValue(selectType?.value || '');
+    setRepeatFields(null);
+    [repeatSelect, repeatEndTypeSelect, repeatFrequencySelect].filter(Boolean).forEach((control) => {
+      control.addEventListener('change', () => syncRepeatUi());
+    });
+    repeatWeekdaysWrap?.addEventListener('change', () => syncRepeatUi({ keepWeekdays: true }));
+    inputStartTime?.addEventListener('change', () => syncRepeatUi());
     setShareModeValue(getShareModeValue());
     if (shareModeChips.length) {
       shareModeChips.forEach((chip) => {
@@ -2134,13 +2424,14 @@
 
     function getScheduleIdFromEvent(ev) {
       if (!ev) return null;
+      const fromExt = ev.extendedProps && ev.extendedProps.scheduleId ? String(ev.extendedProps.scheduleId).trim() : '';
+      if (fromExt) return fromExt;
       // FullCalendar EventApi exposes id; some internal shapes expose _def.publicId.
       const direct = (ev.id !== undefined && ev.id !== null) ? String(ev.id).trim() : '';
       if (direct) return direct;
       const fromDef = ev._def && ev._def.publicId ? String(ev._def.publicId).trim() : '';
       if (fromDef) return fromDef;
-      const fromExt = ev.extendedProps && ev.extendedProps.scheduleId ? String(ev.extendedProps.scheduleId).trim() : '';
-      return fromExt || null;
+      return null;
     }
 
   // (notifications removed)
@@ -2199,17 +2490,12 @@
           // ignore
         }
 
-        const currentId = getCurrentProfileId();
-        const ownerId = Number(enrichedEvent?.extendedProps?.ownerUserId);
-        const isOwner = currentId && ownerId && currentId === ownerId;
-        openModal({ mode: isOwner ? 'edit' : 'view', event: enrichedEvent, ownerOverride, openerEl: info?.jsEvent?.target || calendarEl });
+        const canEdit = canCurrentUserEditEvent(enrichedEvent);
+        openModal({ mode: canEdit ? 'edit' : 'view', event: enrichedEvent, ownerOverride, openerEl: info?.jsEvent?.target || calendarEl });
       },
 
       eventDrop: function (info) {
-        const currentId = getCurrentProfileId();
-        const ownerId = Number(info?.event?.extendedProps?.ownerUserId);
-        const isOwner = currentId && ownerId && currentId === ownerId;
-        if (!isOwner) {
+        if (!canCurrentUserEditEvent(info?.event)) {
           info.revert();
           return;
         }
@@ -2217,14 +2503,15 @@
       },
 
       eventResize: function (info) {
-        const currentId = getCurrentProfileId();
-        const ownerId = Number(info?.event?.extendedProps?.ownerUserId);
-        const isOwner = currentId && ownerId && currentId === ownerId;
-        if (!isOwner) {
+        if (!canCurrentUserEditEvent(info?.event)) {
           info.revert();
           return;
         }
         persistEventMutation(info);
+      },
+
+      datesSet: function () {
+        setTimeout(() => refreshCalendarEvents(), 0);
       },
 
       eventReceive: function(info) {
@@ -2312,8 +2599,9 @@
         shareDepartments: modalCtx.shareDepartmentsPayload || [],
         attendees: modalCtx.attendees || [],
         reminders: reminderSelect && reminderSelect.value ? [reminderSelect.value] : [],
-        sticker: stickerSelect ? stickerSelect.value : '',
+        sticker: '',
         isImportant: !!modalCtx.important,
+        existingRepeatRule: modalCtx.sourceEvent?.extendedProps?.repeatRule || {},
         color,
       };
       let payload;
@@ -2349,8 +2637,8 @@
       }
     });
 
-  btnDelete?.addEventListener('click', async function () {
-      if (modalCtx.mode !== 'edit' || !modalCtx.eventId) return;
+    btnDelete?.addEventListener('click', async function () {
+      if (!modalCtx.canDelete || !modalCtx.eventId) return;
       const confirmed = await showCalConfirm('선택한 일정을 삭제하시겠습니까?', '일정 삭제');
       if (!confirmed) return;
       try {
@@ -2386,12 +2674,224 @@
       }
     }
 
+    function dateKeyFromDate(dateObj) {
+      if (!dateObj || Number.isNaN(dateObj.getTime())) return '';
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseDateKeyToDate(dateKey) {
+      const parts = String(dateKey || '').split('-').map((part) => parseInt(part, 10));
+      if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return new Date(NaN);
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function addDaysToDateKey(dateKey, days) {
+      const date = parseDateKeyToDate(dateKey);
+      if (Number.isNaN(date.getTime())) return dateKey;
+      date.setDate(date.getDate() + Number(days || 0));
+      return dateKeyFromDate(date);
+    }
+
+    function daysBetweenDateKeys(startKey, endKey) {
+      const startDate = parseDateKeyToDate(startKey);
+      const endDate = parseDateKeyToDate(endKey);
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+      return Math.round((endDate.getTime() - startDate.getTime()) / 86400000);
+    }
+
+    function getCalendarVisibleRange() {
+      try {
+        const view = calendarInstance && calendarInstance.view;
+        const activeStart = view && view.activeStart ? new Date(view.activeStart) : null;
+        const activeEnd = view && view.activeEnd ? new Date(view.activeEnd) : null;
+        if (!activeStart || !activeEnd) return null;
+        const inclusiveEnd = new Date(activeEnd.getTime() - 1);
+        return {
+          startDate: activeStart,
+          endDate: inclusiveEnd,
+          startKey: dateKeyFromDate(activeStart),
+          endKey: dateKeyFromDate(inclusiveEnd),
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function scheduleItemRangeKeys(item) {
+      const startDate = parseDateTimeInput(item?.start_datetime || item?.startDate || item?.start);
+      const endDate = parseDateTimeInput(item?.end_datetime || item?.endDate || item?.end) || startDate;
+      if (!startDate || !endDate) return null;
+      return {
+        startKey: dateKeyFromDate(startDate),
+        endKey: dateKeyFromDate(endDate),
+      };
+    }
+
+    function repeatExceptionSet(rule) {
+      const values = (rule && (rule.exdates || rule.exceptionDates)) || [];
+      return new Set(Array.isArray(values) ? values.map((value) => String(value || '').slice(0, 10)).filter(Boolean) : []);
+    }
+
+    function lastDayOfMonth(year, monthIndex) {
+      return new Date(year, monthIndex + 1, 0).getDate();
+    }
+
+    function clampedMonthDate(baseDate, offsetMonths) {
+      const totalMonth = baseDate.getMonth() + offsetMonths;
+      const year = baseDate.getFullYear() + Math.floor(totalMonth / 12);
+      const month = ((totalMonth % 12) + 12) % 12;
+      const day = Math.min(baseDate.getDate(), lastDayOfMonth(year, month));
+      return new Date(year, month, day);
+    }
+
+    function clampedYearDate(baseDate, offsetYears) {
+      const year = baseDate.getFullYear() + offsetYears;
+      const month = baseDate.getMonth();
+      const day = Math.min(baseDate.getDate(), lastDayOfMonth(year, month));
+      return new Date(year, month, day);
+    }
+
+    function buildOccurrenceScheduleItem(item, occurrenceKey, occurrenceIndex) {
+      const baseStart = parseDateTimeInput(item?.start_datetime);
+      const baseEnd = parseDateTimeInput(item?.end_datetime) || baseStart;
+      const occurrenceDate = parseDateKeyToDate(occurrenceKey);
+      if (!baseStart || !baseEnd || Number.isNaN(occurrenceDate.getTime())) return null;
+      let occurrenceStart;
+      let occurrenceEnd;
+      if (item.is_all_day) {
+        const range = scheduleItemRangeKeys(item);
+        const spanDays = range ? Math.max(1, daysBetweenDateKeys(range.startKey, range.endKey) + 1) : 1;
+        occurrenceStart = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate(), 0, 0, 0, 0);
+        occurrenceEnd = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate() + spanDays - 1, 23, 59, 59, 0);
+      } else {
+        occurrenceStart = new Date(
+          occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate(),
+          baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds(), 0
+        );
+        occurrenceEnd = new Date(occurrenceStart.getTime() + Math.max(baseEnd.getTime() - baseStart.getTime(), HOUR_IN_MS));
+      }
+      return {
+        ...item,
+        start_datetime: toLocalIsoString(occurrenceStart),
+        end_datetime: toLocalIsoString(occurrenceEnd),
+        __repeatInstance: true,
+        __repeatMasterId: item.id,
+        __repeatOccurrenceDate: occurrenceKey,
+        __repeatOccurrenceStart: toLocalIsoString(occurrenceStart),
+        __repeatOccurrenceEnd: toLocalIsoString(occurrenceEnd),
+        __repeatIndex: occurrenceIndex,
+      };
+    }
+
+    function occurrenceOverlapsVisible(item, visible) {
+      const range = scheduleItemRangeKeys(item);
+      if (!range || !visible) return true;
+      return range.startKey <= visible.endKey && range.endKey >= visible.startKey;
+    }
+
+    function shouldStopRepeat(rule, occurrenceKey, producedCount, visibleEndKey) {
+      const endType = repeatRuleEndType(rule);
+      const untilKey = repeatRuleUntil(rule);
+      const count = repeatRuleCount(rule);
+      if (endType === 'until' && untilKey && occurrenceKey > untilKey) return true;
+      if (endType === 'count' && count && producedCount >= count) return true;
+      return endType !== 'count' && !untilKey && occurrenceKey > visibleEndKey;
+    }
+
+    function expandRecurringScheduleItem(item, visible) {
+      const repeatType = normalizeRepeatType(item?.repeat_type || item?.repeatType || 'none');
+      if (repeatType === 'none' || !visible) return [item];
+      const baseRange = scheduleItemRangeKeys(item);
+      if (!baseRange) return [];
+      const baseStart = parseDateKeyToDate(baseRange.startKey);
+      if (Number.isNaN(baseStart.getTime())) return [];
+      const rule = normalizeRepeatRule(item.repeat_rule || item.repeatRule || {});
+      const frequency = repeatRuleFrequency(repeatType, rule);
+      const interval = repeatRuleInterval(rule);
+      const exceptions = repeatExceptionSet(rule);
+      const untilKey = repeatRuleUntil(rule);
+      const loopEndKey = untilKey && untilKey < visible.endKey ? untilKey : visible.endKey;
+      const occurrences = [];
+      let producedCount = 0;
+      let guard = 0;
+
+      function maybeAdd(occurrenceKey) {
+        if (shouldStopRepeat(rule, occurrenceKey, producedCount, visible.endKey)) return false;
+        producedCount += 1;
+        if (!exceptions.has(occurrenceKey)) {
+          const occurrence = buildOccurrenceScheduleItem(item, occurrenceKey, producedCount - 1);
+          if (occurrence && occurrenceOverlapsVisible(occurrence, visible)) {
+            occurrences.push(occurrence);
+          }
+        }
+        return true;
+      }
+
+      if (frequency === 'daily') {
+        const cursor = new Date(baseStart);
+        while (guard++ < 20000) {
+          const occurrenceKey = dateKeyFromDate(cursor);
+          if (!maybeAdd(occurrenceKey)) break;
+          if (repeatRuleEndType(rule) !== 'count' && occurrenceKey > loopEndKey) break;
+          cursor.setDate(cursor.getDate() + interval);
+        }
+        return occurrences;
+      }
+
+      if (frequency === 'weekly') {
+        const ruleDays = Array.isArray(rule.daysOfWeek) ? rule.daysOfWeek : (Array.isArray(rule.days_of_week) ? rule.days_of_week : []);
+        const selectedDays = ruleDays.length
+          ? ruleDays.map((day) => String(day).toUpperCase())
+          : [CAL_REPEAT_WEEKDAYS[baseStart.getDay()]];
+        const cursor = new Date(baseStart);
+        while (guard++ < 20000) {
+          const occurrenceKey = dateKeyFromDate(cursor);
+          const dayDiff = daysBetweenDateKeys(baseRange.startKey, occurrenceKey);
+          const weekOffset = Math.floor(dayDiff / 7);
+          if (dayDiff >= 0 && weekOffset % interval === 0 && selectedDays.includes(CAL_REPEAT_WEEKDAYS[cursor.getDay()])) {
+            if (!maybeAdd(occurrenceKey)) break;
+          }
+          if (repeatRuleEndType(rule) !== 'count' && occurrenceKey > loopEndKey) break;
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        return occurrences;
+      }
+
+      if (frequency === 'monthly' || frequency === 'yearly') {
+        let index = 0;
+        while (guard++ < 20000) {
+          const occurrenceDate = frequency === 'monthly'
+            ? clampedMonthDate(baseStart, index * interval)
+            : clampedYearDate(baseStart, index * interval);
+          const occurrenceKey = dateKeyFromDate(occurrenceDate);
+          if (!maybeAdd(occurrenceKey)) break;
+          if (repeatRuleEndType(rule) !== 'count' && occurrenceKey > loopEndKey) break;
+          index += 1;
+        }
+        return occurrences;
+      }
+
+      return [item];
+    }
+
     async function fetchVisibleSchedules() {
-      const res = await apiGetSchedules({ limit: DEFAULT_FETCH_LIMIT });
+      const visible = getCalendarVisibleRange();
+      const params = { limit: DEFAULT_FETCH_LIMIT };
+      if (visible && visible.startKey && visible.endKey) {
+        params.start = `${visible.startKey}T00:00:00`;
+        params.end = `${visible.endKey}T23:59:59`;
+      }
+      const res = await apiGetSchedules(params);
       if (!res || res.success === false || !Array.isArray(res.items)) {
         return [];
       }
-      return (res.items || []).map(scheduleToEvent).filter(Boolean);
+      return (res.items || [])
+        .reduce((items, item) => items.concat(expandRecurringScheduleItem(item, visible)), [])
+        .map(scheduleToEvent)
+        .filter(Boolean);
     }
 
     function scheduleToEvent(item) {
@@ -2401,9 +2901,12 @@
       const currentId = getCurrentProfileId();
       const ownerId = Number(item.owner_user_id);
       const isOwner = currentId && ownerId && currentId === ownerId;
-      const viewerCanEdit = !!isOwner;
+      const viewerCanEdit = !!(item.viewer_can_edit || isOwner);
+      const viewerCanDelete = !!(item.viewer_can_delete || isOwner);
+      const isRepeatInstance = !!item.__repeatInstance;
+      const eventId = isRepeatInstance ? `${String(item.id)}::${String(item.__repeatOccurrenceDate || '')}` : String(item.id);
       return {
-        id: String(item.id),
+        id: eventId,
         title: item.title,
         start: item.start_datetime,
         end: item.end_datetime,
@@ -2412,9 +2915,9 @@
         allDay: !!item.is_all_day,
         backgroundColor: color,
         borderColor: color,
-        editable: viewerCanEdit,
-        startEditable: viewerCanEdit,
-        durationEditable: viewerCanEdit,
+        editable: viewerCanEdit && !isRepeatInstance,
+        startEditable: viewerCanEdit && !isRepeatInstance,
+        durationEditable: viewerCanEdit && !isRepeatInstance,
         extendedProps: {
           type: item.event_type,
           shareMode,
@@ -2431,13 +2934,22 @@
           ownerUserId: item.owner_user_id || null,
           owner: item.owner || null,
           viewerCanEdit,
-          viewerCanDelete: !!item.viewer_can_delete,
+          viewerCanDelete,
+          scheduleId: item.id,
+          repeatType: normalizeRepeatType(item.repeat_type || item.repeatType || 'none'),
+          repeatRule: normalizeRepeatRule(item.repeat_rule || item.repeatRule || {}),
+          repeatInstance: isRepeatInstance,
+          repeatMasterId: item.__repeatMasterId || item.id,
+          repeatOccurrenceDate: item.__repeatOccurrenceDate || '',
+          repeatOccurrenceStart: item.__repeatOccurrenceStart || '',
+          repeatOccurrenceEnd: item.__repeatOccurrenceEnd || '',
         },
       };
     }
 
     async function hydrateEventForModal(fcEvent) {
-      if (!fcEvent || !fcEvent.id) return fcEvent;
+      const scheduleId = getScheduleIdFromEvent(fcEvent);
+      if (!fcEvent || !scheduleId) return fcEvent;
       const existingOwner = fcEvent.extendedProps?.owner;
       const existingImage = existingOwner && (existingOwner.profile_image || existingOwner.profileImage)
         ? String(existingOwner.profile_image || existingOwner.profileImage).trim()
@@ -2446,7 +2958,7 @@
         return fcEvent;
       }
       try {
-        const res = await apiGetSchedule(fcEvent.id);
+        const res = await apiGetSchedule(scheduleId);
         const item = res && res.item;
         const hydrated = scheduleToEvent(item);
         return hydrated || fcEvent;
@@ -2459,8 +2971,9 @@
       if (!info || !info.event) return;
       try {
         setCalendarBusy(true);
+        const scheduleId = getScheduleIdFromEvent(info.event);
         const payload = buildPayloadFromCalendarEvent(info.event);
-        await apiUpdateSchedule(info.event.id, payload);
+        await apiUpdateSchedule(scheduleId, payload);
         await refreshCalendarEvents();
       } catch (err) {
         console.error('Failed to update schedule', err);
@@ -2530,6 +3043,8 @@
         sticker: overrides?.sticker ?? fcEvent.extendedProps?.sticker ?? '',
         is_important: !!(overrides?.isImportant ?? fcEvent.extendedProps?.isImportant),
         color_code: overrides?.color || fcEvent.backgroundColor || null,
+        repeat_type: overrides?.repeatType || fcEvent.extendedProps?.repeatType || 'none',
+        repeat_rule: overrides?.repeatRule || fcEvent.extendedProps?.repeatRule || {},
       };
     }
 
@@ -2559,6 +3074,7 @@
         throw new Error('시작/종료 시간을 확인할 수 없습니다.');
       }
       const shareScope = shareModeToScope(options.shareMode);
+      const repeatPayload = buildRepeatPayloadFromForm(options.startTimeValue, options.existingRepeatRule || {});
       return {
         title: options.title,
         start_datetime: range.start,
@@ -2575,6 +3091,8 @@
         sticker: options.sticker || '',
         is_important: !!options.isImportant,
         color_code: options.color || null,
+        repeat_type: repeatPayload.repeat_type,
+        repeat_rule: repeatPayload.repeat_rule,
       };
     }
 

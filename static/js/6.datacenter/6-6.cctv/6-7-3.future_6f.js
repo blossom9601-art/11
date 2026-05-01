@@ -1,32 +1,9 @@
 
 // RACK 관리 - 퓨처센터(5층): 데이터셋, 렌더, 정렬/검색/페이징, CSV 내보내기
 (function() {
-	const NUM_ROWS = 52;
 	const numericKeys = new Set(['height_u','device_count']);
 	const state = { data: [], filtered: [], page: 1, pageSize: 10, sortKey: 'rack_name', sortDir: 'asc', search: '' };
 	const selected = new Set();
-
-	function sampleData() {
-		const statuses = ['운영','대기','점검','장애'];
-		// 할당 상면 샘플 (A~F열 + 01~20번)
-		const vendors = ['Dell','HPE','IBM','Cisco','Lenovo'];
-		const models = ['42U','45U','48U','NetShelter','Rack-Std'];
-		const rows = ['A','B','C','D','E','F'];
-		const arr = [];
-		for (let i = 1; i <= NUM_ROWS; i++) {
-			arr.push({
-				rack_name: `FC5F-R${String(i).padStart(2,'0')}`,
-				rack_business: `${rows[(i-1) % rows.length]}열-${String(((i-1) % 20) + 1).padStart(2,'0')}번`,
-				rack_vendor: vendors[i % vendors.length],
-				rack_model: models[i % models.length],
-				status: statuses[i % statuses.length],
-				height_u: [42,45,48][i % 3],
-				device_count: (i * 3) % 40 + 1,
-				power_panel: `PP-${(i % 6) + 1}`
-			});
-		}
-		return arr;
-	}
 
 	function cmp(a, b, key, dir) {
 		let av = a[key];
@@ -313,8 +290,8 @@
 	}
 
 	function init() {
-		state.data = sampleData();
-		state.filtered = state.data.slice();
+		state.data = [];
+		state.filtered = [];
 		applySort();
 		const input = document.getElementById('physical-search');
 		const clearBtn = document.getElementById('physical-search-clear');

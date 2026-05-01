@@ -116,8 +116,276 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-/* Reveal page: all DOM content is parsed before this script, so show immediately */
-try { document.body.classList.add('bls-ready'); } catch(_e){}
+/* Global render gate: skeleton first, finished UI only after DOM/CSS/API idle. */
+(function initBlossomReadyGate(){
+    if (window.BlossomReady && window.BlossomReady.version) return;
+
+    var root = document.documentElement;
+    var state = {
+        isLoading: true,
+        isReady: false,
+        pending: {},
+        sequence: 0,
+        initialRevealStarted: false
+    };
+    var SETTLE_MS = 90;
+    var INITIAL_TIMEOUT_MS = 6500;
+    var IDLE_TIMEOUT_MS = 3500;
+
+    function emit(name, detail) {
+        try { document.dispatchEvent(new CustomEvent(name, { detail: detail || {} })); } catch (_e) {}
+    }
+
+    function pendingCount() {
+        var count = 0;
+        for (var key in state.pending) {
+            if (Object.prototype.hasOwnProperty.call(state.pending, key)) count++;
+        }
+        return count;
+    }
+
+    function applyState(reason) {
+        try {
+            root.setAttribute('data-bls-loading', state.isLoading ? 'true' : 'false');
+            root.setAttribute('data-bls-ready', state.isReady ? 'true' : 'false');
+            root.classList.toggle('spa-loading', !!state.isLoading && !state.isReady);
+        } catch (_e) {}
+        try {
+            if (document.body) {
+                document.body.classList.toggle('bls-loading', !!state.isLoading);
+                document.body.classList.toggle('bls-ready', !!state.isReady);
+            }
+        } catch (_e2) {}
+        emit('blossom:loading', {
+            isLoading: state.isLoading,
+            isReady: state.isReady,
+            pending: pendingCount(),
+            reason: reason || ''
+        });
+    }
+
+    function skeletonMarkup() {
+        return '<div class="spa-skeleton-bar" style="width:60%"></div>'
+            + '<div class="spa-skeleton-bar" style="width:90%"></div>'
+            + '<div class="spa-skeleton-bar" style="width:75%"></div>'
+            + '<div class="spa-skeleton-bar" style="width:85%"></div>'
+            + '<div class="spa-skeleton-bar short" style="width:40%"></div>';
+    }
+
+    function markMounting(target) {
+        if (!target || !target.setAttribute) return target;
+        try {
+            target.setAttribute('data-bls-mounting', 'true');
+            target.setAttribute('aria-busy', 'true');
+            if (!target.querySelector(':scope > .bls-mount-skeleton')) {
+                var skeleton = document.createElement('div');
+                skeleton.className = 'bls-mount-skeleton';
+                skeleton.setAttribute('aria-hidden', 'true');
+                skeleton.innerHTML = skeletonMarkup();
+                target.appendChild(skeleton);
+            }
+        } catch (_e) {}
+        return target;
+    }
+
+    function clearMounting(scope) {
+        try {
+            var rootNode = scope && scope.querySelectorAll ? scope : document;
+            var mountingNodes = rootNode.querySelectorAll('[data-bls-mounting="true"]');
+            for (var index = 0; index < mountingNodes.length; index++) {
+                var node = mountingNodes[index];
+                var skeletons = node.querySelectorAll(':scope > .bls-mount-skeleton');
+                for (var skeletonIndex = 0; skeletonIndex < skeletons.length; skeletonIndex++) {
+                    try { skeletons[skeletonIndex].remove(); } catch (_removeError) {}
+                }
+                node.removeAttribute('data-bls-mounting');
+                if (node.getAttribute('aria-busy') === 'true') node.setAttribute('aria-busy', 'false');
+            }
+        } catch (_e) {}
+        try {
+            var bootMain = document.querySelector('main.main-content[data-spa-boot]');
+            if (bootMain) bootMain.removeAttribute('data-spa-boot');
+        } catch (_e2) {}
+    }
+
+    function whenDomReady() {
+        if (document.readyState !== 'loading') return Promise.resolve(true);
+        return new Promise(function (resolve) {
+            document.addEventListener('DOMContentLoaded', function () { resolve(true); }, { once: true });
+        });
+    }
+
+    function waitForFonts() {
+        try {
+            if (document.fonts && document.fonts.ready) {
+                return Promise.race([
+                    document.fonts.ready.then(function () { return true; }),
+                    new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 900); })
+                ]);
+            }
+        } catch (_e) {}
+        return Promise.resolve(true);
+    }
+
+    function waitForStyles() {
+        var links = [];
+        try {
+            links = Array.prototype.slice.call(document.querySelectorAll('link[rel="stylesheet"][href]'));
+        } catch (_e) {
+            links = [];
+        }
+        if (!links.length) return Promise.resolve(true);
+        var waits = links.map(function (link) {
+            try {
+                if (link.sheet) return Promise.resolve(true);
+            } catch (_sheetError) {
+                return Promise.resolve(true);
+            }
+            return new Promise(function (resolve) {
+                var resolved = false;
+                function done() {
+                    if (resolved) return;
+                    resolved = true;
+                    resolve(true);
+                }
+                try {
+                    link.addEventListener('load', done, { once: true });
+                    link.addEventListener('error', done, { once: true });
+                } catch (_eventError) {
+                    done();
+                }
+                setTimeout(done, 1200);
+            });
+        });
+        return Promise.all(waits).then(function () { return true; });
+    }
+
+    function waitForPending(timeoutMs) {
+        var timeout = typeof timeoutMs === 'number' ? timeoutMs : IDLE_TIMEOUT_MS;
+        return new Promise(function (resolve) {
+            var finished = false;
+            var startedAt = Date.now();
+            function check() {
+                if (finished) return;
+                if (pendingCount() === 0) {
+                    finished = true;
+                    setTimeout(function () { resolve(true); }, SETTLE_MS);
+                    return;
+                }
+                if (Date.now() - startedAt >= timeout) {
+                    finished = true;
+                    resolve(false);
+                    return;
+                }
+                setTimeout(check, 50);
+            }
+            check();
+        });
+    }
+
+    function waitForReady(timeoutMs) {
+        return Promise.all([whenDomReady(), waitForStyles(), waitForFonts()]).then(function () {
+            return waitForPending(timeoutMs);
+        });
+    }
+
+    function register(name, promise) {
+        var token = String(++state.sequence) + ':' + (name || 'task');
+        state.pending[token] = true;
+        state.isLoading = true;
+        applyState('register:' + (name || 'task'));
+        Promise.resolve(promise).then(function () {
+            delete state.pending[token];
+            applyState('resolve:' + (name || 'task'));
+        }, function () {
+            delete state.pending[token];
+            applyState('reject:' + (name || 'task'));
+        });
+        return promise;
+    }
+
+    function startLoading(name, target) {
+        state.isLoading = true;
+        if (target) markMounting(target);
+        applyState('start:' + (name || 'loading'));
+    }
+
+    function finishLoading(name, target) {
+        return waitForReady(IDLE_TIMEOUT_MS).then(function () {
+            clearMounting(target || document);
+            state.isLoading = false;
+            state.isReady = true;
+            applyState('finish:' + (name || 'loading'));
+            emit('blossom:ready', { reason: name || 'loading', isReady: true, isLoading: false });
+            return true;
+        });
+    }
+
+    function revealInitial(reason) {
+        if (state.initialRevealStarted) return;
+        state.initialRevealStarted = true;
+        waitForReady(INITIAL_TIMEOUT_MS).then(function () {
+            clearMounting(document);
+            state.isLoading = false;
+            state.isReady = true;
+            applyState(reason || 'initial');
+            emit('blossom:ready', { reason: reason || 'initial', isReady: true, isLoading: false });
+        });
+    }
+
+    try {
+        if (typeof window.fetch === 'function' && !window.fetch.__blossomReadyWrapped) {
+            var originalFetch = window.fetch;
+            var wrappedFetch = function () {
+                var fetchPromise = originalFetch.apply(this, arguments);
+                try {
+                    if (!state.isReady || state.isLoading) {
+                        register('fetch', fetchPromise.then(function () { return true; }, function () { return false; }));
+                    }
+                } catch (_e) {}
+                return fetchPromise;
+            };
+            wrappedFetch.__blossomReadyWrapped = true;
+            window.fetch = wrappedFetch;
+        }
+    } catch (_wrapError) {}
+
+    window.BlossomReady = {
+        version: '20260501-fouc1',
+        state: state,
+        isLoading: function () { return !!state.isLoading; },
+        isReady: function () { return !!state.isReady; },
+        register: register,
+        waitForReady: waitForReady,
+        startLoading: startLoading,
+        finishLoading: finishLoading,
+        markMounting: markMounting,
+        clearMounting: clearMounting,
+        revealInitial: revealInitial
+    };
+
+    applyState('boot');
+
+    document.addEventListener('blossom:pageLoaded', function () {
+        if (state.isReady) {
+            startLoading('pageLoaded');
+            finishLoading('pageLoaded');
+        } else {
+            revealInitial('pageLoaded');
+        }
+    });
+
+    whenDomReady().then(function () {
+        var bootMain = document.querySelector('main.main-content[data-spa-boot]');
+        if (!bootMain) {
+            var mainContent = document.querySelector('main.main-content');
+            if (mainContent) markMounting(mainContent);
+            revealInitial('dom-ready');
+        }
+    });
+
+    setTimeout(function () { revealInitial('timeout'); }, INITIAL_TIMEOUT_MS);
+})();
 
 // SPA 전환 후 설정 탭(버전관리/페이지관리) 재초기화 강제 훅
 document.addEventListener('blossom:pageLoaded', function () {
@@ -4244,6 +4512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (_e) {}
 
+        try { if (window.BlossomReady) window.BlossomReady.markMounting(newMain); } catch (_readyError) {}
         currentMain.replaceWith(newMain);
 
         // 사이드바 상태 복원
@@ -4411,6 +4680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function __spaNavigate(href) {
+        try { if (window.BlossomReady) window.BlossomReady.startLoading('spa:navigate'); } catch (_readyError) {}
         // 즉시 active 반영 + progress bar
         try { __spaSetActiveLink(href); } catch (_e) {}
         // 캐시 히트 시 스켈레톤 표시 생략 → 즉시 교체 (체감 속도 대폭 개선)
@@ -4506,6 +4776,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 가로 탭(온프레미스/클라우드/프레임 등) 클릭 시 .tab-content 영역만 교체.
     // page-header, system-tabs 탭 바는 유지하여 최소 렌더링으로 체감 속도 개선.
     function __spaTabNavigate(href, clickedTab) {
+        try { if (window.BlossomReady) window.BlossomReady.startLoading('spa:tab'); } catch (_readyError) {}
         var nextKey = '';
         try {
             var nextUrl = new URL(href, location.origin);
@@ -4576,6 +4847,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.documentElement.classList.remove('spa-loading');
                 });
             } else {
+                try { if (window.BlossomReady) window.BlossomReady.markMounting(newTabContent); } catch (_readyError) {}
                 currentTabContent.replaceWith(newTabContent);
                 newTabContent.classList.add('spa-fade-in');
                 newTabContent.addEventListener('animationend', function () {
@@ -4709,6 +4981,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // .server-detail-content 영역만 교체하여 뒤로가기·제목·탭바를 유지 — 부드러운 전환.
     // 프로젝트 탭(tab81-90)은 자체 SPA(setupProjectSPA)가 있으므로 제외.
     function __spaDetailTabNavigate(href, clickedTab) {
+        try { if (window.BlossomReady) window.BlossomReady.startLoading('spa:detail-tab'); } catch (_readyError) {}
         // 1. 즉시 active 탭 전환 (시각 피드백)
         var tabBar = clickedTab ? clickedTab.closest('.server-detail-tabs') : null;
         if (tabBar) {
@@ -4748,6 +5021,7 @@ document.addEventListener('DOMContentLoaded', () => {
             var newContent = doc.querySelector('.server-detail-content');
             var currentContent = document.querySelector('.server-detail-content');
             if (newContent && currentContent) {
+                try { if (window.BlossomReady) window.BlossomReady.markMounting(newContent); } catch (_readyError) {}
                 currentContent.replaceWith(newContent);
                 newContent.classList.add('spa-fade-in');
                 newContent.addEventListener('animationend', function () {
@@ -5337,6 +5611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 existingMains.forEach((m,i)=>{ if(i>0){ try { m.parentElement.removeChild(m); } catch(_e){} } });
                 const currentMain = existingMains[0] || document.querySelector('main.main-content');
                 if(!currentMain) throw new Error('current main missing');
+                try { if (window.BlossomReady) window.BlossomReady.markMounting(newMain); } catch (_readyError) {}
                 currentMain.replaceWith(newMain);
                 // FOUC 방지: _header.html의 .main-content{opacity:0} 규칙 상쇄
                 newMain.style.opacity = '1';
@@ -5510,6 +5785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const existingMains = Array.from(document.querySelectorAll('main.main-content'));
                             existingMains.forEach((m,i)=>{ if(i>0){ try { m.parentElement.removeChild(m); } catch(_e){} } });
                             const currentMain = existingMains[0] || document.querySelector('main.main-content');
+                            try { if (window.BlossomReady) window.BlossomReady.markMounting(newMain); } catch (_readyError) {}
                             if(currentMain){ currentMain.replaceWith(newMain); }
                             restoreSidebarStateOnMain(newMain);
                             const nestedMains = newMain.querySelectorAll('main.main-content');
@@ -5517,6 +5793,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             finalizeStickerAfterSwap(newMain);
                             try { dedupeInfoWidgets('swap'); scheduleInfoDedup(); } catch(_e){}
                             history.pushState({spa:true, href:action}, '', action);
+                            try { document.dispatchEvent(new CustomEvent('blossom:pageLoaded', { detail: { href: action, title: document.title, timestamp: Date.now() } })); } catch(_eventError){}
                             try { updateActiveMenuAfterSwap(); } catch(_e){}
                             setTimeout(()=>{ try { dedupeInfoWidgets('final'); } catch(_e){} }, 100);
                             setTimeout(()=>{ try { dedupeInfoWidgets('final'); } catch(_e){} }, 800);
@@ -5682,6 +5959,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setBusy(busy) {
         try {
+            if (window.BlossomReady) {
+                if (busy) window.BlossomReady.startLoading('cost-tabs');
+                else window.BlossomReady.finishLoading('cost-tabs');
+            }
+        } catch (_readyError) {}
+        try {
             const main = document.querySelector('main.main-content');
             if (main) main.setAttribute('aria-busy', busy ? 'true' : 'false');
         } catch (_e) {}
@@ -5817,6 +6100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const curMain = document.querySelector('main.main-content');
         const nextMain = nextDoc ? nextDoc.querySelector('main.main-content') : null;
         if (!curMain || !nextMain) throw new Error('main-content missing');
+        try { if (window.BlossomReady) window.BlossomReady.markMounting(nextMain); } catch (_readyError) {}
         curMain.replaceWith(nextMain);
 
         // 사이드바 상태 복원 (SPA 교체 시 클래스 유실 방지)

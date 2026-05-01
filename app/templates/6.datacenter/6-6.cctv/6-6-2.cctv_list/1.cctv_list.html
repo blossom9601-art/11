@@ -8,8 +8,9 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/detail6.css?v=1.4">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -123,9 +124,9 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260413_dc_tab_silent"></script>
-    <script src="/static/js/common/page_tab_renderer.js?v=1.0.0"></script>
-    <script src="/static/js/6.datacenter/6-6.cctv/6-6-2.cctv_list/1.cctv_list.js"></script>
+        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
+    <script src="/static/js/6.datacenter/6-6.cctv/6-6-2.cctv_list/1.cctv_list.js?v=1.03"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -137,12 +138,12 @@
                     </button>
                 </div>
                 <div class="server-add-body">
-                    <form id="system-add-form">
+                    <form id="system-add-form" data-fk-ignore="1">
                         <!-- 비즈니스 -->
                         <div class="form-section">
                             <div class="section-header"><h4>비즈니스</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>업무 상태 <span class="required">*</span></label><input name="business_status" class="form-input search-select" placeholder="검색 선택" data-search-source="businessStatus" required></div>
+                                <div class="form-row"><label>업무 상태 <span class="required">*</span></label><input name="business_status" class="form-input search-select" placeholder="업무 상태 검색" data-placeholder="업무 상태 검색" data-search-source="dcAssetBusinessStatus" data-searchable="true" required></div>
                                 <div class="form-row"><label>업무 이름</label><input name="business_name" class="form-input" placeholder="입력"></div>
                             </div>
                         </div>
@@ -182,7 +183,7 @@
                     <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                 </div>
                 <div class="server-edit-body">
-                    <form id="system-edit-form"><!-- 동적 채움 --></form>
+                    <form id="system-edit-form" data-fk-ignore="1"><!-- 동적 채움 --></form>
                 </div>
                 <div class="server-edit-actions align-right">
                     <div class="action-buttons right"><button type="button" class="btn-primary" id="system-edit-save">저장</button></div>

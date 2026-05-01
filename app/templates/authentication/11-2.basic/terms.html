@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/admin.css">
     <script defer src="/static/js/blossom.js"></script>
 </head>
@@ -30,6 +30,7 @@
             {% endif %}
             {% endwith %}
             <form action="/terms" method="post" class="terms-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="terms-content">
                 <h2>약   관</h2>
                 <div class="terms-scroll" role="region" aria-label="약관 내용" tabindex="0">

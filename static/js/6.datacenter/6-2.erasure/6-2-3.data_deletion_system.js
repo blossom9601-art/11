@@ -1,38 +1,11 @@
-// 데이터 삭제 관리 - 데이터 삭제 시스템: 50개 샘플, 렌더/정렬/검색/페이징/CSV
+// 데이터 삭제 관리 - 데이터 삭제 시스템: 렌더/정렬/검색/페이징/CSV
 (function() {
   const LS_KEY_SYSTEMS = 'ERASURE_SYSTEMS';
-  const NUM_ROWS = 50;
   const state = { data: [], filtered: [], page: 1, pageSize: 10, sortKey: 'sys_vendor', sortDir: 'asc', search: '' };
   const selected = new Set(); // key: sys_serial
   let actionsBound = false;
   let initialized = false;
   let editingSerial = null; // null => add, otherwise edit target
-
-  function rand(arr, i) { return arr[i % arr.length]; }
-  function pad(n, w=2){ return String(n).padStart(w,'0'); }
-  function makeSerial(i) { const base=(70000000 + i*157)%99999999; return 'SYS' + String(base).padStart(8,'0'); }
-
-  function sampleData(){
-    const vendors=['Samsung','Seagate','Western Digital','Hitachi','Toshiba','Dell','HPE','Lenovo'];
-    const models=['R730','R740','ProLiant DL380','ThinkSystem SR650','PowerEdge T640','Ultrastar 12G','PM9A3','X300'];
-    const sites=['본사 IDC','판교 IDC','강남 센터','용인 센터'];
-    const locations=['1층 A열','1층 B열','2층 C열','2층 D열','3층 E열'];
-    const depts=['인프라운영팀','보안운영팀','데이터관리팀','서비스운영팀'];
-    const owners=['김민수','박지민','이도윤','최예린','정우진','한서연','오승민','유다은'];
-    const arr=[];
-    for(let i=0;i<NUM_ROWS;i++){
-      arr.push({
-        sys_vendor: rand(vendors, i+1),
-        sys_model: rand(models, i+2),
-        sys_serial: makeSerial(i+1),
-        sys_site: rand(sites, i+3),
-        sys_location: rand(locations, i+4),
-        sys_dept: rand(depts, i+5),
-        sys_owner: rand(owners, i+6),
-      });
-    }
-    return arr;
-  }
 
   function loadData(){
     try {
@@ -184,7 +157,7 @@
     if (initialized) { render(); return; }
     initialized = true;
     const persisted = loadData();
-    state.data = persisted || sampleData();
+    state.data = persisted || [];
     if (!persisted) saveData(state.data);
     state.filtered=state.data.slice(); applySort();
     const input=document.getElementById('physical-search'); const clearBtn=document.getElementById('physical-search-clear');

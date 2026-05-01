@@ -1,7 +1,21 @@
-<!-- FOUC 방지: 외부 CSS/JS 로드 전에 main-content 숨김 → DOMContentLoaded 시 fade-in -->
-<style>.main-content{opacity:0;transition:opacity .18s ease}</style>
-<script>(function(){function r(){var m=document.querySelector('.main-content');if(m)m.style.opacity='1'}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',r)}else{r()}setTimeout(r,3000)})()</script>
-<noscript><style>.main-content{opacity:1!important}</style></noscript>
+<!-- Critical shell CSS: 외부 CSS가 늦어도 헤더/사이드바/스켈레톤 레이아웃을 먼저 고정 -->
+<style id="bls-critical-shell-css">
+html,body{margin:0;min-height:100%;background:#f9fafb;}
+.main-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #e5e7eb;box-sizing:border-box;}
+.header-left,.header-right,.header-center,.header-search-form{display:flex;align-items:center;}
+.header-left{gap:12px;}.header-right{gap:8px;}.header-center{flex:1;justify-content:center;padding:0 18px;}.header-search-form{width:min(100%,560px);gap:8px;}
+.header-logo{height:40px;}.system-title{margin:0;font-size:1.5rem;font-weight:700;color:#374151;}.system-subtitle{display:none;}
+.header-search-input{width:100%;height:40px;border:1px solid #d1d5db;border-radius:12px;padding:0 14px;box-sizing:border-box;background:#fff;color:#111827;}
+.header-btn{position:relative;border:0;background:transparent;border-radius:8px;padding:8px;color:#4b5563;cursor:pointer;}
+.header-icon{width:20px;height:20px;display:block;}.header-avatar-icon{width:28px;height:28px;border-radius:50%;object-fit:cover;display:block;}
+.sidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #f1f5f9;z-index:200;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;}
+.sidebar-menu{padding:80px 0 16px;box-sizing:border-box;}.menu-list{list-style:none;margin:0;padding:0;}.menu-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#64748b;text-decoration:none;font-size:.85rem;font-weight:500;box-sizing:border-box;}.submenu{list-style:none;margin:0;padding:0;max-height:0;overflow:hidden;background:#f8fafc;}.menu-item.open .submenu{max-height:1000px;}.submenu-link{display:block;padding:8px 20px 8px 52px;color:#64748b;text-decoration:none;font-size:.8rem;}
+.menu-icon{width:18px;height:18px;flex-shrink:0;}.submenu-arrow{width:14px;height:14px;margin-left:auto;flex-shrink:0;}.bls-inline-icon{display:inline-block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:currentColor;filter:none!important;}
+.main-content{margin-left:260px;height:calc(100vh - 64px);padding:0 24px;background:#f9fafb;box-sizing:border-box;overflow:auto;position:relative;min-height:360px;}
+.spa-skeleton{padding:32px 24px;display:flex;flex-direction:column;gap:18px;min-height:300px;box-sizing:border-box;}.spa-skeleton-bar{height:18px;border-radius:6px;background:#eef2f7;}.spa-skeleton-bar.short{height:14px;}
+body:not(.bls-ready) main.main-content:not([data-spa-boot])>:not(.spa-skeleton):not(.bls-mount-skeleton),[data-bls-mounting="true"]>:not(.bls-mount-skeleton){visibility:hidden!important;}
+</style>
+<noscript><style>body main.main-content>*{visibility:visible!important}</style></noscript>
 
 <!-- 공통 디자인 토큰 & 컴포넌트 -->
 <link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
@@ -39,20 +53,20 @@
   </div>
 	<div class="header-right">
 		<button class="header-btn" id="btn-sidebar" title="메뉴">
-			<img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
+      <img src="/static/image/svg/header/free-icon-burger.svg" alt="메뉴" class="header-icon">
 		</button>
 		<button class="header-btn" id="btn-work-timeline" title="작업 타임라인" type="button" data-href="{{ url_for('main.addon_work_timeline') }}">
-			<img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
+      <img src="/static/image/svg/free-icon-font-paint-roller.svg" alt="작업 타임라인" class="header-icon">
 		</button>
 		<a class="header-btn" id="btn-notifications" title="알림" href="{{ url_for('main.addon_notifications') }}">
-			<img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
+      <img src="/static/image/svg/header/free-icon-bell.svg" alt="알림" class="header-icon">
 			<span class="header-badge" id="noti-badge"></span>
 		</a>
 		<a class="header-btn" id="btn-chat" title="채팅" href="{{ url_for('main.addon_chat') }}">
-			<img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
+      <img src="/static/image/svg/header/free-icon-chat.svg" alt="채팅" class="header-icon">
 		</a>
 		<a class="header-btn" id="btn-calendar" title="달력" href="{{ url_for('main.addon_calendar') }}">
-			<img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
+      <img src="/static/image/svg/header/free-icon-calendar.svg" alt="달력" class="header-icon">
 		</a>
 		<button class="header-btn" id="btn-account" title="계정" type="button" data-emp-no="{{ current_user_emp_no or '' }}">
 			<img src="{{ current_profile_image or '/static/image/svg/profil/free-icon-bussiness-man.svg' }}" alt="{{ current_user_name or '계정' }}" class="header-avatar-icon" loading="lazy" data-debug-avatar="{{ current_profile_image }}">
@@ -94,8 +108,14 @@
       })
       .catch(function(){});
   }
-  check();
-  setInterval(check, POLL_MS);
+  function start(){
+    if (btn.__blsChatPollStarted) return;
+    btn.__blsChatPollStarted = true;
+    check();
+    setInterval(check, POLL_MS);
+  }
+  if (document.body && document.body.classList.contains('bls-ready')) start();
+  else document.addEventListener('blossom:ready', start, { once: true });
 })();
 </script>
 
@@ -119,8 +139,14 @@
       })
       .catch(function(){ badge.classList.remove('show'); badge.textContent = ''; });
   }
-  check();
-  setInterval(check, POLL_MS);
+  function start(){
+    if (badge.__blsNotiPollStarted) return;
+    badge.__blsNotiPollStarted = true;
+    check();
+    setInterval(check, POLL_MS);
+  }
+  if (document.body && document.body.classList.contains('bls-ready')) start();
+  else document.addEventListener('blossom:ready', start, { once: true });
 })();
 </script>
 

@@ -454,7 +454,6 @@
     const REGISTER_DROPZONE_ID = 'register-dropzone';
     const REGISTER_META_ID = 'register-meta';
     const REGISTER_FILE_CHIP_ID = 'register-file-chip';
-    const REGISTER_SAMPLE_BTN_ID = 'register-sample-download';
     const REGISTER_RESULTS_ID = 'register-results';
     const REGISTER_EMPTY_ID = 'register-empty';
     const REGISTER_OK_ID = 'system-register-ok';
@@ -590,7 +589,7 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
         apiAvailable: false,
@@ -628,31 +627,12 @@
         if(hEl){ hEl.value = (CRITERIA.humidMax==null? '': String(CRITERIA.humidMax)); }
     }
 
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
-
-    // 온/습도 기록 페이지: 샘플 데이터 5개 제공
-    function mockData(count=5){
-        // Use older dates to avoid accidental duplicate conflicts during first-use demos
-        const rows = [
-            { id:1, date:'2025-09-01', place:'퓨처센터(5층) Lab1', temp_max: '27.3', temp_avg:'24.8', humid_max:'61', humid_avg:'55', result:'적정', note:'' },
-            { id:2, date:'2025-09-01', place:'퓨처센터(6층) Lab2', temp_max: '28.1', temp_avg:'25.2', humid_max:'65', humid_avg:'57', result:'주의', note:'온도 상향' },
-            { id:3, date:'2025-09-01', place:'을지트윈타워(15층) Lab3', temp_max: '26.0', temp_avg:'23.9', humid_max:'58', humid_avg:'52', result:'적정', note:'' },
-            { id:4, date:'2025-09-01', place:'재해복구센터(4층) Lab4', temp_max: '29.4', temp_avg:'26.7', humid_max:'68', humid_avg:'60', result:'경고', note:'습도 상향' },
-            { id:5, date:'2025-09-02', place:'퓨처센터(5층) Lab1', temp_max: '27.9', temp_avg:'25.1', humid_max:'63', humid_avg:'56', result:'적정', note:'' }
-        ];
-        return rows.slice(0, Math.max(0, count|0));
-    }
-
     async function initData(){
-        // API 우선 로드, 실패 시 mock 데이터로 fallback
         try{
             const res = await apiListThermoLogs();
             const items = res?.items;
             if(Array.isArray(items)){
                 state.data = items;
-                // fallback용 nextId 계산
                 const maxId = items.reduce((m, r)=>{
                     const n = parseInt(r?.id, 10);
                     return Number.isFinite(n) ? Math.max(m, n) : m;
@@ -666,8 +646,8 @@
             // ignore
         }
         state.apiAvailable = false;
-        state.data = mockData(5);
-        state.nextId = state.data.length + 1;
+        state.data = [];
+        state.nextId = 1;
         applyFilter();
     }
 
@@ -859,9 +839,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -1859,7 +1838,6 @@
             const chip = document.getElementById(REGISTER_FILE_CHIP_ID);
             const container = document.getElementById(REGISTER_RESULTS_ID);
             const empty = document.getElementById(REGISTER_EMPTY_ID);
-            const sampleBtn = document.getElementById(REGISTER_SAMPLE_BTN_ID);
             const dlBtn = document.getElementById('register-results-download');
             // single-file lock state within add modal lifecycle
             let registerFileLocked = false;
@@ -1907,7 +1885,7 @@
                         const header = rows[0].map(h=> String(h).trim());
                         const expected = ['측정 일시','업무 이름','구분','값','비고'];
                         const looksExpected = expected.every((h,i)=> header[i]===h);
-                        if(!looksExpected && header.length < 4){ showMessage('알 수 없는 양식입니다. 샘플 파일을 참고해 주세요.', '업로드 오류'); return; }
+                        if(!looksExpected && header.length < 4){ showMessage('알 수 없는 양식입니다. 헤더 열을 확인해 주세요.', '업로드 오류'); return; }
                         const recs = [];
                         function excelSerialToDate(n){
                             // Excel serial number (days since 1899-12-30), includes fractional day for time.
@@ -2293,25 +2271,6 @@
 
             dlBtn?.addEventListener('click', downloadCurrentAnalysis);
 
-            // 샘플 다운로드
-            sampleBtn?.addEventListener('click', async ()=>{
-                try{ await ensureXLSX(); }catch(_e){ showMessage('샘플 생성을 위한 라이브러리를 불러오지 못했습니다.', '오류'); return; }
-                const XLSX = window.XLSX;
-                const headers = ['측정 일시','업무 이름','구분','값','비고'];
-                const data = [
-                    headers,
-                    ['2025-10-06 00:00','온습도1','온도','22.1','℃'],
-                    ['2025-10-06 00:00','온습도1','습도','45.2','%'],
-                    ['2025-10-06 00:20','온습도1','온도','22.1','℃'],
-                    ['2025-10-06 00:20','온습도1','습도','45.2','%']
-                ];
-                const ws = XLSX.utils.aoa_to_sheet(data);
-                ws['!cols'] = [ {wch:20},{wch:12},{wch:8},{wch:8},{wch:6} ];
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, '샘플');
-                XLSX.writeFile(wb, 'thermo_result_sample.xlsx');
-            });
-
             // no dedicated OK button in single-flow; values are saved via the main 저장/등록 버튼
         })();
         // upload modal
@@ -2634,21 +2593,6 @@
     // (조건 필터 관련 함수 제거됨)
 
     function init(){
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
         loadColumnSelection();
         // Load persisted page size (allowed values only)
         try {

@@ -744,27 +744,11 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
     columnFilters: {} // { col: value | [values...] } (조건 필터 기능 제거 예정 - 빈 유지)
     };
-
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
-
-    // 데이터 삭제 시스템: 샘플 데이터 5개 제공
-    function mockData(count=5){
-        const rows = [
-            { id:1, business_status:'가동', business_name:'주문 처리', system_name:'order-api-01', system_ip:'10.0.10.21', manage_ip:'10.0.200.21', vendor:'Dell', model:'PowerEdge R650', serial:'DELL-1A2B3C', place:'서울1센터', location:'R1-C03-U12', system_owner_dept:'인프라팀', system_owner:'홍길동', service_owner_dept:'플랫폼팀', service_owner:'김영수' },
-            { id:2, business_status:'유휴', business_name:'데이터 마트', system_name:'dwh-node-02', system_ip:'10.0.20.52', manage_ip:'10.0.220.52', vendor:'HPE', model:'DL380 Gen10', serial:'HPE-9Z88XY', place:'서울1센터', location:'R2-C10-U20', system_owner_dept:'인프라팀', system_owner:'이영희', service_owner_dept:'데이터팀', service_owner:'박민수' },
-            { id:3, business_status:'대기', business_name:'결제 백오피스', system_name:'pay-mgmt-01', system_ip:'10.0.30.11', manage_ip:'10.0.230.11', vendor:'Lenovo', model:'SR650', serial:'LEN-7777AA', place:'판교센터', location:'R3-C05-U08', system_owner_dept:'운영팀', system_owner:'최가을', service_owner_dept:'경영관리', service_owner:'정하늘' },
-            { id:4, business_status:'가동', business_name:'알림 처리', system_name:'notify-svc-03', system_ip:'10.0.40.33', manage_ip:'10.0.240.33', vendor:'Cisco', model:'UCS C220', serial:'CSC-ABC999', place:'서울2센터', location:'R4-C02-U02', system_owner_dept:'운영팀', system_owner:'김철수', service_owner_dept:'플랫폼팀', service_owner:'문지은' },
-            { id:5, business_status:'가동', business_name:'로그 수집', system_name:'log-in-01', system_ip:'10.0.50.70', manage_ip:'10.0.250.70', vendor:'Supermicro', model:'SYS-1029', serial:'SMC-QQ12ZZ', place:'부산센터', location:'R5-C08-U40', system_owner_dept:'인프라팀', system_owner:'박보라', service_owner_dept:'보안팀', service_owner:'오세훈' }
-        ];
-        return rows.slice(0, Math.max(0, count|0));
-    }
 
     function _parseSearchTokens(raw){
         const trimmed = String(raw || '').trim();
@@ -944,8 +928,10 @@
 
     function initData(){
         if(!USE_SERVER){
-            state.data = mockData(5);
-            state.nextId = state.data.length + 1;
+            state.data = [];
+            state.nextId = 1;
+            state.filtered = [];
+            state.total = 0;
             applyFilter();
             return;
         }
@@ -1088,9 +1074,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = USE_SERVER ? (state.total || 0) : state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = USE_SERVER ? (state.total || 0) : state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -2284,21 +2269,6 @@
             const search = document.getElementById(SEARCH_ID);
             if(search) search.value = '';
         }
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
         resetAllToDefaults();
         initData();
         bindEvents();

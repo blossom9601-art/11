@@ -19,7 +19,9 @@
         approvalRequests: [],
         sessionUser: null,
         selectedRequest: null,
-        pendingPayload: null
+        pendingPayload: null,
+        requestType: 'use',
+        category: ''
     };
 
     function qs(id) { return document.getElementById(id); }
@@ -71,6 +73,15 @@
     function selectedResources() {
         return state.selectedIds.map(function (id) { return byId(state.resources, id); }).filter(function (row) { return !!row; });
     }
+    function requestTypeLabel(type) {
+        return (type || state.requestType) === 'delete' ? '삭제 신청' : '사용 신청';
+    }
+    function requestTypeValue(type) {
+        return (type || state.requestType) === 'delete' ? 'delete' : 'use';
+    }
+    function isDeleteRequestMode() {
+        return state.requestType === 'delete';
+    }
     function primaryUrl(row) {
         if (!row) return '';
         if (row.primary_url) return row.primary_url;
@@ -99,6 +110,30 @@
         addKind(row.resource_type);
         return result;
     }
+    function normalizeCategory(value) {
+        return String(value || '').replace(/\s+/g, '').toLowerCase();
+    }
+    function categoryLabel(row) {
+        var raw = normalizeCategory(row && (row.category_name || row.category || ''));
+        if (raw === '내부서비스' || raw === 'internal' || raw.indexOf('내부') >= 0) return '내부 서비스';
+        if (raw === '외부서비스' || raw === 'external' || raw === '웹' || raw === 'web' || raw.indexOf('외부') >= 0) return '외부 서비스';
+        if (raw === '관리콘솔' || raw === 'adminconsole' || raw === 'console' || raw.indexOf('관리콘솔') >= 0 || raw.indexOf('콘솔') >= 0) return '관리 콘솔';
+        if (raw === '기타' || raw === 'etc') return '기타';
+        return '기타';
+    }
+    function endpointTarget(ep) {
+        if (!ep) return '-';
+        if (ep.kind === 'WEB') return ep.url || ep.host || '-';
+        return (ep.host || ep.url || '-') + (ep.port ? ':' + ep.port : '');
+    }
+    function endpointSummary(row) {
+        var eps = row.endpoints || [];
+        if (!eps.length) return '<span class="ac-meta resource-url-cell">' + esc(primaryUrl(row) || row.host_address || '-') + '</span>';
+        return '<div class="request-endpoint-stack">' + eps.map(function (ep) {
+            var label = ep.label || ep.kind || '-';
+            return '<span class="request-endpoint-chip"><span class="endpoint-kind-tag kind-' + esc(ep.kind || '') + '">' + esc(ep.kind || '-') + '</span><span>' + esc(label) + '</span><strong>' + esc(endpointTarget(ep)) + '</strong></span>';
+        }).join('') + '</div>';
+    }
     function isAdminUser() {
         var user = state.sessionUser || {};
         var role = String(user.role || '').trim().toUpperCase();
@@ -115,19 +150,38 @@
         if (isPermanentEndDate(endDate)) return (startDate || '-') + ' ~ 영구 접근';
         return (startDate || '-') + ' ~ ' + (endDate || '-');
     }
+    function requestPeriodText(row) {
+        if (row && row.request_type === '삭제') return '삭제 승인 후 권한 회수';
+        return formatPeriod(row && row.request_start_date, row && row.request_end_date);
+    }
     function approvalStageLabel(row) {
         if (!row) return '-';
         return row.current_approval_phase_name || row.current_phase_name || row.phase_name || row.approval_status || row.approver_name || '-';
     }
     function resourceStatus(row) {
         if (!row) return { code: 'blocked', label: '확인 필요', badge: 'status-blocked', reason: '자원 정보를 확인할 수 없습니다.' };
+        if (isDeleteRequestMode()) {
+            if (row.delete_request_pending) {
+                return { code: 'pending', label: '삭제 승인 대기', badge: 'status-pending', reason: '삭제 승인 대기 중인 동일 자원이 있습니다.' };
+            }
+            if (row.can_delete_request || row.can_access) {
+                return { code: 'available', label: '삭제 신청 가능', badge: 'status-approved', reason: '' };
+            }
+            if (row.request_pending && !row.can_access) {
+                return { code: 'pending', label: '승인 대기', badge: 'status-pending', reason: '사용 승인 대기 중인 자원은 삭제 신청할 수 없습니다.' };
+            }
+            return { code: 'blocked', label: '권한 없음', badge: 'status-blocked', reason: '유효한 접근 권한이 있는 자원만 삭제 신청할 수 있습니다.' };
+        }
         if (!(row.active_flag === 1 || row.active_flag === '1' || row.active_flag === true)) {
             return { code: 'inactive', label: '비활성', badge: 'status-blocked', reason: '비활성화된 자원입니다.' };
+        }
+        if (row.delete_request_pending) {
+            return { code: 'pending', label: '삭제 승인 대기', badge: 'status-pending', reason: '삭제 승인 대기 중인 자원은 사용 신청할 수 없습니다.' };
         }
         if (row.can_access) {
             return { code: 'accessible', label: '권한 보유', badge: 'status-usable', reason: '이미 유효한 승인 권한이 있습니다.' };
         }
-        if (row.request_pending) {
+        if (row.use_request_pending || row.request_pending) {
             return { code: 'pending', label: '승인 대기', badge: 'status-pending', reason: '승인 대기 중인 동일 자원이 있습니다.' };
         }
         if (row.can_request === false) {
@@ -204,6 +258,10 @@
     function updateApproverLabel() {
         var approver = qs('request-approver');
         if (!approver) return;
+        if (isDeleteRequestMode()) {
+            approver.value = (state.sessionUser && (state.sessionUser.dept_name || state.sessionUser.department)) ? (((state.sessionUser.dept_name || state.sessionUser.department)) + ' 팀장 자동 지정') : '부서 팀장 자동 지정';
+            return;
+        }
         if (isPermanentMode()) {
             approver.value = '관리자/보안 담당자 자동 지정';
             return;
@@ -214,8 +272,15 @@
         var form = qs('request-form');
         var end = qs('request-end-date');
         var note = qs('request-permanent-note');
-        var permanent = isPermanentMode();
+        var periodPanel = qs('request-period-mode-panel');
+        var dateGrid = qs('request-period-date-grid');
+        var quickPeriods = qs('request-quick-periods');
+        var permanent = isPermanentMode() && !isDeleteRequestMode();
         if (form) form.classList.toggle('is-permanent', permanent);
+        if (form) form.classList.toggle('is-delete-request', isDeleteRequestMode());
+        if (periodPanel) periodPanel.hidden = isDeleteRequestMode();
+        if (dateGrid) dateGrid.hidden = isDeleteRequestMode();
+        if (quickPeriods) quickPeriods.hidden = isDeleteRequestMode();
         if (end) {
             end.disabled = permanent;
             if (permanent && end._flatpickr) end._flatpickr.clear();
@@ -228,6 +293,25 @@
         if (note) note.hidden = !permanent;
         updateApproverLabel();
         syncDateConstraints();
+    }
+
+    function syncRequestTypeUI() {
+        var isDelete = isDeleteRequestMode();
+        var title = qs('request-form-title');
+        var desc = qs('request-form-desc');
+        var reason = qs('request-reason');
+        var submit = qs('request-submit-button');
+        var hideOwnedLabel = document.querySelector('label[for="request-hide-owned"] span');
+        Array.prototype.slice.call(document.querySelectorAll('.request-type-card')).forEach(function (card) {
+            var input = card.querySelector('input[type="radio"]');
+            card.classList.toggle('is-active', !!input && input.checked);
+        });
+        if (title) title.textContent = isDelete ? '삭제 신청서 작성' : '사용 신청서 작성';
+        if (desc) desc.textContent = isDelete ? '보유 중인 접근 권한 삭제를 요청합니다.' : '여러 자원을 선택해 하나의 신청서로 제출합니다.';
+        if (reason) reason.placeholder = isDelete ? '삭제 사유와 회수 필요성을 구체적으로 입력하세요.' : '업무 목적과 필요 기간을 구체적으로 입력하세요.';
+        if (submit) submit.textContent = isDelete ? '삭제 신청 제출' : '사용 신청 제출';
+        if (hideOwnedLabel) hideOwnedLabel.textContent = isDelete ? '권한 없는 자원 숨김' : '이미 승인된 자원 숨김';
+        syncPeriodMode();
     }
     function ensureTodayButton(instance) {
         var container = instance && instance.calendarContainer;
@@ -314,7 +398,7 @@
             var kinds = resourceKinds(row).join('/');
             return '<div class="selected-resource-item" data-id="' + esc(row.id) + '">' +
                 '<div><strong>' + esc(row.resource_name || '-') + '</strong>' +
-                '<span>' + esc(kinds || '-') + ' · ' + esc(row.category_name || '-') + ' · ' + esc(primaryUrl(row) || '-') + '</span></div>' +
+                '<span>' + esc(kinds || '-') + ' · ' + esc(categoryLabel(row)) + ' · ' + esc((row.endpoints || []).length ? ((row.endpoints || []).length + '개 접속점') : (primaryUrl(row) || '-')) + '</span></div>' +
                 '<button type="button" class="action-chip action-danger" data-remove-selected="' + esc(row.id) + '">삭제</button>' +
                 '</div>';
         }).join('');
@@ -322,29 +406,38 @@
     function populateCategoryFilter() {
         var select = qs('request-category-filter');
         var previous = select.value || '';
-        var map = {};
-        state.resources.forEach(function (row) { var c = (row.category_name || '').trim(); if (c) map[c] = true; });
-        select.innerHTML = '<option value="">전체</option>' + Object.keys(map).sort().map(function (name) {
-            return '<option value="' + esc(name) + '">' + esc(name) + '</option>';
+        var fixed = ['', '내부 서비스', '외부 서비스', '관리 콘솔', '기타'];
+        select.innerHTML = fixed.map(function (name) {
+            return '<option value="' + esc(name) + '">' + esc(name || '전체') + '</option>';
         }).join('');
-        if (previous && map[previous]) select.value = previous;
+        if (fixed.indexOf(previous) >= 0) select.value = previous;
+    }
+    function syncCategoryTabs() {
+        Array.prototype.slice.call(document.querySelectorAll('.request-category-tabs .system-tab-btn[data-category]')).forEach(function (button) {
+            var active = (button.getAttribute('data-category') || '') === (state.category || '');
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        if (qs('request-category-filter') && qs('request-category-filter').value !== (state.category || '')) qs('request-category-filter').value = state.category || '';
     }
     function applyResourceFilters() {
         var keyword = (qs('request-resource-search').value || '').trim().toLowerCase();
         var kind = (qs('request-kind-filter').value || '').trim();
-        var category = (qs('request-category-filter').value || '').trim();
+        var category = (state.category || qs('request-category-filter').value || '').trim();
         var status = (qs('request-status-filter').value || '').trim();
         var hideOwned = !!(qs('request-hide-owned') && qs('request-hide-owned').checked);
         state.filteredResources = state.resources.filter(function (row) {
             var kinds = resourceKinds(row);
             var rowStatus = resourceStatus(row);
-            if (hideOwned && rowStatus.code === 'accessible') return false;
+            if (hideOwned && ((!isDeleteRequestMode() && rowStatus.code === 'accessible') || (isDeleteRequestMode() && rowStatus.code !== 'available'))) return false;
             if (kind && kinds.indexOf(kind) < 0) return false;
-            if (category && (row.category_name || '') !== category) return false;
+            if (category && categoryLabel(row) !== category) return false;
             if (status === 'selectable' && rowStatus.reason) return false;
-            if (status && status !== 'selectable' && rowStatus.code !== status) return false;
+            if (status && status !== 'selectable') {
+                if (!(isDeleteRequestMode() && status === 'accessible' && rowStatus.code === 'available') && rowStatus.code !== status) return false;
+            }
             if (keyword) {
-                var hay = [row.resource_name, row.resource_url, row.primary_url, row.category_name, row.description, row.host_address, row.protocol, row.port_number, row.login_account, row.tags, row.access_status].concat(kinds);
+                var hay = [row.resource_name, row.resource_url, row.primary_url, row.category_name, categoryLabel(row), row.description, row.host_address, row.protocol, row.port_number, row.login_account, row.tags, row.access_status].concat(kinds);
                 (row.endpoints || []).forEach(function (ep) { hay.push(ep.url, ep.host, ep.protocol, ep.kind, ep.label, ep.port, ep.url_path); });
                 if (hay.join(' ').toLowerCase().indexOf(keyword) < 0) return false;
             }
@@ -442,8 +535,8 @@
                 '<td class="resource-check-col"><input type="checkbox" class="request-resource-check" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + (disabled ? ' disabled' : '') + ' aria-label="' + esc(row.resource_name || '자원') + ' 선택"></td>' +
                 '<td class="resource-picker-main"><strong>' + esc(row.resource_name || '-') + '</strong><span>' + esc(row.description || '-') + '</span></td>' +
                 '<td>' + renderKindTags(row) + '</td>' +
-                '<td>' + esc(row.category_name || '-') + '</td>' +
-                '<td><span class="ac-meta resource-url-cell">' + esc(primaryUrl(row) || row.host_address || '-') + '</span></td>' +
+                '<td>' + esc(categoryLabel(row)) + '</td>' +
+                '<td>' + endpointSummary(row) + '</td>' +
                 '<td><span class="status-badge ' + esc(status.badge) + '">' + esc(status.label) + '</span></td>' +
                 '<td class="resource-reason-cell">' + esc(reason || '-') + '</td>' +
                 '</tr>';
@@ -456,6 +549,22 @@
         box.innerHTML = errors.map(function (err) {
             return '<div>' + esc(err.resource_name || ('자원 #' + err.resource_id)) + ': ' + esc(err.message || '-') + '</div>';
         }).join('');
+    }
+    function setRequestType(type, clearSelection) {
+        var nextType = requestTypeValue(type);
+        if (state.requestType === nextType && !clearSelection) return;
+        state.requestType = nextType;
+        if (clearSelection) {
+            state.selectedIds = [];
+            setResourceErrors([]);
+        }
+        Array.prototype.slice.call(document.querySelectorAll('input[name="requestType"]')).forEach(function (input) {
+            input.checked = requestTypeValue(input.value) === state.requestType;
+        });
+        applyResourceFilters();
+        renderResources();
+        renderSelected();
+        syncRequestTypeUI();
     }
     function seedSelectedFromNavigation() {
         if (state.seededFromNavigation) return;
@@ -492,7 +601,7 @@
         }).join('');
     }
     function resourceCategory(row) {
-        return row.category_name || '기타';
+        return categoryLabel(row);
     }
     function resourceTarget(row) {
         return primaryUrl(row) || row.resource_url || row.host_address || '-';
@@ -537,13 +646,14 @@
                 '<div>' +
                     '<span class="detail-kicker">신청 정보</span>' +
                     '<strong class="detail-title">' + esc(item.request_no || '-') + '</strong>' +
-                    '<span class="detail-subtitle">' + esc(formatPeriod(item.request_start_date, item.request_end_date)) + '</span>' +
+                    '<span class="detail-subtitle">' + esc(requestPeriodText(item)) + '</span>' +
                 '</div>' +
                 '<div class="detail-summary-status">' + formatStatus(item.request_status || '-') + '</div>' +
             '</div>' +
             '<div class="detail-box detail-box-main">' +
                 '<div class="detail-box-title"><strong>기본 정보</strong><span>' + esc(resourceCount) + '개 자원</span></div>' +
                 '<div class="detail-kv-grid">' +
+                    '<div class="detail-kv"><span>신청 유형</span><strong>' + esc(item.request_type_label || requestTypeLabel(item.request_type === '삭제' ? 'delete' : 'use')) + '</strong></div>' +
                     '<div class="detail-kv"><span>신청자</span><strong>' + esc(item.requester_name || '-') + '</strong></div>' +
                     '<div class="detail-kv"><span>승인자</span><strong>' + approverText + '</strong></div>' +
                     '<div class="detail-kv"><span>긴급 여부</span><strong>' + esc(Number(item.emergency_flag || 0) ? '긴급' : '일반') + '</strong></div>' +
@@ -607,7 +717,8 @@
             var emergency = Number(row.emergency_flag || 0) ? '긴급' : '일반';
             return '<tr>' +
                 '<td>' + esc(row.submitted_at || row.created_at || '-') + '</td>' +
-                '<td><strong>' + esc(row.request_no || '-') + '</strong><span class="ac-meta">' + esc(formatPeriod(row.request_start_date, row.request_end_date)) + '</span></td>' +
+                '<td><strong>' + esc(row.request_no || '-') + '</strong><span class="ac-meta">' + esc(requestPeriodText(row)) + '</span></td>' +
+                '<td>' + esc(row.request_type_label || requestTypeLabel(row.request_type === '삭제' ? 'delete' : 'use')) + '</td>' +
                 '<td><strong>' + esc(row.resource_count || 0) + '개</strong><span class="ac-meta">' + esc(row.resource_name || '-') + '</span></td>' +
                 '<td>' + formatStatus(row.request_status || '-') + '</td>' +
                 '<td><strong>' + esc(approvalStageLabel(row)) + '</strong><span class="ac-meta">' + esc(row.approver_name || '-') + (row.delegated ? ' / 대무' : '') + '</span></td>' +
@@ -637,6 +748,7 @@
             state.resources = results[0].rows || [];
             state.sessionUser = (results[1].user || {});
             populateCategoryFilter();
+            syncCategoryTabs();
             applyResourceFilters();
             renderResources();
             renderSelected();
@@ -650,24 +762,28 @@
         if (!state.selectedIds.length) return '신청 대상 자원을 선택하세요.';
         if (!reason) return '신청 사유를 입력하세요.';
         if (reason.length < REASON_MIN_LENGTH) return '신청 사유는 10자 이상 입력하세요.';
+        if (isDeleteRequestMode()) return '';
         if (!qs('request-start-date').value) return '사용 시작일을 입력하세요.';
         if (!isPermanentMode() && !qs('request-end-date').value) return '사용 종료일을 입력하세요.';
         if (!isPermanentMode() && qs('request-start-date').value > qs('request-end-date').value) return '시작일은 종료일보다 늦을 수 없습니다.';
         return '';
     }
     function openConfirm(payload) {
-        var period = formatPeriod(payload.request_start_date, payload.request_end_date);
+        var isDelete = payload.request_type === 'delete';
+        var period = isDelete ? '삭제 승인 후 권한 회수' : formatPeriod(payload.request_start_date, payload.request_end_date);
         var approver = qs('request-approver').value || '-알 수 없음-';
         var emergency = payload.emergency_flag ? '긴급' : '일반';
         var reason = payload.reason || '-';
         if (reason.length > 120) reason = reason.slice(0, 120) + '...';
         state.pendingPayload = payload;
+        qs('request-confirm-title').textContent = isDelete ? '접근 삭제 신청 확인' : '접근 사용 신청 확인';
         qs('request-confirm-body').innerHTML = '' +
             '<div class="confirm-summary-card">' +
                 '<div class="confirm-metric"><span>신청 자원</span><strong>' + esc(payload.resource_ids.length) + '개</strong></div>' +
-                '<div class="confirm-state"><span class="confirm-state-dot"></span>승인 대기 생성</div>' +
+                '<div class="confirm-state"><span class="confirm-state-dot"></span>' + esc(requestTypeLabel(payload.request_type)) + ' 승인 대기 생성</div>' +
             '</div>' +
             '<div class="confirm-detail-grid">' +
+                '<div class="confirm-row"><span>신청 유형</span><strong>' + esc(requestTypeLabel(payload.request_type)) + '</strong></div>' +
                 '<div class="confirm-row"><span>사용 기간</span><strong>' + esc(period) + '</strong></div>' +
                 '<div class="confirm-row"><span>승인자</span><strong>' + esc(approver) + '</strong></div>' +
                 '<div class="confirm-row"><span>긴급 여부</span><strong>' + esc(emergency) + '</strong></div>' +
@@ -690,14 +806,16 @@
     function submitRequest(event) {
         event.preventDefault();
         var message = validateForm();
+        var today = formatDate(new Date());
         if (message) { setMessage(message, 'error'); return; }
         openConfirm({
+            request_type: state.requestType,
             resource_ids: state.selectedIds.slice(),
             reason: qs('request-reason').value.trim(),
-            request_start_date: qs('request-start-date').value,
-            request_end_date: isPermanentMode() ? PERMANENT_END_DATE : qs('request-end-date').value,
-            request_period_type: isPermanentMode() ? 'permanent' : 'range',
-            permanent_access: isPermanentMode() ? 1 : 0,
+            request_start_date: isDeleteRequestMode() ? today : qs('request-start-date').value,
+            request_end_date: isDeleteRequestMode() ? today : (isPermanentMode() ? PERMANENT_END_DATE : qs('request-end-date').value),
+            request_period_type: isDeleteRequestMode() ? 'delete' : (isPermanentMode() ? 'permanent' : 'range'),
+            permanent_access: (!isDeleteRequestMode() && isPermanentMode()) ? 1 : 0,
             emergency_flag: qs('request-emergency-flag').value === '1' ? 1 : 0
         });
     }
@@ -707,6 +825,7 @@
         var originalText = btn.textContent;
         btn.disabled = true;
         btn.textContent = '제출 중...';
+        var submittedLabel = requestTypeLabel(state.pendingPayload.request_type);
         postJson('/api/access-control/requests', state.pendingPayload)
             .then(function () {
                 closeConfirm();
@@ -717,7 +836,7 @@
                 switchSegment('mine');
                 switchMainTab('status');
                 setTableState('신청 목록을 불러오는 중입니다.');
-                setMessage('신청이 제출되었습니다.', 'success');
+                setMessage(submittedLabel + '이 제출되었습니다.', 'success');
                 return Promise.all([
                     loadBaseData().catch(function () {}),
                     loadRequests().then(function () {
@@ -764,9 +883,10 @@
         if (action === 'cancel') { postJson('/api/access-control/requests/' + id + '/cancel', {}).then(loadRequests).catch(function (err) { window.alert(err.message); }); return; }
         if (action === 'reapply') {
             state.selectedIds = [];
+            setRequestType(item.request_type === '삭제' ? 'delete' : 'use', false);
             (item.resource_ids || [item.resource_id]).forEach(addSelected);
             qs('request-reason').value = item.reason || '';
-            state.periodMode = isPermanentEndDate(item.request_end_date) ? 'permanent' : 'range';
+            state.periodMode = item.request_type === '삭제' ? 'range' : (isPermanentEndDate(item.request_end_date) ? 'permanent' : 'range');
             var periodRadio = qs(state.periodMode === 'permanent' ? 'request-period-permanent' : 'request-period-range');
             if (periodRadio) periodRadio.checked = true;
             setDateField(qs('request-start-date'), item.request_start_date || '');
@@ -791,9 +911,23 @@
         });
         qs('request-resource-search').addEventListener('input', function () { applyResourceFilters(); renderResources(); });
         qs('request-kind-filter').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
-        qs('request-category-filter').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
+        qs('request-category-filter').addEventListener('change', function () { state.category = qs('request-category-filter').value || ''; syncCategoryTabs(); applyResourceFilters(); renderResources(); });
         qs('request-status-filter').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
         qs('request-hide-owned').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
+        Array.prototype.slice.call(document.querySelectorAll('input[name="requestType"]')).forEach(function (input) {
+            input.addEventListener('change', function () {
+                setRequestType(input.value, true);
+                setMessage(requestTypeLabel() + ' 모드로 전환했습니다.', 'success');
+            });
+        });
+        Array.prototype.slice.call(document.querySelectorAll('.request-category-tabs .system-tab-btn[data-category]')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                state.category = button.getAttribute('data-category') || '';
+                syncCategoryTabs();
+                applyResourceFilters();
+                renderResources();
+            });
+        });
         qs('request-resource-prev').addEventListener('click', function () { if (state.resourcePage > 1) { state.resourcePage--; renderResources(); } });
         qs('request-resource-next').addEventListener('click', function () { state.resourcePage++; renderResources(); });
         qs('request-select-page-check').addEventListener('change', function (event) { event.target.checked ? selectRows(pageRows(), '현재 페이지') : removeRows(pageRows()); });
@@ -804,7 +938,8 @@
         qs('request-reset-filters').addEventListener('click', function () {
             qs('request-resource-search').value = '';
             qs('request-kind-filter').value = '';
-            qs('request-category-filter').value = '';
+            state.category = '';
+            syncCategoryTabs();
             qs('request-status-filter').value = '';
             qs('request-hide-owned').checked = false;
             applyResourceFilters();
@@ -871,6 +1006,7 @@
         bindEvents();
         initRequestDatePickers();
         applyQuickPeriod(7);
+        syncRequestTypeUI();
         syncPeriodMode();
         loadBaseData().then(loadRequests).catch(function (err) { setTableState(err.message); });
     });

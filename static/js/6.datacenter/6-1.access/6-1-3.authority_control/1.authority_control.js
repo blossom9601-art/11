@@ -265,15 +265,11 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
     columnFilters: {} // { col: value | [values...] } (조건 필터 기능 제거 예정 - 빈 유지)
     };
-
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
 
     // ---- API wiring (access_permission) ----
     const PERMISSIONS_API_BASE = '/api/datacenter/access/permissions';
@@ -483,18 +479,6 @@
         state.selected.clear();
         state.nextId = (state.data.reduce((m, r)=> Math.max(m, Number(r.id)||0), 0) || 0) + 1;
         applyFilter();
-    }
-
-    // 권한 등록 페이지: 샘플 데이터 5개 제공
-    function mockData(count=5){
-        const rows = [
-            { id: 1, status: '활성', name: '홍길동', affiliation: '인프라팀', employee_type: '내부직원', access_level: '상시출입', note: '', auth_start_date: '', auth_end_date: '', auth_changed_date: '', zone_futurecenter_dc: 'O', zone_futurecenter_ops: 'O', zone_eulji_dc: 'X', zone_drs_dc: 'X' },
-            { id: 2, status: '활성', name: '김철수', affiliation: '개발1팀', employee_type: '협력직원', access_level: '임시출입', note: '테스트', auth_start_date: '2025-08-01', auth_end_date: '2025-08-31', auth_changed_date: '2025-08-15', zone_futurecenter_dc: 'O', zone_futurecenter_ops: 'X', zone_eulji_dc: 'O', zone_drs_dc: 'X' },
-            { id: 3, status: '만료', name: '이영희', affiliation: '플랫폼팀', employee_type: '외부직원', access_level: '임시출입', note: '', auth_start_date: '2025-07-01', auth_end_date: '2025-07-31', auth_changed_date: '', zone_futurecenter_dc: 'X', zone_futurecenter_ops: 'O', zone_eulji_dc: 'X', zone_drs_dc: 'O' },
-            { id: 4, status: '활성', name: '박보라', affiliation: '보안팀', employee_type: '내부직원', access_level: '상시출입', note: '', auth_start_date: '', auth_end_date: '', auth_changed_date: '2025-05-10', zone_futurecenter_dc: 'O', zone_futurecenter_ops: 'O', zone_eulji_dc: 'O', zone_drs_dc: 'O' },
-            { id: 5, status: '만료', name: '최가을', affiliation: 'DB운영팀', employee_type: '협력직원', access_level: '임시출입', note: '프로젝트 종료', auth_start_date: '2025-06-01', auth_end_date: '2025-06-30', auth_changed_date: '2025-06-15', zone_futurecenter_dc: 'X', zone_futurecenter_ops: 'X', zone_eulji_dc: 'X', zone_drs_dc: 'X' }
-        ];
-        return rows.slice(0, Math.max(0, count|0));
     }
 
     function initData(){
@@ -713,9 +697,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -1805,21 +1788,6 @@
     async function init(){
         // 1) 동적 구역 목록을 먼저 로드 (컬럼 메타 구성에 필요)
         await loadZones();
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
     loadColumnSelection();
     // Enforce first render equals "초기화" state
     resetColumnSelection();

@@ -71,15 +71,21 @@
     function openModal(modalId){
         var modal = document.getElementById(modalId);
         if(!modal) return;
-        modal.style.display = 'flex';
+        modal.style.display = '';
+        modal.classList.add('show');
         modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
     }
 
     function closeModal(modalId){
         var modal = document.getElementById(modalId);
         if(!modal) return;
-        modal.style.display = 'none';
+        modal.classList.remove('show');
         modal.setAttribute('aria-hidden', 'true');
+        modal.style.display = '';
+        if(!document.querySelector('.server-add-modal.show, .server-edit-modal.show, .bls-modal-overlay.show')){
+            document.body.classList.remove('modal-open');
+        }
     }
 
     function showMessageModal(title, message){
@@ -263,7 +269,7 @@
         }
         if(!delModal) return;
         var sub = document.getElementById('delete-subtitle');
-        if(sub) sub.textContent = '선택한 '+selectedIds.length+'개 워크플로우를 삭제하시겠습니까?';
+        if(sub) sub.textContent = '선택된 '+selectedIds.length+'개의 워크플로우를 정말 삭제처리하시겠습니까?';
         openModal(DELETE_MODAL_ID);
     }
     function closeDelete(){ closeModal(DELETE_MODAL_ID); }

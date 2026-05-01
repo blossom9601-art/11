@@ -531,16 +531,6 @@
 		URL.revokeObjectURL(url);
 	}
 
-	function requestSelectedResources() {
-		if (state.selected.size === 0) {
-			alert('접근 신청할 자원을 먼저 선택하세요.');
-			return;
-		}
-		var ids = Array.from(state.selected);
-		try { localStorage.setItem('accessControlRequestResourceIds', JSON.stringify(ids)); } catch (_) {}
-		window.location.href = '/p/access_control_request?resource_ids=' + encodeURIComponent(ids.join(','));
-	}
-
 	var _eventsBound = false;
 	function bindEvents() {
 		if (_eventsBound) return;
@@ -590,7 +580,6 @@
 			renderRows();
 		});
 		qs('status-add-btn').addEventListener('click', function () { openModal(null); });
-		qs('status-request-btn').addEventListener('click', requestSelectedResources);
 		qs('status-delete-btn').addEventListener('click', openBulkDeleteModal);
 		qs('status-download-btn').addEventListener('click', downloadCsv);
 

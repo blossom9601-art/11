@@ -51,6 +51,10 @@ REQUEST_STATUS_REJECTED = '반려'
 REQUEST_STATUS_CANCELLED = '취소'
 REQUEST_STATUS_EXPIRED = '만료'
 
+REQUEST_TYPE_USE = '사용'
+REQUEST_TYPE_DELETE = '삭제'
+REQUEST_TYPES = (REQUEST_TYPE_USE, REQUEST_TYPE_DELETE)
+
 REQUEST_ITEM_STATUS_PENDING = '승인대기'
 REQUEST_ITEM_STATUS_APPROVED = '승인'
 REQUEST_ITEM_STATUS_REJECTED = '반려'
@@ -99,6 +103,36 @@ def _dict(row) -> Optional[Dict[str, Any]]:
     return dict(row) if row is not None else None
 
 
+def _enrich_audit_actor_profiles(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not rows:
+        return rows
+    user_ids = sorted({int(row.get('actor_user_id')) for row in rows if _to_int_or_none(row.get('actor_user_id'))})
+    emp_values = sorted({str(row.get('actor_emp_no') or '').strip().upper() for row in rows if str(row.get('actor_emp_no') or '').strip()})
+    profiles = []
+    try:
+        from sqlalchemy import func, or_
+        from app.models import UserProfile
+
+        conditions = []
+        if user_ids:
+            conditions.append(UserProfile.id.in_(user_ids))
+        if emp_values:
+            conditions.append(func.upper(UserProfile.emp_no).in_(emp_values))
+        if conditions:
+            profiles = UserProfile.query.filter(or_(*conditions)).all()
+    except Exception:
+        profiles = []
+    by_id = {profile.id: profile for profile in profiles if getattr(profile, 'id', None) is not None}
+    by_emp = {str(profile.emp_no or '').strip().upper(): profile for profile in profiles if str(profile.emp_no or '').strip()}
+    for row in rows:
+        profile = by_id.get(_to_int_or_none(row.get('actor_user_id'))) or by_emp.get(str(row.get('actor_emp_no') or '').strip().upper())
+        row['actor_display_name'] = (getattr(profile, 'name', '') or getattr(profile, 'nickname', '') or row.get('actor_name') or row.get('actor_emp_no') or '').strip() if profile else (row.get('actor_name') or row.get('actor_emp_no') or '')
+        row['actor_display_emp_no'] = (getattr(profile, 'emp_no', '') or row.get('actor_emp_no') or '').strip() if profile else (row.get('actor_emp_no') or '')
+        row['actor_department'] = (getattr(profile, 'department', '') or '').strip() if profile else ''
+        row['actor_profile_image'] = (getattr(profile, 'profile_image', '') or '').strip() if profile else ''
+    return rows
+
+
 def _now() -> str:
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -118,6 +152,21 @@ def _is_permanent_access_payload(payload: Dict[str, Any]) -> bool:
     if _to_bool(payload.get('permanent_access') or payload.get('permanentAccess') or 0):
         return True
     return str(payload.get('request_end_date') or '').strip() == PERMANENT_ACCESS_END_DATE
+
+
+def _normalize_request_type(payload: Dict[str, Any]) -> str:
+    raw = str(
+        payload.get('request_type')
+        or payload.get('requestType')
+        or payload.get('action_type')
+        or payload.get('actionType')
+        or payload.get('type')
+        or ''
+    ).strip()
+    lowered = raw.lower()
+    if raw in (REQUEST_TYPE_DELETE, '삭제 신청', '권한 삭제', '권한 회수', '회수') or lowered in ('delete', 'remove', 'revoke', 'revoke_access'):
+        return REQUEST_TYPE_DELETE
+    return REQUEST_TYPE_USE
 
 
 def _to_int_or_none(value: Any) -> Optional[int]:
@@ -150,6 +199,7 @@ def _ensure_request_extra_columns(conn: sqlite3.Connection) -> None:
     rows = conn.execute(f"PRAGMA table_info({REQUEST_TABLE})").fetchall()
     existing = {row[1] for row in rows}
     spec = (
+        ('request_type', f"TEXT NOT NULL DEFAULT '{REQUEST_TYPE_USE}'"),
         ('delegated_from_user_id', 'INTEGER'),
         ('delegated_from_emp_no', "TEXT NOT NULL DEFAULT ''"),
         ('delegated_from_name', "TEXT NOT NULL DEFAULT ''"),
@@ -348,6 +398,7 @@ def init_web_access_control_tables(app=None) -> None:
                 approver_user_id        INTEGER,
                 approver_emp_no         TEXT NOT NULL DEFAULT '',
                 approver_name           TEXT NOT NULL DEFAULT '',
+                request_type            TEXT NOT NULL DEFAULT '{REQUEST_TYPE_USE}',
                 reason                  TEXT NOT NULL DEFAULT '',
                 request_status          TEXT NOT NULL DEFAULT '{REQUEST_STATUS_DRAFT}',
                 approval_status         TEXT NOT NULL DEFAULT '{APPROVAL_STATUS_PENDING}',
@@ -1379,7 +1430,22 @@ def _has_active_grant_conn(conn: sqlite3.Connection, user_id: int, resource_id: 
     return row is not None
 
 
-def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_id: int) -> bool:
+def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_id: int, request_type: Optional[str] = None) -> bool:
+    normalized_type = _normalize_request_type({'request_type': request_type}) if request_type else ''
+    joined_type_clause = ''
+    legacy_type_clause = ''
+    type_params: List[Any] = []
+    if normalized_type:
+        joined_type_clause = ' AND COALESCE(r.request_type, ?) = ?'
+        legacy_type_clause = ' AND COALESCE(request_type, ?) = ?'
+        type_params = [REQUEST_TYPE_USE, normalized_type]
+    params: List[Any] = [
+        user_id,
+        resource_id,
+        REQUEST_STATUS_SUBMITTED,
+        REQUEST_STATUS_PENDING,
+        REQUEST_ITEM_STATUS_PENDING,
+    ] + type_params
     row = conn.execute(
         f'''SELECT ri.id
               FROM {REQUEST_ITEM_TABLE} ri
@@ -1389,11 +1455,18 @@ def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_i
                AND ri.resource_id = ?
                AND r.request_status IN (?, ?)
                AND ri.item_status = ?
+               {joined_type_clause}
              LIMIT 1''',
-        (user_id, resource_id, REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_PENDING, REQUEST_ITEM_STATUS_PENDING)
+        params
     ).fetchone()
     if row:
         return True
+    legacy_params: List[Any] = [
+        user_id,
+        resource_id,
+        REQUEST_STATUS_SUBMITTED,
+        REQUEST_STATUS_PENDING,
+    ] + type_params
     legacy = conn.execute(
         f'''SELECT id
               FROM {REQUEST_TABLE}
@@ -1401,8 +1474,9 @@ def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_i
                AND requester_user_id = ?
                AND resource_id = ?
                AND request_status IN (?, ?)
+               {legacy_type_clause}
              LIMIT 1''',
-        (user_id, resource_id, REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_PENDING)
+        legacy_params
     ).fetchone()
     return legacy is not None
 
@@ -1452,6 +1526,8 @@ def _load_request_items(conn: sqlite3.Connection, request_id: int) -> List[Dict[
 def _decorate_request(conn: sqlite3.Connection, data: Dict[str, Any], include_history: bool = False) -> Dict[str, Any]:
     items = _load_request_items(conn, int(data.get('id') or 0))
     data['items'] = items
+    data['request_type'] = _normalize_request_type(data)
+    data['request_type_label'] = data['request_type'] + ' 신청'
     data['permanent_access'] = str(data.get('request_end_date') or '').strip() == PERMANENT_ACCESS_END_DATE
     data['resource_count'] = len(items) if items else (1 if data.get('resource_id') else 0)
     data['resource_ids'] = [item['resource_id'] for item in items]
@@ -1501,25 +1577,27 @@ def _decorate_request(conn: sqlite3.Connection, data: Dict[str, Any], include_hi
 def has_active_grant(user_id: int, resource_id: int, app=None) -> bool:
     expire_due_grants(app)
     with _get_connection(app) as conn:
-                return _has_active_grant_conn(conn, user_id, resource_id)
+        return _has_active_grant_conn(conn, user_id, resource_id)
 
 
-def has_pending_request(user_id: int, resource_id: int, app=None) -> bool:
+def has_pending_request(user_id: int, resource_id: int, request_type: Optional[str] = None, app=None) -> bool:
     with _get_connection(app) as conn:
-                return _has_pending_request_conn(conn, user_id, resource_id)
+        return _has_pending_request_conn(conn, user_id, resource_id, request_type=request_type)
 
 
 def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> Dict[str, Any]:
     user_id = int(actor['user_id'])
+    request_type = _normalize_request_type(payload)
+    is_delete_request = request_type == REQUEST_TYPE_DELETE
     resource_ids = _normalize_resource_ids(payload)
     if not resource_ids:
         raise ValueError('신청 대상 자원을 한 개 이상 선택하세요.')
     reason = (payload.get('reason') or '').strip()
     if len(reason) < REQUEST_REASON_MIN_LENGTH:
         raise ValueError(f'신청 사유는 {REQUEST_REASON_MIN_LENGTH}자 이상 입력하세요.')
-    permanent_access = _is_permanent_access_payload(payload)
-    start_date = str(payload.get('request_start_date') or '').strip()
-    end_date = PERMANENT_ACCESS_END_DATE if permanent_access else str(payload.get('request_end_date') or '').strip()
+    permanent_access = (not is_delete_request) and _is_permanent_access_payload(payload)
+    start_date = str(payload.get('request_start_date') or '').strip() or (_today() if is_delete_request else '')
+    end_date = PERMANENT_ACCESS_END_DATE if permanent_access else (str(payload.get('request_end_date') or '').strip() or (start_date if is_delete_request else ''))
     if not start_date:
         raise ValueError('사용 시작일은 필수입니다.')
     if not permanent_access and not end_date:
@@ -1544,15 +1622,27 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
             if not resource:
                 item_errors.append({'resource_id': rid, 'message': '자원 정보를 찾을 수 없습니다.'})
                 continue
-            if int(resource.get('active_flag') or 0) != 1:
+            if int(resource.get('active_flag') or 0) != 1 and not is_delete_request:
                 item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '비활성화된 자원은 신청할 수 없습니다.'})
                 continue
-            if _has_active_grant_conn(conn, user_id, rid):
-                item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '이미 유효한 승인 권한이 있습니다.'})
-                continue
-            if _has_pending_request_conn(conn, user_id, rid):
-                item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '승인 대기 중인 동일 자원이 있습니다.'})
-                continue
+            has_active_grant = _has_active_grant_conn(conn, user_id, rid)
+            if is_delete_request:
+                if not has_active_grant:
+                    item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '삭제 신청은 유효한 접근 권한이 있는 자원만 가능합니다.'})
+                    continue
+                if _has_pending_request_conn(conn, user_id, rid, REQUEST_TYPE_DELETE):
+                    item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '삭제 승인 대기 중인 동일 자원이 있습니다.'})
+                    continue
+            else:
+                if has_active_grant:
+                    item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '이미 유효한 승인 권한이 있습니다.'})
+                    continue
+                if _has_pending_request_conn(conn, user_id, rid, REQUEST_TYPE_USE):
+                    item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '승인 대기 중인 동일 자원이 있습니다.'})
+                    continue
+                if _has_pending_request_conn(conn, user_id, rid, REQUEST_TYPE_DELETE):
+                    item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '삭제 승인 대기 중인 자원은 사용 신청할 수 없습니다.'})
+                    continue
             valid_ids.append(rid)
         if item_errors:
             raise WebAccessValidationError('신청할 수 없는 자원이 포함되어 있습니다.', item_errors)
@@ -1569,10 +1659,10 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
                  requester_name, requester_department_id, requester_department,
                  approver_user_id, approver_emp_no, approver_name,
                  delegated_from_user_id, delegated_from_emp_no, delegated_from_name, delegation_id,
-                 reason, request_status, approval_status, request_start_date, request_end_date,
+                  request_type, reason, request_status, approval_status, request_start_date, request_end_date,
                  emergency_flag, submitted_at, current_policy_id, created_at, updated_at,
                  created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
                 request_no,
@@ -1589,6 +1679,7 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
                 approver['delegated_from_emp_no'],
                 approver['delegated_from_name'],
                 approver['delegation_id'],
+                request_type,
                 reason,
                 REQUEST_STATUS_PENDING,
                 APPROVAL_STATUS_PENDING,
@@ -1611,9 +1702,13 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
                     VALUES (?, ?, ?, ?, ?)''',
                 (request_id, rid, REQUEST_ITEM_STATUS_PENDING, now, now)
             )
-            _insert_audit(conn, actor, rid, request_id, '신청', '성공', reason, {'request_status': REQUEST_STATUS_PENDING, 'resource_count': len(valid_ids), 'permanent_access': permanent_access})
-        phase_name = '관리자/보안 승인' if permanent_access else ('팀장 승인(대무)' if approver.get('delegated') else '팀장 승인')
-        phase_code = 'SECURITY_ADMIN' if permanent_access else 'TEAM_LEAD'
+            _insert_audit(conn, actor, rid, request_id, '삭제신청' if is_delete_request else '신청', '성공', reason, {'request_status': REQUEST_STATUS_PENDING, 'resource_count': len(valid_ids), 'permanent_access': permanent_access, 'request_type': request_type})
+        if is_delete_request:
+            phase_name = '권한 삭제 승인(대무)' if approver.get('delegated') else '권한 삭제 승인'
+            phase_code = 'REVOKE_APPROVAL'
+        else:
+            phase_name = '관리자/보안 승인' if permanent_access else ('팀장 승인(대무)' if approver.get('delegated') else '팀장 승인')
+            phase_code = 'SECURITY_ADMIN' if permanent_access else 'TEAM_LEAD'
         conn.execute(
             f'''
             INSERT INTO {APPROVAL_TABLE}
@@ -1835,6 +1930,8 @@ def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', i
     target_item_ids = _normalize_item_ids(item_ids, current)
     if not target_item_ids:
         raise ValueError('승인할 자원을 선택하세요.')
+    request_type = _normalize_request_type(current)
+    is_delete_request = request_type == REQUEST_TYPE_DELETE
     now = _now()
     with _get_connection(app) as conn:
         conn.execute(
@@ -1877,33 +1974,49 @@ def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', i
             [request_id] + target_item_ids
         ).fetchall()
         for item in item_rows:
-            conn.execute(
-                f'''
-                INSERT INTO {GRANT_TABLE}
-                    (resource_id, user_id, department_id, source_request_id, grant_status,
-                     grant_start_date, grant_end_date, granted_by_user_id, granted_by_emp_no,
-                     granted_by_name, approval_required, created_at, updated_at, created_by, updated_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (
-                    item['resource_id'],
-                    current['requester_user_id'],
-                    current.get('requester_department_id'),
-                    request_id,
-                    GRANT_STATUS_ACTIVE,
-                    current['request_start_date'],
-                    current['request_end_date'],
-                    actor.get('user_id'),
-                    actor.get('emp_no', ''),
-                    actor.get('name', ''),
-                    int(current.get('approval_required') or 1),
-                    now,
-                    now,
-                    actor.get('emp_no', ''),
-                    actor.get('emp_no', ''),
+            if is_delete_request:
+                conn.execute(
+                    f'''
+                    UPDATE {GRANT_TABLE}
+                       SET is_deleted = 1,
+                           grant_status = ?,
+                           updated_at = ?,
+                           updated_by = ?
+                     WHERE is_deleted = 0
+                       AND user_id = ?
+                       AND resource_id = ?
+                    ''',
+                    (GRANT_STATUS_BLOCKED, now, actor.get('emp_no', ''), current['requester_user_id'], item['resource_id'])
                 )
-            )
-            _insert_audit(conn, actor, item['resource_id'], request_id, '승인', '성공', opinion.strip(), {'grant_end_date': current['request_end_date'], 'item_id': item['id']})
+                _insert_audit(conn, actor, item['resource_id'], request_id, '삭제승인', '성공', opinion.strip(), {'item_id': item['id'], 'request_type': request_type})
+            else:
+                conn.execute(
+                    f'''
+                    INSERT INTO {GRANT_TABLE}
+                        (resource_id, user_id, department_id, source_request_id, grant_status,
+                         grant_start_date, grant_end_date, granted_by_user_id, granted_by_emp_no,
+                         granted_by_name, approval_required, created_at, updated_at, created_by, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (
+                        item['resource_id'],
+                        current['requester_user_id'],
+                        current.get('requester_department_id'),
+                        request_id,
+                        GRANT_STATUS_ACTIVE,
+                        current['request_start_date'],
+                        current['request_end_date'],
+                        actor.get('user_id'),
+                        actor.get('emp_no', ''),
+                        actor.get('name', ''),
+                        int(current.get('approval_required') or 1),
+                        now,
+                        now,
+                        actor.get('emp_no', ''),
+                        actor.get('emp_no', ''),
+                    )
+                )
+                _insert_audit(conn, actor, item['resource_id'], request_id, '승인', '성공', opinion.strip(), {'grant_end_date': current['request_end_date'], 'item_id': item['id'], 'request_type': request_type})
         _sync_request_status_from_items(conn, request_id, actor)
         conn.commit()
     return get_request(request_id, app)
@@ -2116,6 +2229,17 @@ def touch_access(resource_id: int, user_id: int, actor: Dict[str, Any], ip_addre
             (resource_id, user_id, GRANT_STATUS_ACTIVE, today, today)
         ).fetchone()
         if not grant:
+            _insert_audit(
+                conn,
+                actor,
+                resource_id,
+                None,
+                '접속',
+                '실패',
+                '접속 가능한 권한이 없습니다.',
+                {'ip_address': ip_address},
+            )
+            conn.commit()
             raise ValueError('접속 가능한 권한이 없습니다.')
         conn.execute(
             f'UPDATE {GRANT_TABLE} SET last_accessed_at = ?, updated_at = ? WHERE id = ?',
@@ -2176,6 +2300,23 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
          WHERE 1 = 1
     '''
     params: List[Any] = []
+    audit_scope = str(filters.get('audit_scope') or '').strip()
+    if audit_scope == 'access':
+        where_sql += " AND l.action_type = '접속' AND l.action_result = '성공'"
+    elif audit_scope == 'fail':
+        where_sql += " AND l.action_result IS NOT NULL AND l.action_result <> '성공'"
+    if filters.get('keyword'):
+        keyword = f"%{str(filters['keyword']).strip()}%"
+        where_sql += '''
+            AND (
+                l.actor_name LIKE ?
+                OR l.actor_emp_no LIKE ?
+                OR r.resource_name LIKE ?
+                OR l.ip_address LIKE ?
+                OR l.note LIKE ?
+            )
+        '''
+        params.extend([keyword, keyword, keyword, keyword, keyword])
     if filters.get('actor_name'):
         where_sql += ' AND (l.actor_name LIKE ? OR l.actor_emp_no LIKE ?)'
         actor_keyword = f"%{str(filters['actor_name']).strip()}%"
@@ -2210,15 +2351,33 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
         offset = (page - 1) * page_size
         rows = conn.execute(
             f'''
-            SELECT l.*, r.resource_name, r.resource_url
+            SELECT l.*,
+                   r.resource_name,
+                   r.resource_url,
+                   r.resource_type,
+                   COALESCE(
+                       (
+                           SELECT e.kind
+                             FROM {ENDPOINT_TABLE} e
+                            WHERE e.resource_id = r.id
+                            ORDER BY e.is_primary DESC, e.sort_order ASC, e.id ASC
+                            LIMIT 1
+                       ),
+                       CASE
+                           WHEN UPPER(COALESCE(r.resource_type, '')) = 'SSH' OR r.resource_type IN ('서버', 'DB') THEN 'SSH'
+                           WHEN r.id IS NOT NULL THEN 'WEB'
+                           ELSE ''
+                       END
+                   ) AS endpoint_kind
             {where_sql}
              ORDER BY l.id DESC
              LIMIT ? OFFSET ?
             ''',
             params + [page_size, offset]
         ).fetchall()
+    row_dicts = [_dict(row) for row in rows]
     return {
-        'rows': [_dict(row) for row in rows],
+        'rows': _enrich_audit_actor_profiles(row_dicts),
         'total': total,
         'page': page,
         'page_size': page_size,
@@ -2242,6 +2401,8 @@ def _insert_audit(
     note: str,
     extra: Dict[str, Any],
 ) -> None:
+    extra = extra or {}
+    ip_address = str(extra.get('ip_address') or actor.get('ip_address', '') or '')
     conn.execute(
         f'''
         INSERT INTO {AUDIT_TABLE}
@@ -2259,9 +2420,9 @@ def _insert_audit(
             target_request_id,
             action_type,
             action_result,
-            actor.get('ip_address', ''),
+            ip_address,
             note,
-            str(extra or {}),
+            str(extra),
         )
     )
 

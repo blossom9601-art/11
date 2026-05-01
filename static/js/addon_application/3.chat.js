@@ -56,6 +56,25 @@
   const searchModalResults = document.getElementById('chat-search-results');
   const searchModalScopeBtns = document.querySelectorAll('.chat-search-scope-btn');
   const btnMsgSearch = document.getElementById('btn-msg-search');
+  const roomTabsEl = document.getElementById('roomTabs');
+  const roomTabButtons = Array.from(document.querySelectorAll('.room-tab[data-room-tab]'));
+  const roomPanes = Array.from(document.querySelectorAll('.room-pane[data-room-pane]'));
+  const filesListEl = document.getElementById('filesList');
+  const filesEmptyEl = document.getElementById('filesEmpty');
+  const filesCountEl = document.getElementById('filesCount');
+  const filesSearchInput = document.getElementById('filesSearchInput');
+  const filesDeleteSelectedBtn = document.getElementById('filesDeleteSelected');
+  const ideasListEl = document.getElementById('ideasList');
+  const ideasEmptyEl = document.getElementById('ideasEmpty');
+  const tasksListEl = document.getElementById('tasksList');
+  const tasksEmptyEl = document.getElementById('tasksEmpty');
+  const membersListEl = document.getElementById('membersList');
+  const membersEmptyEl = document.getElementById('membersEmpty');
+  const membersCountEl = document.getElementById('membersCount');
+  const btnIdeaAdd = document.getElementById('btnIdeaAdd');
+  const btnTaskAdd = document.getElementById('btnTaskAdd');
+  const btnRoomRename = document.getElementById('btnRoomRename');
+  const btnMemberInvite = document.getElementById('btnMemberInvite');
   // No toast container; member-add notices render as plain text in the message list
 
   const profile = {
@@ -137,6 +156,14 @@
   const DND_MIME = 'application/x-chat-item';
   let hydrateRefreshScheduled = false;
   let pendingDeleteId = null;
+  let activeRoomTab = 'chat';
+  let roomFileItems = [];
+  let activeFileTypeFilter = 'all';
+  let selectedRoomFileIds = new Set();
+  let ideaEditingId = null;
+  let ideaEditingComments = [];
+  let taskEditingId = null;
+  let roomMembersCache = [];
 
   function syntheticConversationIdForKey(key){
     if (!key) return null;
@@ -586,6 +613,32 @@
     return `${base}/${roomId}`;
   }
 
+  async function chatJson(url, options){
+    const opts = Object.assign({ credentials: 'same-origin' }, options || {});
+    const headers = Object.assign({}, opts.headers || {});
+    if (opts.body != null && !(opts.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+    opts.headers = headers;
+    const resp = await fetch(url, opts);
+    const text = await resp.text();
+    let data = null;
+    if (text) {
+      try { data = JSON.parse(text); } catch (_) { data = text; }
+    }
+    if (!resp.ok) {
+      const err = new Error((data && (data.message || data.error)) || `요청 실패 (${resp.status})`);
+      err.status = resp.status;
+      err.payload = data;
+      throw err;
+    }
+    return data;
+  }
+
+  function roomApiPath(roomId, suffix){
+    return buildRoomUrl(roomId) + suffix;
+  }
+
   function formatListTime(isoString){
     if (!isoString) return '';
     try {
@@ -736,13 +789,15 @@
 
   function normalizeRoomFromApi(room){
     if (!room || typeof room !== 'object') return null;
-    const isGroup = String(room.room_type || '').toUpperCase() === 'GROUP';
+    const roomType = String(room.room_type || '').toUpperCase();
+    const isChannel = roomType === 'CHANNEL';
+    const isGroup = roomType === 'GROUP' || isChannel;
     const members = Array.isArray(room.members) ? room.members.map(normalizeMemberFromApi).filter(Boolean) : [];
     const contact = isGroup ? null : selectPrimaryMember(members);
     const rawRoomName = !isPlaceholderName(room.room_name) ? String(room.room_name).trim() : '';
     const contactName = contact && !isPlaceholderName(contact.name) ? String(contact.name).trim() : '';
     const name = isGroup
-      ? (rawRoomName || '그룹 채팅')
+      ? (rawRoomName || (isChannel ? '채널' : '그룹 채팅'))
       : (contactName || rawRoomName || '대화');
     const lastStamp = room.last_message_at || room.updated_at || room.created_at;
     const convId = `room-${room.id}`;
@@ -1887,7 +1942,8 @@
   function isGroupConversation(conv){
     if (!conv) return false;
     if (typeof conv.roomType === 'string') {
-      return conv.roomType.toUpperCase() === 'GROUP';
+      const type = conv.roomType.toUpperCase();
+      return type === 'GROUP' || type === 'CHANNEL';
     }
     return Array.isArray(conv.groupAvatars) && conv.groupAvatars.length >= 2;
   }
@@ -2638,10 +2694,767 @@
     });
   }
 
+  function getActiveConversation(){
+    return conversations.find(c => c.id === activeId) || null;
+  }
+
+  function getActiveRoomId(){
+    const conv = getActiveConversation();
+    return conv && conv.roomId ? conv.roomId : null;
+  }
+
+  function isStillActiveRoom(roomId){
+    const current = getActiveRoomId();
+    return current != null && String(current) === String(roomId);
+  }
+
+  function notifyCollab(message, opts){
+    openInfoModal(message, opts || { title: '알림' });
+  }
+
+  function formatRoomDateTime(value){
+    if (!value) return '';
+    try {
+      const ms = typeof value === 'string' ? parseTimestampMs(value) : null;
+      const date = ms != null ? new Date(ms) : new Date(value);
+      if (!date || Number.isNaN(date.getTime())) return '';
+      const pad = n => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    } catch (_) { return ''; }
+  }
+
+  function humanFileSize(value){
+    if (value == null || value === '') return '';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = Number(value) || 0;
+    let idx = 0;
+    while (size >= 1024 && idx < units.length - 1) { size /= 1024; idx += 1; }
+    return `${size.toFixed(size < 10 && idx > 0 ? 1 : 0)} ${units[idx]}`;
+  }
+
+  function roomTabSeenKey(roomId){ return `blossom_web_room_tab_seen:${roomId}`; }
+  function getRoomTabSeen(roomId){
+    try { return JSON.parse(localStorage.getItem(roomTabSeenKey(roomId)) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+  function setRoomTabSeen(roomId, tabName, count){
+    if (!roomId || !tabName) return;
+    try {
+      const seen = getRoomTabSeen(roomId);
+      seen[tabName] = Number(count || 0);
+      localStorage.setItem(roomTabSeenKey(roomId), JSON.stringify(seen));
+    } catch (_) {}
+  }
+  function updateRoomTabDot(tabName, on){
+    const tab = roomTabButtons.find(btn => btn.getAttribute('data-room-tab') === tabName);
+    const dot = tab && tab.querySelector('.rt-dot');
+    if (dot) dot.hidden = !on;
+  }
+  function updateRoomTabDotCount(tabName, count){
+    const roomId = getActiveRoomId();
+    if (!roomId) { updateRoomTabDot(tabName, false); return; }
+    const n = Number(count || 0);
+    const seen = getRoomTabSeen(roomId);
+    if (seen[tabName] == null || activeRoomTab === tabName) {
+      setRoomTabSeen(roomId, tabName, n);
+      updateRoomTabDot(tabName, false);
+      return;
+    }
+    updateRoomTabDot(tabName, n > Number(seen[tabName] || 0));
+  }
+
+  async function refreshRoomTabDots(roomId){
+    if (!roomId) {
+      ['files', 'ideas', 'tasks', 'members'].forEach(tab => updateRoomTabDot(tab, false));
+      return;
+    }
+    try {
+      const results = await Promise.allSettled([
+        chatJson(roomApiPath(roomId, '/files')),
+        chatJson(roomApiPath(roomId, '/ideas')),
+        chatJson(roomApiPath(roomId, '/tasks')),
+        chatJson(roomApiPath(roomId, '/members')),
+      ]);
+      if (!isStillActiveRoom(roomId)) return;
+      const files = results[0].status === 'fulfilled' ? (results[0].value.items || []) : [];
+      const ideas = results[1].status === 'fulfilled' ? (results[1].value.items || []) : [];
+      const tasks = results[2].status === 'fulfilled' ? (results[2].value.items || []) : [];
+      const rawMembers = results[3].status === 'fulfilled' ? results[3].value : [];
+      const members = Array.isArray(rawMembers) ? rawMembers : (rawMembers.items || []);
+      updateRoomTabDotCount('files', files.length);
+      updateRoomTabDotCount('ideas', ideas.length);
+      updateRoomTabDotCount('tasks', tasks.length);
+      updateRoomTabDotCount('members', members.filter(m => !m.left_at).length);
+    } catch (_) {}
+  }
+
+  function setActiveRoomTab(tabName){
+    const next = ['chat', 'files', 'ideas', 'tasks', 'members'].includes(tabName) ? tabName : 'chat';
+    activeRoomTab = next;
+    const roomId = getActiveRoomId();
+    if (roomTabsEl) roomTabsEl.hidden = !roomId;
+    roomTabButtons.forEach(btn => {
+      const on = btn.getAttribute('data-room-tab') === next;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    roomPanes.forEach(pane => {
+      const on = pane.getAttribute('data-room-pane') === next;
+      pane.classList.toggle('is-active', on);
+      pane.hidden = !on;
+    });
+    if (!roomId) return;
+    setRoomTabSeen(roomId, next, getRoomTabCurrentCount(next));
+    updateRoomTabDot(next, false);
+    if (next === 'files') reloadRoomFiles(roomId);
+    else if (next === 'ideas') reloadRoomIdeas(roomId);
+    else if (next === 'tasks') reloadRoomTasks(roomId);
+    else if (next === 'members') reloadRoomMembers(roomId);
+    else requestMessagesScrollbarUpdate();
+  }
+
+  function getRoomTabCurrentCount(tabName){
+    if (tabName === 'files') return roomFileItems.length;
+    if (tabName === 'members') return roomMembersCache.filter(m => !m.left_at).length;
+    return 0;
+  }
+
+  function fileKind(item){
+    const name = String((item && (item.original_name || item.file_name || item.file_path)) || '').toLowerCase();
+    const type = String((item && (item.content_type || item.file_type || item.mime_type)) || '').toLowerCase();
+    if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)) return 'image';
+    if (type === 'application/pdf' || type.startsWith('text/') || /\.(pdf|txt|md|csv|log|json|xml|docx?|xlsx?|pptx?|hwp|hwpx)$/i.test(name)) return 'doc';
+    if (/\.(zip|7z|rar|tar|gz)$/i.test(name)) return 'archive';
+    return 'etc';
+  }
+
+  function fileKindLabel(item){
+    const kind = fileKind(item);
+    if (kind === 'image') return 'IMG';
+    if (kind === 'doc') return 'DOC';
+    if (kind === 'archive') return 'ZIP';
+    return 'FILE';
+  }
+
+  function fileOpenUrl(item, inline){
+    if (!item) return '';
+    let url = item.file_path || item.download_url || item.raw_url || item.url || '';
+    if (!url) return '';
+    if (!/^https?:\/\//i.test(url) && url.charAt(0) !== '/') url = '/' + url;
+    if (inline) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'inline=1';
+    return url;
+  }
+
+  async function reloadRoomFiles(roomId){
+    if (!filesListEl) return;
+    filesListEl.innerHTML = '<div class="rp-empty">불러오는 중...</div>';
+    if (filesEmptyEl) filesEmptyEl.hidden = true;
+    try {
+      const data = await chatJson(roomApiPath(roomId, '/files'));
+      if (!isStillActiveRoom(roomId)) return;
+      roomFileItems = (data && data.items) || [];
+      const liveIds = new Set(roomFileItems.map(item => String(item.id)));
+      selectedRoomFileIds.forEach(id => { if (!liveIds.has(String(id))) selectedRoomFileIds.delete(id); });
+      updateRoomTabDotCount('files', roomFileItems.length);
+      renderRoomFiles();
+    } catch (err) {
+      filesListEl.innerHTML = '';
+      if (filesEmptyEl) { filesEmptyEl.hidden = false; filesEmptyEl.textContent = '파일을 불러오지 못했습니다: ' + (err.message || ''); }
+    }
+  }
+
+  function updateSelectedFilesDeleteButton(){
+    if (!filesDeleteSelectedBtn) return;
+    const n = selectedRoomFileIds.size;
+    filesDeleteSelectedBtn.disabled = n <= 0;
+    filesDeleteSelectedBtn.textContent = n > 0 ? `선택 삭제 (${n})` : '선택 삭제';
+  }
+
+  function renderRoomFiles(){
+    if (!filesListEl) return;
+    const query = String((filesSearchInput && filesSearchInput.value) || '').trim().toLowerCase();
+    const type = activeFileTypeFilter || 'all';
+    const filtered = roomFileItems.filter(item => {
+      if (type !== 'all' && fileKind(item) !== type) return false;
+      if (!query) return true;
+      const hay = [item.original_name, item.file_name, item.file_path, item.uploader && item.uploader.name].filter(Boolean).join(' ').toLowerCase();
+      return hay.indexOf(query) >= 0;
+    });
+    filesListEl.innerHTML = '';
+    updateSelectedFilesDeleteButton();
+    if (filesCountEl) filesCountEl.textContent = roomFileItems.length ? `${roomFileItems.length}개${(query || type !== 'all') ? ' · 필터 ' + filtered.length + '개' : ''}` : '';
+    if (!filtered.length) {
+      if (filesEmptyEl) { filesEmptyEl.hidden = false; filesEmptyEl.textContent = roomFileItems.length ? '필터와 일치하는 파일이 없습니다.' : '아직 공유된 파일이 없습니다.'; }
+      return;
+    }
+    if (filesEmptyEl) filesEmptyEl.hidden = true;
+    filtered.forEach(item => {
+      const row = createEl('div', 'file-item');
+      const select = createEl('label', 'fi-select');
+      select.title = '삭제할 파일 선택';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = selectedRoomFileIds.has(String(item.id));
+      checkbox.addEventListener('change', function(){
+        if (checkbox.checked) selectedRoomFileIds.add(String(item.id));
+        else selectedRoomFileIds.delete(String(item.id));
+        updateSelectedFilesDeleteButton();
+      });
+      select.appendChild(checkbox);
+      row.appendChild(select);
+      const icon = createEl('div', 'fi-icon');
+      icon.textContent = fileKindLabel(item);
+      row.appendChild(icon);
+      const body = createEl('div', 'fi-body');
+      const name = createEl('div', 'fi-name');
+      name.textContent = item.original_name || item.file_name || 'file';
+      const meta = createEl('div', 'fi-meta');
+      const metaParts = [];
+      if (item.uploader && item.uploader.name) metaParts.push(item.uploader.name);
+      if (item.uploaded_at || item.message_created_at) metaParts.push(formatRoomDateTime(item.uploaded_at || item.message_created_at));
+      if (item.file_size) metaParts.push(humanFileSize(item.file_size));
+      meta.textContent = metaParts.filter(Boolean).join(' · ');
+      body.appendChild(name);
+      body.appendChild(meta);
+      row.appendChild(body);
+      const actions = createEl('div', 'fi-actions');
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.textContent = '열기';
+      openBtn.addEventListener('click', function(){
+        const url = fileOpenUrl(item, true) || fileOpenUrl(item, false);
+        if (url) window.open(url, '_blank', 'noopener');
+      });
+      const down = document.createElement('a');
+      down.textContent = '다운로드';
+      down.href = fileOpenUrl(item, false) || '#';
+      down.target = '_blank';
+      down.rel = 'noopener';
+      down.setAttribute('download', item.original_name || item.file_name || 'download');
+      actions.appendChild(openBtn);
+      actions.appendChild(down);
+      row.appendChild(actions);
+      filesListEl.appendChild(row);
+    });
+  }
+
+  async function deleteSelectedRoomFiles(){
+    const ids = Array.from(selectedRoomFileIds).map(id => parseInt(id, 10)).filter(id => id > 0);
+    if (!ids.length) return;
+    if (!window.confirm(ids.length + '개 파일을 삭제하시겠습니까? 대화창의 해당 첨부도 함께 사라집니다.')) return;
+    const roomId = getActiveRoomId();
+    try {
+      for (const fileId of ids) {
+        await chatJson(`${chatConfig.apiRoot}/files/${fileId}`, { method: 'DELETE' });
+        selectedRoomFileIds.delete(String(fileId));
+      }
+      roomFileItems = roomFileItems.filter(item => ids.indexOf(Number(item.id)) < 0);
+      renderRoomFiles();
+      if (roomId) {
+        await fetchRoomMessages(roomId, { replace: true });
+        await reloadRoomFiles(roomId);
+        refreshRoomTabDots(roomId);
+      }
+      notifyCollab('파일을 삭제했습니다.', { title: '파일 삭제' });
+    } catch (err) {
+      notifyCollab('파일 삭제 실패: ' + (err.message || '알 수 없는 오류'), { title: '파일 삭제' });
+    }
+  }
+
+  function ideaStatusLabel(value){ return ({ review: '검토중', in_progress: '진행중', done: '완료', hold: '보류' })[value] || '검토중'; }
+  function chatIcon(name){ return '/static/image/svg/chat/' + name; }
+  function iconActionButton(iconName, label){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-action';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = '<img src="' + chatIcon(iconName) + '" alt="">';
+    return btn;
+  }
+
+  function parseIdeaBody(raw){
+    let text = String(raw || '');
+    let comments = [];
+    const commentMatch = text.match(/\n?\[댓글데이터:([A-Za-z0-9+/=]+)\]\s*$/);
+    if (commentMatch) {
+      try { comments = JSON.parse(decodeURIComponent(escape(atob(commentMatch[1])))) || []; } catch (_) { comments = []; }
+      text = text.slice(0, commentMatch.index).trimEnd();
+    }
+    const statusMatch = text.match(/^\[상태:(review|in_progress|done|hold)\]\n?/);
+    return { status: statusMatch ? statusMatch[1] : 'review', body: statusMatch ? text.slice(statusMatch[0].length) : text, comments: comments };
+  }
+
+  function composeIdeaBody(body, status, comments){
+    let text = '[상태:' + (status || 'review') + ']\n' + (body || '');
+    if (comments && comments.length) {
+      try { text += '\n[댓글데이터:' + btoa(unescape(encodeURIComponent(JSON.stringify(comments)))) + ']'; } catch (_) {}
+    }
+    return text;
+  }
+
+  function commentUser(comment){
+    const raw = comment.user || { id: comment.user_id || comment.userId, name: comment.name || '사용자', profile_image: comment.profile_image };
+    return { id: raw.id || comment.user_id || 0, name: raw.name || '사용자', avatar: resolveAvatarSrc(raw.profile_image || raw.avatar || '', raw.name || '사용자') };
+  }
+
+  async function reloadRoomIdeas(roomId){
+    if (!ideasListEl) return;
+    ideasListEl.innerHTML = '<div class="rp-empty">불러오는 중...</div>';
+    if (ideasEmptyEl) ideasEmptyEl.hidden = true;
+    try {
+      const data = await chatJson(roomApiPath(roomId, '/ideas'));
+      if (!isStillActiveRoom(roomId)) return;
+      const items = (data && data.items) || [];
+      updateRoomTabDotCount('ideas', items.length);
+      ideasListEl.innerHTML = '';
+      if (!items.length) { if (ideasEmptyEl) { ideasEmptyEl.hidden = false; ideasEmptyEl.textContent = '등록된 아이디어가 없습니다.'; } return; }
+      if (ideasEmptyEl) ideasEmptyEl.hidden = true;
+      items.forEach(item => renderIdeaItem(item));
+    } catch (err) {
+      ideasListEl.innerHTML = '';
+      if (ideasEmptyEl) { ideasEmptyEl.hidden = false; ideasEmptyEl.textContent = '아이디어를 불러오지 못했습니다: ' + (err.message || ''); }
+    }
+  }
+
+  function renderIdeaItem(item){
+    const parsed = parseIdeaBody(item.body || '');
+    const card = createEl('div', 'idea-item');
+    const title = createEl('div', 'ii-title');
+    title.textContent = item.title || '';
+    card.appendChild(title);
+    if (parsed.body) {
+      const body = createEl('div', 'ii-body');
+      body.textContent = parsed.body;
+      card.appendChild(body);
+    }
+    const meta = createEl('div', 'ii-meta');
+    const status = createEl('span', 'ii-status ii-status-' + parsed.status);
+    status.textContent = ideaStatusLabel(parsed.status);
+    meta.appendChild(status);
+    const likeData = item.likes || {};
+    const vote = document.createElement('button');
+    vote.type = 'button';
+    vote.className = 'ii-vote' + (likeData.liked_by_me ? ' is-voted' : '');
+    vote.innerHTML = '<img src="' + chatIcon('free-icon-font-thumbs-up.svg') + '" alt=""><span>' + (Number(likeData.count) || 0) + '</span>';
+    vote.addEventListener('click', async function(){
+      const roomId = getActiveRoomId();
+      if (!roomId) return;
+      try { await chatJson(roomApiPath(roomId, `/ideas/${item.id}/like`), { method: 'POST' }); await reloadRoomIdeas(roomId); }
+      catch (err) { notifyCollab('좋아요 처리 실패: ' + (err.message || ''), { title: '아이디어' }); }
+    });
+    meta.appendChild(vote);
+    if (item.created_by && item.created_by.name) {
+      const author = createEl('span');
+      author.textContent = item.created_by.name;
+      meta.appendChild(author);
+    }
+    if (item.created_at) {
+      const time = createEl('span');
+      time.textContent = formatRoomDateTime(item.created_at);
+      meta.appendChild(time);
+    }
+    const actions = createEl('div', 'ii-actions');
+    const commentBtn = iconActionButton('free-icon-font-comment-pen.svg', '댓글');
+    actions.appendChild(commentBtn);
+    if (Number(item.created_by_user_id) === Number(state.currentUserId)) {
+      const edit = iconActionButton('free-icon-font-pen-square.svg', '수정');
+      edit.addEventListener('click', function(){ openIdeaForm(item, parsed); });
+      actions.appendChild(edit);
+      const del = iconActionButton('free-icon-font-trash-xmark.svg', '삭제');
+      del.addEventListener('click', async function(){
+        if (!window.confirm('아이디어를 삭제할까요?')) return;
+        const roomId = getActiveRoomId();
+        if (!roomId) return;
+        try { await chatJson(roomApiPath(roomId, `/ideas/${item.id}`), { method: 'DELETE' }); await reloadRoomIdeas(roomId); refreshRoomTabDots(roomId); }
+        catch (err) { notifyCollab('아이디어 삭제 실패: ' + (err.message || ''), { title: '아이디어' }); }
+      });
+      actions.appendChild(del);
+    }
+    meta.appendChild(actions);
+    card.appendChild(meta);
+    const comments = Array.isArray(item.comments) ? item.comments : parsed.comments;
+    const commentsBox = createEl('div', 'ii-comments');
+    const summary = createEl('div');
+    summary.textContent = comments.length ? `댓글 ${comments.length}개` : '댓글 없음';
+    commentsBox.appendChild(summary);
+    comments.slice(-3).forEach(comment => {
+      const user = commentUser(comment);
+      const row = createEl('div', 'ii-comment-row');
+      row.appendChild(avatarImg(user.avatar, user.name, 'sm'));
+      const text = createEl('span');
+      text.textContent = (user.name || '사용자') + ': ' + (comment.body || comment.text || '');
+      row.appendChild(text);
+      commentsBox.appendChild(row);
+    });
+    commentBtn.addEventListener('click', function(){
+      const exists = commentsBox.querySelector('.ii-comment-box');
+      if (exists) { exists.remove(); return; }
+      const box = createEl('div', 'ii-comment-box');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '댓글 입력';
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.textContent = '등록';
+      const submit = async function(){
+        const body = input.value.trim();
+        const roomId = getActiveRoomId();
+        if (!body || !roomId) return;
+        try { await chatJson(roomApiPath(roomId, `/ideas/${item.id}/comments`), { method: 'POST', body: JSON.stringify({ body: body }) }); await reloadRoomIdeas(roomId); }
+        catch (err) { notifyCollab('댓글 등록 실패: ' + (err.message || ''), { title: '아이디어' }); }
+      };
+      save.addEventListener('click', submit);
+      input.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') submit(); });
+      box.appendChild(input);
+      box.appendChild(save);
+      commentsBox.appendChild(box);
+      setTimeout(function(){ input.focus(); }, 0);
+    });
+    card.appendChild(commentsBox);
+    ideasListEl.appendChild(card);
+  }
+
+  function closeCollabModal(kind){
+    const modal = kind === 'task' ? document.getElementById('taskFormModal') : document.getElementById('ideaFormModal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function openIdeaForm(item, parsedBody){
+    const modal = document.getElementById('ideaFormModal');
+    if (!modal) return;
+    const parsed = parsedBody || parseIdeaBody(item ? item.body : '');
+    ideaEditingId = item ? item.id : null;
+    ideaEditingComments = parsed.comments || [];
+    document.getElementById('ideaFormTitle').textContent = item ? '아이디어 수정' : '아이디어 추가';
+    document.getElementById('ideaFormTitleInput').value = item ? (item.title || '') : '';
+    document.getElementById('ideaFormBodyInput').value = item ? (parsed.body || '') : '';
+    document.getElementById('ideaFormStatus').value = parsed.status || 'review';
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(function(){ document.getElementById('ideaFormTitleInput').focus(); }, 30);
+  }
+
+  function taskStatusLabel(value){ return ({ todo: '대기', in_progress: '진행 중', done: '완료' })[value] || value || '대기'; }
+  function taskPriorityLabel(value){ return ({ low: '낮음', normal: '보통', high: '높음' })[value] || value || '보통'; }
+  function parseTaskDescription(raw){
+    const text = String(raw || '');
+    const approval = /^\[승인요청\]\n?/.test(text);
+    let body = approval ? text.replace(/^\[승인요청\]\n?/, '') : text;
+    let checklist = [];
+    const marker = '\n[체크리스트]\n';
+    const idx = body.indexOf(marker);
+    if (idx >= 0) {
+      const tail = body.slice(idx + marker.length);
+      body = body.slice(0, idx).trim();
+      checklist = tail.split(/\n/).map(line => line.replace(/^-\s*\[[ x]\]\s*/i, '').trim()).filter(Boolean);
+    }
+    return { description: body, checklist: checklist, approval: approval };
+  }
+  function composeTaskDescription(desc, checklistText, approval){
+    let text = String(desc || '').trim();
+    const lines = String(checklistText || '').split(/\n/).map(line => line.trim()).filter(Boolean);
+    if (lines.length) text += (text ? '\n' : '') + '[체크리스트]\n' + lines.map(line => '- [ ] ' + line).join('\n');
+    if (approval) text = '[승인요청]\n' + text;
+    return text;
+  }
+
+  async function reloadRoomTasks(roomId){
+    if (!tasksListEl) return;
+    tasksListEl.innerHTML = '<div class="rp-empty">불러오는 중...</div>';
+    if (tasksEmptyEl) tasksEmptyEl.hidden = true;
+    try {
+      const data = await chatJson(roomApiPath(roomId, '/tasks'));
+      if (!isStillActiveRoom(roomId)) return;
+      const items = (data && data.items) || [];
+      updateRoomTabDotCount('tasks', items.length);
+      tasksListEl.innerHTML = '';
+      if (!items.length) { if (tasksEmptyEl) { tasksEmptyEl.hidden = false; tasksEmptyEl.textContent = '등록된 업무가 없습니다.'; } return; }
+      if (tasksEmptyEl) tasksEmptyEl.hidden = true;
+      items.forEach(item => renderTaskItem(item));
+    } catch (err) {
+      tasksListEl.innerHTML = '';
+      if (tasksEmptyEl) { tasksEmptyEl.hidden = false; tasksEmptyEl.textContent = '업무를 불러오지 못했습니다: ' + (err.message || ''); }
+    }
+  }
+
+  function renderTaskItem(item){
+    const parsed = parseTaskDescription(item.description || '');
+    const card = createEl('div', 'task-item' + (item.status === 'done' ? ' is-done' : ''));
+    const check = document.createElement('button');
+    check.type = 'button';
+    check.className = 'ti-check';
+    check.textContent = '✓';
+    check.title = item.status === 'done' ? '완료 해제' : '완료 처리';
+    check.addEventListener('click', async function(){
+      const roomId = getActiveRoomId();
+      if (!roomId) return;
+      try { await chatJson(roomApiPath(roomId, `/tasks/${item.id}`), { method: 'PUT', body: JSON.stringify({ status: item.status === 'done' ? 'todo' : 'done' }) }); await reloadRoomTasks(roomId); }
+      catch (err) { notifyCollab('업무 상태 변경 실패: ' + (err.message || ''), { title: '업무공유' }); }
+    });
+    card.appendChild(check);
+    const body = createEl('div', 'ti-body');
+    const title = createEl('div', 'ti-title');
+    title.textContent = item.title || '';
+    body.appendChild(title);
+    if (parsed.description) {
+      const desc = createEl('div', 'ti-desc');
+      desc.textContent = parsed.description;
+      body.appendChild(desc);
+    }
+    if (parsed.checklist.length) {
+      const checklist = createEl('div', 'ti-checklist');
+      parsed.checklist.slice(0, 6).forEach(line => {
+        const row = createEl('div', 'ti-checkline');
+        row.textContent = '□ ' + line;
+        checklist.appendChild(row);
+      });
+      body.appendChild(checklist);
+    }
+    const meta = createEl('div', 'ti-meta');
+    const status = createEl('span', 'ti-status');
+    status.textContent = taskStatusLabel(item.status);
+    meta.appendChild(status);
+    const priority = createEl('span', 'ti-pri ti-pri-' + (item.priority || 'normal'));
+    priority.textContent = taskPriorityLabel(item.priority);
+    meta.appendChild(priority);
+    if (parsed.approval) {
+      const approval = createEl('span', 'ti-approval');
+      approval.textContent = '운영/보안 승인 요청';
+      meta.appendChild(approval);
+    }
+    if (item.assignee && item.assignee.name) {
+      const assignee = createEl('span');
+      assignee.textContent = item.assignee.name;
+      meta.appendChild(assignee);
+    }
+    if (item.due_date) {
+      const due = createEl('span');
+      due.textContent = item.due_date;
+      meta.appendChild(due);
+    }
+    const actions = createEl('div', 'ti-actions');
+    if (Number(item.created_by_user_id) === Number(state.currentUserId) || Number(item.assignee_user_id) === Number(state.currentUserId)) {
+      const edit = iconActionButton('free-icon-font-pen-square.svg', '수정');
+      edit.addEventListener('click', function(){ openTaskForm(item, parsed); });
+      actions.appendChild(edit);
+    }
+    if (Number(item.created_by_user_id) === Number(state.currentUserId)) {
+      const del = iconActionButton('free-icon-font-trash-xmark.svg', '삭제');
+      del.addEventListener('click', async function(){
+        if (!window.confirm('업무를 삭제할까요?')) return;
+        const roomId = getActiveRoomId();
+        if (!roomId) return;
+        try { await chatJson(roomApiPath(roomId, `/tasks/${item.id}`), { method: 'DELETE' }); await reloadRoomTasks(roomId); refreshRoomTabDots(roomId); }
+        catch (err) { notifyCollab('업무 삭제 실패: ' + (err.message || ''), { title: '업무공유' }); }
+      });
+      actions.appendChild(del);
+    }
+    meta.appendChild(actions);
+    body.appendChild(meta);
+    card.appendChild(body);
+    tasksListEl.appendChild(card);
+  }
+
+  function populateTaskAssignees(){
+    const select = document.getElementById('taskFormAssignee');
+    if (!select) return;
+    select.innerHTML = '<option value="">담당자 없음</option>';
+    const conv = getActiveConversation();
+    const members = roomMembersCache.length ? roomMembersCache : materializeMembers(conv);
+    members.forEach(member => {
+      const user = member.user || member;
+      const userId = member.user_id || user.id || member.id;
+      if (!userId || member.left_at) return;
+      const option = document.createElement('option');
+      option.value = String(userId);
+      option.textContent = user.name || member.name || ('user#' + userId);
+      select.appendChild(option);
+    });
+  }
+
+  function openTaskForm(item, parsedDescription){
+    const modal = document.getElementById('taskFormModal');
+    if (!modal) return;
+    const parsed = parsedDescription || parseTaskDescription(item ? item.description : '');
+    taskEditingId = item ? item.id : null;
+    document.getElementById('taskFormTitle').textContent = item ? '업무 수정' : '업무 추가';
+    document.getElementById('taskFormTitleInput').value = item ? (item.title || '') : '';
+    document.getElementById('taskFormDescInput').value = item ? (parsed.description || '') : '';
+    document.getElementById('taskFormStatus').value = item ? (item.status || 'todo') : 'todo';
+    document.getElementById('taskFormPriority').value = item ? (item.priority || 'normal') : 'normal';
+    document.getElementById('taskFormDue').value = item ? (item.due_date || '') : '';
+    populateTaskAssignees();
+    document.getElementById('taskFormAssignee').value = item && item.assignee_user_id ? String(item.assignee_user_id) : '';
+    document.getElementById('taskFormChecklist').value = parsed.checklist.join('\n');
+    document.getElementById('taskFormApproval').checked = !!parsed.approval;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(function(){ document.getElementById('taskFormTitleInput').focus(); }, 30);
+  }
+
+  async function reloadRoomMembers(roomId){
+    if (!membersListEl) return;
+    membersListEl.innerHTML = '<div class="rp-empty">불러오는 중...</div>';
+    if (membersEmptyEl) membersEmptyEl.hidden = true;
+    try {
+      const data = await chatJson(roomApiPath(roomId, '/members'));
+      if (!isStillActiveRoom(roomId)) return;
+      const items = Array.isArray(data) ? data : (data && data.items) || [];
+      roomMembersCache = items;
+      updateRoomTabDotCount('members', items.filter(item => !item.left_at).length);
+      if (membersCountEl) membersCountEl.textContent = items.length ? `(${items.length}명)` : '';
+      membersListEl.innerHTML = '';
+      if (!items.length) { if (membersEmptyEl) membersEmptyEl.hidden = false; return; }
+      if (membersEmptyEl) membersEmptyEl.hidden = true;
+      const conv = getActiveConversation();
+      const ownerId = conv && conv.createdByUserId;
+      items.forEach(member => {
+        const user = member.user || {};
+        const row = createEl('div', 'room-member-item');
+        row.appendChild(avatarImg(user.profile_image || user.avatar || '', user.name || '사용자', 'sm'));
+        const body = createEl('div', 'mi-body');
+        const name = createEl('div', 'mi-name');
+        name.textContent = user.name || member.name || ('user#' + (member.user_id || user.id || ''));
+        const sub = createEl('div', 'mi-sub');
+        sub.textContent = [user.emp_no || member.emp_no, user.department || user.dept || member.department, user.position || user.job || member.position].filter(Boolean).join(' · ');
+        body.appendChild(name);
+        body.appendChild(sub);
+        row.appendChild(body);
+        const role = createEl('span', 'mi-role' + (Number(member.user_id || user.id) === Number(ownerId) ? ' is-owner' : ''));
+        role.textContent = Number(member.user_id || user.id) === Number(ownerId) ? '관리자' : '멤버';
+        row.appendChild(role);
+        const presence = createEl('span', 'mi-presence');
+        presence.textContent = Number(member.user_id || user.id) === Number(state.currentUserId) ? '온라인' : '참여중';
+        row.appendChild(presence);
+        membersListEl.appendChild(row);
+      });
+    } catch (err) {
+      membersListEl.innerHTML = '';
+      if (membersEmptyEl) { membersEmptyEl.hidden = false; membersEmptyEl.textContent = '참여자 정보를 불러오지 못했습니다: ' + (err.message || ''); }
+    }
+  }
+
+  async function persistRoomName(conv, nextName){
+    if (!conv || !nextName) return;
+    conv.name = nextName;
+    conv.nameLocked = true;
+    if (thread.nameEl) thread.nameEl.textContent = nextName;
+    if (profile.nameEl) profile.nameEl.textContent = nextName;
+    renderList(getActiveFilter(), searchEl.value);
+    if (conv.roomId) {
+      await chatJson(buildRoomUrl(conv.roomId), {
+        method: 'PATCH',
+        body: JSON.stringify({ room_name: nextName, updated_by_user_id: state.currentUserId }),
+      });
+    }
+  }
+
+  async function renameActiveRoomFromPrompt(){
+    const conv = getActiveConversation();
+    if (!conv) return;
+    const label = isChannelConversation(conv) ? '채널 이름' : '채팅 이름';
+    const current = displayNameForConversation(conv);
+    const value = window.prompt(label + '을 입력하세요. (20자 이내)', current);
+    if (value === null) return;
+    const next = String(value || '').trim().slice(0, 20);
+    if (!next) { notifyCollab('이름을 입력하세요.', { title: '이름 변경' }); return; }
+    try {
+      await persistRoomName(conv, next);
+      notifyCollab('이름을 변경했습니다.', { title: '이름 변경' });
+      hydrateFromApi({ silent: true });
+    } catch (err) {
+      notifyCollab('이름 변경 실패: ' + (err.message || '알 수 없는 오류'), { title: '이름 변경' });
+    }
+  }
+
+  roomTabButtons.forEach(btn => {
+    btn.addEventListener('click', function(){ setActiveRoomTab(btn.getAttribute('data-room-tab')); });
+  });
+  filesSearchInput?.addEventListener('input', renderRoomFiles);
+  filesDeleteSelectedBtn?.addEventListener('click', deleteSelectedRoomFiles);
+  document.querySelectorAll('#filesTypeFilter .rp-filter-pill').forEach(btn => {
+    btn.addEventListener('click', function(){
+      activeFileTypeFilter = btn.getAttribute('data-file-type') || 'all';
+      document.querySelectorAll('#filesTypeFilter .rp-filter-pill').forEach(item => item.classList.toggle('active', item === btn));
+      renderRoomFiles();
+    });
+  });
+  btnIdeaAdd?.addEventListener('click', function(){ openIdeaForm(null); });
+  document.getElementById('btnIdeaSave')?.addEventListener('click', async function(){
+    const saveBtn = this;
+    const title = document.getElementById('ideaFormTitleInput').value.trim();
+    const body = document.getElementById('ideaFormBodyInput').value.trim();
+    const status = document.getElementById('ideaFormStatus').value || 'review';
+    const roomId = getActiveRoomId();
+    if (!title) { notifyCollab('제목을 입력하세요.', { title: '아이디어' }); return; }
+    if (!roomId) return;
+    saveBtn.disabled = true;
+    try {
+      const payload = { title: title, body: composeIdeaBody(body, status, ideaEditingComments) };
+      if (ideaEditingId) await chatJson(roomApiPath(roomId, `/ideas/${ideaEditingId}`), { method: 'PUT', body: JSON.stringify(payload) });
+      else await chatJson(roomApiPath(roomId, '/ideas'), { method: 'POST', body: JSON.stringify(payload) });
+      closeCollabModal('idea');
+      await reloadRoomIdeas(roomId);
+      refreshRoomTabDots(roomId);
+    } catch (err) {
+      notifyCollab('아이디어 저장 실패: ' + (err.message || '알 수 없는 오류'), { title: '아이디어' });
+    } finally { saveBtn.disabled = false; }
+  });
+  btnTaskAdd?.addEventListener('click', function(){ openTaskForm(null); });
+  document.getElementById('btnTaskSave')?.addEventListener('click', async function(){
+    const saveBtn = this;
+    const title = document.getElementById('taskFormTitleInput').value.trim();
+    const roomId = getActiveRoomId();
+    if (!title) { notifyCollab('제목을 입력하세요.', { title: '업무공유' }); return; }
+    if (!roomId) return;
+    const assigneeValue = document.getElementById('taskFormAssignee').value;
+    const payload = {
+      title: title,
+      description: composeTaskDescription(
+        document.getElementById('taskFormDescInput').value.trim(),
+        document.getElementById('taskFormChecklist').value,
+        document.getElementById('taskFormApproval').checked
+      ),
+      status: document.getElementById('taskFormStatus').value || 'todo',
+      priority: document.getElementById('taskFormPriority').value || 'normal',
+      due_date: document.getElementById('taskFormDue').value || null,
+      assignee_user_id: assigneeValue ? parseInt(assigneeValue, 10) : null,
+    };
+    saveBtn.disabled = true;
+    try {
+      if (taskEditingId) await chatJson(roomApiPath(roomId, `/tasks/${taskEditingId}`), { method: 'PUT', body: JSON.stringify(payload) });
+      else await chatJson(roomApiPath(roomId, '/tasks'), { method: 'POST', body: JSON.stringify(payload) });
+      closeCollabModal('task');
+      await reloadRoomTasks(roomId);
+      refreshRoomTabDots(roomId);
+    } catch (err) {
+      notifyCollab('업무 저장 실패: ' + (err.message || '알 수 없는 오류'), { title: '업무공유' });
+    } finally { saveBtn.disabled = false; }
+  });
+  document.querySelectorAll('[data-collab-close]').forEach(btn => {
+    btn.addEventListener('click', function(){ closeCollabModal(btn.getAttribute('data-collab-close')); });
+  });
+  btnRoomRename?.addEventListener('click', renameActiveRoomFromPrompt);
+  btnMemberInvite?.addEventListener('click', function(){
+    if (addMemberBtn && addMemberBtn.disabled) return;
+    openAddMemberMenu(btnMemberInvite || addMemberBtn);
+  });
+
   function setActive(id){
     activeId = id;
     state.activeDirectoryKey = null;
     closeAddMemberMenu();
+    roomFileItems = [];
+    selectedRoomFileIds = new Set();
+    roomMembersCache = [];
+    activeFileTypeFilter = 'all';
+    if (filesSearchInput) filesSearchInput.value = '';
+    document.querySelectorAll('#filesTypeFilter .rp-filter-pill').forEach(btn => {
+      btn.classList.toggle('active', (btn.getAttribute('data-file-type') || 'all') === 'all');
+    });
     const conv = conversations.find(c => c.id === id) || null;
     const prevUnread = conv ? (conv.unread || 0) : 0;
     const prevInteracted = conv ? (conv.lastInteracted || 0) : 0;
@@ -2721,9 +3534,12 @@
     renderMessages(id && conv ? id : null);
     if (id && conv && conv.roomId) {
       loadPinnedMessages(id);
+      setActiveRoomTab('chat');
+      refreshRoomTabDots(conv.roomId);
     } else if (pinBarEl) {
       pinBarEl.hidden = true;
       if (pinBarPopoverEl) pinBarPopoverEl.hidden = true;
+      setActiveRoomTab('chat');
     }
 
     // Now that the divider has been rendered, update lastReadMessageId to latest.
@@ -3083,6 +3899,10 @@
           conv.lastInteracted = mapped.createdAt;
         }
         finalize(text || (attachments.length ? '[첨부파일]' : ''), mapped?.time || when);
+        if (attachedFiles.length && conv.roomId) {
+          if (activeRoomTab === 'files') reloadRoomFiles(conv.roomId);
+          refreshRoomTabDots(conv.roomId);
+        }
         return;
       } catch (err) {
         console.warn('[chat] Failed to send via API', err);
@@ -3893,7 +4713,7 @@
   let nameBeforeEdit = '';
   function beginEditName(){
     const conv = conversations.find(c => c.id === activeId);
-    if (!conv || !Array.isArray(conv.groupAvatars)) return; // only groups
+    if (!conv || !isGroupConversation(conv)) return;
     if (!thread.nameEl) return;
     nameBeforeEdit = conv.name || '';
     thread.nameEl.setAttribute('contenteditable', 'true');
@@ -3913,12 +4733,9 @@
     thread.nameEl.removeAttribute('contenteditable');
     if (save && conv){
       const finalName = newName || nameBeforeEdit;
-      conv.name = finalName;
-  conv.nameLocked = true; // mark as user-customized to preserve name on future member additions
-      thread.nameEl.textContent = finalName;
-      profile.nameEl.textContent = finalName;
-      // reflect change in list
-      renderList(getActiveFilter(), searchEl.value);
+      persistRoomName(conv, finalName).catch(function(err){
+        console.warn('[chat] room rename failed', err);
+      });
     } else {
       thread.nameEl.textContent = nameBeforeEdit;
     }
@@ -4006,7 +4823,8 @@
     // Prefer server-backed group chat whenever we have real user ids.
     if (chatConfig.roomsUrl && myId != null && friendUserId != null) {
       try {
-        const activeIsGroup = String(activeConv.roomType || '').toUpperCase() === 'GROUP';
+        const activeRoomType = String(activeConv.roomType || '').toUpperCase();
+        const activeIsGroup = activeRoomType === 'GROUP' || activeRoomType === 'CHANNEL';
 
         // Add member into existing server group.
         if (activeIsGroup && activeConv.roomId) {
@@ -4030,6 +4848,10 @@
             if (normalized) {
               Object.assign(activeConv, normalized);
             }
+          }
+          if (activeConv.id === activeId && activeConv.roomId) {
+            if (activeRoomTab === 'members') reloadRoomMembers(activeConv.roomId);
+            refreshRoomTabDots(activeConv.roomId);
           }
           return { conv: activeConv, addedName: friendName };
         }

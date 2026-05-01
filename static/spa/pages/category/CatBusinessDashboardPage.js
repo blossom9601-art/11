@@ -2,6 +2,13 @@
 import { api }  from '../../shared/api-client.js';
 import { esc }  from '../../shared/dom-utils.js';
 
+const BUS_DASH_EMPTY_STICKER =
+  '<div class="no-data-lottie spa-cat-bus-sticker"' +
+    ' style="display:flex;align-items:center;justify-content:center;width:100%;min-height:72px;flex-direction:column;">' +
+    '<img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음"' +
+      ' style="width:72px;height:72px;object-fit:contain;" />' +
+  '</div>';
+
 const SECTIONS = [
   { key: 'work',      label: '업무 분류',   route: '/category/business/work',      api: '/api/work-categories' },
   { key: 'division',  label: '업무 구분',   route: '/category/business/division',  api: '/api/work-divisions' },
@@ -32,13 +39,20 @@ export default class CatBusinessDashboardPage {
   unmount() {}
 
   _render() {
-    const cards = SECTIONS.map(s => `
+    const cards = SECTIONS.map(s => {
+      const raw = this._counts[s.key];
+      const body =
+        typeof raw === 'number' && raw === 0
+          ? BUS_DASH_EMPTY_STICKER
+          : `<p class="spa-kpi-value">${esc(String(raw ?? '...'))}</p>`;
+      return `
       <a href="/spa${s.route}" class="spa-hub-card" data-route="${s.route}">
         <div class="spa-hub-card__body">
           <h4>${esc(s.label)}</h4>
-          <p class="spa-kpi-value">${this._counts[s.key] ?? '...'}</p>
+          ${body}
         </div>
-      </a>`).join('');
+      </a>`;
+    }).join('');
 
     this._el.innerHTML = `
       <div class="spa-page">

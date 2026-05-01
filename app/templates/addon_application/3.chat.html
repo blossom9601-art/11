@@ -8,8 +8,8 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260424-15">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260502-02">
 </head>
 <body class="chat-layout">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -100,11 +100,80 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
                     </div>
-                    <div class="messages-viewport">
-                        <div id="chat-messages" class="messages" aria-live="polite"></div>
-                        <div class="messages-scrollbar" id="messages-scrollbar" aria-hidden="true">
-                            <span class="thumb"></span>
-                        </div>
+                    <nav class="room-tabs" id="roomTabs" aria-label="채팅방 내부 메뉴" hidden>
+                        <button class="room-tab active" type="button" data-room-tab="chat" aria-selected="true">
+                            <span class="rt-ic rt-ic-chat" aria-hidden="true"></span>
+                            <span class="rt-main">대화</span>
+                        </button>
+                        <button class="room-tab" type="button" data-room-tab="files" aria-selected="false">
+                            <span class="rt-ic rt-ic-files" aria-hidden="true"></span>
+                            <span class="rt-main">파일</span><span class="rt-dot" hidden></span>
+                        </button>
+                        <button class="room-tab" type="button" data-room-tab="ideas" aria-selected="false">
+                            <span class="rt-ic rt-ic-ideas" aria-hidden="true"></span>
+                            <span class="rt-main">아이디어</span><span class="rt-dot" hidden></span>
+                        </button>
+                        <button class="room-tab" type="button" data-room-tab="tasks" aria-selected="false">
+                            <span class="rt-ic rt-ic-tasks" aria-hidden="true"></span>
+                            <span class="rt-main">업무공유</span><span class="rt-dot" hidden></span>
+                        </button>
+                        <button class="room-tab" type="button" data-room-tab="members" aria-selected="false">
+                            <span class="rt-ic rt-ic-members" aria-hidden="true"></span>
+                            <span class="rt-main">참여자 정보</span><span class="rt-dot" hidden></span>
+                        </button>
+                    </nav>
+                    <div class="room-body" id="roomBody">
+                        <section class="room-pane room-pane-chat is-active" id="roomPaneChat" data-room-pane="chat">
+                            <div class="messages-viewport">
+                                <div id="chat-messages" class="messages" aria-live="polite"></div>
+                                <div class="messages-scrollbar" id="messages-scrollbar" aria-hidden="true">
+                                    <span class="thumb"></span>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="room-pane" id="roomPaneFiles" data-room-pane="files" hidden>
+                            <div class="rp-head">
+                                <h3 class="rp-title">공유 파일 <span id="filesCount" class="rp-meta"></span></h3>
+                                <button class="btn-secondary rp-delete-selected" id="filesDeleteSelected" type="button" disabled>선택 삭제</button>
+                            </div>
+                            <div class="rp-toolbar">
+                                <input class="rp-search" id="filesSearchInput" type="search" placeholder="파일명, 업로더 검색" autocomplete="off">
+                                <div class="rp-filter-pills" id="filesTypeFilter" role="group" aria-label="파일 유형 필터">
+                                    <button class="rp-filter-pill active" type="button" data-file-type="all">전체</button>
+                                    <button class="rp-filter-pill" type="button" data-file-type="image">이미지</button>
+                                    <button class="rp-filter-pill" type="button" data-file-type="doc">문서</button>
+                                    <button class="rp-filter-pill" type="button" data-file-type="archive">압축</button>
+                                    <button class="rp-filter-pill" type="button" data-file-type="etc">기타</button>
+                                </div>
+                            </div>
+                            <div class="rp-list" id="filesList"></div>
+                            <div class="rp-empty" id="filesEmpty" hidden>아직 공유된 파일이 없습니다.</div>
+                        </section>
+                        <section class="room-pane" id="roomPaneIdeas" data-room-pane="ideas" hidden>
+                            <div class="rp-head">
+                                <h3 class="rp-title">아이디어</h3>
+                                <button class="btn-primary rp-add" id="btnIdeaAdd" type="button">아이디어 추가</button>
+                            </div>
+                            <div class="rp-list" id="ideasList"></div>
+                            <div class="rp-empty" id="ideasEmpty" hidden>등록된 아이디어가 없습니다.</div>
+                        </section>
+                        <section class="room-pane" id="roomPaneTasks" data-room-pane="tasks" hidden>
+                            <div class="rp-head">
+                                <h3 class="rp-title">업무공유</h3>
+                                <button class="btn-primary rp-add" id="btnTaskAdd" type="button">업무 추가</button>
+                            </div>
+                            <div class="rp-list" id="tasksList"></div>
+                            <div class="rp-empty" id="tasksEmpty" hidden>등록된 업무가 없습니다.</div>
+                        </section>
+                        <section class="room-pane" id="roomPaneMembers" data-room-pane="members" hidden>
+                            <div class="rp-head">
+                                <h3 class="rp-title">참여자 정보 <span id="membersCount" class="rp-meta"></span></h3>
+                                <button class="btn-secondary rp-add" id="btnRoomRename" type="button">이름 변경</button>
+                                <button class="btn-primary rp-add" id="btnMemberInvite" type="button">멤버 초대</button>
+                            </div>
+                            <div class="rp-list" id="membersList"></div>
+                            <div class="rp-empty" id="membersEmpty" hidden>참여자 정보가 없습니다.</div>
+                        </section>
                     </div>
                     <footer class="thread-input">
                         <div class="input-wrap">
@@ -331,6 +400,84 @@
         </div>
     </div>
 
+    <div class="chat-modal" id="ideaFormModal" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" data-collab-close="idea" aria-hidden="true"></div>
+        <div class="chat-modal__dialog chat-collab-form" role="dialog" aria-modal="true" aria-labelledby="ideaFormTitle">
+            <div class="chat-search-header">
+                <h3 id="ideaFormTitle">아이디어 추가</h3>
+                <button class="chat-search-close" type="button" data-collab-close="idea" aria-label="닫기">×</button>
+            </div>
+            <div class="collab-form-body">
+                <label class="form-label" for="ideaFormTitleInput">제목</label>
+                <input class="form-input" id="ideaFormTitleInput" type="text" maxlength="200" autocomplete="off">
+                <label class="form-label" for="ideaFormStatus">상태</label>
+                <select class="form-input" id="ideaFormStatus">
+                    <option value="review">검토중</option>
+                    <option value="in_progress">진행중</option>
+                    <option value="done">완료</option>
+                    <option value="hold">보류</option>
+                </select>
+                <label class="form-label" for="ideaFormBodyInput">내용</label>
+                <textarea class="form-input" id="ideaFormBodyInput" rows="6"></textarea>
+            </div>
+            <div class="collab-form-foot">
+                <button class="btn-secondary" type="button" data-collab-close="idea">취소</button>
+                <button class="btn-primary" type="button" id="btnIdeaSave">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-modal" id="taskFormModal" hidden aria-hidden="true">
+        <div class="chat-modal__backdrop" data-collab-close="task" aria-hidden="true"></div>
+        <div class="chat-modal__dialog chat-collab-form" role="dialog" aria-modal="true" aria-labelledby="taskFormTitle">
+            <div class="chat-search-header">
+                <h3 id="taskFormTitle">업무 추가</h3>
+                <button class="chat-search-close" type="button" data-collab-close="task" aria-label="닫기">×</button>
+            </div>
+            <div class="collab-form-body">
+                <label class="form-label" for="taskFormTitleInput">제목</label>
+                <input class="form-input" id="taskFormTitleInput" type="text" maxlength="200" autocomplete="off">
+                <div class="form-row">
+                    <div class="form-col">
+                        <label class="form-label" for="taskFormStatus">상태</label>
+                        <select class="form-input" id="taskFormStatus">
+                            <option value="todo">대기</option>
+                            <option value="in_progress">진행 중</option>
+                            <option value="done">완료</option>
+                        </select>
+                    </div>
+                    <div class="form-col">
+                        <label class="form-label" for="taskFormPriority">우선순위</label>
+                        <select class="form-input" id="taskFormPriority">
+                            <option value="low">낮음</option>
+                            <option value="normal">보통</option>
+                            <option value="high">높음</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col">
+                        <label class="form-label" for="taskFormDue">기한</label>
+                        <input class="form-input" id="taskFormDue" type="date">
+                    </div>
+                    <div class="form-col">
+                        <label class="form-label" for="taskFormAssignee">담당자</label>
+                        <select class="form-input" id="taskFormAssignee"><option value="">담당자 없음</option></select>
+                    </div>
+                </div>
+                <label class="form-label" for="taskFormDescInput">내용</label>
+                <textarea class="form-input" id="taskFormDescInput" rows="5"></textarea>
+                <label class="form-label" for="taskFormChecklist">체크리스트</label>
+                <textarea class="form-input" id="taskFormChecklist" rows="4" placeholder="한 줄에 하나씩 입력"></textarea>
+                <label class="collab-check"><input id="taskFormApproval" type="checkbox"> 운영/보안 승인 요청</label>
+            </div>
+            <div class="collab-form-foot">
+                <button class="btn-secondary" type="button" data-collab-close="task">취소</button>
+                <button class="btn-primary" type="button" id="btnTaskSave">저장</button>
+            </div>
+        </div>
+    </div>
+
         <div id="chat-config" hidden
             data-rooms-url="{{ chat_rooms_url or '/api/chat/rooms' }}"
             data-rooms-create-url="{{ chat_rooms_create_url or '/api/chat/rooms' }}"
@@ -342,7 +489,7 @@
             data-user-image="{{ current_profile_image or '' }}"
             data-directory-url="{{ chat_directory_url or '/api/chat/directory' }}"></div>
 
-        <script src="/static/js/addon_application/3.chat.js?{{ chat_js_version or 'v=20260425-01' }}"></script>
+        <script src="/static/js/addon_application/3.chat.js?{{ chat_js_version or 'v=20260501-01' }}"></script>
 
         </section>
     </main>

@@ -19,6 +19,24 @@
    * 단일 컨테이너에 탭을 렌더링한다.
    * @param {HTMLElement} container  탭을 렌더링할 div
    */
+  function skeletonHtml() {
+    return '<div class="spa-skeleton compact">'
+      + '<div class="spa-skeleton-bar w45 h14"></div>'
+      + '<div class="spa-skeleton-bar w70 h14"></div>'
+      + '</div>';
+  }
+
+  function setLoading(container, isLoading) {
+    if (!container) return;
+    container.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    container.setAttribute('data-bls-loading', isLoading ? 'true' : 'false');
+    if (isLoading) {
+      container.innerHTML = skeletonHtml();
+    } else {
+      container.removeAttribute('data-bls-loading');
+    }
+  }
+
   function renderTabs(container) {
     var pageCode   = container.getAttribute('data-page-code');
     var currentKey = container.getAttribute('data-current-key') || '';
@@ -26,10 +44,15 @@
 
     if (!pageCode) return;
 
-    fetch('/api/page-tabs?page_code=' + encodeURIComponent(pageCode))
+    setLoading(container, true);
+
+    var request = fetch('/api/page-tabs?page_code=' + encodeURIComponent(pageCode))
       .then(function (res) { return res.json(); })
       .then(function (data) {
-        if (!data.success || !data.items || !data.items.length) return;
+        if (!data.success || !data.items || !data.items.length) {
+          container.innerHTML = '';
+          return;
+        }
 
         // 탭 래퍼 생성 (기존 .system-tabs 스타일 재사용)
         var wrap = document.createElement('div');
@@ -101,7 +124,19 @@
       })
       .catch(function (err) {
         console.error('[PageTabRenderer] fetch error:', err);
+        container.innerHTML = '';
+      })
+      .then(function () {
+        setLoading(container, false);
       });
+
+    try {
+      if (window.BlossomReady && typeof window.BlossomReady.register === 'function') {
+        window.BlossomReady.register('page-tabs:' + pageCode, request);
+      }
+    } catch (_e) {}
+
+    return request;
   }
 
   /**

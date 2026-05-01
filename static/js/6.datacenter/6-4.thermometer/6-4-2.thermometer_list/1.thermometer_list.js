@@ -250,7 +250,9 @@
         '시스템 담당부서':'system_owner_dept','시스템 담당자':'system_owner',
         '서비스 담당부서':'service_owner_dept','서비스 담당자':'service_owner'
     };
-    const ENUM_SETS = { };
+    /** 추가/수정·일괄·엑셀: 업무 상태는 활성 / 비활성만 허용 */
+    const DC_ASSET_BUSINESS_STATUS_FIXED = ['활성', '비활성'];
+    const ENUM_SETS = { business_status: new Set(DC_ASSET_BUSINESS_STATUS_FIXED) };
     function isEmptyRow(arr){ return !arr || arr.every(v=> String(v??'').trim()===''); }
     function isIntegerLike(val){ if(val==null) return false; const s=String(val).trim(); if(s==='') return false; return /^-?\d+$/.test(s); }
     function toIntOrBlank(val){ const s=String(val??'').trim(); if(s==='') return ''; return parseInt(s,10); }
@@ -297,8 +299,15 @@
     ]);
 
     const SEARCH_SELECT_DEFINITIONS = {
+        dcAssetBusinessStatus: {
+            type: 'static',
+            options: [
+                { value: '활성', label: '활성' },
+                { value: '비활성', label: '비활성' },
+            ],
+        },
         businessStatus: {
-            // Load from biz_work_status
+            // Load from biz_work_status (표시 라벨 매핑용)
             url: '/api/work-statuses',
             normalize: (item)=>{
                 const code = String(item?.status_code || '').trim();
@@ -374,7 +383,7 @@
     };
 
     const FIELD_SEARCH_SOURCE = {
-        business_status: 'businessStatus',
+        business_status: 'dcAssetBusinessStatus',
         place: 'centers',
         system_owner_dept: 'departments',
         system_owner: 'users',
@@ -397,6 +406,35 @@
         system_owner: '시스템 담당부서를 먼저 선택하세요.',
         service_owner: '서비스 담당부서를 먼저 선택하세요.'
     };
+
+    function ensureDcAssetBusinessStatusCache(){
+        const key = 'dcAssetBusinessStatus';
+        if(searchSelectCache.get(key)?.loaded) return;
+        const base = DC_ASSET_BUSINESS_STATUS_FIXED.map(x => ({ value: x, label: x }));
+        searchSelectCache.set(key, { options: base, loaded: true, promise: null });
+    }
+
+    function augmentDcAssetBusinessStatusCache(displayValue){
+        ensureDcAssetBusinessStatusCache();
+        const v = String(displayValue ?? '').trim();
+        if(!v || v === '-') return;
+        const key = 'dcAssetBusinessStatus';
+        const cached = searchSelectCache.get(key);
+        const opts = Array.isArray(cached?.options) ? cached.options.slice() : [];
+        if(opts.some(o => String(o.value) === v || String(o.label) === v)) return;
+        opts.push({ value: v, label: v });
+        searchSelectCache.set(key, { options: opts, loaded: true, promise: null });
+    }
+
+    function dcAssetBusinessStatusTableCell(displayLabelRaw, highlightFn, col){
+        const displayVal = (displayLabelRaw == null || String(displayLabelRaw).trim() === '') ? '-' : String(displayLabelRaw).trim();
+        if(displayVal === '-') return highlightFn('-', col);
+        const norm = displayVal.replace(/\s+/g, '');
+        const isActive = norm === '활성' || norm === '사용' || norm === '가동';
+        const dotCls = isActive ? 'rack-detail-status-dot--active' : 'rack-detail-status-dot--inactive';
+        const text = highlightFn(displayVal, col);
+        return `<span class="rack-detail-status-wrap"><span class="rack-detail-status-dot ${dotCls}" aria-hidden="true"></span><span class="rack-detail-status-label">${text}</span></span>`;
+    }
 
     function normalizeToken(value){
         return String(value ?? '').trim().toLowerCase().replace(/\s+/g, '');
@@ -977,64 +1015,13 @@
         search: '',
         // 선택된 행 (row id 기반) 저장하여 리렌더 후에도 유지
         selected: new Set(),
-        nextId: 1, // mockData 초기화 후 재설정
+        nextId: 1,
         sortKey: null,
         sortDir: 'asc',
         columnFilters: {}, // { col: value | [values...] } (조건 필터 기능 제거 예정 - 빈 유지)
         isLoading: false,
         loadError: null
     };
-
-    // Optional demo: override the visible counter via URL param without changing data/pagination
-    // Usage: append ?demoCounter=1500 (commas allowed, e.g., 1,500)
-    let DEMO_COUNTER = null;
-
-    // RACK 시스템 페이지: 샘플 데이터 5개 제공
-    function mockData(count=5){
-        const rows = [
-            {
-                id: 1,
-                business_status: '가동', business_name: '통합인증',
-                vendor: 'HPE', model: 'ProLiant DL380 Gen10', serial: 'SGH12345',
-                place: '판교센터',
-                system_owner_dept: '인프라팀', system_owner: '홍길동',
-                service_owner_dept: '보안팀', service_owner: '김영희'
-            },
-            {
-                id: 2,
-                business_status: '유휴', business_name: 'DW',
-                vendor: 'Dell', model: 'PowerEdge R740', serial: 'D123-9876',
-                place: '상암센터',
-                system_owner_dept: '플랫폼팀', system_owner: '이철수',
-                service_owner_dept: '데이터팀', service_owner: '박민수'
-            },
-            {
-                id: 3,
-                business_status: '가동', business_name: 'ERP',
-                vendor: 'Cisco', model: 'UCS C240 M5', serial: 'CIS-5566',
-                place: '판교센터',
-                system_owner_dept: '인프라팀', system_owner: '최가을',
-                service_owner_dept: '재무팀', service_owner: '오상준'
-            },
-            {
-                id: 4,
-                business_status: '대기', business_name: '차세대API',
-                vendor: 'Lenovo', model: 'ThinkSystem SR650', serial: 'LN-8899',
-                place: '광주센터',
-                system_owner_dept: '플랫폼팀', system_owner: '윤하늘',
-                service_owner_dept: '플랫폼팀', service_owner: '윤하늘'
-            },
-            {
-                id: 5,
-                business_status: '가동', business_name: '모바일뱅킹',
-                vendor: 'Supermicro', model: 'SYS-2029P', serial: 'SMC-2029P-01',
-                place: '상암센터',
-                system_owner_dept: '인프라팀', system_owner: '한별',
-                service_owner_dept: '서비스개발팀', service_owner: '강동원'
-            }
-        ];
-        return rows.slice(0, Math.max(0, count|0));
-    }
 
     async function loadThermometerData(options){
         const opts = options || {};
@@ -1230,13 +1217,11 @@
                     }
                     const displayVal = (rawVal==null || String(rawVal).trim()==='') ? '-' : rawVal;
                     let cellValue = highlight(displayVal, col);
-                    // 업무 상태 배지 표시 (가동/유휴/대기)
+                    // 업무 상태: 활성/비활성 색점 + 라벨 (레거시 코드는 라벨 매핑)
                     if(col === 'business_status'){
                         const code = String(rawVal ?? '').trim();
-                        const label = code ? getWorkStatusLabel(code) : String(displayVal);
-                        const map = { '가동':'ws-run', '유휴':'ws-idle', '대기':'ws-wait' };
-                        const cls = map[label] || 'ws-wait';
-                        cellValue = `<span class="status-pill"><span class="status-dot ${cls}" aria-hidden="true"></span><span class="status-text">${highlight(label || '-', col)}</span></span>`;
+                        const labelText = (!code || code === '-') ? '-' : (getWorkStatusLabel(code) || code);
+                        cellValue = dcAssetBusinessStatusTableCell(labelText === '-' ? '-' : labelText, highlight, col);
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
                 }).join('')
@@ -1251,9 +1236,8 @@
         const countEl = document.getElementById(COUNT_ID);
         if(countEl){
             const prev = parseInt(countEl.getAttribute('data-count') || (countEl.textContent||'0').replace(/,/g,''), 10) || 0;
-            let next = state.filtered.length;
-            if(DEMO_COUNTER != null){ next = DEMO_COUNTER; }
-            const display = (DEMO_COUNTER != null) ? next.toLocaleString('ko-KR') : String(next);
+            const next = state.filtered.length;
+            const display = String(next);
             countEl.textContent = display;
             countEl.setAttribute('data-count', String(next));
             // size class management
@@ -1478,6 +1462,7 @@
                 wrap.innerHTML=`<label>${labelText}${requiredMark}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
             section.appendChild(grid); form.appendChild(section);
         });
+        augmentDcAssetBusinessStatusCache(row?.business_status);
         form.querySelectorAll('.search-select').forEach(input=>{
             const current = (input.value || '').trim();
             if(!current){
@@ -1485,26 +1470,8 @@
                 delete input.dataset.display;
                 return;
             }
-            // Default: show what we have.
             input.dataset.value = current;
             input.dataset.display = current;
-
-            // Special case: work status is stored as code, but should DISPLAY as name.
-            if(input.dataset.searchSource === 'businessStatus'){
-                const applyLabel = ()=>{
-                    const label = getWorkStatusLabel(current);
-                    if(label && label !== current){
-                        input.dataset.display = label;
-                        input.value = label;
-                        refreshSearchSelectLabel(input);
-                    }
-                };
-                if(workStatusByCode && workStatusByCode.size){
-                    applyLabel();
-                } else {
-                    prefetchWorkStatuses().then(applyLabel);
-                }
-            }
         });
         initSearchSelects(form);
     }
@@ -1513,7 +1480,9 @@
         const val = escapeHTML(String(value ?? ''));
         const requiredAttr = REQUIRED_FIELDS.has(col) ? ' required' : '';
         if(col==='business_status'){
-            return `<input name="business_status" class="form-input search-select" placeholder="검색 선택" data-search-source="${FIELD_SEARCH_SOURCE.business_status}" value="${val}"${requiredAttr}>`;
+            const ph = '업무 상태 검색';
+            const eph = escapeHTML(ph);
+            return `<input name="business_status" class="form-input search-select" placeholder="${eph}" data-placeholder="${eph}" data-search-source="${FIELD_SEARCH_SOURCE.business_status}" value="${val}" data-searchable="true"${requiredAttr}>`;
         }
         if(col==='business_name'){
             return `<input name="business_name" class="form-input" placeholder="필수" value="${val}" required>`;
@@ -1740,6 +1709,7 @@
     // Event wiring
     let searchDebounceTimer = null;
     function bindEvents(){
+        ensureDcAssetBusinessStatusCache();
         initSearchSelects(document);
         // 탭 (현재 1개지만 향후 확장 대비)
         document.querySelector('.system-tabs')?.addEventListener('click', e=>{
@@ -2126,6 +2096,10 @@
                             const label = header[c]; const key = HEADER_KO_TO_KEY[label];
                             rec[key] = String(row[c]??'').trim();
                         }
+                        const bs = String(rec.business_status ?? '').trim();
+                        if(bs && !ENUM_SETS.business_status.has(bs)){
+                            errors.push(`행 ${r + 1}: 업무 상태는 「활성」 또는 「비활성」만 입력할 수 있습니다.`);
+                        }
                         // RACK 시스템: 별도 숫자 필드 검증 없음
                         imported.push(rec);
                     }
@@ -2337,7 +2311,9 @@
         const EXCLUDE = new Set(['business_name', 'serial']);
         function inputFor(col){
             if(col === 'business_status'){
-                return `<input name="business_status" class="form-input search-select" placeholder="검색 선택" data-search-source="businessStatus" data-bulk-field="business_status">`;
+                const ph = '업무 상태 검색';
+                const eph = escapeHTML(ph);
+                return `<input name="business_status" class="form-input search-select" placeholder="${eph}" data-placeholder="${eph}" data-search-source="dcAssetBusinessStatus" data-bulk-field="business_status" data-searchable="true">`;
             }
             if(col === 'place'){
                 return `<input name="place" class="form-input search-select" placeholder="검색 선택" data-search-source="centers" data-bulk-field="place">`;
@@ -2399,45 +2375,14 @@
     if(checkEl) checkEl.innerHTML = '';
         // 대상 데이터: 현재 필터/정렬 적용 전부를 기준으로 통계 (state.filtered)
         const rows = state.filtered.length ? state.filtered : state.data;
-        // RACK 시스템 통계
-        (function(){
-            const dist = {};
-            (workStatusOptions || []).forEach(o=>{
-                const label = String(o?.label || o?.value || '').trim();
-                if(label) dist[label] = 0;
-            });
-            rows.forEach(r=>{
-                const code = String(r?.business_status ?? '').trim();
-                if(!code) return;
-                const label = getWorkStatusLabel(code);
-                if(!label) return;
-                dist[label] = (dist[label] || 0) + 1;
-            });
-            const fixed = Object.keys(dist);
-            renderStatBlock('stats-software', '업무 상태', dist, fixed);
-        })();
-        renderStatBlock('stats-software', '시스템 제조사', countBy(rows, 'vendor'));
+        renderStatBlock('stats-software', '업무 상태', countBy(rows, 'business_status', DC_ASSET_BUSINESS_STATUS_FIXED), DC_ASSET_BUSINESS_STATUS_FIXED);
+        renderStatBlock('stats-versions', '시스템 제조사', countBy(rows, 'vendor'));
     }
     }
 
     // (조건 필터 관련 함수 제거됨)
 
     function init(){
-        // Demo counter param parsing (e.g., ?demoCounter=1500 or ?demoCounter=1,500)
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const raw = params.get('demoCounter') || params.get('demo-counter');
-            if(raw){
-                const n = parseInt(String(raw).replace(/,/g,'').trim(), 10);
-                if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-            } else if(window.location.hash){
-                const m = window.location.hash.match(/demoCounter=([^&]+)/i) || window.location.hash.match(/demo-counter=([^&]+)/i);
-                if(m && m[1]){
-                    const n = parseInt(String(m[1]).replace(/,/g,'').trim(), 10);
-                    if(Number.isFinite(n) && n >= 0){ DEMO_COUNTER = n; }
-                }
-            }
-        } catch(_e){}
     // preload work statuses so the table shows status names (not codes)
     prefetchWorkStatuses().then(()=>{
         // If data already loaded, rerender to reflect labels

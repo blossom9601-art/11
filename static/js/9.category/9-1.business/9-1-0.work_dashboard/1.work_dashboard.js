@@ -120,9 +120,56 @@ function fixCanvasSize(el) {
   } catch (_) {}
 }
 
+/** 차트 렌더 직전: 캔버스 표시 + 빈 일러스트 숨김 */
+function prepareWorkDashChartCanvas(canvasId) {
+  var el = document.getElementById(canvasId);
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  try { el.style.display = 'block'; } catch (_) {}
+  var wrap = el.parentElement;
+  if (!wrap) return;
+  var ph = wrap.querySelector('.wd-empty-placeholder');
+  if (ph) ph.style.display = 'none';
+}
+
+/** 데이터 없거나 Chart 불가 시: 범례 제거 후 일러스트만 표시(캔버스 숨김, DOM 유지) */
+function paintWorkDashNoDataStickerCanvas(canvasId) {
+  var el = document.getElementById(canvasId);
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  try { var prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
+  var card = el.closest('.exec-card') || el.closest('.card.chart');
+  if (card) {
+    try {
+      var leg = card.querySelector('#' + canvasId + '-legend');
+      if (leg) leg.remove();
+    } catch (_) {}
+    try { card.classList.remove('has-legend'); } catch (_) {}
+  }
+  try { el.style.display = 'none'; } catch (_) {}
+  var wrap = el.parentElement;
+  if (!wrap) return;
+  var ph = wrap.querySelector('.wd-empty-placeholder');
+  if (ph) ph.style.display = 'flex';
+}
+
+function paintWorkDashNoDataStickerGroup(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  try { container.innerHTML = ''; } catch (_) {}
+  var host = container.closest('.wd-treemap-host');
+  if (host) {
+    var ph = host.querySelector('.wd-empty-placeholder');
+    if (ph) ph.style.display = 'flex';
+  }
+}
+
 function renderDoughnut(canvasId, items, onClick, options) {
   const el = document.getElementById(canvasId);
-  if (!el || !window.Chart) return;
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  if (!window.Chart) {
+    paintWorkDashNoDataStickerCanvas(canvasId);
+    return;
+  }
+  prepareWorkDashChartCanvas(canvasId);
   // Destroy previous Chart instance (SPA re-navigation)
   try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
   // Remove stale legend from previous render
@@ -259,7 +306,12 @@ function renderDoughnut(canvasId, items, onClick, options) {
 // Pie (with 5x2 external legend, no center text)
 function renderPie(canvasId, items, onClick, options) {
   const el = document.getElementById(canvasId);
-  if (!el || !window.Chart) return;
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  if (!window.Chart) {
+    paintWorkDashNoDataStickerCanvas(canvasId);
+    return;
+  }
+  prepareWorkDashChartCanvas(canvasId);
   // Destroy previous Chart instance (SPA re-navigation)
   try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
   // Remove stale legend from previous render
@@ -432,7 +484,13 @@ function renderBubble(canvasId, items, onClick, options) {
 }
 
 function renderBarVertical(canvasId, items, onClick) {
-  const el = document.getElementById(canvasId); if (!el || !window.Chart) return;
+  const el = document.getElementById(canvasId);
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  if (!window.Chart) {
+    paintWorkDashNoDataStickerCanvas(canvasId);
+    return;
+  }
+  prepareWorkDashChartCanvas(canvasId);
   try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
   fixCanvasSize(el);
   const limited = top10WithOthers(items);
@@ -460,7 +518,13 @@ function renderBarVertical(canvasId, items, onClick) {
 }
 
 function renderBarHorizontal(canvasId, items, onClick) {
-  const el = document.getElementById(canvasId); if (!el || !window.Chart) return;
+  const el = document.getElementById(canvasId);
+  if (!el || (el.tagName || '').toUpperCase() !== 'CANVAS') return;
+  if (!window.Chart) {
+    paintWorkDashNoDataStickerCanvas(canvasId);
+    return;
+  }
+  prepareWorkDashChartCanvas(canvasId);
   try { const prev = Chart.getChart(el); if (prev) prev.destroy(); } catch (_) {}
   fixCanvasSize(el);
   const limited = top10WithOthers(items);
@@ -504,7 +568,15 @@ function renderTreemap(containerId, items, onClick, options) {
   })).filter(d => d.value > 0);
   data.sort((a, b) => b.value - a.value);
   const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return;
+  if (!total) {
+    paintWorkDashNoDataStickerGroup(containerId);
+    return;
+  }
+  var host = container.closest('.wd-treemap-host');
+  if (host) {
+    var phTreemap = host.querySelector('.wd-empty-placeholder');
+    if (phTreemap) phTreemap.style.display = 'none';
+  }
   const colors = palette(data.length);
 
   // Squarify algorithm
@@ -894,18 +966,25 @@ function initWorkDashboard() {
 
     function doRender() {
       _pinGridLayout();
-      // 분류 → 파이 (Top5+기타)
-      if ((data.classification || []).length) renderPie('chart-classification', data.classification, onSegClick, { topN: 5 });
-      // 구분 → 도넛 (Top5+기타)
-      if ((data.division || []).length) renderDoughnut('chart-division', data.division, onSegClick, { showCenter: false, topN: 5 });
-      // 운영 → 세로 막대
-      var opItems = (data.operation || []).filter(x => (x.count || 0) > 0);
+      var clfPos = (data.classification || []).filter(function(x){ return (x.count || 0) > 0; });
+      if (clfPos.length) renderPie('chart-classification', data.classification, onSegClick, { topN: 5 });
+      else paintWorkDashNoDataStickerCanvas('chart-classification');
+
+      var divPos = (data.division || []).filter(function(x){ return (x.count || 0) > 0; });
+      if (divPos.length) renderDoughnut('chart-division', data.division, onSegClick, { showCenter: false, topN: 5 });
+      else paintWorkDashNoDataStickerCanvas('chart-division');
+
+      var opItems = (data.operation || []).filter(function(x){ return (x.count || 0) > 0; });
       if (opItems.length) renderBarVertical('chart-operation', opItems, onSegClick);
-      // 그룹 → 트리맵 (HW/SW, Top10)
-      if ((data.group || []).length) renderTreemap('chart-group', data.group, onSegClick, { topN: 10 });
-      // 상태 → 가로 막대
-      var stItems = (data.status || []).filter(x => (x.count || 0) > 0);
+      else paintWorkDashNoDataStickerCanvas('chart-operation');
+
+      var grpPos = (data.group || []).filter(function(x){ return ((x.hw || 0) + (x.sw || 0)) > 0; });
+      if (grpPos.length) renderTreemap('chart-group', data.group, onSegClick, { topN: 10 });
+      else paintWorkDashNoDataStickerGroup('chart-group');
+
+      var stItems = (data.status || []).filter(function(x){ return (x.count || 0) > 0; });
       if (stItems.length) renderBarHorizontal('chart-status', stItems, onSegClick);
+      else paintWorkDashNoDataStickerCanvas('chart-status');
 
       // Staged reflow fix for late CSS/layout settlement during SPA navigation.
       [60, 180, 420, 900, 1500, 2600, 3600].forEach(function(ms) {

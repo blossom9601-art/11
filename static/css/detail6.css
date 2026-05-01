@@ -111,3 +111,45 @@
 
 .hw-table input[type="text"], .hw-table input[type="email"], .hw-table input[type="number"], .hw-table textarea, .hw-table select { max-width:100%; }
 
+/* RACK 업무 상태 — 목록·상세: pill/외곽 링 없이 채워진 색점(Point) + 라벨 */
+.rack-detail-status-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  vertical-align: middle;
+}
+.system-data-table td[data-col="business_status"] .rack-detail-status-wrap,
+.server-data-table td[data-col="business_status"] .rack-detail-status-wrap {
+  justify-content: flex-start;
+}
+.rack-detail-status-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  box-sizing: border-box;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  background-clip: padding-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rack-detail-status-dot--active {
+  background-color: #6366f1 !important;
+}
+.rack-detail-status-dot--inactive {
+  background-color: #cbd5e1 !important;
+}
+.rack-detail-status-label {
+  font-weight: 500;
+  color: #374151;
+}

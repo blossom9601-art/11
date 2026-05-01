@@ -9,8 +9,8 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.4">
-    <link rel="stylesheet" href="/static/css/addon_application.css?v=20251214-12">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260502-1">
     <!-- FullCalendar: use global bundle (includes plugins/styles via injectStyles). -->
     <script src="/static/vendor/fullcalendar/6.1.15/index.global.min.js?{{ calendar_vendor_version }}"></script>
     <script src="/static/vendor/fullcalendar/6.1.15/locales-all.global.min.js?{{ calendar_vendor_version }}"></script>
@@ -68,6 +68,7 @@
                                         <div class="view-journal-tags" aria-label="일정 태그">
                                             <span class="view-journal-tag" id="view-sch-type"></span>
                                             <span class="view-journal-tag" id="view-sch-share"></span>
+                                            <span class="view-journal-tag" id="view-sch-repeat"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -173,6 +174,45 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="form-row schedule-repeat-section schedule-wide-row">
+                                <label for="sch-repeat">반복</label>
+                                <div class="schedule-repeat-grid">
+                                    <select id="sch-repeat" class="form-input">
+                                        <option value="none">반복 안 함</option>
+                                        <option value="daily">매일</option>
+                                        <option value="weekly">매주</option>
+                                        <option value="monthly">매월</option>
+                                        <option value="yearly">매년</option>
+                                        <option value="custom">사용자 지정</option>
+                                    </select>
+                                    <select id="sch-repeat-end-type" class="form-input" hidden>
+                                        <option value="never">종료 없음</option>
+                                        <option value="until">특정 날짜까지</option>
+                                        <option value="count">N회 반복</option>
+                                    </select>
+                                    <input type="date" id="sch-repeat-until" class="form-input" hidden>
+                                    <input type="number" id="sch-repeat-count" class="form-input" min="1" step="1" value="10" hidden>
+                                </div>
+                                <div id="sch-repeat-custom" class="schedule-repeat-grid schedule-repeat-custom" hidden>
+                                    <input type="number" id="sch-repeat-interval" class="form-input" min="1" step="1" value="1" aria-label="반복 주기">
+                                    <select id="sch-repeat-frequency" class="form-input" aria-label="반복 단위">
+                                        <option value="daily">일</option>
+                                        <option value="weekly">주</option>
+                                        <option value="monthly">개월</option>
+                                        <option value="yearly">년</option>
+                                    </select>
+                                </div>
+                                <div id="sch-repeat-weekdays" class="schedule-repeat-weekdays" hidden>
+                                    <label><input type="checkbox" value="SU">일</label>
+                                    <label><input type="checkbox" value="MO">월</label>
+                                    <label><input type="checkbox" value="TU">화</label>
+                                    <label><input type="checkbox" value="WE">수</label>
+                                    <label><input type="checkbox" value="TH">목</label>
+                                    <label><input type="checkbox" value="FR">금</label>
+                                    <label><input type="checkbox" value="SA">토</label>
+                                </div>
+                                <div id="sch-repeat-month-policy" class="schedule-repeat-policy" hidden>월말 보정: 없는 날짜는 해당 월의 마지막 날짜로 표시</div>
+                            </div>
                             <div class="form-row" style="grid-column: 1 / -1;">
                                 <label for="sch-attendee-input">참석자</label>
                                 <div class="schedule-token-field">
@@ -193,22 +233,11 @@
                                     <option value="1일 전">1일 전</option>
                                 </select>
                             </div>
-                            <div class="form-row">
-                                <label for="sch-sticker">스티커</label>
-                                <select id="sch-sticker" class="form-input">
-                                    <option value="">선택 안 함</option>
-                                    <option value="/static/image/svg/free-sticker-process.svg">프로세스</option>
-                                    <option value="/static/image/svg/error/free-sticker-teamwork.svg">팀워크</option>
-                                    <option value="/static/image/svg/error/free-sticker-business.svg">비즈니스</option>
-                                    <option value="/static/image/svg/error/free-sticker-report.svg">리포트</option>
-                                    <option value="/static/image/svg/error/free-sticker-business2.svg">비즈니스 2</option>
-                                </select>
-                            </div>
-                            <div class="form-row">
+                            <div class="form-row schedule-color-field schedule-wide-row">
                                 <label for="sch-color">일정 색상</label>
                                 <div class="schedule-color-row">
-                                    <input type="color" id="sch-color" class="schedule-color-input" value="#6366f1">
-                                    <span class="schedule-color-hint">달력에 표시되는 제목 색상</span>
+                                    <input type="hidden" id="sch-color" value="#6366f1">
+                                    <div id="sch-color-palette" class="schedule-color-palette" role="radiogroup" aria-label="일정 색상"></div>
                                 </div>
                             </div>
                             <!-- 설명 -->

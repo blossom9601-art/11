@@ -1,46 +1,12 @@
-// 데이터 삭제 관리 - 데이터 삭제 기록: 50개 샘플, 렌더/정렬/검색/페이징/CSV
+// 데이터 삭제 관리 - 데이터 삭제 기록: 렌더/정렬/검색/페이징/CSV
 (function() {
   const LS_KEY_RECORDS = 'ERASURE_RECORDS';
-  const NUM_ROWS = 50;
   const dateKeys = new Set(['work_date']);
   const state = { data: [], filtered: [], page: 1, pageSize: 10, sortKey: 'work_date', sortDir: 'desc', search: '' };
   const selected = new Set(); // key: serial
   let actionsBound = false;
   let initialized = false;
   let editingSerial = null;
-
-  function rand(arr, i) { return arr[i % arr.length]; }
-  function pad(n, w=2){ return String(n).padStart(w,'0'); }
-  function makeSerial(i) { const base=(20000000 + i*233)%99999999; return 'SN' + String(base).padStart(8,'0'); }
-
-  function sampleData() {
-    const workDepts = ['인프라운영팀','보안운영팀','데이터관리팀','개발1팀','개발2팀','서비스운영팀'];
-    const workers = ['김민수','이서준','박지민','최예린','정하준','한서연','오지후','유나래','장도윤','신가은'];
-    const reqDepts = ['금융서비스팀','플랫폼기획팀','영업지원팀','고객성공팀','AI서비스팀','경영관리팀'];
-    const reqPersons = ['김지수','박서연','이도윤','최하린','정우진','한예나','오승민','유다은','장민준','신서아'];
-    const vendors = ['Samsung','Seagate','Western Digital','Hitachi','Toshiba','Intel','Micron','SK hynix'];
-    const models = ['PM9A1','870 EVO','Barracuda','IronWolf','Ultrastar DC','X300','DC P4610','MX500'];
-    const failReasons = ['배드섹터 다수','장치 인식 불가','권한 문제','전원 불량','소프트웨어 오류'];
-    const arr = []; const today = new Date();
-    for (let i = 0; i < NUM_ROWS; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - (i*3));
-      const yyyy = d.getFullYear(); const mm = pad(d.getMonth()+1); const dd = pad(d.getDate());
-      const success = (i % 5 !== 0) ? '성공' : '실패';
-      arr.push({
-        work_date: `${yyyy}-${mm}-${dd}`,
-        work_dept: rand(workDepts, i+1),
-        worker: rand(workers, i+2),
-        req_dept: rand(reqDepts, i+3),
-        req_person: rand(reqPersons, i+4),
-        vendor: rand(vendors, i+5),
-        model: rand(models, i+6),
-        serial: makeSerial(i+1),
-        success,
-        fail_reason: success==='실패'?rand(failReasons, i):''
-      });
-    }
-    return arr;
-  }
 
   function loadData(){
     try {
@@ -203,7 +169,7 @@
   function init(){
     if (initialized) return; initialized = true;
     const persisted = loadData();
-    state.data = persisted || sampleData();
+    state.data = persisted || [];
     if (!persisted) saveData(state.data);
     state.filtered=state.data.slice(); applySort();
     const input=document.getElementById('physical-search'); const clearBtn=document.getElementById('physical-search-clear'); if(input) input.addEventListener('input',()=>{ state.search=input.value; if(clearBtn) clearBtn.style.display=input.value?'inline-flex':'none'; applyFilter(); });
