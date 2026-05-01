@@ -24,6 +24,24 @@
     }
     function bindEmpNoAlphanumeric(el) {
         if (!el) return;
+        /* IME(한글 등): 조합 중에는 input 필터가 스킵되는 경우가 많음 → 삽입 전에 차단 */
+        el.addEventListener(
+            'beforeinput',
+            function (e) {
+                var t = e.inputType || '';
+                if (
+                    t !== 'insertText' &&
+                    t !== 'insertCompositionText' &&
+                    t !== 'insertReplacementText'
+                ) {
+                    return;
+                }
+                var data = e.data;
+                if (data == null || data === '') return;
+                if (/[^A-Za-z0-9]/.test(data)) e.preventDefault();
+            },
+            true
+        );
         el.addEventListener('input', function (e) {
             if (e.isComposing) return;
             var v = el.value;
@@ -37,6 +55,19 @@
             }
         });
         el.addEventListener('compositionend', function () {
+            requestAnimationFrame(function () {
+                var v = el.value;
+                var f = alphanumericOnly(v);
+                if (v !== f) {
+                    var sel = el.selectionStart;
+                    var before = v.slice(0, sel);
+                    var caret = alphanumericOnly(before).length;
+                    el.value = f;
+                    el.setSelectionRange(caret, caret);
+                }
+            });
+        });
+        el.addEventListener('blur', function () {
             var v = el.value;
             var f = alphanumericOnly(v);
             if (v !== f) el.value = f;
