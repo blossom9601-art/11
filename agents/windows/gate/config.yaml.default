@@ -1,0 +1,8 @@
+gate_server_url: "https://ttt5:8443"
+agent_id: ""
+token: ""
+policy_poll_interval_seconds: 60
+heartbeat_interval_seconds: 30
+log_flush_interval_seconds: 10
+log_level: "info"
+verify_tls: true

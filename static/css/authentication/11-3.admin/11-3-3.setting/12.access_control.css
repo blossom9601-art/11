@@ -3,7 +3,37 @@
  * 본 파일은 접근제어 페이지에서만 필요한 추가 요소만 정의한다.
  */
 
+/* ═══════ 승인 정책 / WEB 통제 — 좌우 2열 (좁은 화면에서는 세로 스택) ═══════ */
+.admin-settings-wrapper .ac-settings-columns {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 18px;
+	align-items: stretch;
+}
+.admin-settings-wrapper .ac-settings-columns > .setting-card {
+	min-width: 0;
+}
+@media (max-width: 960px) {
+	.admin-settings-wrapper .ac-settings-columns {
+		grid-template-columns: 1fr;
+	}
+}
+
 /* 폼 한 줄 전체 차지 */
+.admin-settings-wrapper .setting-card .setting-card-actions.ac-card-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.admin-settings-wrapper .ac-card-footer .ac-card-status {
+	margin: 0;
+	font-size: 13px;
+	color: #64748b;
+	flex: 1;
+	min-width: 140px;
+}
 .admin-settings-wrapper .form-row.form-row-wide { grid-column:1 / -1; }
 .admin-settings-wrapper .required { color:#dc2626; margin-left:4px; }
 
@@ -161,3 +191,38 @@
 	font-size:12px; font-weight:700; cursor:pointer;
 }
 .flatpickr-calendar.blossom-date-popup .fp-today-btn:hover { background:#e0e7ff; }
+
+/* 로드맵·WEB 정책 폼 (20260507) */
+.admin-settings-wrapper .ac-roadmap-details {
+	margin:0 0 16px;
+	padding:12px 14px;
+	background:#f8fafc;
+	border-radius:10px;
+	border:1px solid #e2e8f0;
+	font-size:13px;
+	color:#475569;
+}
+.admin-settings-wrapper .ac-roadmap-details summary {
+	cursor:pointer;
+	font-weight:600;
+	color:#334155;
+}
+.admin-settings-wrapper .ac-roadmap-list {
+	margin:8px 0 0;
+	padding-left:20px;
+	line-height:1.55;
+}
+.admin-settings-wrapper .ac-roadmap-doc { margin:10px 0 0; font-size:12px; color:#64748b; }
+.admin-settings-wrapper .ac-inline-code {
+	font-size:12px;
+	background:#f1f5f9;
+	padding:2px 6px;
+	border-radius:4px;
+}
+.admin-settings-wrapper textarea.ac-textarea-policy {
+	min-height:88px;
+	font-family:inherit;
+	resize:vertical;
+	width:100%;
+	box-sizing:border-box;
+}

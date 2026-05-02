@@ -9,11 +9,11 @@
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260502a">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260503agentkpi1">
 	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260502a" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260503agentkpi1" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -22,25 +22,25 @@
 		<div class="content-wrapper">
 			<div class="page-header audit-page-header">
 				<h1>접근제어 감사</h1>
-				<p>접속 이력과 실패 이력을 구분해 확인합니다.</p>
+				<p>접속 기록과 PC 에이전트 연동 상태를 확인합니다.</p>
 			</div>
 
 			<div class="system-tabs audit-tabs" role="tablist" aria-label="접근제어 감사 탭">
-				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" id="audit-tab-access" data-audit-scope="access">접속 감사</button>
-				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" id="audit-tab-fail" data-audit-scope="fail">실패 감사</button>
+				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" id="audit-tab-access" data-audit-scope="access" aria-controls="audit-list-pane">접속 기록</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" id="audit-tab-agent" data-audit-scope="agent" aria-controls="agent-list-pane">PC 에이전트</button>
 			</div>
 
 			<div class="tab-content single-pane audit-tab-content">
 				<div class="tab-pane active" id="audit-list-pane">
 					<div class="tab-header audit-tab-header">
 						<div class="tab-header-left">
-							<h2><span id="audit-current-title">접속 감사</span> <span class="count-badge" id="audit-count">0</span></h2>
+							<h2><span id="audit-current-title">접속 기록</span> <span class="count-badge" id="audit-count">0</span></h2>
 						</div>
 						<div class="tab-header-right audit-toolbar">
 							<div class="search-container audit-search" role="search">
 								<div class="search-input-wrapper" id="audit-search-wrapper">
 									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-									<input type="text" id="audit-keyword-filter" placeholder="사용자, 자원, IP 검색" class="search-input" aria-label="감사 기록 검색" autocomplete="off">
+									<input type="text" id="audit-keyword-filter" placeholder="이름, 부서, 사번, 자원 이름, 접속 URL/IP, 접속 IP 검색" class="search-input" aria-label="감사 기록 검색" autocomplete="off">
 									<button type="button" class="search-clear-btn" id="audit-search-clear" title="지우기" aria-label="검색어 지우기">
 										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
 									</button>
@@ -54,14 +54,17 @@
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector" id="audit-page-size-wrapper">
 								<select id="audit-page-size" class="page-size-select" aria-controls="audit-table" aria-label="페이지 당 감사 기록 수">
-									<option value="10">10 개</option>
-									<option value="20" selected>20 개</option>
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
 									<option value="30">30 개</option>
 									<option value="50">50 개</option>
 									<option value="100">100 개</option>
 									<option value="200">200 개</option>
 								</select>
 							</div>
+							<button type="button" class="header-btn" id="audit-download-btn" title="CSV 다운로드" aria-label="CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
 							<button type="button" class="header-btn" id="audit-reset-btn" title="초기화" aria-label="필터 초기화">
 								<img src="/static/image/svg/refresh-ccw.svg" alt="초기화" class="header-icon">
 							</button>
@@ -73,14 +76,19 @@
 							<thead>
 								<tr>
 									<th class="audit-col-check"><input type="checkbox" id="audit-select-all" aria-label="감사 기록 전체 선택"></th>
-									<th class="audit-col-time" data-col="occurred_at">일시</th>
-									<th class="audit-col-kind" data-col="endpoint_kind">WEB/SSH</th>
+									<th class="audit-col-access-start" data-col="occurred_at">접속 일시</th>
+									<th class="audit-col-session-end" data-col="session_ended_at">종료 일시</th>
+									<th class="audit-col-kind" data-col="endpoint_kind">유형</th>
 									<th class="audit-col-action" data-col="action_type">작업</th>
 									<th class="audit-col-result" data-col="action_result">결과</th>
-									<th class="audit-col-actor" data-col="actor">사용자</th>
-									<th class="audit-col-resource" data-col="resource">자원</th>
-									<th class="audit-col-ip" data-col="ip_address">IP</th>
-									<th class="audit-col-note" data-col="note">비고</th>
+									<th class="audit-col-fail-reason" data-col="note">실패 사유</th>
+									<th class="audit-col-dept" data-col="actor_department">부서</th>
+									<th class="audit-col-emp-no" data-col="actor_emp_no">사번</th>
+									<th class="audit-col-user-name" data-col="actor_name">사용자</th>
+									<th class="audit-col-resource" data-col="resource_name">자원 이름</th>
+									<th class="audit-col-connect-account" data-col="connect_account">접속 계정</th>
+									<th class="audit-col-access-info" data-col="access_info">접속 URL/IP</th>
+									<th class="audit-col-ip" data-col="ip_address">접속 IP</th>
 								</tr>
 							</thead>
 							<tbody id="audit-table-body"></tbody>
@@ -103,6 +111,142 @@
 							<div class="page-numbers" id="audit-page-numbers"></div>
 							<button type="button" class="pagination-btn" id="audit-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
 							<button type="button" class="pagination-btn" id="audit-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
+						</div>
+					</div>
+				</div>
+
+				<div class="tab-pane agent-tab-pane" id="agent-list-pane" hidden>
+					<div class="agent-kpi-panel" aria-label="PC 에이전트 KPI">
+						<div class="agent-kpi-visual" aria-hidden="true">
+							<img src="/static/image/svg/free-icon-font-analyse1.svg" alt="" class="agent-kpi-icon" loading="lazy">
+						</div>
+						<div class="agent-kpi-content">
+							<div class="agent-kpi-head">
+								<span class="agent-kpi-eyebrow">PC 에이전트 KPI</span>
+								<strong id="agent-kpi-total">0대</strong>
+							</div>
+							<p class="agent-kpi-copy" id="agent-kpi-copy">연동 데이터를 불러오고 있습니다.</p>
+							<div class="agent-kpi-bars" aria-label="PC 에이전트 지표">
+								<div class="agent-kpi-bar-group">
+									<div class="agent-kpi-bar-label"><span>연동 안정률</span><strong id="agent-kpi-normal-rate">0%</strong></div>
+									<div class="agent-kpi-bar"><i id="agent-kpi-normal-bar"></i></div>
+								</div>
+								<div class="agent-kpi-bar-group">
+									<div class="agent-kpi-bar-label"><span>사용자 연결률</span><strong id="agent-kpi-mapped-rate">0%</strong></div>
+									<div class="agent-kpi-bar"><i id="agent-kpi-mapped-bar"></i></div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="tab-header audit-tab-header agent-tab-header">
+						<div class="tab-header-left">
+							<h2>PC 에이전트 <span class="count-badge" id="agent-count">0</span></h2>
+						</div>
+						<div class="tab-header-right audit-toolbar agent-toolbar">
+							<div class="search-container audit-search" role="search">
+								<div class="search-input-wrapper" id="agent-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="agent-keyword-filter" placeholder="PC명, 로그인 사용자, IP, 사번, 이름 검색" class="search-input" aria-label="PC 에이전트 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="agent-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+									<div class="search-loader" id="agent-search-loader" aria-hidden="true"></div>
+								</div>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector agent-filter-selector">
+								<select id="agent-mapping-filter" class="page-size-select" aria-label="사용자 연결 상태">
+									<option value="">전체 연결</option>
+									<option value="mapped">연결됨</option>
+									<option value="unmapped">연결 대기</option>
+								</select>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector">
+								<select id="agent-page-size" class="page-size-select" aria-controls="agent-table" aria-label="페이지 당 PC 에이전트 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="30">30 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<button type="button" class="header-btn" id="agent-download-btn" title="CSV 다운로드" aria-label="PC 에이전트 CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
+							<button type="button" class="header-btn" id="agent-refresh-btn" title="새로고침" aria-label="PC 에이전트 새로고침">
+								<img src="/static/image/svg/refresh-ccw.svg" alt="새로고침" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<div class="system-table-container audit-table-container agent-table-container" id="agent-table-wrap">
+						<table class="system-data-table audit-table agent-table" id="agent-table">
+							<thead>
+								<tr>
+									<th class="agent-col-status">상태</th>
+									<th class="agent-col-host">PC명</th>
+									<th class="agent-col-current-user">현재 로그인</th>
+									<th class="agent-col-mapped-user">연결 사용자</th>
+									<th class="agent-col-version">버전</th>
+									<th class="agent-col-policy">정책</th>
+									<th class="agent-col-last-seen">마지막 하트비트</th>
+									<th class="agent-col-network">IP/MAC</th>
+									<th class="agent-col-error">오류</th>
+									<th class="agent-col-action">관리</th>
+								</tr>
+							</thead>
+							<tbody id="agent-table-body"></tbody>
+						</table>
+					</div>
+					<div id="agent-empty" class="system-empty audit-empty" hidden role="status" aria-live="polite">
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3>PC 에이전트가 없습니다.</h3>
+								<p>에이전트가 연동되면 이곳에서 사용자를 연결할 수 있습니다.</p>
+						</div>
+					</div>
+					<div class="modern-pagination audit-pagination" id="agent-pagination">
+						<div class="pagination-info"><span id="agent-page-info">0개 항목</span></div>
+						<div class="pagination-controls">
+							<button type="button" class="pagination-btn" id="agent-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
+							<button type="button" class="pagination-btn" id="agent-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
+							<div class="page-numbers" id="agent-page-numbers"></div>
+							<button type="button" class="pagination-btn" id="agent-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
+							<button type="button" class="pagination-btn" id="agent-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="modal-overlay-full agent-map-modal" id="agent-map-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agent-map-title">
+				<div class="agent-map-dialog" role="document">
+					<div class="agent-map-header">
+						<div>
+							<h2 id="agent-map-title">사용자 연결</h2>
+							<p id="agent-map-subtitle">PC 에이전트와 조직 사용자를 연결합니다.</p>
+						</div>
+						<button type="button" class="agent-map-close" id="agent-map-close" aria-label="닫기">×</button>
+					</div>
+					<div class="agent-map-body">
+						<div class="agent-map-target" id="agent-map-target"></div>
+						<label class="agent-map-label" for="agent-user-search">사용자 검색</label>
+						<div class="agent-user-search-box">
+							<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+							<input type="text" id="agent-user-search" autocomplete="off" placeholder="이름, 사번, 부서, 이메일 검색" aria-label="연결할 사용자 검색">
+							<div class="search-loader" id="agent-user-search-loader" aria-hidden="true"></div>
+						</div>
+						<div class="agent-user-results" id="agent-user-results" role="listbox" aria-label="사용자 검색 결과"></div>
+						<div class="agent-selected-user" id="agent-selected-user" hidden></div>
+						<label class="agent-map-label" for="agent-map-note">매핑 메모</label>
+						<textarea id="agent-map-note" rows="3" maxlength="500" placeholder="필요 시 매핑 근거를 남기세요."></textarea>
+					</div>
+					<div class="agent-map-footer">
+						<button type="button" class="secondary-btn" id="agent-map-clear">매핑 해제</button>
+						<div class="agent-map-footer-actions">
+							<button type="button" class="secondary-btn" id="agent-map-cancel">취소</button>
+							<button type="button" class="primary-btn" id="agent-map-save">저장</button>
 						</div>
 					</div>
 				</div>

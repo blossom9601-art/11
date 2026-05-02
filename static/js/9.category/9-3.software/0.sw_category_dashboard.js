@@ -116,15 +116,37 @@
 
   function renderDonut(eosl) {
     var canvas = document.getElementById('sw-eosl-donut');
-    if (!canvas || !window.Chart) return;
+    var wrap = document.getElementById('sw-eosl-donut-wrap');
+    var emptyPh = document.getElementById('sw-eosl-donut-empty');
+    if (!canvas) return;
     destroyChart('sw-eosl-donut');
 
     var keys = ['healthy', 'imminent', 'expired', 'unknown'];
     var values = keys.map(function (k) { return eosl[k] || 0; });
-    var colors = keys.map(function (k) { return COLORS[k]; });
     var total = values.reduce(function (s, v) { return s + v; }, 0);
 
     var totalEl = document.getElementById('sw-eosl-total');
+    var leg = document.getElementById('sw-eosl-legend');
+
+    if (total === 0) {
+      if (leg) leg.innerHTML = '';
+      if (totalEl) totalEl.textContent = fmt(0);
+      if (wrap) wrap.classList.add('cat-donut-wrap--empty');
+      if (emptyPh) {
+        emptyPh.hidden = false;
+        emptyPh.setAttribute('aria-hidden', 'false');
+      }
+      return;
+    }
+
+    if (!window.Chart) return;
+    if (wrap) wrap.classList.remove('cat-donut-wrap--empty');
+    if (emptyPh) {
+      emptyPh.hidden = true;
+      emptyPh.setAttribute('aria-hidden', 'true');
+    }
+
+    var colors = keys.map(function (k) { return COLORS[k]; });
     if (totalEl) animateCount(totalEl, total);
 
     chartInstances['sw-eosl-donut'] = new Chart(canvas, {
@@ -156,6 +178,11 @@
     var el = document.getElementById('sw-eosl-legend');
     if (!el) return;
     var keys = ['healthy', 'imminent', 'expired', 'unknown'];
+    var sum = keys.reduce(function (s, k) { return s + (eosl[k] || 0); }, 0);
+    if (sum === 0) {
+      el.innerHTML = '';
+      return;
+    }
     el.innerHTML = '';
     keys.forEach(function (k) {
       var div = document.createElement('div');
@@ -171,11 +198,21 @@
   /* ── 4. 위험 자산 리스트 ── */
   function renderRiskList(riskTop) {
     var ul = document.getElementById('sw-risk-list');
+    var ph = document.getElementById('sw-risk-empty-sticker');
     if (!ul) return;
     ul.innerHTML = '';
     if (!riskTop || !riskTop.length) {
-      ul.innerHTML = '<li class="cat-risk-empty">위험 자산이 없습니다.</li>';
+      if (ph) {
+        ph.hidden = false;
+        ph.setAttribute('aria-hidden', 'false');
+      }
+      ul.hidden = true;
       return;
+    }
+    ul.hidden = false;
+    if (ph) {
+      ph.hidden = true;
+      ph.setAttribute('aria-hidden', 'true');
     }
     riskTop.forEach(function (r) {
       var li = document.createElement('li');

@@ -1,6 +1,6 @@
 {
   "name": "blossom-desktop",
-  "version": "0.5.40",
+  "version": "0.5.51",
   "private": true,
   "description": "Blossom 사내 메신저 데스크탑 앱 (Electron)",
   "main": "src/main/index.js",
@@ -9,7 +9,8 @@
     "start:dev": "cross-env BLOSSOM_DEV=1 electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
+    "fetch-putty": "node scripts/download-putty.js",
+    "dist:win": "node scripts/download-putty.js && node scripts/build-blossom-ssh-launch.js && electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux"
   },
@@ -22,6 +23,13 @@
       "build/icon.ico",
       "build/icon.png",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/putty",
+        "to": "putty",
+        "filter": ["**/*"]
+      }
     ],
     "directories": {
       "output": "dist"

@@ -25,7 +25,7 @@
 				<p>각 페이지의 상단 탭을 등록·수정·삭제·순서 변경할 수 있습니다.</p>
 			</div>
 
-			<div class="system-tabs" role="tablist" aria-label="관리자 설정 탭">
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
@@ -40,6 +40,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
 				<a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_access_control_settings') }}">접근제어</a>
 			</div>
 
 			<div class="tab-content single-pane">

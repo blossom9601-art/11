@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/category2.css?v=1.0.5">
-    <link rel="stylesheet" href="/static/css/category-dashboard.css?v=3.2.1">
+    <link rel="stylesheet" href="/static/css/category-dashboard.css?v=3.2.2">
 </head>
 <body>
     {% include 'layouts/_header.html' %}
@@ -70,7 +70,10 @@
                             </div>
                             <div class="cat-card-divider"></div>
                             <div class="cat-donut-area">
-                                <div class="cat-donut-wrap">
+                                <div class="cat-donut-wrap" id="hw-eosl-donut-wrap">
+                                    <div id="hw-eosl-donut-empty" class="cat-dash-empty-placeholder" hidden aria-hidden="true">
+                                        <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90">
+                                    </div>
                                     <canvas id="hw-eosl-donut"></canvas>
                                     <div class="cat-donut-center">
                                         <div class="cat-donut-center-value" id="hw-eosl-total">-</div>
@@ -87,9 +90,14 @@
                                 <h2>Top 5 위험 자산</h2>
                             </div>
                             <div class="cat-card-divider"></div>
-                            <ul class="cat-risk-list" id="hw-risk-list">
-                                <li class="cat-risk-empty">로딩 중…</li>
-                            </ul>
+                            <div class="cat-risk-stack">
+                                <div id="hw-risk-empty-sticker" class="cat-dash-empty-placeholder" hidden aria-hidden="true">
+                                    <img src="/static/image/svg/free-icon-data.svg?v=20260422a" alt="데이터 없음" width="90" height="90">
+                                </div>
+                                <ul class="cat-risk-list" id="hw-risk-list">
+                                    <li class="cat-risk-empty">로딩 중…</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -155,7 +163,7 @@
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
     <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
-    <script src="/static/js/9.category/9-2.hardware/0.hw_category_dashboard.js?v=2.3.1"></script>
+    <script src="/static/js/9.category/9-2.hardware/0.hw_category_dashboard.js?v=2.3.2"></script>
     <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>

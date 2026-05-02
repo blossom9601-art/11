@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('blossom', {
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),
     openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
+    openSsh: (opts) => ipcRenderer.invoke('app:open-ssh', opts),
     setAutoStart: (enabled) => ipcRenderer.invoke('app:set-auto-start', enabled),
     getAutoStart: () => ipcRenderer.invoke('app:get-auto-start'),
     quit: () => ipcRenderer.invoke('app:quit'),

@@ -316,9 +316,28 @@
   flex-shrink: 0;
   position: relative;
 }
+/* 비즈니스 대시보드와 동일한 빈 데이터 일러스트 (도넛 영역) */
+.cat-donut-wrap .cat-dash-empty-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
 .cat-donut-wrap canvas {
   width: 100% !important;
   height: 100% !important;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+.cat-donut-wrap.cat-donut-wrap--empty canvas {
+  display: none !important;
+}
+.cat-donut-wrap.cat-donut-wrap--empty .cat-donut-center {
+  visibility: hidden;
 }
 .cat-donut-center {
   position: absolute;
@@ -370,6 +389,23 @@
 /* ══════════════════════════════════════════════════════════════
  * 4. Top 위험 자산 리스트
  * ════════════════════════════════════════════════════════════ */
+.cat-risk-stack {
+  position: relative;
+  min-height: 220px;
+}
+.cat-risk-stack .cat-dash-empty-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+.cat-risk-stack .cat-risk-list {
+  position: relative;
+  z-index: 1;
+}
 .cat-risk-list {
   list-style: none;
   margin: 0;
@@ -425,6 +461,11 @@
   padding: 32px 0;
   color: #8A94A6;
   font-size: 14px;
+}
+.cat-dash-empty-placeholder img {
+  object-fit: contain;
+  max-width: 100%;
+  opacity: 0.95;
 }
 
 /* ══════════════════════════════════════════════════════════════

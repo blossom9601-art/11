@@ -80,7 +80,7 @@ body.modal-open { overflow: hidden; }
 	background: #fff; color: #374151; font-size: 13px; cursor: pointer;
 	background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
 	background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
-	appearance: none; -webkit-appearance: none;
+	-webkit-appearance: none; appearance: none;
 }
 .status-filter-select:focus { outline: none; border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
 
@@ -215,25 +215,30 @@ body.modal-open { overflow: hidden; }
 .server-add-modal #status-form-message { color: #b91c1c; font-size: 13px; }
 .server-add-modal #status-form-delete { color: #b91c1c; }
 
-/* === 접속점 컬럼 === */
-#status-table th[data-col="endpoint_summary"] { min-width: 320px; }
-#status-table td.status-col-endpoint {
+/* === 유형 / 접속정보 컬럼 === */
+#status-table th[data-col="access_type"] { width: 110px; text-align: left; }
+#status-table th[data-col="access_info"] { min-width: 320px; }
+#status-table td.status-col-access-type {
+	width: 110px;
+	white-space: normal;
+}
+#status-table td.status-col-access-info {
 	display: table-cell; vertical-align: middle;
-	max-width: 420px; white-space: normal; word-break: break-all;
+	max-width: 460px; white-space: normal; word-break: break-all;
 }
-.status-col-endpoint .endpoint-kind-tag {
+.status-col-access-type .endpoint-kind-tag {
 	display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px;
-	font-weight: 700; letter-spacing: .3px; margin-right: 8px; vertical-align: middle;
+	font-weight: 700; letter-spacing: .3px; margin: 2px 6px 2px 0; vertical-align: middle;
 }
-.status-col-endpoint .endpoint-kind-tag.kind-WEB { background: #eef2ff; color: #4f46e5; }
-.status-col-endpoint .endpoint-kind-tag.kind-SSH { background: #ecfdf5; color: #047857; }
-.status-col-endpoint .endpoint-url-text { color: #1f2937; vertical-align: middle; }
-.status-col-endpoint .endpoint-extra-badge {
-	display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
-	background: #f3f4f6; color: #4b5563; font-size: 11px; font-weight: 700; vertical-align: middle;
+.status-col-access-type .endpoint-kind-tag.kind-WEB { background: #eef2ff; color: #4f46e5; }
+.status-col-access-type .endpoint-kind-tag.kind-SSH { background: #ecfdf5; color: #047857; }
+.status-col-access-info .access-info-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
 }
-#status-table th[data-col="endpoint_count"] { width: 90px; text-align: left; }
-#status-table td[data-col="endpoint_count"] { width: 90px; text-align: center; }
+.status-col-access-info .access-info-text { color: #1f2937; line-height: 1.45; }
 
 /* === 모달: 접속점 repeater === */
 .endpoint-section-header {

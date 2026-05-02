@@ -44,6 +44,50 @@
 			body: JSON.stringify(body || {})
 		});
 	}
+	function endpointAccessType(endpoint) {
+		var type = String((endpoint && (endpoint.access_type || endpoint.kind)) || '').trim().toUpperCase();
+		return type === '웹' ? 'WEB' : (type || '-');
+	}
+	function endpointAccessInfo(endpoint) {
+		if (!endpoint) return '';
+		var type = endpointAccessType(endpoint);
+		var host = String(endpoint.host || '').trim();
+		var port = String(endpoint.port || '').trim();
+		if (endpoint.access_info) return endpoint.access_info;
+		if (type === 'WEB') return endpoint.url || endpoint.primary_url || host;
+		if (type === 'SSH') return host + (port && port !== '22' ? ':' + port : '');
+		return endpoint.url || host;
+	}
+	function accessEndpoints(row) {
+		var endpoints = row.endpoints || [];
+		if (endpoints.length) return endpoints;
+		return [{
+			access_type: row.access_type || row.primary_access_type || row.primary_kind || row.resource_type,
+			access_info: row.access_info || row.primary_access_info || row.primary_url || row.resource_url || row.host_address,
+			host: row.host_address,
+			port: row.port_number,
+			url: row.primary_url || row.resource_url
+		}];
+	}
+	function renderAccessTypeCell(row) {
+		var seen = {};
+		var tags = [];
+		accessEndpoints(row).forEach(function (endpoint) {
+			var type = endpointAccessType(endpoint);
+			if (!type || type === '-' || seen[type]) return;
+			seen[type] = true;
+			tags.push('<span class="endpoint-kind-tag kind-' + esc(type) + '">' + esc(type) + '</span>');
+		});
+		return tags.length ? tags.join('') : '-';
+	}
+	function renderAccessInfoCell(row) {
+		var values = [];
+		accessEndpoints(row).forEach(function (endpoint) {
+			var info = endpointAccessInfo(endpoint);
+			if (info) values.push('<span class="access-info-text">' + esc(info) + '</span>');
+		});
+		return values.length ? '<div class="access-info-stack">' + values.join('') + '</div>' : '-';
+	}
 
 	function applyFilters() {
 		var search = (qs('status-search').value || '').trim().toLowerCase();
@@ -51,13 +95,13 @@
 		var stateValue = (qs('status-state-filter').value || '').trim();
 		var category = state.category || '';
 		state.filtered = state.all.filter(function (row) {
-			var eps = row.endpoints || [];
+			var eps = accessEndpoints(row);
 			if (category) {
 				var rowCat = (row.category_name || '').trim();
 				if (rowCat !== category) return false;
 			}
 			if (type) {
-				var hasKind = eps.some(function (ep) { return (ep.kind || '') === type; });
+				var hasKind = eps.some(function (endpoint) { return endpointAccessType(endpoint) === type; });
 				if (!hasKind) return false;
 			}
 			if (stateValue) {
@@ -66,9 +110,9 @@
 			}
 			if (search) {
 				var stateLbl = row.active_flag ? '사용 가능' : '차단';
-				var hay = [row.resource_name, row.description, row.primary_url, row.category_name, stateLbl];
-				eps.forEach(function (ep) {
-					hay.push(ep.label, ep.host, ep.url, ep.kind, ep.protocol);
+				var hay = [row.resource_name, row.description, row.primary_url, row.primary_access_info, row.access_info, row.category_name, stateLbl];
+				eps.forEach(function (endpoint) {
+					hay.push(endpoint.label, endpoint.host, endpoint.url, endpointAccessType(endpoint), endpointAccessInfo(endpoint), endpoint.protocol);
 				});
 				var hayStr = hay.map(function (v) { return (v || '').toString().toLowerCase(); }).join(' ');
 				if (hayStr.indexOf(search) === -1) return false;
@@ -117,17 +161,6 @@
 		var start = (state.page - 1) * state.pageSize;
 		var slice = state.filtered.slice(start, start + state.pageSize);
 		var html = slice.map(function (row) {
-			var eps = row.endpoints || [];
-			var primary = row.primary_endpoint || eps[0] || null;
-			var summary = '-';
-			if (primary) {
-				var url = primary.url || (primary.host || '-');
-				summary = '<span class="endpoint-kind-tag kind-' + esc(primary.kind || '') + '">' + esc(primary.kind || '') + '</span>' +
-					'<span class="endpoint-url-text">' + esc(url) + '</span>';
-				if (eps.length > 1) {
-					summary += '<span class="endpoint-extra-badge">+' + (eps.length - 1) + '</span>';
-				}
-			}
 			var stateLabel = row.active_flag ? '사용 가능' : '차단';
 			var dotCls = row.active_flag ? 'ws-run' : 'ws-c1';
 			var checked = state.selected.has(row.id) ? ' checked' : '';
@@ -136,8 +169,8 @@
 					'<td data-col="select" class="status-col-check"><input type="checkbox" class="row-check" data-id="' + esc(row.id) + '"' + checked + ' aria-label="선택"></td>' +
 					'<td data-col="resource_name" data-label="자원명"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
 					'<td data-col="category" data-label="분류">' + esc(row.category_name || '-') + '</td>' +
-					'<td data-col="endpoint_summary" data-label="접속점" class="status-col-endpoint">' + summary + '</td>' +
-					'<td data-col="endpoint_count" data-label="접속점 수">' + esc(eps.length) + '</td>' +
+					'<td data-col="access_type" data-label="유형" class="status-col-access-type">' + renderAccessTypeCell(row) + '</td>' +
+					'<td data-col="access_info" data-label="접속정보" class="status-col-access-info">' + renderAccessInfoCell(row) + '</td>' +
 					'<td data-col="active_flag" data-label="상태"><span class="status-pill"><span class="status-dot ' + dotCls + '" aria-hidden="true"></span><span class="status-text">' + esc(stateLabel) + '</span></span></td>' +
 					'<td data-col="actions" data-label="관리" class="system-actions">' +
 						'<button type="button" class="action-btn" data-action="edit" data-id="' + esc(row.id) + '" title="수정" aria-label="수정">' +
@@ -496,7 +529,7 @@
 	function downloadCsv() {
 		var rows = state.filtered;
 		if (!rows.length) { window.alert('내려받을 데이터가 없습니다.'); return; }
-		var headers = ['자원명', '상태', '접속점 라벨', '유형', '프로토콜', '호스트', '포트', '경로', 'URL', '대표', '설명'];
+		var headers = ['자원명', '분류', '상태', '유형', '접속정보', '프로토콜', '호스트', '포트', '설명'];
 		function csvCell(v) {
 			if (v === null || v === undefined) return '';
 			var s = String(v).replace(/"/g, '""');
@@ -505,16 +538,21 @@
 		var lines = [headers.join(',')];
 		rows.forEach(function (r) {
 			var stateLbl = r.active_flag ? '사용 가능' : '차단';
-			var eps = r.endpoints || [];
+			var eps = accessEndpoints(r);
 			if (!eps.length) {
-				lines.push([r.resource_name, stateLbl, '', '', '', '', '', '', '', '', r.description].map(csvCell).join(','));
+				lines.push([r.resource_name, r.category_name, stateLbl, '', '', '', '', '', r.description].map(csvCell).join(','));
 				return;
 			}
-			eps.forEach(function (ep) {
+			eps.forEach(function (endpoint) {
 				lines.push([
-					r.resource_name, stateLbl,
-					ep.label, ep.kind, ep.protocol, ep.host, ep.port, ep.url_path, ep.url,
-					ep.is_primary ? '대표' : '',
+					r.resource_name,
+					r.category_name,
+					stateLbl,
+					endpointAccessType(endpoint),
+					endpointAccessInfo(endpoint),
+					endpoint.protocol,
+					endpoint.host,
+					endpoint.port,
 					r.description
 				].map(csvCell).join(','));
 			});

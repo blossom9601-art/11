@@ -389,12 +389,11 @@
   const shareModeHiddenInput = document.getElementById('share-mode-value');
   const shareModeChips = Array.from(document.querySelectorAll('.share-mode-chip'));
   const importantBtn = document.getElementById('sch-important-btn');
-  const attendeeInput = document.getElementById('sch-attendee-input');
-  const attendeeAddBtn = document.getElementById('sch-attendee-add');
-  const attendeeList = document.getElementById('sch-attendee-list');
   const reminderSelect = document.getElementById('sch-reminder');
   const stickerSelect = document.getElementById('sch-sticker');
   const colorInput = document.getElementById('sch-color');
+  const colorButton = document.getElementById('sch-color-btn');
+  const colorPanel = document.getElementById('sch-color-panel');
   const colorPalette = document.getElementById('sch-color-palette');
   const repeatSelect = document.getElementById('sch-repeat');
   const repeatEndTypeSelect = document.getElementById('sch-repeat-end-type');
@@ -430,6 +429,7 @@
   const viewAttachments = document.getElementById('view-sch-attachments');
   const viewAttachmentsEmpty = document.getElementById('view-sch-attachments-empty');
   const SHARE_MODE_LABELS = { all: '전체공유', basic: '기본', department: '부서공유', custom: '선택공유' };
+  const DEFAULT_SCHEDULE_COLOR = SCHEDULE_COLOR_PALETTE[0];
   const dropdownRegistry = {};
   let activeDropdownKey = null;
   let attachmentObjectUrls = [];
@@ -463,20 +463,9 @@
     shareSearch.setAttribute('autocomplete', 'off');
     shareSearch.setAttribute('placeholder', '팀 또는 구성원을 검색하세요');
   }
-
-    // Event type to color mapping (Korean labels)
-    const typeToColor = (t) => ({
-      '작업': '#a3e635',    // lime
-      '미팅': '#60a5fa',    // blue
-      '교육': '#f59e0b',    // amber
-      '휴가': '#f472b6',    // pink
-      '점검': '#34d399',    // emerald
-      '기타': '#c4b5fd'     // purple
-    }[t] || '#a5b4fc');
-
     function normalizePaletteColor(value) {
       const color = String(value || '').trim();
-      return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : SCHEDULE_COLOR_PALETTE[0];
+      return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : DEFAULT_SCHEDULE_COLOR;
     }
 
     function setColorValue(value) {
@@ -484,12 +473,43 @@
       if (colorInput) {
         colorInput.value = color;
       }
+      if (typeDot) {
+        typeDot.style.background = color;
+      }
+      if (colorButton) {
+        colorButton.setAttribute('aria-label', `일정 색상 선택: ${color}`);
+      }
       if (colorPalette) {
         colorPalette.querySelectorAll('.schedule-color-swatch').forEach((button) => {
           const selected = String(button.getAttribute('data-color') || '').toLowerCase() === color;
           button.classList.toggle('is-selected', selected);
           button.setAttribute('aria-checked', selected ? 'true' : 'false');
         });
+      }
+    }
+
+    function closeColorPanel() {
+      if (!colorPanel) return;
+      colorPanel.hidden = true;
+      if (colorButton) {
+        colorButton.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function openColorPanel() {
+      if (!colorPanel || modalCtx.mode === 'view') return;
+      colorPanel.hidden = false;
+      if (colorButton) {
+        colorButton.setAttribute('aria-expanded', 'true');
+      }
+    }
+
+    function toggleColorPanel() {
+      if (!colorPanel) return;
+      if (colorPanel.hidden) {
+        openColorPanel();
+      } else {
+        closeColorPanel();
       }
     }
 
@@ -503,9 +523,10 @@
         if (modalCtx.mode === 'view') return;
         const button = event.target.closest('.schedule-color-swatch[data-color]');
         if (!button) return;
-        setColorValue(button.getAttribute('data-color') || '#6366f1');
+        setColorValue(button.getAttribute('data-color') || DEFAULT_SCHEDULE_COLOR);
+        closeColorPanel();
       });
-      setColorValue(colorInput?.value || SCHEDULE_COLOR_PALETTE[0]);
+      setColorValue(colorInput?.value || DEFAULT_SCHEDULE_COLOR);
     }
 
     function normalizeRepeatType(raw) {
@@ -917,7 +938,6 @@
         inputLocation,
         inputDesc,
         inputAttachments,
-        attendeeInput,
         reminderSelect,
         stickerSelect,
         colorInput,
@@ -937,8 +957,9 @@
       if (importantBtn) {
         importantBtn.disabled = isReadOnly;
       }
-      if (attendeeAddBtn) {
-        attendeeAddBtn.disabled = isReadOnly;
+      if (colorButton) {
+        colorButton.disabled = isReadOnly;
+        if (isReadOnly) closeColorPanel();
       }
       if (colorPalette) {
         colorPalette.querySelectorAll('button').forEach((btn) => {
@@ -1019,7 +1040,7 @@
         openerEl: openerEl || modalCtx.openerEl || null,
         openerActiveEl: (document && document.activeElement) ? document.activeElement : null,
         existingAttachments: Array.isArray(event?.extendedProps?.attachments) ? event.extendedProps.attachments.slice() : [],
-        attendees: normalizeTokenList(event?.extendedProps?.attendees || []),
+        attendees: [],
         important: !!event?.extendedProps?.isImportant,
         canDelete: !!(event && canDeleteSchedule),
       };
@@ -1118,14 +1139,14 @@
       renderShareChips(modalCtx.shares);
   // description
   inputDesc.value = event?.extendedProps?.description || '';
-  renderAttendees(modalCtx.attendees);
+  modalCtx.attendees = [];
   setImportant(!!modalCtx.important);
   if (reminderSelect) {
     const reminders = event?.extendedProps?.reminders || [];
     reminderSelect.value = Array.isArray(reminders) && reminders.length ? String(reminders[0] || '') : '';
   }
   if (stickerSelect) stickerSelect.value = event?.extendedProps?.sticker || '';
-  setColorValue(event?.backgroundColor || event?.extendedProps?.color || typeToColor(type || '미팅'));
+  setColorValue(event?.backgroundColor || event?.extendedProps?.color || DEFAULT_SCHEDULE_COLOR);
   setRepeatFields(event || null);
   // set all-day UI state (after potential override)
   setAllDayUI(!!(event ? event.allDay : allDay));
@@ -1211,35 +1232,6 @@
       }
     }
 
-    function normalizeTokenList(items) {
-      if (!Array.isArray(items)) return [];
-      const seen = new Set();
-      return items
-        .map((item) => String(item || '').trim())
-        .filter((item) => {
-          if (!item || seen.has(item)) return false;
-          seen.add(item);
-          return true;
-        });
-    }
-
-    function renderAttendees(items) {
-      modalCtx.attendees = normalizeTokenList(items);
-      if (!attendeeList) return;
-      attendeeList.innerHTML = modalCtx.attendees.map((name) => `
-        <button type="button" class="schedule-token" data-attendee="${escapeHtml(name)}">
-          <span>${escapeHtml(name)}</span><span aria-hidden="true">×</span>
-        </button>
-      `).join('');
-    }
-
-    function addAttendeeFromInput() {
-      const value = (attendeeInput?.value || '').trim();
-      if (!value) return;
-      renderAttendees([...(modalCtx.attendees || []), value]);
-      if (attendeeInput) attendeeInput.value = '';
-    }
-
     function setImportant(flag) {
       modalCtx.important = !!flag;
       if (importantBtn) {
@@ -1259,18 +1251,10 @@
     shareSearch?.addEventListener('input', handleShareSearchInput);
     shareSearch?.addEventListener('keydown', handleShareSearchKeydown);
     importantBtn?.addEventListener('click', () => setImportant(!modalCtx.important));
-    attendeeAddBtn?.addEventListener('click', addAttendeeFromInput);
-    attendeeInput?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        addAttendeeFromInput();
-      }
-    });
-    attendeeList?.addEventListener('click', (event) => {
-      const token = event.target.closest('.schedule-token[data-attendee]');
-      if (!token) return;
-      const name = token.getAttribute('data-attendee') || '';
-      renderAttendees((modalCtx.attendees || []).filter((item) => item !== name));
+    colorButton?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleColorPanel();
     });
     shareSuggest?.addEventListener('click', (event) => {
       const li = event.target.closest('li[data-user-id], li[data-dept-id]');
@@ -1278,6 +1262,9 @@
       handleShareSuggestionSelection(li);
     });
     document.addEventListener('click', (event) => {
+      if (colorPanel && !colorPanel.hidden && !colorPanel.contains(event.target) && !colorButton?.contains(event.target)) {
+        closeColorPanel();
+      }
       if (!shareCustomWrap || !shareSuggest || shareSuggest.hidden) return;
       if (shareCustomWrap.contains(event.target) || shareSuggest.contains(event.target)) return;
       hideShareSuggest();
@@ -1734,7 +1721,6 @@
         typeSelectedLabel.classList.toggle('placeholder', !normalized);
       }
       markDropdownSelection(typeDropdownOptions, normalized);
-      updateTypeDot(normalized || '미팅');
     }
 
     function getShareModeValue() {
@@ -2121,12 +2107,6 @@
       }
       if (entry.dept_name) return entry.dept_name;
       return deptId ? `팀 #${deptId}` : '팀';
-    }
-
-    // Type dot update
-    function updateTypeDot(type) {
-      if (!typeDot) return;
-      typeDot.style.background = typeToColor(type || '미팅');
     }
 
     // Time validation helpers
@@ -2581,7 +2561,7 @@
       const type = selectType.value || '미팅';
       const location = (inputLocation.value || '').trim();
       const description = (inputDesc?.value || '').trim();
-      const color = (colorInput && colorInput.value) || typeToColor(type);
+      const color = normalizePaletteColor((colorInput && colorInput.value) || DEFAULT_SCHEDULE_COLOR);
       const selectedMode = getShareModeValue();
       const payloadBase = {
         title,
@@ -2597,12 +2577,11 @@
         shareMode: selectedMode,
         shareUsers: modalCtx.shareUsersPayload || [],
         shareDepartments: modalCtx.shareDepartmentsPayload || [],
-        attendees: modalCtx.attendees || [],
+        attendees: [],
         reminders: reminderSelect && reminderSelect.value ? [reminderSelect.value] : [],
         sticker: '',
         isImportant: !!modalCtx.important,
         existingRepeatRule: modalCtx.sourceEvent?.extendedProps?.repeatRule || {},
-        color,
       };
       let payload;
       try {
@@ -2897,7 +2876,7 @@
     function scheduleToEvent(item) {
       if (!item) return null;
       const shareMode = shareScopeToMode(item.share_scope);
-      const color = item.color_code || typeToColor(item.event_type);
+      const color = item.color_code || DEFAULT_SCHEDULE_COLOR;
       const currentId = getCurrentProfileId();
       const ownerId = Number(item.owner_user_id);
       const isOwner = currentId && ownerId && currentId === ownerId;
@@ -2994,7 +2973,7 @@
                         : cat === 'danger' ? '휴가'
                         : '미팅';
       ev.setExtendedProp('type', mappedType);
-      const color = typeToColor(mappedType);
+      const color = ev.backgroundColor || info.draggedEl?.getAttribute('data-color') || DEFAULT_SCHEDULE_COLOR;
       ev.setProp('backgroundColor', color);
       ev.setProp('borderColor', color);
       try {

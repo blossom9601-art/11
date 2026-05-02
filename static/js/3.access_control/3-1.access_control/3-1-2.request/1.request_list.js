@@ -130,8 +130,7 @@
         var eps = row.endpoints || [];
         if (!eps.length) return '<span class="ac-meta resource-url-cell">' + esc(primaryUrl(row) || row.host_address || '-') + '</span>';
         return '<div class="request-endpoint-stack">' + eps.map(function (ep) {
-            var label = ep.label || ep.kind || '-';
-            return '<span class="request-endpoint-chip"><span class="endpoint-kind-tag kind-' + esc(ep.kind || '') + '">' + esc(ep.kind || '-') + '</span><span>' + esc(label) + '</span><strong>' + esc(endpointTarget(ep)) + '</strong></span>';
+            return '<span class="request-endpoint-chip"><strong>' + esc(endpointTarget(ep)) + '</strong></span>';
         }).join('') + '</div>';
     }
     function isAdminUser() {
@@ -158,16 +157,25 @@
         if (!row) return '-';
         return row.current_approval_phase_name || row.current_phase_name || row.phase_name || row.approval_status || row.approver_name || '-';
     }
+    /** API의 can_access 또는 access_status(사용 가능·만료 예정)로 실제 접근 허용 상태 판별 */
+    function rowHasActiveAccess(row) {
+        if (!row) return false;
+        var v = row.can_access;
+        if (v === true || v === 1 || v === '1') return true;
+        var st = row.access_status || '';
+        if (st === '사용 가능' || st === '만료 예정' || st === '삭제 승인 대기') return true;
+        return false;
+    }
     function resourceStatus(row) {
         if (!row) return { code: 'blocked', label: '확인 필요', badge: 'status-blocked', reason: '자원 정보를 확인할 수 없습니다.' };
         if (isDeleteRequestMode()) {
             if (row.delete_request_pending) {
                 return { code: 'pending', label: '삭제 승인 대기', badge: 'status-pending', reason: '삭제 승인 대기 중인 동일 자원이 있습니다.' };
             }
-            if (row.can_delete_request || row.can_access) {
+            if (row.can_delete_request || rowHasActiveAccess(row)) {
                 return { code: 'available', label: '삭제 신청 가능', badge: 'status-approved', reason: '' };
             }
-            if (row.request_pending && !row.can_access) {
+            if (row.request_pending && !rowHasActiveAccess(row)) {
                 return { code: 'pending', label: '승인 대기', badge: 'status-pending', reason: '사용 승인 대기 중인 자원은 삭제 신청할 수 없습니다.' };
             }
             return { code: 'blocked', label: '권한 없음', badge: 'status-blocked', reason: '유효한 접근 권한이 있는 자원만 삭제 신청할 수 있습니다.' };
@@ -178,7 +186,15 @@
         if (row.delete_request_pending) {
             return { code: 'pending', label: '삭제 승인 대기', badge: 'status-pending', reason: '삭제 승인 대기 중인 자원은 사용 신청할 수 없습니다.' };
         }
-        if (row.can_access) {
+        if (row.access_status === '시작 전') {
+            return {
+                code: 'scheduled',
+                label: '사용 시작 전',
+                badge: 'status-pending',
+                reason: '승인은 되었으나 사용 시작일(한국 시간) 이전입니다. 시작일 이후에는 접속 메뉴에서 이용할 수 있습니다.'
+            };
+        }
+        if (rowHasActiveAccess(row)) {
             return { code: 'accessible', label: '권한 보유', badge: 'status-usable', reason: '이미 유효한 승인 권한이 있습니다.' };
         }
         if (row.use_request_pending || row.request_pending) {
@@ -258,6 +274,10 @@
     function updateApproverLabel() {
         var approver = qs('request-approver');
         if (!approver) return;
+        if (!isPermanentMode() && isAdminUser()) {
+            approver.value = '관리자 본인 승인';
+            return;
+        }
         if (isDeleteRequestMode()) {
             approver.value = (state.sessionUser && (state.sessionUser.dept_name || state.sessionUser.department)) ? (((state.sessionUser.dept_name || state.sessionUser.department)) + ' 팀장 자동 지정') : '부서 팀장 자동 지정';
             return;
@@ -429,7 +449,8 @@
         state.filteredResources = state.resources.filter(function (row) {
             var kinds = resourceKinds(row);
             var rowStatus = resourceStatus(row);
-            if (hideOwned && ((!isDeleteRequestMode() && rowStatus.code === 'accessible') || (isDeleteRequestMode() && rowStatus.code !== 'available'))) return false;
+            if (hideOwned && !isDeleteRequestMode() && (rowStatus.code === 'accessible' || rowStatus.code === 'scheduled')) return false;
+            if (hideOwned && isDeleteRequestMode() && rowStatus.code !== 'available') return false;
             if (kind && kinds.indexOf(kind) < 0) return false;
             if (category && categoryLabel(row) !== category) return false;
             if (status === 'selectable' && rowStatus.reason) return false;
@@ -501,6 +522,26 @@
             return String(b.last_accessed_at || b.approved_at || '').localeCompare(String(a.last_accessed_at || a.approved_at || ''));
         });
     }
+    function pageNumberItems(current, totalPages) {
+        var items = [];
+        var page;
+        var start = Math.max(2, current - 1);
+        var end = Math.min(totalPages - 1, current + 1);
+        items.push(1);
+        if (start > 2) items.push('ellipsis-left');
+        for (page = start; page <= end; page++) items.push(page);
+        if (end < totalPages - 1) items.push('ellipsis-right');
+        if (totalPages > 1) items.push(totalPages);
+        return items;
+    }
+    function renderResourcePageNumbers(pages) {
+        var box = qs('request-resource-page-numbers');
+        if (!box) return;
+        box.innerHTML = pageNumberItems(state.resourcePage, pages).map(function (item) {
+            if (typeof item !== 'number') return '<span class="resource-page-ellipsis">...</span>';
+            return '<button type="button" class="resource-page-number' + (item === state.resourcePage ? ' active' : '') + '" data-resource-page="' + item + '" aria-current="' + (item === state.resourcePage ? 'page' : 'false') + '">' + item + '</button>';
+        }).join('');
+    }
     function renderResources() {
         var list = qs('request-resource-list');
         var total = state.filteredResources.length;
@@ -517,13 +558,12 @@
         qs('request-filtered-count').textContent = '필터 결과 ' + total + '개';
         qs('request-resource-prev').disabled = state.resourcePage <= 1;
         qs('request-resource-next').disabled = state.resourcePage >= pages;
+        renderResourcePageNumbers(pages);
         if (headerCheck) {
             headerCheck.checked = !!pageSelectable.length && pageSelected === pageSelectable.length;
             headerCheck.indeterminate = pageSelected > 0 && pageSelected < pageSelectable.length;
             headerCheck.disabled = !pageSelectable.length;
         }
-        qs('request-select-page').disabled = !pageSelectable.length;
-        qs('request-select-filtered').disabled = !available;
         if (!rows.length) { list.innerHTML = '<tr><td colspan="7"><div class="resource-picker-empty">검색 결과가 없습니다.</div></td></tr>'; return; }
         list.innerHTML = rows.map(function (row) {
             var selected = state.selectedIds.indexOf(Number(row.id)) >= 0;
@@ -533,7 +573,7 @@
             var rowClass = disabled ? ' is-disabled' : (selected ? ' is-selected' : '');
             return '<tr class="resource-picker-row' + rowClass + '" data-id="' + esc(row.id) + '">' +
                 '<td class="resource-check-col"><input type="checkbox" class="request-resource-check" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + (disabled ? ' disabled' : '') + ' aria-label="' + esc(row.resource_name || '자원') + ' 선택"></td>' +
-                '<td class="resource-picker-main"><strong>' + esc(row.resource_name || '-') + '</strong><span>' + esc(row.description || '-') + '</span></td>' +
+                '<td class="resource-picker-main"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
                 '<td>' + renderKindTags(row) + '</td>' +
                 '<td>' + esc(categoryLabel(row)) + '</td>' +
                 '<td>' + endpointSummary(row) + '</td>' +
@@ -593,12 +633,10 @@
             localStorage.removeItem('accessControlRequestResourceId');
         } catch (_) {}
     }
-    function renderResourceKindTags(row) {
+    function renderResourceKindText(row) {
         var kinds = resourceKinds(row);
-        if (!kinds.length) return '<span class="request-resource-tag"><b>유형</b>-</span>';
-        return kinds.map(function (kind) {
-            return '<span class="request-resource-tag request-resource-tag-kind"><b>유형</b>' + esc(kind) + '</span>';
-        }).join('');
+        if (!kinds.length) return '<span class="request-item-empty">-</span>';
+        return esc(kinds.join(' / '));
     }
     function resourceCategory(row) {
         return categoryLabel(row);
@@ -622,8 +660,8 @@
                 return '<tr data-item-id="' + esc(row.id) + '">' +
                     '<td class="request-item-check-cell">' + (canCheck ? '<input type="checkbox" class="request-item-check" value="' + esc(row.id) + '" aria-label="' + esc(row.resource_name || '자원') + ' 선택">' : '') + '</td>' +
                     '<td class="request-item-name-cell"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
-                    '<td class="request-item-kind-cell"><span class="request-resource-tags">' + renderResourceKindTags(row) + '</span></td>' +
-                    '<td class="request-item-category-cell"><span class="request-resource-tag request-resource-tag-category">' + esc(resourceCategory(row)) + '</span></td>' +
+                    '<td class="request-item-kind-cell">' + renderResourceKindText(row) + '</td>' +
+                    '<td class="request-item-category-cell">' + esc(resourceCategory(row)) + '</td>' +
                     '<td class="request-item-target-cell"><span class="request-item-target">' + esc(resourceTarget(row)) + '</span></td>' +
                     '<td class="request-item-status-cell">' + formatStatus(row.item_status || '-') + '</td>' +
                     '<td class="request-item-reason-cell">' + (row.reject_reason ? esc(row.reject_reason) : '<span class="request-item-empty">-</span>') + '</td>' +
@@ -719,8 +757,8 @@
                 '<td>' + esc(row.submitted_at || row.created_at || '-') + '</td>' +
                 '<td><strong>' + esc(row.request_no || '-') + '</strong><span class="ac-meta">' + esc(requestPeriodText(row)) + '</span></td>' +
                 '<td>' + esc(row.request_type_label || requestTypeLabel(row.request_type === '삭제' ? 'delete' : 'use')) + '</td>' +
-                '<td><strong>' + esc(row.resource_count || 0) + '개</strong><span class="ac-meta">' + esc(row.resource_name || '-') + '</span></td>' +
-                '<td>' + formatStatus(row.request_status || '-') + '</td>' +
+                '<td class="request-count-cell"><strong>' + esc(row.resource_count || 0) + '개</strong></td>' +
+                '<td class="request-status-cell">' + formatStatus(row.request_status || '-') + '</td>' +
                 '<td><strong>' + esc(approvalStageLabel(row)) + '</strong><span class="ac-meta">' + esc(row.approver_name || '-') + (row.delegated ? ' / 대무' : '') + '</span></td>' +
                 '<td>' + esc(row.requester_name || '-') + '</td>' +
                 '<td>' + esc(emergency) + '</td>' +
@@ -761,7 +799,7 @@
         setResourceErrors([]);
         if (!state.selectedIds.length) return '신청 대상 자원을 선택하세요.';
         if (!reason) return '신청 사유를 입력하세요.';
-        if (reason.length < REASON_MIN_LENGTH) return '신청 사유는 10자 이상 입력하세요.';
+        if (reason.length < REASON_MIN_LENGTH) return (isDeleteRequestMode() ? '삭제 사유' : '신청 사유') + '는 10자 이상 입력하세요.';
         if (isDeleteRequestMode()) return '';
         if (!qs('request-start-date').value) return '사용 시작일을 입력하세요.';
         if (!isPermanentMode() && !qs('request-end-date').value) return '사용 종료일을 입력하세요.';
@@ -900,10 +938,12 @@
         if (action === 'reject') { actOnRequest(id, 'reject'); }
     }
     function bindEvents() {
+        var form = qs('request-form');
         Array.prototype.slice.call(document.querySelectorAll('.request-main-tab')).forEach(function (button) {
             button.addEventListener('click', function () { switchMainTab(button.getAttribute('data-request-tab')); });
         });
-        qs('request-form').addEventListener('submit', submitRequest);
+        form.noValidate = true;
+        form.addEventListener('submit', submitRequest);
         qs('request-table-body').addEventListener('click', handleTableAction);
         qs('request-table-state').addEventListener('click', function (event) {
             var button = event.target.closest('button[data-switch-main-tab]');
@@ -930,11 +970,16 @@
         });
         qs('request-resource-prev').addEventListener('click', function () { if (state.resourcePage > 1) { state.resourcePage--; renderResources(); } });
         qs('request-resource-next').addEventListener('click', function () { state.resourcePage++; renderResources(); });
+        qs('request-resource-page-numbers').addEventListener('click', function (event) {
+            var button = event.target.closest('button[data-resource-page]');
+            var page;
+            if (!button) return;
+            page = parseInt(button.getAttribute('data-resource-page'), 10);
+            if (!page || page === state.resourcePage) return;
+            state.resourcePage = page;
+            renderResources();
+        });
         qs('request-select-page-check').addEventListener('change', function (event) { event.target.checked ? selectRows(pageRows(), '현재 페이지') : removeRows(pageRows()); });
-        qs('request-select-page').addEventListener('click', function () { selectRows(pageRows(), '현재 페이지'); });
-        qs('request-select-filtered').addEventListener('click', function () { selectRows(state.filteredResources, '필터 결과'); });
-        qs('request-select-recent').addEventListener('click', function () { selectRows(recentRequestRows(), '최근 신청 자원'); });
-        qs('request-select-frequent').addEventListener('click', function () { selectRows(frequentRows(), '최근 사용 자원'); });
         qs('request-reset-filters').addEventListener('click', function () {
             qs('request-resource-search').value = '';
             qs('request-kind-filter').value = '';

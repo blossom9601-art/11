@@ -34,7 +34,10 @@ def _ssh_run(ip, account, password, command, timeout=10):
     try:
         import paramiko
     except ImportError:
-        return {"ok": False, "error": "paramiko not installed"}
+        return {
+            "ok": False,
+            "error": "SSH client library missing on this web host (install: pip install paramiko)",
+        }
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
@@ -329,19 +332,22 @@ body{background:#f4f6f9;color:#1e293b;font-family:-apple-system,BlinkMacSystemFo
 .pw-modal .pw-cancel{background:#fff;color:#64748b;border:1px solid #e2e8f0}
 .pw-modal .pw-cancel:hover{background:#f8fafc}
 .content{flex:1;padding:28px 32px}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.card{background:#fff;border-radius:8px;padding:20px 22px;border:1px solid #e5e7eb;cursor:pointer;
-      transition:all 0.15s ease;-webkit-user-select:none;user-select:none}
-.card:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-.card.active{border-color:#1e293b;box-shadow:0 2px 12px rgba(30,41,59,0.15)}
-.card .card-label{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.8px;
-                  font-weight:600;margin-bottom:10px}
-.card .card-value{font-size:28px;font-weight:700;line-height:1}
-.card .card-value.v-total{color:#1e293b}
-.card .card-value.v-pending{color:#d97706}
-.card .card-value.v-approved{color:#059669}
-.card .card-value.v-rejected{color:#dc2626}
-.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.agent-tabs{display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:20px;background:#fff;border:1px solid #e5e7eb;
+    border-radius:8px;padding:6px 8px;align-items:flex-end}
+.agent-tabs a.tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;font-weight:600;
+    color:#64748b;text-decoration:none;border-radius:6px;transition:background .15s,color .15s}
+.agent-tabs a.tab:hover{color:#1e293b;background:#f8fafc}
+.agent-tabs a.tab.active{color:#1e293b;background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}
+.agent-tabs .tab-count{font-size:12px;font-weight:700;color:#94a3af;min-width:1.5em;text-align:center}
+.agent-tabs a.tab.active .tab-count{color:#3b82f6}
+.pagination{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pagination a,.pagination span.pg-disabled{display:inline-flex;align-items:center;justify-content:center;
+    min-width:32px;height:30px;padding:0 10px;border-radius:5px;font-size:11px;font-weight:600;text-decoration:none;
+    border:1px solid #e5e7eb;color:#374151;background:#fff}
+.pagination a:hover{background:#f8fafc;border-color:#cbd5e1}
+.pagination a.pg-current{background:#1e293b;color:#fff;border-color:#1e293b}
+.pagination span.pg-disabled{color:#cbd5e1;border-color:#f1f5f9;background:#f9fafb;cursor:default}
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px}
 .toolbar .info{color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
 .btn-refresh{height:30px;padding:0 14px;background:#1e293b;border:none;border-radius:5px;
              color:#e2e8f0;font-size:10px;cursor:pointer;text-decoration:none;font-weight:700;
@@ -370,7 +376,7 @@ tr:last-child td{border-bottom:none}
 .badge-disabled{background:#fef2f2;color:#dc2626}
 .badge-pending{background:#fef3c7;color:#92400e}
 .badge-approved{background:#d1fae5;color:#065f46}
-.badge-rejected{background:#fee2e2;color:#991b1b}
+.badge-rejected,.badge-retired{background:#fee2e2;color:#991b1b}
 .badge-none{background:#f3f4f6;color:#9ca3af}
 .btn-action{display:inline-block;padding:4px 12px;border:1px solid;border-radius:4px;font-size:11px;
             font-weight:600;cursor:pointer;margin-right:4px;text-decoration:none;text-align:center;
@@ -403,9 +409,12 @@ tr:last-child td{border-bottom:none}
 .paging-info{font-size:11px;color:#9ca3af;letter-spacing:0.3px}
 .msg{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;
     font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.15);
-    animation:toastIn .3s ease,toastOut .4s ease 2.6s forwards;pointer-events:none}
-.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #86efac}
-.msg-err{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
+    animation:toastIn .3s ease,toastOut .4s ease 5.8s forwards;pointer-events:none;max-width:min(560px,92vw);
+    line-height:1.4;text-align:center}
+.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #86efac;
+    animation:toastIn .3s ease,toastOut .4s ease 2.8s forwards}
+.msg-err{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;
+    animation:toastIn .3s ease,toastOut .4s ease 7.2s forwards}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes toastOut{from{opacity:1}to{opacity:0}}
 </style>
@@ -436,12 +445,10 @@ tr:last-child td{border-bottom:none}
         </div>
     </div>
     <div class="content">
-        
-        <div class="cards">
-            <div class="card" onclick="filterByCard('all')"><div class="card-label">Total Agents</div><div class="card-value v-total">{{ total }}</div></div>
-            <div class="card" onclick="filterByCard('pending')"><div class="card-label">Pending</div><div class="card-value v-pending">{{ cnt_pending }}</div></div>
-            <div class="card" onclick="filterByCard('approved')"><div class="card-label">Approved</div><div class="card-value v-approved">{{ cnt_approved }}</div></div>
-            <div class="card" onclick="filterByCard('rejected')"><div class="card-label">Rejected</div><div class="card-value v-rejected">{{ cnt_rejected }}</div></div>
+        <div class="agent-tabs">
+            <a href="/?tab=registered" class="tab {{ 'active' if current_tab == 'registered' else '' }}">Registered<span class="tab-count">{{ cnt_registered }}</span></a>
+            <a href="/?tab=pending" class="tab {{ 'active' if current_tab == 'pending' else '' }}">Pending<span class="tab-count">{{ cnt_pending }}</span></a>
+            <a href="/?tab=retired" class="tab {{ 'active' if current_tab == 'retired' else '' }}">Retired<span class="tab-count">{{ cnt_retired }}</span></a>
         </div>
         <div class="toolbar">
             <span class="info" id="clock"></span>
@@ -456,7 +463,7 @@ tr:last-child td{border-bottom:none}
                 <button class="btn-toolbar" onclick="downloadCSV()" title="CSV Download">
                     <img src="/static/image/svg/lumina/free-icon-font-file-csv.svg" style="width:14px;height:14px;filter:invert(1)">
                 </button>
-                <a href="/" class="btn-toolbar" title="Refresh">
+                <a href="/?tab={{ current_tab }}" class="btn-toolbar" title="Refresh">
                     <img src="/static/image/svg/lumina/free-icon-font-refresh.svg" style="width:14px;height:14px;filter:invert(1)">
                 </a>
             </div>
@@ -476,14 +483,11 @@ tr:last-child td{border-bottom:none}
         function applyPerPage(){
             var n=parseInt(document.getElementById('perPage').value);
             var rows=document.querySelectorAll('.tbl-wrap tbody tr');
-            var shown=0,total=0;
+            var shown=0;
             for(var i=0;i<rows.length;i++){
                 if(rows[i].querySelector('td[colspan]')){rows[i].style.display='';continue;}
-                var cells=rows[i].querySelectorAll('td');
-                var approval=cells[7]?cells[7].textContent.trim().toLowerCase():'';
-                if(_cardFilter!=='all' && approval!==_cardFilter){rows[i].style.display='none';continue;}
-                total++;
-                if(shown<n){rows[i].style.display='';shown++;}else{rows[i].style.display='none';}
+                shown++;
+                if(shown<=n){rows[i].style.display='';}else{rows[i].style.display='none';}
             }
         }
 
@@ -506,17 +510,6 @@ tr:last-child td{border-bottom:none}
             a.download='agents_'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.csv';
             a.click();
             URL.revokeObjectURL(a.href);
-        }
-
-        var _cardFilter='all';
-        function filterByCard(type){
-            _cardFilter=type;
-            var cards=document.querySelectorAll('.card');
-            cards[0].classList.toggle('active',type==='all');
-            cards[1].classList.toggle('active',type==='pending');
-            cards[2].classList.toggle('active',type==='approved');
-            cards[3].classList.toggle('active',type==='rejected');
-            applyPerPage();
         }
 
         var _sortCol=-1,_sortAsc=true;
@@ -555,7 +548,7 @@ tr:last-child td{border-bottom:none}
                 <thead>
                     <tr>
                         <th onclick="sortTable(0)">ID<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(1)">Hostname<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(2)">OS<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(3)">IP Address<span class="sort-arrow">&udarr;</span></th>
-                        <th onclick="sortTable(4)">Last Seen<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(5)">Status<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(6)">Integration<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(7)">Approval<span class="sort-arrow">&udarr;</span></th>
+                        <th onclick="sortTable(4)">Last Seen<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(5)">Status<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(6)">Integration<span class="sort-arrow">&udarr;</span></th><th onclick="sortTable(7)">Enrollment<span class="sort-arrow">&udarr;</span></th>
                         <th onclick="sortTable(8)">Approved At<span class="sort-arrow">&udarr;</span></th><th>Actions</th>
                     </tr>
                 </thead>
@@ -570,25 +563,25 @@ tr:last-child td{border-bottom:none}
                         <td style="font-size:12px;color:#6b7280">{{ a.last_seen }}</td>
                         <td><span class="badge badge-{{ a.status }}">{{ a.status }}</span></td>
                         <td><img src="/static/image/svg/lumina/free-icon-font-handshake.svg" class="integration-icon {{ 'linked' if a.integration == 'linked' else '' }}" title="{{ 'Linked' if a.integration == 'linked' else 'None' }}"></td>
-                        <td><span class="badge badge-{{ a.approval }}">{{ a.approval_label }}</span></td>
+                        <td><span class="badge badge-{{ a.approval }}{% if a.approval == 'rejected' %} badge-retired{% endif %}">{{ a.approval_label }}</span></td>
                         <td style="color:#6b7280;font-size:12px">{{ a.approved_at or '—' }}</td>
                         <td>
                             {% if a.approval != 'approved' %}
-                            <a href="/action/{{ a.id }}/approve" class="btn-action btn-approve"
+                            <a href="/action/{{ a.id }}/approve?tab={{ current_tab }}" class="btn-action btn-approve"
                                onclick="return confirm('Approve agent {{ a.hostname }}?')" title="Approve"><img src="/static/image/svg/lumina/free-icon-font-map-marker-check.svg"></a>
                             {% endif %}
                             {% if a.approval != 'rejected' %}
-                            <a href="/action/{{ a.id }}/reject" class="btn-action btn-reject"
+                            <a href="/action/{{ a.id }}/reject?tab={{ current_tab }}" class="btn-action btn-reject"
                                onclick="return confirm('Reject agent {{ a.hostname }}?')" title="Reject"><img src="/static/image/svg/lumina/free-icon-font-comment-xmark.svg"></a>
                             {% endif %}
-                            <a href="/action/{{ a.id }}/delete" class="btn-action btn-remove"
+                            <a href="/action/{{ a.id }}/delete?tab={{ current_tab }}" class="btn-action btn-remove"
                                onclick="return confirm('Remove agent {{ a.hostname }}? This cannot be undone.')" title="Remove"><img src="/static/image/svg/lumina/free-icon-font-trash.svg"></a>
                         </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:48px;
-                        font-size:13px">No registered agents</td></tr>
+                        font-size:13px">{{ empty_message }}</td></tr>
                 {% endif %}
                 </tbody>
             </table>
@@ -702,9 +695,12 @@ body{background:#f4f6f9;color:#1e293b;font-family:-apple-system,BlinkMacSystemFo
 .info-row .val{font-size:13px;color:#1e293b}
 .msg{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;
     font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.15);
-    animation:toastIn .3s ease,toastOut .4s ease 2.6s forwards;pointer-events:none}
-.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #86efac}
-.msg-err{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
+    animation:toastIn .3s ease,toastOut .4s ease 5.8s forwards;pointer-events:none;max-width:min(560px,92vw);
+    line-height:1.4;text-align:center}
+.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #86efac;
+    animation:toastIn .3s ease,toastOut .4s ease 2.8s forwards}
+.msg-err{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;
+    animation:toastIn .3s ease,toastOut .4s ease 7.2s forwards}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes toastOut{from{opacity:1}to{opacity:0}}
 .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
@@ -914,8 +910,11 @@ body{background:#f4f6f9;color:#1e293b;font-family:-apple-system,BlinkMacSystemFo
 
             <div class="btn-group" style="margin-top:16px">
                 <button type="submit" class="btn-primary">Save &amp; Apply</button>
-                <button type="button" class="btn-secondary" onclick="location.href='/settings/ntp/sync'">Sync System Time</button>
             </div>
+            </form>
+
+            <form method="POST" action="/settings/ntp/sync" style="margin-top:10px" onsubmit="this.querySelector('button').disabled=true">
+                <button type="submit" class="btn-secondary">Force sync now</button>
             </form>
 
             </div>
@@ -1175,7 +1174,7 @@ def create_app():
         agents = []
         for r in rows:
             approval = r.get("approval_status") or "pending"
-            label_map = {"pending": "Pending", "approved": "Approved", "rejected": "Rejected"}
+            label_map = {"pending": "Pending", "approved": "Registered", "rejected": "Retired"}
             agents.append({
                 "id": r["id"],
                 "hostname": r.get("hostname", ""),
@@ -1216,26 +1215,40 @@ def create_app():
     def dashboard():
         msg = session.pop("msg", None)
         msg_cls = session.pop("msg_cls", "msg-ok")
+        tab = (request.args.get("tab") or "pending").lower()
+        if tab not in ("registered", "pending", "retired"):
+            tab = "pending"
+
         try:
-            agents = _get_agents()
+            agents_all = _get_agents()
         except Exception as e:
-            agents = []
+            agents_all = []
             msg = "DB Error: %s" % str(e)
             msg_cls = "msg-err"
 
-        total = len(agents)
-        cnt_pending = sum(1 for a in agents if a["approval"] == "pending")
-        cnt_approved = sum(1 for a in agents if a["approval"] == "approved")
-        cnt_rejected = sum(1 for a in agents if a["approval"] == "rejected")
+        cnt_pending = sum(1 for a in agents_all if a["approval"] == "pending")
+        cnt_registered = sum(1 for a in agents_all if a["approval"] == "approved")
+        cnt_retired = sum(1 for a in agents_all if a["approval"] == "rejected")
+
+        if tab == "registered":
+            agents = [a for a in agents_all if a["approval"] == "approved"]
+            empty_message = "No registered agents."
+        elif tab == "retired":
+            agents = [a for a in agents_all if a["approval"] == "rejected"]
+            empty_message = "No retired agents."
+        else:
+            agents = [a for a in agents_all if a["approval"] == "pending"]
+            empty_message = "No agents awaiting approval."
 
         return render_template_string(
             DASHBOARD_HTML,
             user=session.get("user", "admin"),
             agents=agents,
-            total=total,
             cnt_pending=cnt_pending,
-            cnt_approved=cnt_approved,
-            cnt_rejected=cnt_rejected,
+            cnt_registered=cnt_registered,
+            cnt_retired=cnt_retired,
+            current_tab=tab,
+            empty_message=empty_message,
             render_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             msg=msg,
             msg_cls=msg_cls,
@@ -1246,10 +1259,13 @@ def create_app():
     @app.route("/action/<int:agent_id>/<action>")
     @login_required
     def agent_action(agent_id, action):
+        tab = (request.args.get("tab") or "pending").lower()
+        if tab not in ("registered", "pending", "retired"):
+            tab = "pending"
         if action not in ("approve", "reject", "delete"):
             session["msg"] = "Invalid request."
             session["msg_cls"] = "msg-err"
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("dashboard", tab=tab))
 
         try:
             conn = get_db()
@@ -1280,15 +1296,15 @@ def create_app():
                     session["msg_cls"] = "msg-err"
                 else:
                     conn.commit()
-                    label = "approved" if action == "approve" else "rejected"
-                    session["msg"] = "Agent ID=%d %s" % (agent_id, label)
+                    label = "marked as registered" if action == "approve" else "moved to retired"
+                    session["msg"] = "Agent ID %d %s." % (agent_id, label)
                     session["msg_cls"] = "msg-ok"
             conn.close()
         except Exception as e:
             session["msg"] = "Error: %s" % str(e)
             session["msg_cls"] = "msg-err"
 
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("dashboard", tab=tab))
 
     # ── Settings / NTP ───────────────────────────────────
     import shlex
@@ -1297,6 +1313,74 @@ def create_app():
         """Python 3.6 compatible subprocess.run wrapper."""
         return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               universal_newlines=True, timeout=timeout)
+
+    def _lumina_force_local_time_sync(fast=False):
+        """Best-effort NTP step on this host (requires root). Returns (ok, detail).
+
+        When *fast* is True (HTTP "Force sync"), only quick chrony makestep is run so the
+        request finishes within reverse-proxy and Gunicorn timeouts.
+        """
+        notes = []
+        if fast:
+            for cmd in (["chronyc", "-a", "makestep"], ["chronyc", "makestep"]):
+                try:
+                    r = _run_cmd(cmd, timeout=8)
+                    out = (r.stdout or "").strip()
+                    err = (r.stderr or "").strip()
+                    if r.returncode == 0:
+                        return True, (out or "chrony makestep OK")
+                    notes.append("%s exit=%s %s" % (cmd[0], r.returncode, err or out))
+                except FileNotFoundError:
+                    notes.append("chronyc not installed")
+                    return False, "; ".join(notes)
+                except Exception as exc:
+                    notes.append(str(exc))
+            return False, "; ".join(notes) if notes else "force sync failed"
+        for cmd in (["chronyc", "-a", "makestep"], ["chronyc", "makestep"]):
+            try:
+                r = _run_cmd(cmd, timeout=20)
+                out = (r.stdout or "").strip()
+                err = (r.stderr or "").strip()
+                if r.returncode == 0:
+                    return True, (out or "chrony makestep OK")
+                notes.append("%s exit=%s %s" % (cmd[0], r.returncode, err or out))
+            except FileNotFoundError:
+                notes.append("chronyc not installed")
+                break
+            except Exception as exc:
+                notes.append(str(exc))
+        try:
+            subprocess.run(
+                ["systemctl", "restart", "chronyd"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=25,
+            )
+        except Exception:
+            try:
+                subprocess.run(
+                    ["systemctl", "restart", "chrony"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=25,
+                )
+            except Exception as exc:
+                notes.append("chronyd restart: %s" % exc)
+        try:
+            r2 = _run_cmd(["chronyc", "waitsync", "35"], timeout=45)
+            if r2.returncode == 0:
+                return True, "chronyd restarted; " + (r2.stdout or "").strip()[:200]
+            notes.append("waitsync: " + ((r2.stderr or r2.stdout) or "").strip()[:300])
+        except Exception as exc:
+            notes.append("waitsync: %s" % exc)
+        for pool in ("pool.ntp.org", "time.google.com"):
+            try:
+                r3 = _run_cmd(["ntpdate", "-u", pool], timeout=60)
+                if r3.returncode == 0:
+                    return True, "ntpdate %s OK" % pool
+                notes.append("ntpdate %s: %s" % (pool, ((r3.stderr or r3.stdout) or "").strip()[:200]))
+            except FileNotFoundError:
+                notes.append("ntpdate not installed")
+                break
+            except Exception as exc:
+                notes.append("ntpdate: %s" % exc)
+        return False, "; ".join(notes) if notes else "force sync failed"
 
     def _ntp_status():
         """Query chrony/ntpd status on the server."""
@@ -1525,45 +1609,62 @@ def create_app():
 
         return redirect(url_for("settings_page"))
 
-    @app.route("/settings/ntp/sync")
+    @app.route("/settings/ntp/sync", methods=["GET", "POST"])
     @login_required
     def settings_ntp_force_sync():
-        # Force sync local
-        local_ok = False
-        try:
-            r = _run_cmd(["chronyc", "makestep"], timeout=10)
-            if r.returncode == 0:
-                local_ok = True
-            else:
-                session["msg"] = "Sync command returned: %s" % (r.stderr or r.stdout).strip()
-                session["msg_cls"] = "msg-err"
-        except FileNotFoundError:
-            try:
-                _run_cmd(["ntpdate", "-u", "pool.ntp.org"], timeout=10)
-                local_ok = True
-            except Exception as e:
-                session["msg"] = "Force sync failed: %s" % str(e)
-                session["msg_cls"] = "msg-err"
-        except Exception as e:
-            session["msg"] = "Force sync failed: %s" % str(e)
-            session["msg_cls"] = "msg-err"
+        from concurrent.futures import ThreadPoolExecutor, wait
 
-        # Force sync remote servers
-        sync_cmd = "chronyc makestep 2>/dev/null || ntpdate -u pool.ntp.org 2>/dev/null || true"
+        local_ok, local_detail = _lumina_force_local_time_sync(fast=True)
+
+        # Short remote step only (no waitsync/ntpdate) so nginx+gunicorn (30s) do not 502.
+        sync_cmd = (
+            "bash -ce "
+            "'chronyc -a makestep 2>/dev/null || chronyc makestep 2>/dev/null || true; "
+            "systemctl restart chronyd 2>/dev/null || systemctl restart chrony 2>/dev/null || true'"
+        )
         failed = []
         local_ips = _get_local_ips()
-        for srv in LUMINA_SERVERS:
-            if srv["ip"] in local_ips:
-                continue  # Already synced locally
-            r = _ssh_run(srv["ip"], srv["account"], srv["password"], sync_cmd)
-            if not r.get("ok"):
-                failed.append("%s(%s)" % (srv["hostname"], srv["ip"]))
+        remotes = [srv for srv in LUMINA_SERVERS if srv["ip"] not in local_ips]
+        ssh_timeout = 22
+        wall_timeout = 28
+        if remotes:
+            with ThreadPoolExecutor(max_workers=min(8, len(remotes))) as pool:
+                pairs = [
+                    (
+                        srv,
+                        pool.submit(
+                            _ssh_run,
+                            srv["ip"],
+                            srv["account"],
+                            srv["password"],
+                            sync_cmd,
+                            ssh_timeout,
+                        ),
+                    )
+                    for srv in remotes
+                ]
+                futures = [f for _, f in pairs]
+                done, not_done = wait(futures, timeout=wall_timeout)
+                for srv, fut in pairs:
+                    if fut in not_done:
+                        failed.append("%s(%s): SSH timed out" % (srv["hostname"], srv["ip"]))
+                        continue
+                    r = fut.result()
+                    if not r.get("ok"):
+                        err = (r.get("stderr") or r.get("stdout") or r.get("error") or "ssh failed")
+                        failed.append("%s(%s): %s" % (srv["hostname"], srv["ip"], err[:160]))
 
         if local_ok and not failed:
-            session["msg"] = "Time synchronization forced on all servers (DB/AP/WEB)."
+            session["msg"] = "Time synchronization completed on all reachable servers. (%s)" % local_detail[:220]
             session["msg_cls"] = "msg-ok"
         elif local_ok and failed:
-            session["msg"] = "Local sync OK. Failed on: %s" % ", ".join(failed)
+            session["msg"] = "Local OK (%s). Remote issues: %s" % (local_detail[:100], "; ".join(failed))
+            session["msg_cls"] = "msg-err"
+        elif not local_ok and not failed:
+            session["msg"] = "Local sync failed: %s" % local_detail[:500]
+            session["msg_cls"] = "msg-err"
+        else:
+            session["msg"] = "Local: %s | Remote: %s" % (local_detail[:220], "; ".join(failed))
             session["msg_cls"] = "msg-err"
 
         return redirect(url_for("settings_page"))

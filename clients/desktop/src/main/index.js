@@ -2,6 +2,20 @@
 const path = require('path');
 const { app, BrowserWindow, Tray, Menu, Notification, ipcMain, shell, nativeImage, safeStorage, session } = require('electron');
 const Store = require('electron-store');
+const { launchPuttyFromParams } = require('./putty-launch');
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 const store = new Store({
   name: 'blossom-desktop',
@@ -104,7 +118,7 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  // 외부 링크는 기본 브라우저에서 열기
+  // 외부 링크는 OS 기본 처리 — blossom-ssh:// 는 설치 시 등록된 PuTTY 런처(powershell)로 연결
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -264,6 +278,15 @@ ipcMain.handle('app:open-external', (_e, url) => {
   }
   return false;
 });
+ipcMain.handle('app:open-ssh', (_e, opts) => {
+  const o = opts || {};
+  return launchPuttyFromParams({
+    host: String(o.host || '').trim(),
+    port: o.port,
+    user: o.user != null ? String(o.user) : '',
+    password: o.password != null ? String(o.password) : '',
+  });
+});
 ipcMain.handle('app:open-downloads', async () => {
   try {
     const result = await shell.openPath(app.getPath('downloads'));
@@ -340,6 +363,8 @@ ipcMain.on('badge:set', (_e, count) => {
 });
 
 app.whenReady().then(() => {
+  if (!gotTheLock) return;
+
   // 서버 응답 쿠키의 SameSite=Lax → None;Secure 재작성
   // (renderer가 file:// origin 이라 cross-site로 분류되어 Lax 쿠키가 전송되지 않는 문제 회피)
   try {

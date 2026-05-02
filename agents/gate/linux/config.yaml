@@ -1,0 +1,11 @@
+# Lumina Gate API Server configuration
+listen_host: "0.0.0.0"
+listen_port: 8443
+tls_enabled: false
+tls_cert_file: ""
+tls_key_file: ""
+data_dir: "/var/lib/lumina-gate"
+log_dir: "/var/log/lumina-gate"
+log_level: "info"
+policy_file: "/etc/lumina-gate/policy.json"
+default_policy_action: "ALLOW"

@@ -8,15 +8,15 @@
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260501b">
-	<link rel="stylesheet" href="/static/css/3.access_control/3-1.access_control/3-1-3.status/status_list.css?v=20260424j">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260502i">
+	<link rel="stylesheet" href="/static/css/3.access_control/3-1.access_control/3-1-3.status/status_list.css?v=20260502a">
 	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-3.status/1.status_list.js?v=20260501c" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-3.status/1.status_list.js?v=20260502a" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
 	{% include 'layouts/_sidebar.html' %}
-	<main class="main-content">
+	<main class="main-content access-status-page">
 		<div class="content-wrapper">
 			<div class="page-header">
 				<div class="page-utility-right" data-info-key="access_control.status"></div>
@@ -92,8 +92,8 @@
 									<th data-col="select" class="status-col-check"><input type="checkbox" id="status-select-all" aria-label="전체 선택"></th>
 									<th data-col="resource_name">자원명</th>
 									<th data-col="category">분류</th>
-									<th data-col="endpoint_summary">접속점</th>
-									<th data-col="endpoint_count">접속점 수</th>
+									<th data-col="access_type">유형</th>
+									<th data-col="access_info">접속정보</th>
 									<th data-col="active_flag">상태</th>
 									<th data-col="actions">관리</th>
 								</tr>

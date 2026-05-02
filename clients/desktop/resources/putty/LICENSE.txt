@@ -1,0 +1,8 @@
+PuTTY is copyright 1997-2024 Simon Tatham and others.
+
+The full PuTTY distribution includes documentation licensed under a permissive
+document license; the program itself (putty.exe) is distributed under the MIT
+License. See: https://www.chiark.greenend.org.uk/~sgtatham/putty/licence.html
+
+Bundled by Blossom Chat solely to launch SSH sessions from the intranet web UI
+via the blossom-ssh:// protocol handler.

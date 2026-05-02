@@ -7,9 +7,9 @@
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260502b">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507roadmap1">
 	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260502b" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260507roadmap1" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -26,9 +26,10 @@
 				<section class="access-connect-panel access-connect-list-panel" aria-label="접속 자원 탐색">
 					<div class="access-connect-head">
 						<div>
-							<h2>내 승인 자원 <span id="access-total" class="count-badge access-total-badge" data-count="0" aria-live="polite">0</span></h2>
+							<h2>내 승인 자원</h2>
 							<p>자원명, URL, IP로 검색하고 바로 접속합니다.</p>
 						</div>
+						<span id="access-total" class="count-badge access-total-badge" data-count="0" aria-live="polite">0</span>
 					</div>
 					<div class="system-tabs access-category-tabs" role="tablist" aria-label="자원 분류">
 						<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
@@ -56,6 +57,7 @@
 								<option value="">전체</option>
 								<option value="사용 가능">사용 가능</option>
 								<option value="만료 예정">만료 예정</option>
+								<option value="시작 전">시작 전</option>
 								<option value="만료됨">만료됨</option>
 							</select>
 						</div>
@@ -89,5 +91,14 @@
 			</div>
 		</div>
 	</main>
+	<div id="ac-web-iframe-modal" class="ac-web-iframe-modal" hidden>
+		<div class="ac-web-iframe-inner">
+			<div class="ac-web-iframe-toolbar">
+				<span class="ac-web-iframe-hint">주소창은 Blossom을 유지합니다. 사이트가 iframe을 금지하면 비어 보일 수 있습니다.</span>
+				<button type="button" class="action-chip action-muted" id="ac-web-iframe-close">닫기</button>
+			</div>
+			<iframe id="ac-web-iframe-frame" class="ac-web-iframe-frame" title="WEB 접속" sandbox="allow-forms allow-scripts allow-downloads allow-popups"></iframe>
+		</div>
+	</div>
 </body>
 </html>

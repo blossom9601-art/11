@@ -771,6 +771,9 @@ def show(key: str, token: str | None = None):
     _xhr = request.headers.get('X-Requested-With', '')
     _force_full_render_keys = {
         'cat_business_dashboard',
+        # HW/SW 카테고리 대시보드: 차트·빈 상태 스티커 등 최신 마크업/스크립트가 즉시 반영되도록 풀 렌더
+        'cat_hw_dashboard',
+        'cat_sw_dashboard',
         # 비용관리 탭은 탭 전환 실패 시에도 풀 페이지 이동으로 항상 복구되도록
         # SPA 셸 우회(직접 방문/기본 링크 이동 시에도 즉시 풀 렌더 반환)
         'cost_opex_dashboard',

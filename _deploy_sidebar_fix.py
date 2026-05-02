@@ -1,4 +1,4 @@
-"""사이드바 이벤트 위임 수정 배포"""
+"""Blossom 메인 웹(`/opt/blossom/web`) 배포. Lumina(9601)는 `_deploy_lumina.py`를 사용."""
 import paramiko, tarfile, io, os, time
 
 HOST = "192.168.56.108"
@@ -54,7 +54,7 @@ def main():
     # 3. 서비스 재시작
     print("[3/3] 서비스 재시작...")
     out, err = ssh_exec(ssh,
-        "systemctl restart blossom-web && sleep 3 && systemctl is-active blossom-web",
+        "systemctl restart lumina-web && sleep 3 && systemctl is-active lumina-web",
         timeout=30)
     print(f"  서비스: {out.strip()}")
 

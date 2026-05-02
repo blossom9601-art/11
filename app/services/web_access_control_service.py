@@ -1,7 +1,8 @@
 import os
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from flask import current_app
 
@@ -14,6 +15,7 @@ REQUEST_ITEM_TABLE = 'web_access_request_item'
 APPROVAL_TABLE = 'web_access_approval'
 GRANT_TABLE = 'web_access_grant'
 AUDIT_TABLE = 'web_access_audit_log'
+PC_AGENT_TABLE = 'pc_agent_device'
 ATTACHMENT_TABLE = 'web_access_request_attachment'
 NOTIFICATION_TABLE = 'web_access_notification'
 DELEGATION_TABLE = 'web_access_approver_delegation'
@@ -72,8 +74,28 @@ GRANT_STATUS_PENDING = '승인대기'
 GRANT_STATUS_EXPIRED = '만료'
 GRANT_STATUS_BLOCKED = '차단'
 
+# 감사 로그 action_result — SSH 접속은 클라이언트에서 인증 결과를 받은 뒤 확정한다.
+AUDIT_ACCESS_OUTCOME_SUCCESS = '성공'
+AUDIT_ACCESS_OUTCOME_FAIL = '실패'
+AUDIT_ACCESS_OUTCOME_PENDING = '진행중'
+
 PERMANENT_ACCESS_END_DATE = '9999-12-31'
 REQUEST_REASON_MIN_LENGTH = 10
+
+# 권한 기간은 DB에 저장된 YYYY-MM-DD 와 비교한다. 서버 OS가 UTC여도 한국 달력과 맞춘다.
+_ACCESS_POLICY_TZ = None
+
+
+def _access_policy_tz():
+    global _ACCESS_POLICY_TZ
+    if _ACCESS_POLICY_TZ is not None:
+        return _ACCESS_POLICY_TZ
+    try:
+        _ACCESS_POLICY_TZ = ZoneInfo('Asia/Seoul')
+    except Exception:
+        # Windows 등 tzdata 미설치 환경: 한국은 일광절약시 없음 → UTC+9 고정
+        _ACCESS_POLICY_TZ = timezone(timedelta(hours=9), name='KST')
+    return _ACCESS_POLICY_TZ
 
 
 class WebAccessValidationError(ValueError):
@@ -138,7 +160,55 @@ def _now() -> str:
 
 
 def _today() -> str:
-    return date.today().isoformat()
+    return datetime.now(_access_policy_tz()).date().isoformat()
+
+
+def web_access_calendar_today_iso() -> str:
+    """Flask/API에서 grant 날짜와 동일한 기준의 '오늘' (Seoul 달력)."""
+    return _today()
+
+
+def normalize_grant_date_key(value: Any) -> Optional[str]:
+    """grant_start_date / grant_end_date 를 YYYY-MM-DD 키로 맞춘다 (시간·타임존 접미사 때문에 문자열 비교가 깨지는 경우 방지)."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    if len(s) >= 10 and s[4] == '-' and s[7] == '-':
+        return s[:10]
+    try:
+        return date.fromisoformat(s[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def grant_is_active_on_date(grant: Dict[str, Any], day_iso: str) -> bool:
+    if (grant.get('grant_status') or '') != GRANT_STATUS_ACTIVE:
+        return False
+    start = normalize_grant_date_key(grant.get('grant_start_date'))
+    end = normalize_grant_date_key(grant.get('grant_end_date'))
+    if not start or not end:
+        return False
+    return start <= day_iso <= end
+
+
+def _select_active_grant_row(conn: sqlite3.Connection, user_id: int, resource_id: int) -> Optional[sqlite3.Row]:
+    today = _today()
+    rows = conn.execute(
+        f'''
+        SELECT * FROM {GRANT_TABLE}
+         WHERE is_deleted = 0
+           AND user_id = ?
+           AND resource_id = ?
+         ORDER BY id DESC
+        ''',
+        (user_id, resource_id),
+    ).fetchall()
+    for row in rows:
+        if grant_is_active_on_date(dict(row), today):
+            return row
+    return None
 
 
 def _to_bool(value: Any) -> int:
@@ -210,6 +280,34 @@ def _ensure_request_extra_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {REQUEST_TABLE} ADD COLUMN {col} {decl}")
 
 
+def _ensure_endpoint_extra_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(f"PRAGMA table_info({ENDPOINT_TABLE})").fetchall()
+    existing = {row[1] for row in rows}
+    spec = (
+        ('access_type', "TEXT NOT NULL DEFAULT ''"),
+        ('access_info', "TEXT NOT NULL DEFAULT ''"),
+    )
+    for col, decl in spec:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE {ENDPOINT_TABLE} ADD COLUMN {col} {decl}")
+
+
+def _ensure_audit_extra_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(f"PRAGMA table_info({AUDIT_TABLE})").fetchall()
+    existing = {row[1] for row in rows}
+    spec = (
+        ('target_endpoint_id', 'INTEGER'),
+        ('resource_name', "TEXT NOT NULL DEFAULT ''"),
+        ('access_type', "TEXT NOT NULL DEFAULT ''"),
+        ('access_info', "TEXT NOT NULL DEFAULT ''"),
+        ('connect_account', "TEXT NOT NULL DEFAULT ''"),
+        ('session_ended_at', "TEXT NOT NULL DEFAULT ''"),
+    )
+    for col, decl in spec:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE {AUDIT_TABLE} ADD COLUMN {col} {decl}")
+
+
 def _create_request_item_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         f'''
@@ -267,6 +365,334 @@ def _create_delegation_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def _create_pc_agent_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f'''
+        CREATE TABLE IF NOT EXISTS {PC_AGENT_TABLE} (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id            TEXT NOT NULL UNIQUE,
+            hostname            TEXT NOT NULL DEFAULT '',
+            current_user        TEXT NOT NULL DEFAULT '',
+            ip_address          TEXT NOT NULL DEFAULT '',
+            mac_address         TEXT NOT NULL DEFAULT '',
+            os_name             TEXT NOT NULL DEFAULT '',
+            os_version          TEXT NOT NULL DEFAULT '',
+            agent_version       TEXT NOT NULL DEFAULT '',
+            install_version     TEXT NOT NULL DEFAULT '',
+            service_status      TEXT NOT NULL DEFAULT '',
+            policy_version      TEXT NOT NULL DEFAULT '',
+            last_policy_at      TEXT NOT NULL DEFAULT '',
+            last_seen_at        TEXT NOT NULL DEFAULT '',
+            registered_at       TEXT NOT NULL DEFAULT '',
+            last_registered_at  TEXT NOT NULL DEFAULT '',
+            last_error          TEXT NOT NULL DEFAULT '',
+            mapped_user_id      INTEGER,
+            mapped_emp_no       TEXT NOT NULL DEFAULT '',
+            mapped_name         TEXT NOT NULL DEFAULT '',
+            mapped_department   TEXT NOT NULL DEFAULT '',
+            mapping_note        TEXT NOT NULL DEFAULT '',
+            mapped_at           TEXT NOT NULL DEFAULT '',
+            mapped_by_user_id   INTEGER,
+            mapped_by_emp_no    TEXT NOT NULL DEFAULT '',
+            mapped_by_name      TEXT NOT NULL DEFAULT '',
+            created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TEXT,
+            is_deleted          INTEGER NOT NULL DEFAULT 0
+        )
+        '''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{PC_AGENT_TABLE}_heartbeat
+            ON {PC_AGENT_TABLE}(last_seen_at DESC, is_deleted)'''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{PC_AGENT_TABLE}_mapped_user
+            ON {PC_AGENT_TABLE}(mapped_user_id, is_deleted)'''
+    )
+
+
+def _pc_agent_text(value: Any, max_len: int = 255) -> str:
+    text = str(value or '').strip()
+    return text[:max_len]
+
+
+def _parse_pc_agent_time(value: Any) -> Optional[datetime]:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        if text.endswith('Z'):
+            return datetime.fromisoformat(text[:-1] + '+00:00')
+        if 'T' in text:
+            return datetime.fromisoformat(text)
+        return datetime.strptime(text[:19], '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return None
+
+
+def _pc_agent_sync_status(item: Dict[str, Any]) -> str:
+    if str(item.get('last_error') or '').strip():
+        return '오류'
+    service_status = str(item.get('service_status') or '').strip().lower()
+    if service_status and service_status not in ('running', 'run', 'active', '정상'):
+        return '오류'
+    last_seen = _parse_pc_agent_time(item.get('last_seen_at'))
+    if not last_seen:
+        return '미연동'
+    now = datetime.now(timezone.utc) if last_seen.tzinfo else datetime.now()
+    try:
+        seconds = (now - last_seen).total_seconds()
+    except Exception:
+        return '확인필요'
+    if seconds <= 180:
+        return '정상'
+    if seconds <= 900:
+        return '지연'
+    return '끊김'
+
+
+def _pc_agent_item(row: sqlite3.Row) -> Dict[str, Any]:
+    item = _dict(row) or {}
+    user_id = _to_int_or_none(item.get('mapped_user_id'))
+    item['mapped_user'] = None
+    if user_id:
+        item['mapped_user'] = {
+            'id': user_id,
+            'emp_no': item.get('user_emp_no') or item.get('mapped_emp_no') or '',
+            'name': item.get('user_name') or item.get('mapped_name') or '',
+            'department': item.get('user_department') or item.get('mapped_department') or '',
+            'profile_image': item.get('user_profile_image') or '',
+        }
+    item['sync_status'] = _pc_agent_sync_status(item)
+    return item
+
+
+def _pc_agent_select_sql() -> str:
+    return f'''
+        SELECT a.*,
+               u.emp_no AS user_emp_no,
+               COALESCE(NULLIF(u.name, ''), NULLIF(u.nickname, ''), NULLIF(a.mapped_name, ''), NULLIF(a.mapped_emp_no, ''), '') AS user_name,
+               COALESCE(NULLIF(u.department, ''), NULLIF(a.mapped_department, ''), '') AS user_department,
+               u.profile_image AS user_profile_image
+          FROM {PC_AGENT_TABLE} a
+          LEFT JOIN org_user u ON u.id = a.mapped_user_id
+    '''
+
+
+def get_pc_agent(agent_pk: int, app=None) -> Optional[Dict[str, Any]]:
+    aid = _to_int_or_none(agent_pk)
+    if not aid:
+        return None
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            _pc_agent_select_sql() + ' WHERE a.id = ? AND a.is_deleted = 0 LIMIT 1',
+            (aid,),
+        ).fetchone()
+    return _pc_agent_item(row) if row else None
+
+
+def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page_size: int = 20, app=None) -> Dict[str, Any]:
+    filters = filters or {}
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        max_page_size = 5000 if filters.get('export_all') else 200
+        page_size = max(1, min(int(page_size or 20), max_page_size))
+    except (TypeError, ValueError):
+        page_size = 20
+    where = ' WHERE a.is_deleted = 0'
+    params: List[Any] = []
+    keyword = str(filters.get('keyword') or '').strip()
+    if keyword:
+        like = f'%{keyword}%'
+        where += '''
+            AND (
+                a.agent_id LIKE ? OR a.hostname LIKE ? OR a.current_user LIKE ?
+                OR a.ip_address LIKE ? OR a.mac_address LIKE ? OR a.agent_version LIKE ?
+                OR a.policy_version LIKE ? OR a.last_error LIKE ?
+                OR COALESCE(u.name, '') LIKE ? OR COALESCE(u.nickname, '') LIKE ?
+                OR COALESCE(u.emp_no, '') LIKE ? OR COALESCE(u.department, '') LIKE ?
+                OR a.mapped_name LIKE ? OR a.mapped_emp_no LIKE ? OR a.mapped_department LIKE ?
+            )
+        '''
+        params.extend([like] * 15)
+    mapping_state = str(filters.get('mapping_state') or '').strip()
+    if mapping_state == 'mapped':
+        where += ' AND a.mapped_user_id IS NOT NULL'
+    elif mapping_state == 'unmapped':
+        where += ' AND a.mapped_user_id IS NULL'
+    with _get_connection(app) as conn:
+        count_row = conn.execute(
+            f'''SELECT COUNT(*) AS total
+                  FROM {PC_AGENT_TABLE} a
+                  LEFT JOIN org_user u ON u.id = a.mapped_user_id
+                {where}''',
+            params,
+        ).fetchone()
+        total = int((count_row or {}).get('total') if isinstance(count_row, dict) else count_row['total']) if count_row else 0
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        offset = (page - 1) * page_size
+        rows = conn.execute(
+            _pc_agent_select_sql() + where + ' ORDER BY COALESCE(NULLIF(a.last_seen_at, \'\'), a.updated_at, a.created_at) DESC, a.id DESC LIMIT ? OFFSET ?',
+            params + [page_size, offset],
+        ).fetchall()
+        summary_rows = conn.execute(
+            f'''SELECT a.mapped_user_id, a.last_seen_at, a.service_status, a.last_error
+                  FROM {PC_AGENT_TABLE} a
+                  LEFT JOIN org_user u ON u.id = a.mapped_user_id
+                {where}''',
+            params,
+        ).fetchall()
+    items = [_pc_agent_item(row) for row in rows]
+    status_counts = {'정상': 0, '지연': 0, '끊김': 0, '미연동': 0, '오류': 0, '확인필요': 0}
+    mapped_count = 0
+    for row in summary_rows:
+        item = _dict(row) or {}
+        if item.get('mapped_user_id'):
+            mapped_count += 1
+        status = _pc_agent_sync_status(item) or '확인필요'
+        status_counts[status] = status_counts.get(status, 0) + 1
+    unmapped_count = max(0, total - mapped_count)
+    return {
+        'rows': items,
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': total_pages,
+        'summary': {
+            'total_count': total,
+            'status_counts': status_counts,
+            'mapped_count': mapped_count,
+            'unmapped_count': unmapped_count,
+            'visible_status_counts': status_counts,
+            'visible_mapped_count': mapped_count,
+            'visible_unmapped_count': unmapped_count,
+        },
+    }
+
+
+def upsert_pc_agent(payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = None, app=None) -> Dict[str, Any]:
+    agent_id = _pc_agent_text(payload.get('agent_id') or payload.get('agentId'), 128)
+    if not agent_id:
+        raise ValueError('agent_id가 필요합니다.')
+    now = _now()
+    values = {
+        'agent_id': agent_id,
+        'hostname': _pc_agent_text(payload.get('hostname'), 255),
+        'current_user': _pc_agent_text(payload.get('current_user') or payload.get('currentUser'), 255),
+        'ip_address': _pc_agent_text(payload.get('ip_address') or payload.get('ipAddress'), 64),
+        'mac_address': _pc_agent_text(payload.get('mac_address') or payload.get('macAddress'), 64),
+        'os_name': _pc_agent_text(payload.get('os_name') or payload.get('osName'), 128),
+        'os_version': _pc_agent_text(payload.get('os_version') or payload.get('osVersion'), 128),
+        'agent_version': _pc_agent_text(payload.get('agent_version') or payload.get('agentVersion') or payload.get('version'), 64),
+        'install_version': _pc_agent_text(payload.get('install_version') or payload.get('installVersion'), 64),
+        'service_status': _pc_agent_text(payload.get('service_status') or payload.get('serviceStatus'), 64),
+        'policy_version': _pc_agent_text(payload.get('policy_version') or payload.get('policyVersion'), 64),
+        'last_policy_at': _pc_agent_text(payload.get('last_policy_at') or payload.get('lastPolicyAt'), 64),
+        'last_seen_at': _pc_agent_text(payload.get('last_seen_at') or payload.get('lastSeenAt'), 64),
+        'registered_at': _pc_agent_text(payload.get('registered_at') or payload.get('registeredAt'), 64),
+        'last_registered_at': _pc_agent_text(payload.get('last_registered_at') or payload.get('lastRegisteredAt'), 64),
+        'last_error': _pc_agent_text(payload.get('last_error') or payload.get('lastError'), 512),
+    }
+    if not values['last_seen_at'] and payload.get('heartbeat'):
+        values['last_seen_at'] = now
+    with _get_connection(app) as conn:
+        current = conn.execute(f'SELECT id FROM {PC_AGENT_TABLE} WHERE agent_id = ? LIMIT 1', (agent_id,)).fetchone()
+        if current:
+            conn.execute(
+                f'''UPDATE {PC_AGENT_TABLE}
+                       SET hostname = ?, current_user = ?, ip_address = ?, mac_address = ?,
+                           os_name = ?, os_version = ?, agent_version = ?, install_version = ?,
+                           service_status = ?, policy_version = ?, last_policy_at = ?, last_seen_at = ?,
+                           registered_at = COALESCE(NULLIF(registered_at, ''), ?),
+                           last_registered_at = ?, last_error = ?, updated_at = ?, is_deleted = 0
+                     WHERE id = ?''',
+                (
+                    values['hostname'], values['current_user'], values['ip_address'], values['mac_address'],
+                    values['os_name'], values['os_version'], values['agent_version'], values['install_version'],
+                    values['service_status'], values['policy_version'], values['last_policy_at'], values['last_seen_at'],
+                    values['registered_at'] or now, values['last_registered_at'], values['last_error'], now, current['id'],
+                ),
+            )
+            agent_pk = int(current['id'])
+        else:
+            cur = conn.execute(
+                f'''INSERT INTO {PC_AGENT_TABLE}
+                    (agent_id, hostname, current_user, ip_address, mac_address, os_name, os_version,
+                     agent_version, install_version, service_status, policy_version, last_policy_at,
+                     last_seen_at, registered_at, last_registered_at, last_error, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    values['agent_id'], values['hostname'], values['current_user'], values['ip_address'], values['mac_address'],
+                    values['os_name'], values['os_version'], values['agent_version'], values['install_version'],
+                    values['service_status'], values['policy_version'], values['last_policy_at'], values['last_seen_at'],
+                    values['registered_at'] or now, values['last_registered_at'], values['last_error'], now, now,
+                ),
+            )
+            agent_pk = int(cur.lastrowid)
+        conn.commit()
+    item = get_pc_agent(agent_pk, app=app)
+    return item or {}
+
+
+def map_pc_agent_user(agent_pk: int, user_id: int, actor: Dict[str, Any], mapping_note: str = '', app=None) -> Dict[str, Any]:
+    aid = _to_int_or_none(agent_pk)
+    uid = _to_int_or_none(user_id)
+    if not aid or not uid:
+        raise ValueError('에이전트와 사용자를 선택하세요.')
+    now = _now()
+    with _get_connection(app) as conn:
+        agent = conn.execute(f'SELECT id FROM {PC_AGENT_TABLE} WHERE id = ? AND is_deleted = 0', (aid,)).fetchone()
+        if not agent:
+            raise ValueError('PC 에이전트를 찾을 수 없습니다.')
+        user = _load_user_by_id(conn, uid)
+        if not user:
+            raise ValueError('사용자 정보를 찾을 수 없습니다.')
+        conn.execute(
+            f'''UPDATE {PC_AGENT_TABLE}
+                   SET mapped_user_id = ?, mapped_emp_no = ?, mapped_name = ?, mapped_department = ?,
+                       mapping_note = ?, mapped_at = ?, mapped_by_user_id = ?, mapped_by_emp_no = ?,
+                       mapped_by_name = ?, updated_at = ?
+                 WHERE id = ?''',
+            (
+                user['id'], user.get('emp_no') or '', _user_display_name(user), user.get('department') or '',
+                _pc_agent_text(mapping_note, 500), now, actor.get('user_id'), actor.get('emp_no') or '',
+                actor.get('name') or actor.get('emp_no') or '', now, aid,
+            ),
+        )
+        conn.commit()
+    item = get_pc_agent(aid, app=app)
+    return item or {}
+
+
+def clear_pc_agent_user(agent_pk: int, actor: Optional[Dict[str, Any]] = None, app=None) -> Dict[str, Any]:
+    aid = _to_int_or_none(agent_pk)
+    if not aid:
+        raise ValueError('에이전트를 선택하세요.')
+    now = _now()
+    with _get_connection(app) as conn:
+        agent = conn.execute(f'SELECT id FROM {PC_AGENT_TABLE} WHERE id = ? AND is_deleted = 0', (aid,)).fetchone()
+        if not agent:
+            raise ValueError('PC 에이전트를 찾을 수 없습니다.')
+        conn.execute(
+            f'''UPDATE {PC_AGENT_TABLE}
+                   SET mapped_user_id = NULL, mapped_emp_no = '', mapped_name = '', mapped_department = '',
+                       mapping_note = '', mapped_at = '', mapped_by_user_id = ?, mapped_by_emp_no = ?,
+                       mapped_by_name = ?, updated_at = ?
+                 WHERE id = ?''',
+            (
+                (actor or {}).get('user_id'), (actor or {}).get('emp_no') or '',
+                (actor or {}).get('name') or (actor or {}).get('emp_no') or '', now, aid,
+            ),
+        )
+        conn.commit()
+    item = get_pc_agent(aid, app=app)
+    return item or {}
+
+
 def _request_item_status_from_request(status: str) -> str:
     if status == REQUEST_STATUS_APPROVED:
         return REQUEST_ITEM_STATUS_APPROVED
@@ -321,6 +747,57 @@ def _validate_resource_payload(resource_type: str, host_address: str, port_numbe
         raise ValueError(f'{rtype} 유형은 1~65535 범위의 포트 번호가 필요합니다.')
     if rtype in ('SSH', '서버') and not login_account.strip():
         raise ValueError(f'{rtype} 유형은 로그인 계정이 필요합니다.')
+
+
+def _ensure_policy_extra_columns(conn: sqlite3.Connection) -> None:
+    """web_access_policy 테이블에 WEB 통제·인프라 메모 컬럼을 추가한다 (기존 DB 마이그레이션)."""
+    try:
+        rows = conn.execute(f'PRAGMA table_info({POLICY_TABLE})').fetchall()
+    except sqlite3.Error:
+        return
+    existing = {str(r[1]) for r in rows}
+    migrations = [
+        ('web_open_mode', "TEXT NOT NULL DEFAULT 'new_tab'"),
+        ('web_iframe_allow_patterns', "TEXT NOT NULL DEFAULT ''"),
+        ('web_host_gate_patterns', "TEXT NOT NULL DEFAULT ''"),
+        ('web_infra_runbook', "TEXT NOT NULL DEFAULT ''"),
+    ]
+    for col, ddl in migrations:
+        if col not in existing:
+            conn.execute(f'ALTER TABLE {POLICY_TABLE} ADD COLUMN {col} {ddl}')
+
+
+def _normalize_web_open_mode(raw: Any) -> str:
+    v = str(raw or '').strip().lower().replace('-', '_')
+    if v in ('iframe', 'iframe_embed', 'embed', 'panel'):
+        return 'iframe_embed'
+    return 'new_tab'
+
+
+def _sanitize_policy_text(raw: Any, max_len: int) -> str:
+    s = str(raw or '').replace('\r\n', '\n')
+    if len(s) > max_len:
+        s = s[:max_len]
+    return s
+
+
+def _split_policy_patterns(text: Any) -> List[str]:
+    out: List[str] = []
+    for line in str(text or '').splitlines():
+        s = line.strip()
+        if s:
+            out.append(s)
+    return out
+
+
+def get_browse_policy_for_user(app=None) -> Dict[str, Any]:
+    """일반 사용자 WEB 접속 UI용 정책 스냅샷 (민감 필드 제외)."""
+    pol = get_default_policy(app) or {}
+    return {
+        'web_open_mode': _normalize_web_open_mode(pol.get('web_open_mode')),
+        'web_host_gate_patterns': _split_policy_patterns(pol.get('web_host_gate_patterns')),
+        'web_iframe_allow_patterns': _split_policy_patterns(pol.get('web_iframe_allow_patterns')),
+    }
 
 
 def init_web_access_control_tables(app=None) -> None:
@@ -384,6 +861,7 @@ def init_web_access_control_tables(app=None) -> None:
             )
             '''
         )
+        _ensure_policy_extra_columns(conn)
         conn.execute(
             f'''
             CREATE TABLE IF NOT EXISTS {REQUEST_TABLE} (
@@ -507,12 +985,18 @@ def init_web_access_control_tables(app=None) -> None:
                 actor_emp_no        TEXT NOT NULL DEFAULT '',
                 actor_name          TEXT NOT NULL DEFAULT '',
                 target_resource_id  INTEGER,
+                target_endpoint_id  INTEGER,
                 target_request_id   INTEGER,
+                resource_name       TEXT NOT NULL DEFAULT '',
+                access_type         TEXT NOT NULL DEFAULT '',
+                access_info         TEXT NOT NULL DEFAULT '',
                 action_type         TEXT NOT NULL,
                 action_result       TEXT NOT NULL DEFAULT '성공',
                 ip_address          TEXT NOT NULL DEFAULT '',
                 note                TEXT NOT NULL DEFAULT '',
-                extra_json          TEXT NOT NULL DEFAULT '{{}}'
+                extra_json                  TEXT NOT NULL DEFAULT '{{}}',
+                connect_account             TEXT NOT NULL DEFAULT '',
+                session_ended_at            TEXT NOT NULL DEFAULT ''
             )
             '''
         )
@@ -520,6 +1004,7 @@ def init_web_access_control_tables(app=None) -> None:
             f'''CREATE INDEX IF NOT EXISTS idx_{AUDIT_TABLE}_action_time
                 ON {AUDIT_TABLE}(occurred_at DESC)'''
         )
+        _ensure_audit_extra_columns(conn)
         conn.execute(
             f'''
             CREATE TABLE IF NOT EXISTS {NOTIFICATION_TABLE} (
@@ -545,7 +1030,10 @@ def init_web_access_control_tables(app=None) -> None:
         _seed_default_resource(conn)
         _create_endpoint_table(conn)
         _create_delegation_table(conn)
+        _create_pc_agent_table(conn)
         _migrate_endpoints_from_resource(conn)
+        _backfill_endpoint_access_columns(conn)
+        _backfill_audit_access_columns(conn)
         conn.commit()
 
 
@@ -612,10 +1100,12 @@ def _create_endpoint_table(conn: sqlite3.Connection) -> None:
             resource_id     INTEGER NOT NULL,
             label           TEXT NOT NULL DEFAULT '',
             kind            TEXT NOT NULL DEFAULT 'WEB',
+            access_type     TEXT NOT NULL DEFAULT '',
             protocol        TEXT NOT NULL DEFAULT '',
             host            TEXT NOT NULL DEFAULT '',
             port            INTEGER,
             url_path        TEXT NOT NULL DEFAULT '',
+            access_info     TEXT NOT NULL DEFAULT '',
             is_primary      INTEGER NOT NULL DEFAULT 0,
             sort_order      INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -628,6 +1118,7 @@ def _create_endpoint_table(conn: sqlite3.Connection) -> None:
         f'''CREATE INDEX IF NOT EXISTS idx_{ENDPOINT_TABLE}_resource
             ON {ENDPOINT_TABLE}(resource_id, sort_order)'''
     )
+    _ensure_endpoint_extra_columns(conn)
 
 
 def _parse_url_for_endpoint(url: str) -> Optional[Dict[str, Any]]:
@@ -715,17 +1206,19 @@ def _migrate_endpoints_from_resource(conn: sqlite3.Connection) -> None:
             continue
         conn.execute(
             f'''INSERT INTO {ENDPOINT_TABLE}
-                (resource_id, label, kind, protocol, host, port, url_path,
-                 is_primary, sort_order, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?)''',
+                (resource_id, label, kind, access_type, protocol, host, port, url_path,
+                 access_info, is_primary, sort_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?)''',
             (
                 row['id'],
                 '기본',
                 endpoint['kind'],
+                _endpoint_access_type(endpoint),
                 endpoint['protocol'],
                 endpoint['host'],
                 endpoint['port'],
                 endpoint['url_path'],
+                _endpoint_access_info(endpoint),
                 _now(),
             )
         )
@@ -750,6 +1243,62 @@ def _endpoint_url(ep: Dict[str, Any]) -> str:
         port_part = '' if not port or int(port) == 22 else f':{int(port)}'
         return f'ssh://{host}{port_part}'
     return host
+
+
+def _endpoint_access_type(endpoint: Dict[str, Any]) -> str:
+    kind = (endpoint.get('kind') or endpoint.get('access_type') or '').strip().upper()
+    if kind == '웹':
+        return ENDPOINT_KIND_WEB
+    if kind in ENDPOINT_KINDS:
+        return kind
+    return kind or ENDPOINT_KIND_WEB
+
+
+def _endpoint_access_info(endpoint: Dict[str, Any]) -> str:
+    access_type = _endpoint_access_type(endpoint)
+    host = (endpoint.get('host') or '').strip()
+    port = _to_int_or_none(endpoint.get('port'))
+    if access_type == ENDPOINT_KIND_WEB:
+        return _endpoint_url(endpoint)
+    if access_type == ENDPOINT_KIND_SSH:
+        if not host:
+            return ''
+        return f'{host}:{port}' if port and port != ENDPOINT_DEFAULT_PORT['SSH'] else host
+    return _endpoint_url(endpoint) or host
+
+
+def _backfill_endpoint_access_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        f'''SELECT id, kind, access_type, protocol, host, port, url_path, access_info
+              FROM {ENDPOINT_TABLE}'''
+    ).fetchall()
+    for row in rows:
+        endpoint = dict(row)
+        access_type = _endpoint_access_type(endpoint)
+        access_info = _endpoint_access_info(endpoint)
+        if endpoint.get('access_type') == access_type and endpoint.get('access_info') == access_info:
+            continue
+        conn.execute(
+            f'''UPDATE {ENDPOINT_TABLE}
+                   SET access_type = ?,
+                       access_info = ?
+                 WHERE id = ?''',
+            (access_type, access_info, endpoint['id'])
+        )
+
+
+def _enrich_resource_endpoint_fields(item: Dict[str, Any], endpoints: List[Dict[str, Any]]) -> Dict[str, Any]:
+    item['endpoints'] = endpoints
+    item['endpoint_count'] = len(endpoints)
+    primary = next((endpoint for endpoint in endpoints if endpoint.get('is_primary')), endpoints[0] if endpoints else None)
+    item['primary_endpoint'] = primary
+    item['primary_url'] = (primary or {}).get('url', '') if primary else ''
+    item['primary_kind'] = (primary or {}).get('kind', '') if primary else ''
+    item['primary_access_type'] = (primary or {}).get('access_type', '') if primary else ''
+    item['primary_access_info'] = (primary or {}).get('access_info', '') if primary else ''
+    item['access_type'] = item['primary_access_type']
+    item['access_info'] = item['primary_access_info']
+    return item
 
 
 def _validate_endpoint_payload(ep: Dict[str, Any]) -> Dict[str, Any]:
@@ -806,6 +1355,8 @@ def list_endpoints(resource_id: int, conn: Optional[sqlite3.Connection] = None, 
     for row in rows:
         d = dict(row)
         d['url'] = _endpoint_url(d)
+        d['access_type'] = _endpoint_access_type(d)
+        d['access_info'] = _endpoint_access_info(d)
         items.append(d)
     return items
 
@@ -829,19 +1380,23 @@ def _replace_endpoints(conn: sqlite3.Connection, resource_id: int, endpoints: Li
     conn.execute(f'DELETE FROM {ENDPOINT_TABLE} WHERE resource_id = ?', (resource_id,))
     now = _now()
     for idx, ep in enumerate(cleaned):
+        access_type = _endpoint_access_type(ep)
+        access_info = _endpoint_access_info(ep)
         conn.execute(
             f'''INSERT INTO {ENDPOINT_TABLE}
-                (resource_id, label, kind, protocol, host, port, url_path,
-                 is_primary, sort_order, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (resource_id, label, kind, access_type, protocol, host, port, url_path,
+                 access_info, is_primary, sort_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (
                 resource_id,
                 ep['label'],
                 ep['kind'],
+                access_type,
                 ep['protocol'],
                 ep['host'],
                 ep['port'],
                 ep['url_path'],
+                access_info,
                 ep['is_primary'],
                 idx,
                 now,
@@ -899,7 +1454,8 @@ def expire_due_grants(app=None) -> int:
              WHERE is_deleted = 0
                AND grant_status = ?
                AND COALESCE(grant_end_date, '') <> ''
-               AND grant_end_date < ?
+               AND length(trim(grant_end_date)) >= 10
+               AND substr(trim(grant_end_date), 1, 10) < ?
             ''',
             (GRANT_STATUS_EXPIRED, _now(), GRANT_STATUS_ACTIVE, today)
         )
@@ -925,6 +1481,7 @@ def expire_due_grants(app=None) -> int:
 
 def get_default_policy(app=None) -> Dict[str, Any]:
     with _get_connection(app) as conn:
+        _ensure_policy_extra_columns(conn)
         row = conn.execute(f'SELECT * FROM {POLICY_TABLE} ORDER BY id LIMIT 1').fetchone()
     return _dict(row) or {}
 
@@ -942,10 +1499,21 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
         'notify_before_days': int(payload.get('notify_before_days', current.get('notify_before_days', 7)) or 7),
         'duplicate_request_blocked': _to_bool(payload.get('duplicate_request_blocked', current.get('duplicate_request_blocked', 1))),
         'default_period_days': int(payload.get('default_period_days', current.get('default_period_days', 30)) or 30),
+        'web_open_mode': _normalize_web_open_mode(payload.get('web_open_mode', current.get('web_open_mode'))),
+        'web_iframe_allow_patterns': _sanitize_policy_text(
+            payload.get('web_iframe_allow_patterns', current.get('web_iframe_allow_patterns')), 4000
+        ),
+        'web_host_gate_patterns': _sanitize_policy_text(
+            payload.get('web_host_gate_patterns', current.get('web_host_gate_patterns')), 4000
+        ),
+        'web_infra_runbook': _sanitize_policy_text(
+            payload.get('web_infra_runbook', current.get('web_infra_runbook')), 8000
+        ),
         'updated_at': _now(),
         'updated_by': actor,
     }
     with _get_connection(app) as conn:
+        _ensure_policy_extra_columns(conn)
         conn.execute(
             f'''
             UPDATE {POLICY_TABLE}
@@ -956,6 +1524,10 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
                    notify_before_days = ?,
                    duplicate_request_blocked = ?,
                    default_period_days = ?,
+                   web_open_mode = ?,
+                   web_iframe_allow_patterns = ?,
+                   web_host_gate_patterns = ?,
+                   web_infra_runbook = ?,
                    updated_at = ?,
                    updated_by = ?
              WHERE id = ?
@@ -968,6 +1540,10 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
                 updates['notify_before_days'],
                 updates['duplicate_request_blocked'],
                 updates['default_period_days'],
+                updates['web_open_mode'],
+                updates['web_iframe_allow_patterns'],
+                updates['web_host_gate_patterns'],
+                updates['web_infra_runbook'],
                 updates['updated_at'],
                 updates['updated_by'],
                 current['id'],
@@ -1003,13 +1579,7 @@ def list_resources(search: str = '', status: str = '', resource_type: str = '', 
         for row in rows:
             d = dict(row)
             endpoints = list_endpoints(d['id'], conn=conn)
-            d['endpoints'] = endpoints
-            d['endpoint_count'] = len(endpoints)
-            primary = next((ep for ep in endpoints if ep.get('is_primary')), endpoints[0] if endpoints else None)
-            d['primary_endpoint'] = primary
-            d['primary_url'] = (primary or {}).get('url', '') if primary else ''
-            d['primary_kind'] = (primary or {}).get('kind', '') if primary else ''
-            items.append(d)
+            items.append(_enrich_resource_endpoint_fields(d, endpoints))
     return items
 
 
@@ -1023,12 +1593,7 @@ def get_resource(resource_id: int, app=None) -> Optional[Dict[str, Any]]:
             return None
         d = dict(row)
         endpoints = list_endpoints(resource_id, conn=conn)
-        d['endpoints'] = endpoints
-        d['endpoint_count'] = len(endpoints)
-        primary = next((ep for ep in endpoints if ep.get('is_primary')), endpoints[0] if endpoints else None)
-        d['primary_endpoint'] = primary
-        d['primary_url'] = (primary or {}).get('url', '') if primary else ''
-        d['primary_kind'] = (primary or {}).get('kind', '') if primary else ''
+        _enrich_resource_endpoint_fields(d, endpoints)
     return d
 
 
@@ -1272,32 +1837,80 @@ def _user_display_name(row: Dict[str, Any]) -> str:
     return (row.get('name') or row.get('nickname') or row.get('emp_no') or '').strip()
 
 
+def _user_profile_dict(profile: Any) -> Optional[Dict[str, Any]]:
+    if not profile:
+        return None
+    return {
+        'id': getattr(profile, 'id', None),
+        'emp_no': (getattr(profile, 'emp_no', '') or '').strip(),
+        'name': (getattr(profile, 'name', '') or '').strip(),
+        'nickname': (getattr(profile, 'nickname', '') or '').strip(),
+        'department': (getattr(profile, 'department', '') or '').strip(),
+        'department_id': getattr(profile, 'department_id', None),
+        'role': (getattr(profile, 'role', '') or '').strip(),
+    }
+
+
+def _load_user_profile_by_id(user_id: Any) -> Optional[Dict[str, Any]]:
+    uid = _to_int_or_none(user_id)
+    if not uid:
+        return None
+    try:
+        from app.models import UserProfile, db
+        return _user_profile_dict(db.session.get(UserProfile, uid))
+    except Exception:
+        return None
+
+
+def _load_user_profile_by_emp_no(emp_no: str) -> Optional[Dict[str, Any]]:
+    emp = (emp_no or '').strip()
+    if not emp:
+        return None
+    try:
+        from sqlalchemy import func
+        from app.models import UserProfile
+        profile = UserProfile.query.filter(func.upper(UserProfile.emp_no) == emp.upper()).first()
+        return _user_profile_dict(profile)
+    except Exception:
+        return None
+
+
 def _load_user_by_emp_no(conn: sqlite3.Connection, emp_no: str) -> Optional[Dict[str, Any]]:
     emp = (emp_no or '').strip()
     if not emp:
         return None
-    row = conn.execute(
-        '''SELECT id, emp_no, name, nickname, department, department_id, role
-             FROM org_user
-            WHERE UPPER(COALESCE(emp_no, '')) = UPPER(?)
-            LIMIT 1''',
-        (emp,)
-    ).fetchone()
-    return _dict(row)
+    try:
+        row = conn.execute(
+            '''SELECT id, emp_no, name, nickname, department, NULL AS department_id, role
+                 FROM org_user
+                WHERE UPPER(COALESCE(emp_no, '')) = UPPER(?)
+                LIMIT 1''',
+            (emp,)
+        ).fetchone()
+        if row:
+            return _dict(row)
+    except sqlite3.OperationalError:
+        pass
+    return _load_user_profile_by_emp_no(emp)
 
 
 def _load_user_by_id(conn: sqlite3.Connection, user_id: Any) -> Optional[Dict[str, Any]]:
     uid = _to_int_or_none(user_id)
     if not uid:
         return None
-    row = conn.execute(
-        '''SELECT id, emp_no, name, nickname, department, department_id, role
-             FROM org_user
-            WHERE id = ?
-            LIMIT 1''',
-        (uid,)
-    ).fetchone()
-    return _dict(row)
+    try:
+        row = conn.execute(
+            '''SELECT id, emp_no, name, nickname, department, NULL AS department_id, role
+                 FROM org_user
+                WHERE id = ?
+                LIMIT 1''',
+            (uid,)
+        ).fetchone()
+        if row:
+            return _dict(row)
+    except sqlite3.OperationalError:
+        pass
+    return _load_user_profile_by_id(uid)
 
 
 def _active_delegation_for_approver(conn: sqlite3.Connection, approver_id: int, on_date: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -1366,6 +1979,23 @@ def _load_permanent_access_approver(conn: sqlite3.Connection) -> Optional[Dict[s
     return fallback
 
 
+def _actor_as_approver(conn: sqlite3.Connection, actor: Dict[str, Any]) -> Dict[str, Any]:
+    approver_user_id = actor.get('user_id')
+    approver_emp_no = (actor.get('emp_no') or '').strip()
+    approver_name = (actor.get('name') or approver_emp_no or 'ADMIN').strip()
+    return {
+        'approver_user_id': approver_user_id,
+        'approver_emp_no': approver_emp_no,
+        'approver_name': approver_name,
+        'delegated_from_user_id': None,
+        'delegated_from_emp_no': '',
+        'delegated_from_name': '',
+        'delegation_id': None,
+        'delegated': False,
+        'admin_actor': True,
+    }
+
+
 def _resolve_request_approver(conn: sqlite3.Connection, payload: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
     if _is_permanent_access_payload(payload):
         approver = _load_permanent_access_approver(conn)
@@ -1382,6 +2012,8 @@ def _resolve_request_approver(conn: sqlite3.Connection, payload: Dict[str, Any],
             'delegated': False,
             'permanent_access': True,
         }
+    if _actor_is_admin(actor):
+        return _actor_as_approver(conn, actor)
     manager_emp_no = (actor.get('manager_emp_no') or '').strip()
     manager = _load_user_by_emp_no(conn, manager_emp_no)
     if not manager:
@@ -1414,20 +2046,7 @@ def _resolve_request_approver(conn: sqlite3.Connection, payload: Dict[str, Any],
 
 
 def _has_active_grant_conn(conn: sqlite3.Connection, user_id: int, resource_id: int) -> bool:
-    today = _today()
-    row = conn.execute(
-        f'''SELECT id
-              FROM {GRANT_TABLE}
-             WHERE is_deleted = 0
-               AND user_id = ?
-               AND resource_id = ?
-               AND grant_status = ?
-               AND grant_start_date <= ?
-               AND grant_end_date >= ?
-             LIMIT 1''',
-        (user_id, resource_id, GRANT_STATUS_ACTIVE, today, today)
-    ).fetchone()
-    return row is not None
+    return _select_active_grant_row(conn, user_id, resource_id) is not None
 
 
 def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_id: int, request_type: Optional[str] = None) -> bool:
@@ -1704,10 +2323,10 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
             )
             _insert_audit(conn, actor, rid, request_id, '삭제신청' if is_delete_request else '신청', '성공', reason, {'request_status': REQUEST_STATUS_PENDING, 'resource_count': len(valid_ids), 'permanent_access': permanent_access, 'request_type': request_type})
         if is_delete_request:
-            phase_name = '권한 삭제 승인(대무)' if approver.get('delegated') else '권한 삭제 승인'
+            phase_name = '관리자 권한 삭제 승인' if approver.get('admin_actor') else ('권한 삭제 승인(대무)' if approver.get('delegated') else '권한 삭제 승인')
             phase_code = 'REVOKE_APPROVAL'
         else:
-            phase_name = '관리자/보안 승인' if permanent_access else ('팀장 승인(대무)' if approver.get('delegated') else '팀장 승인')
+            phase_name = '관리자/보안 승인' if permanent_access else ('관리자 승인' if approver.get('admin_actor') else ('팀장 승인(대무)' if approver.get('delegated') else '팀장 승인'))
             phase_code = 'SECURITY_ADMIN' if permanent_access else 'TEAM_LEAD'
         conn.execute(
             f'''
@@ -2210,24 +2829,20 @@ def revoke_grant(grant_id: int, actor: Dict[str, Any], app=None) -> bool:
         return (cur.rowcount or 0) > 0
 
 
-def touch_access(resource_id: int, user_id: int, actor: Dict[str, Any], ip_address: str = '', app=None) -> Dict[str, Any]:
+def touch_access(
+    resource_id: int,
+    user_id: int,
+    actor: Dict[str, Any],
+    ip_address: str = '',
+    endpoint_id: Optional[int] = None,
+    connect_account: str = '',
+    app=None,
+) -> Dict[str, Any]:
     expire_due_grants(app)
-    today = _today()
+    endpoint_id = _to_int_or_none(endpoint_id)
+    connect_account = str(connect_account or '').strip()[:128]
     with _get_connection(app) as conn:
-        grant = conn.execute(
-            f'''
-            SELECT * FROM {GRANT_TABLE}
-             WHERE is_deleted = 0
-               AND resource_id = ?
-               AND user_id = ?
-               AND grant_status = ?
-               AND grant_start_date <= ?
-               AND grant_end_date >= ?
-             ORDER BY id DESC
-             LIMIT 1
-            ''',
-            (resource_id, user_id, GRANT_STATUS_ACTIVE, today, today)
-        ).fetchone()
+        grant = _select_active_grant_row(conn, user_id, resource_id)
         if not grant:
             _insert_audit(
                 conn,
@@ -2237,7 +2852,7 @@ def touch_access(resource_id: int, user_id: int, actor: Dict[str, Any], ip_addre
                 '접속',
                 '실패',
                 '접속 가능한 권한이 없습니다.',
-                {'ip_address': ip_address},
+                {'ip_address': ip_address, 'endpoint_id': endpoint_id, 'connect_account': connect_account},
             )
             conn.commit()
             raise ValueError('접속 가능한 권한이 없습니다.')
@@ -2245,10 +2860,28 @@ def touch_access(resource_id: int, user_id: int, actor: Dict[str, Any], ip_addre
             f'UPDATE {GRANT_TABLE} SET last_accessed_at = ?, updated_at = ? WHERE id = ?',
             (_now(), _now(), grant['id'])
         )
-        _insert_audit(conn, actor, resource_id, grant['source_request_id'], '접속', '성공', '', {'ip_address': ip_address})
+        audit_context = _audit_resource_context(conn, resource_id, endpoint_id)
+        access_kind = str(audit_context.get('access_type') or '').strip().upper()
+        initial_outcome = AUDIT_ACCESS_OUTCOME_PENDING if access_kind == ENDPOINT_KIND_SSH else AUDIT_ACCESS_OUTCOME_SUCCESS
+        audit_log_id = _insert_audit(
+            conn,
+            actor,
+            resource_id,
+            grant['source_request_id'],
+            '접속',
+            initial_outcome,
+            '',
+            {'ip_address': ip_address, 'endpoint_id': endpoint_id, 'connect_account': connect_account},
+        )
         conn.commit()
         resource = conn.execute(f'SELECT * FROM {RESOURCE_TABLE} WHERE id = ?', (resource_id,)).fetchone()
-    return {'grant_id': grant['id'], 'resource': _dict(resource), 'grant': _dict(grant)}
+    return {
+        'grant_id': grant['id'],
+        'resource': _dict(resource),
+        'grant': _dict(grant),
+        'access': audit_context,
+        'audit_log_id': audit_log_id,
+    }
 
 
 def get_access_activity(resource_id: int, user_id: int, limit: int = 5, app=None) -> Dict[str, Any]:
@@ -2284,45 +2917,167 @@ def get_access_activity(resource_id: int, user_id: int, limit: int = 5, app=None
     }
 
 
+def _audit_resource_context(conn: sqlite3.Connection, target_resource_id: Optional[int], target_endpoint_id: Optional[int] = None) -> Dict[str, Any]:
+    resource_id = _to_int_or_none(target_resource_id)
+    endpoint_id = _to_int_or_none(target_endpoint_id)
+    context = {
+        'target_endpoint_id': endpoint_id,
+        'resource_name': '',
+        'access_type': '',
+        'access_info': '',
+    }
+    if not resource_id:
+        return context
+    resource = conn.execute(f'SELECT * FROM {RESOURCE_TABLE} WHERE id = ?', (resource_id,)).fetchone()
+    if resource:
+        context['resource_name'] = resource['resource_name'] or ''
+    endpoints = list_endpoints(resource_id, conn=conn)
+    endpoint = None
+    if endpoint_id:
+        endpoint = next((item for item in endpoints if _to_int_or_none(item.get('id')) == endpoint_id), None)
+    if not endpoint:
+        endpoint = next((item for item in endpoints if item.get('is_primary')), endpoints[0] if endpoints else None)
+    if endpoint:
+        context['target_endpoint_id'] = _to_int_or_none(endpoint.get('id'))
+        context['access_type'] = _endpoint_access_type(endpoint)
+        context['access_info'] = _endpoint_access_info(endpoint)
+        return context
+    if resource:
+        legacy_type = str(resource['resource_type'] or '').strip()
+        host = str(resource['host_address'] or '').strip()
+        port = _to_int_or_none(resource['port_number'])
+        url = str(resource['resource_url'] or '').strip()
+        if legacy_type == '웹' or url.lower().startswith(('http://', 'https://')):
+            context['access_type'] = ENDPOINT_KIND_WEB
+            context['access_info'] = url or host
+        elif legacy_type.upper() == ENDPOINT_KIND_SSH or legacy_type in ('서버', 'DB'):
+            context['access_type'] = ENDPOINT_KIND_SSH
+            context['access_info'] = f'{host}:{port}' if host and port and port != ENDPOINT_DEFAULT_PORT['SSH'] else host
+        else:
+            context['access_type'] = legacy_type.upper() or ''
+            context['access_info'] = url or host
+    return context
+
+
+def _backfill_audit_access_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        f'''SELECT id, target_resource_id, target_endpoint_id, resource_name, access_type, access_info
+              FROM {AUDIT_TABLE}
+             WHERE target_resource_id IS NOT NULL'''
+    ).fetchall()
+    for row in rows:
+        context = _audit_resource_context(conn, row['target_resource_id'], row['target_endpoint_id'])
+        resource_name = row['resource_name'] or context['resource_name']
+        access_type = row['access_type'] or context['access_type']
+        access_info = row['access_info'] or context['access_info']
+        endpoint_id = row['target_endpoint_id'] or context['target_endpoint_id']
+        if (
+            row['resource_name'] == resource_name
+            and row['access_type'] == access_type
+            and row['access_info'] == access_info
+            and row['target_endpoint_id'] == endpoint_id
+        ):
+            continue
+        conn.execute(
+            f'''UPDATE {AUDIT_TABLE}
+                   SET target_endpoint_id = ?,
+                       resource_name = ?,
+                       access_type = ?,
+                       access_info = ?
+                 WHERE id = ?''',
+            (endpoint_id, resource_name, access_type, access_info, row['id'])
+        )
+
+
 def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, page_size: int = 20, app=None) -> Dict[str, Any]:
     filters = filters or {}
+    export_all = bool(filters.get('export_all'))
+    export_max = 5000
     try:
         page = max(1, int(page or 1))
     except (TypeError, ValueError):
         page = 1
     try:
-        page_size = max(1, min(int(page_size or 20), 200))
+        raw_size = int(page_size or 20)
     except (TypeError, ValueError):
-        page_size = 20
+        raw_size = 20
+    if export_all:
+        page_size = max(1, min(raw_size, export_max))
+    else:
+        try:
+            page_size = max(1, min(raw_size, 200))
+        except (TypeError, ValueError):
+            page_size = 20
+    resource_name_expr = "COALESCE(NULLIF(l.resource_name, ''), r.resource_name, '')"
+    access_type_expr = f'''
+        COALESCE(
+            NULLIF(l.access_type, ''),
+            NULLIF(selected_endpoint.access_type, ''),
+            NULLIF(selected_endpoint.kind, ''),
+            NULLIF(primary_endpoint.access_type, ''),
+            NULLIF(primary_endpoint.kind, ''),
+            CASE
+                WHEN UPPER(COALESCE(r.resource_type, '')) = '{ENDPOINT_KIND_SSH}' OR r.resource_type IN ('서버', 'DB') THEN '{ENDPOINT_KIND_SSH}'
+                WHEN r.id IS NOT NULL THEN '{ENDPOINT_KIND_WEB}'
+                ELSE ''
+            END
+        )
+    '''
+    access_info_expr = '''
+        COALESCE(
+            NULLIF(l.access_info, ''),
+            NULLIF(selected_endpoint.access_info, ''),
+            NULLIF(primary_endpoint.access_info, ''),
+            NULLIF(r.resource_url, ''),
+            NULLIF(r.host_address, ''),
+            ''
+        )
+    '''
     where_sql = f'''
           FROM {AUDIT_TABLE} l
           LEFT JOIN {RESOURCE_TABLE} r ON r.id = l.target_resource_id
+          LEFT JOIN {ENDPOINT_TABLE} selected_endpoint
+                 ON selected_endpoint.id = l.target_endpoint_id
+                AND selected_endpoint.resource_id = r.id
+          LEFT JOIN {ENDPOINT_TABLE} primary_endpoint
+                 ON primary_endpoint.id = (
+                    SELECT e.id
+                      FROM {ENDPOINT_TABLE} e
+                     WHERE e.resource_id = r.id
+                     ORDER BY e.is_primary DESC, e.sort_order ASC, e.id ASC
+                     LIMIT 1
+                 )
          WHERE 1 = 1
     '''
     params: List[Any] = []
     audit_scope = str(filters.get('audit_scope') or '').strip()
     if audit_scope == 'access':
-        where_sql += " AND l.action_type = '접속' AND l.action_result = '성공'"
+        where_sql += f" AND l.action_type = '접속' AND l.action_result IN ('{AUDIT_ACCESS_OUTCOME_SUCCESS}', '{AUDIT_ACCESS_OUTCOME_PENDING}')"
     elif audit_scope == 'fail':
-        where_sql += " AND l.action_result IS NOT NULL AND l.action_result <> '성공'"
+        where_sql += (
+            f" AND l.action_result IS NOT NULL"
+            f" AND l.action_result NOT IN ('{AUDIT_ACCESS_OUTCOME_SUCCESS}', '{AUDIT_ACCESS_OUTCOME_PENDING}')"
+        )
     if filters.get('keyword'):
         keyword = f"%{str(filters['keyword']).strip()}%"
         where_sql += '''
             AND (
                 l.actor_name LIKE ?
                 OR l.actor_emp_no LIKE ?
-                OR r.resource_name LIKE ?
+                OR ''' + resource_name_expr + ''' LIKE ?
+                OR ''' + access_info_expr + ''' LIKE ?
                 OR l.ip_address LIKE ?
                 OR l.note LIKE ?
+                OR IFNULL(l.connect_account, '') LIKE ?
             )
         '''
-        params.extend([keyword, keyword, keyword, keyword, keyword])
+        params.extend([keyword, keyword, keyword, keyword, keyword, keyword, keyword])
     if filters.get('actor_name'):
         where_sql += ' AND (l.actor_name LIKE ? OR l.actor_emp_no LIKE ?)'
         actor_keyword = f"%{str(filters['actor_name']).strip()}%"
         params.extend([actor_keyword, actor_keyword])
     if filters.get('resource_name'):
-        where_sql += ' AND r.resource_name LIKE ?'
+        where_sql += ' AND ' + resource_name_expr + ' LIKE ?'
         params.append(f"%{str(filters['resource_name']).strip()}%")
     if filters.get('action_type'):
         where_sql += ' AND l.action_type = ?'
@@ -2339,36 +3094,45 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
             SELECT COUNT(*) AS total,
                    SUM(CASE WHEN l.action_type = '접속' THEN 1 ELSE 0 END) AS access_count,
                    SUM(CASE WHEN l.action_type IN ('승인', '반려') THEN 1 ELSE 0 END) AS decision_count,
-                   SUM(CASE WHEN l.action_result IS NOT NULL AND l.action_result <> '성공' THEN 1 ELSE 0 END) AS fail_count
+                   SUM(CASE WHEN l.action_result IS NOT NULL AND l.action_result NOT IN ('{AUDIT_ACCESS_OUTCOME_SUCCESS}', '{AUDIT_ACCESS_OUTCOME_PENDING}') THEN 1 ELSE 0 END) AS fail_count
             {where_sql}
             ''',
             params
         ).fetchone()
         summary = _dict(summary_row) if summary_row else {}
         total = int(summary.get('total') or 0)
-        total_pages = max(1, (total + page_size - 1) // page_size)
-        page = min(page, total_pages)
-        offset = (page - 1) * page_size
+        if export_all:
+            page = 1
+            page_size = min(page_size, total) if total else 0
+            offset = 0
+            total_pages = 1
+        else:
+            total_pages = max(1, (total + page_size - 1) // page_size)
+            page = min(page, total_pages)
+            offset = (page - 1) * page_size
         rows = conn.execute(
             f'''
-            SELECT l.*,
-                   r.resource_name,
+            SELECT l.id,
+                   l.occurred_at,
+                   l.session_ended_at,
+                   l.connect_account,
+                   l.actor_user_id,
+                   l.actor_emp_no,
+                   l.actor_name,
+                   l.target_resource_id,
+                   l.target_endpoint_id,
+                   l.target_request_id,
+                   l.action_type,
+                   l.action_result,
+                   l.ip_address,
+                   l.note,
+                   l.extra_json,
+                   {resource_name_expr} AS resource_name,
                    r.resource_url,
                    r.resource_type,
-                   COALESCE(
-                       (
-                           SELECT e.kind
-                             FROM {ENDPOINT_TABLE} e
-                            WHERE e.resource_id = r.id
-                            ORDER BY e.is_primary DESC, e.sort_order ASC, e.id ASC
-                            LIMIT 1
-                       ),
-                       CASE
-                           WHEN UPPER(COALESCE(r.resource_type, '')) = 'SSH' OR r.resource_type IN ('서버', 'DB') THEN 'SSH'
-                           WHEN r.id IS NOT NULL THEN 'WEB'
-                           ELSE ''
-                       END
-                   ) AS endpoint_kind
+                   {access_type_expr} AS access_type,
+                   {access_type_expr} AS endpoint_kind,
+                   {access_info_expr} AS access_info
             {where_sql}
              ORDER BY l.id DESC
              LIMIT ? OFFSET ?
@@ -2376,7 +3140,7 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
             params + [page_size, offset]
         ).fetchall()
     row_dicts = [_dict(row) for row in rows]
-    return {
+    out = {
         'rows': _enrich_audit_actor_profiles(row_dicts),
         'total': total,
         'page': page,
@@ -2389,6 +3153,88 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
             'fail_count': int(summary.get('fail_count') or 0),
         },
     }
+    if export_all and total > page_size:
+        out['export_truncated'] = True
+        out['export_max'] = export_max
+    return out
+
+
+def update_audit_log_connect_account(audit_log_id: int, user_id: int, connect_account: str, app=None) -> bool:
+    connect_account = str(connect_account or '').strip()[:128]
+    uid = _to_int_or_none(user_id)
+    aid = _to_int_or_none(audit_log_id)
+    if not uid or not aid:
+        return False
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            f'SELECT id, actor_user_id FROM {AUDIT_TABLE} WHERE id = ?',
+            (aid,),
+        ).fetchone()
+        if not row or int(row['actor_user_id'] or 0) != int(uid):
+            return False
+        conn.execute(
+            f'UPDATE {AUDIT_TABLE} SET connect_account = ? WHERE id = ?',
+            (connect_account, aid),
+        )
+        conn.commit()
+    return True
+
+
+def close_audit_log_session(audit_log_id: int, user_id: int, app=None) -> bool:
+    uid = _to_int_or_none(user_id)
+    aid = _to_int_or_none(audit_log_id)
+    if not uid or not aid:
+        return False
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            f'SELECT id, actor_user_id, session_ended_at FROM {AUDIT_TABLE} WHERE id = ?',
+            (aid,),
+        ).fetchone()
+        if not row or int(row['actor_user_id'] or 0) != int(uid):
+            return False
+        if row['session_ended_at']:
+            return True
+        conn.execute(
+            f'UPDATE {AUDIT_TABLE} SET session_ended_at = ? WHERE id = ?',
+            (_now(), aid),
+        )
+        conn.commit()
+    return True
+
+
+def complete_audit_connection_outcome(
+    audit_log_id: int,
+    user_id: int,
+    ok: bool,
+    reason: str = '',
+    app=None,
+) -> bool:
+    """SSH 접속 기록: 터미널 클라이언트가 인증 결과를 보고할 때 '진행중' → 성공/실패."""
+    reason = str(reason or '').strip()[:512]
+    uid = _to_int_or_none(user_id)
+    aid = _to_int_or_none(audit_log_id)
+    if not uid or not aid:
+        return False
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            f'SELECT id, actor_user_id, action_result, action_type FROM {AUDIT_TABLE} WHERE id = ?',
+            (aid,),
+        ).fetchone()
+        if not row or int(row['actor_user_id'] or 0) != int(uid):
+            return False
+        if (row['action_type'] or '') != '접속':
+            return False
+        current = str(row['action_result'] or '').strip()
+        if current != AUDIT_ACCESS_OUTCOME_PENDING:
+            return True
+        new_result = AUDIT_ACCESS_OUTCOME_SUCCESS if ok else AUDIT_ACCESS_OUTCOME_FAIL
+        note = '' if ok else (reason or 'SSH 인증에 실패했습니다.')
+        conn.execute(
+            f'UPDATE {AUDIT_TABLE} SET action_result = ?, note = ? WHERE id = ?',
+            (new_result, note, aid),
+        )
+        conn.commit()
+    return True
 
 
 def _insert_audit(
@@ -2400,16 +3246,21 @@ def _insert_audit(
     action_result: str,
     note: str,
     extra: Dict[str, Any],
-) -> None:
+) -> int:
     extra = extra or {}
     ip_address = str(extra.get('ip_address') or actor.get('ip_address', '') or '')
-    conn.execute(
+    connect_account = str(extra.get('connect_account') or '')[:128].strip()
+    session_ended = str(extra.get('session_ended_at') or '')[:32].strip()
+    context = _audit_resource_context(conn, target_resource_id, _to_int_or_none(extra.get('endpoint_id') or extra.get('target_endpoint_id')))
+    cur = conn.execute(
         f'''
         INSERT INTO {AUDIT_TABLE}
             (occurred_at, actor_user_id, actor_emp_no, actor_name,
-             target_resource_id, target_request_id, action_type, action_result,
-             ip_address, note, extra_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             target_resource_id, target_endpoint_id, target_request_id,
+             resource_name, access_type, access_info,
+             action_type, action_result, ip_address, note, extra_json,
+             connect_account, session_ended_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         (
             _now(),
@@ -2417,14 +3268,21 @@ def _insert_audit(
             actor.get('emp_no', ''),
             actor.get('name', ''),
             target_resource_id,
+            context['target_endpoint_id'],
             target_request_id,
+            context['resource_name'],
+            context['access_type'],
+            context['access_info'],
             action_type,
             action_result,
             ip_address,
             note,
             str(extra),
+            connect_account,
+            session_ended,
         )
     )
+    return int(cur.lastrowid or 0)
 
 
 def run_expiry_notifications(app=None) -> Dict[str, Any]:
@@ -2436,8 +3294,8 @@ def run_expiry_notifications(app=None) -> Dict[str, Any]:
     expired = expire_due_grants(app)
     policy = get_default_policy(app) or {}
     notify_days = int(policy.get('notify_before_days') or 7)
-    today = date.today()
-    today_iso = today.isoformat()
+    today_iso = _today()
+    today = date.fromisoformat(today_iso)
     created = 0
     with _get_connection(app) as conn:
         rows = conn.execute(
@@ -2453,9 +3311,12 @@ def run_expiry_notifications(app=None) -> Dict[str, Any]:
             (GRANT_STATUS_ACTIVE, today_iso)
         ).fetchall()
         for row in rows:
+            end_key = normalize_grant_date_key(row['grant_end_date'])
+            if not end_key:
+                continue
             try:
-                end_dt = date.fromisoformat(str(row['grant_end_date']))
-            except Exception:
+                end_dt = date.fromisoformat(end_key)
+            except ValueError:
                 continue
             remaining = (end_dt - today).days
             if remaining < 0 or remaining > notify_days:

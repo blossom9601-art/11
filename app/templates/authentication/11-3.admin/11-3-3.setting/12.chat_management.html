@@ -27,7 +27,7 @@
 				</div>
 			</div>
 
-			<div class="system-tabs" role="tablist" aria-label="관리자 설정 탭">
+			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_locked_users') }}">사용자</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_groups') }}">화면권한</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_settings') }}">인증관리</a>
@@ -42,6 +42,7 @@
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_version') }}">버전관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_page_tab') }}">페이지관리</a>
 				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_brand_settings') }}">브랜드관리</a>
+				<a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('auth.admin_access_control_settings') }}">접근제어</a>
 			</div>
 
 			<form id="chat-policy-form" class="setting-form" autocomplete="off">

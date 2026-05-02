@@ -9,7 +9,7 @@ import re
 import traceback
 import sqlalchemy as sa
 from urllib.parse import urlparse
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 import time
 from typing import Any, Dict, List, Optional, Sequence, Union
 from app.models import (
@@ -185,6 +185,9 @@ from app.services.org_department_service import (
     soft_delete_org_departments as svc_soft_delete_org_departments,
 )
 from app.services.web_access_control_service import (
+    GRANT_STATUS_ACTIVE as WEB_ACCESS_GRANT_STATUS_ACTIVE,
+    GRANT_STATUS_BLOCKED as WEB_ACCESS_GRANT_STATUS_BLOCKED,
+    GRANT_STATUS_EXPIRED as WEB_ACCESS_GRANT_STATUS_EXPIRED,
     REQUEST_STATUS_PENDING as WEB_ACCESS_REQUEST_PENDING,
     REQUEST_STATUS_PARTIAL_APPROVED as WEB_ACCESS_REQUEST_PARTIAL_APPROVED,
     REQUEST_TYPE_DELETE as WEB_ACCESS_REQUEST_TYPE_DELETE,
@@ -192,26 +195,37 @@ from app.services.web_access_control_service import (
     WebAccessValidationError,
     approve_request as svc_approve_web_access_request,
     cancel_request as svc_cancel_web_access_request,
+    clear_pc_agent_user as svc_clear_pc_agent_user,
     create_approver_delegation as svc_create_web_access_delegation,
     create_request as svc_create_web_access_request,
     create_resource as svc_create_web_access_resource,
+    get_browse_policy_for_user as svc_get_web_access_browse_policy,
     get_default_policy as svc_get_web_access_policy,
     get_access_activity as svc_get_web_access_activity,
     get_request as svc_get_web_access_request,
     get_resource as svc_get_web_access_resource,
+    grant_is_active_on_date as svc_grant_is_active_on_date,
     has_active_grant as svc_has_web_access_grant,
     has_pending_request as svc_has_web_access_pending_request,
+    close_audit_log_session as svc_close_web_access_audit_session,
+    complete_audit_connection_outcome as svc_complete_web_access_audit_connection_outcome,
+    list_pc_agents as svc_list_pc_agents,
     list_audit_logs as svc_list_web_access_audit_logs,
     list_approver_delegations as svc_list_web_access_delegations,
     list_grants as svc_list_web_access_grants,
     list_notifications as svc_list_web_access_notifications,
     list_requests as svc_list_web_access_requests,
     list_resources as svc_list_web_access_resources,
+    map_pc_agent_user as svc_map_pc_agent_user,
+    normalize_grant_date_key as svc_normalize_grant_date_key,
     reject_request as svc_reject_web_access_request,
     revoke_grant as svc_revoke_web_access_grant,
     run_expiry_notifications as svc_run_web_access_notifications,
     soft_delete_resource as svc_delete_web_access_resource,
     touch_access as svc_touch_web_access,
+    update_audit_log_connect_account as svc_update_web_access_audit_connect_account,
+    upsert_pc_agent as svc_upsert_pc_agent,
+    web_access_calendar_today_iso as svc_web_access_calendar_today_iso,
     update_default_policy as svc_update_web_access_policy,
     update_resource as svc_update_web_access_resource,
 )
@@ -37599,14 +37613,19 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     has_pending_delete = svc_has_web_access_pending_request(user_id, resource_id, request_type=WEB_ACCESS_REQUEST_TYPE_DELETE)
     has_pending = has_pending_use or has_pending_delete
     grants = svc_list_web_access_grants(user_id=user_id, resource_id=resource_id)
-    grant_row = grants[0] if grants else None
+    today_iso = svc_web_access_calendar_today_iso()
+    grant_row = next((g for g in grants if svc_grant_is_active_on_date(g, today_iso)), None)
+    if grant_row is None and grants:
+        grant_row = grants[0]
     days_remaining = None
     if grant_row and (grant_row.get('grant_end_date') or ''):
-        try:
-            end_date = datetime.strptime(str(grant_row.get('grant_end_date')), '%Y-%m-%d').date()
-            days_remaining = (end_date - datetime.now().date()).days
-        except Exception:
-            days_remaining = None
+        end_key = svc_normalize_grant_date_key(grant_row.get('grant_end_date'))
+        if end_key:
+            try:
+                end_date = date.fromisoformat(end_key)
+                days_remaining = (end_date - date.fromisoformat(today_iso)).days
+            except ValueError:
+                days_remaining = None
     if int(resource.get('active_flag') or 0) != 1:
         state = '차단'
     elif has_grant:
@@ -37614,7 +37633,19 @@ def _resource_access_state(resource: Dict[str, Any], actor: Dict[str, Any]) -> D
     elif has_pending_use:
         state = '승인 대기'
     elif grant_row:
-        state = '만료됨'
+        gst = str(grant_row.get('grant_status') or '').strip()
+        start_key = svc_normalize_grant_date_key(grant_row.get('grant_start_date'))
+        end_key = svc_normalize_grant_date_key(grant_row.get('grant_end_date'))
+        if gst == WEB_ACCESS_GRANT_STATUS_EXPIRED:
+            state = '만료됨'
+        elif gst == WEB_ACCESS_GRANT_STATUS_BLOCKED:
+            state = '차단'
+        elif gst == WEB_ACCESS_GRANT_STATUS_ACTIVE and start_key and today_iso < start_key:
+            state = '시작 전'
+        elif gst == WEB_ACCESS_GRANT_STATUS_ACTIVE and end_key and today_iso > end_key:
+            state = '만료됨'
+        else:
+            state = '만료됨'
     else:
         state = '차단'
     return {
@@ -37670,7 +37701,12 @@ def api_access_control_resources():
         merged = dict(row)
         access_state = _resource_access_state(row, actor)
         merged.update(access_state)
-        if scope in ('accessible', 'access', 'mine_access') and not (access_state.get('can_access') or access_state.get('access_status') == '만료됨'):
+        merged['can_access'] = bool(access_state.get('can_access'))
+        merged['access_status'] = access_state.get('access_status') or ''
+        if scope in ('accessible', 'access', 'mine_access') and not (
+            access_state.get('can_access')
+            or access_state.get('access_status') in ('만료됨', '시작 전')
+        ):
             continue
         items.append(merged)
     return jsonify({'success': True, 'rows': items, 'total': len(items)})
@@ -37687,7 +37723,10 @@ def api_access_control_resource_detail(resource_id: int):
         return jsonify({'success': False, 'message': '자원 정보를 찾을 수 없습니다.'}), 404
     detail = dict(row)
     access_state = _resource_access_state(row, actor)
-    if (request.args.get('scope') or '').strip().lower() in ('accessible', 'access', 'mine_access') and not (access_state.get('can_access') or access_state.get('access_status') == '만료됨'):
+    if (
+        (request.args.get('scope') or '').strip().lower() in ('accessible', 'access', 'mine_access')
+        and not (access_state.get('can_access') or access_state.get('access_status') in ('만료됨', '시작 전'))
+    ):
         return jsonify({'success': False, 'message': '접속 정보 조회 권한이 없습니다.'}), 403
     detail.update(access_state)
     detail['access_log_summary'] = svc_get_web_access_activity(resource_id, actor['user_id'])
@@ -37920,8 +37959,18 @@ def api_access_control_touch_access(resource_id: int):
     if err:
         body, code = err
         return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    endpoint_id = _coerce_positive_int(payload.get('endpoint_id'))
+    connect_account = str(payload.get('connect_account') or '').strip()[:128]
     try:
-        item = svc_touch_web_access(resource_id, actor['user_id'], actor, ip_address=(request.remote_addr or ''))
+        item = svc_touch_web_access(
+            resource_id,
+            actor['user_id'],
+            actor,
+            ip_address=(request.remote_addr or ''),
+            endpoint_id=endpoint_id,
+            connect_account=connect_account,
+        )
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 403
     return jsonify({'success': True, 'item': item})
@@ -37951,6 +38000,17 @@ def api_access_control_update_policy():
         return jsonify({'success': False, 'message': '관리자만 정책을 수정할 수 있습니다.'}), 403
     payload = request.get_json(silent=True) or {}
     item = svc_update_web_access_policy(payload, actor['emp_no'])
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/browse-policy', methods=['GET'])
+def api_access_control_browse_policy():
+    """로그인 사용자용 WEB 접속 UI 정책(호스트 게이트·iframe 모드)."""
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    item = svc_get_web_access_browse_policy()
     return jsonify({'success': True, 'item': item})
 
 
@@ -37994,23 +38054,166 @@ def api_access_control_audit_logs():
         return jsonify(body), code
     if not _is_admin_actor(actor):
         return jsonify({'success': False, 'message': '관리자만 감사 로그를 조회할 수 있습니다.'}), 403
+    export_raw = (request.args.get('export') or '').strip().lower()
+    export_all = export_raw in ('1', 'true', 'yes', 'csv')
     page = _coerce_positive_int(request.args.get('page')) or 1
     page_size = _coerce_positive_int(request.args.get('page_size')) or 20
-    page_size = min(page_size, 200)
-    result = svc_list_web_access_audit_logs(
-        {
-            'audit_scope': request.args.get('audit_scope') or '',
-            'keyword': request.args.get('keyword') or '',
-            'actor_name': request.args.get('actor_name') or '',
-            'resource_name': request.args.get('resource_name') or '',
-            'action_type': request.args.get('action_type') or '',
-            'from_date': request.args.get('from_date') or '',
-            'to_date': request.args.get('to_date') or '',
-        },
-        page=page,
-        page_size=page_size,
-    )
+    if export_all:
+        page_size = 5000
+        page = 1
+    else:
+        page_size = min(page_size, 200)
+    filters = {
+        'audit_scope': request.args.get('audit_scope') or '',
+        'keyword': request.args.get('keyword') or '',
+        'actor_name': request.args.get('actor_name') or '',
+        'resource_name': request.args.get('resource_name') or '',
+        'action_type': request.args.get('action_type') or '',
+        'from_date': request.args.get('from_date') or '',
+        'to_date': request.args.get('to_date') or '',
+    }
+    if export_all:
+        filters['export_all'] = True
+    result = svc_list_web_access_audit_logs(filters, page=page, page_size=page_size)
     return jsonify({'success': True, **result})
+
+
+@api_bp.route('/api/access-control/pc-agents', methods=['GET'])
+def api_access_control_pc_agents():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 PC 에이전트를 조회할 수 있습니다.'}), 403
+    page = _coerce_positive_int(request.args.get('page')) or 1
+    page_size = _coerce_positive_int(request.args.get('page_size')) or 20
+    export_all = str(request.args.get('export') or '').lower() in ('1', 'true', 'yes')
+    filters = {
+        'keyword': request.args.get('keyword') or '',
+        'mapping_state': request.args.get('mapping_state') or '',
+    }
+    if export_all:
+        filters['export_all'] = True
+    max_page_size = 5000 if export_all else 200
+    result = svc_list_pc_agents(filters, page=page, page_size=min(page_size, max_page_size))
+    if export_all and result.get('total', 0) > result.get('page_size', 0):
+        result['export_truncated'] = True
+        result['export_max'] = result.get('page_size', max_page_size)
+    return jsonify({'success': True, **result})
+
+
+@api_bp.route('/api/access-control/pc-agents', methods=['POST'])
+def api_access_control_pc_agent_upsert():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 PC 에이전트를 등록할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_upsert_pc_agent(payload, actor=actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/pc-agents/<int:agent_id>/user', methods=['POST'])
+def api_access_control_pc_agent_user_mapping(agent_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 사용자 매핑을 변경할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    user_id = _coerce_positive_int(payload.get('user_id'))
+    if not user_id:
+        try:
+            item = svc_clear_pc_agent_user(agent_id, actor=actor)
+        except ValueError as exc:
+            return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({'success': True, 'item': item})
+    try:
+        item = svc_map_pc_agent_user(agent_id, user_id, actor, mapping_note=payload.get('mapping_note') or '')
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/pc-agents/<int:agent_id>/user', methods=['DELETE'])
+def api_access_control_pc_agent_user_mapping_delete(agent_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 사용자 매핑을 변경할 수 있습니다.'}), 403
+    try:
+        item = svc_clear_pc_agent_user(agent_id, actor=actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/audit-logs/<int:audit_id>/connect-account', methods=['POST'])
+def api_access_control_audit_connect_account(audit_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    connect_account = str(payload.get('connect_account') or '').strip()[:128]
+    ok = svc_update_web_access_audit_connect_account(audit_id, actor['user_id'], connect_account)
+    if not ok:
+        return jsonify({'success': False, 'message': '감사 기록을 갱신할 수 없습니다.'}), 404
+    return jsonify({'success': True})
+
+
+@api_bp.route('/api/access-control/audit-logs/<int:audit_id>/connection-outcome', methods=['POST'])
+def api_access_control_audit_connection_outcome(audit_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    payload = request.get_json(silent=True) or {}
+    ok = bool(payload.get('ok') is True or payload.get('ok') == 1 or str(payload.get('ok') or '').lower() in ('true', 'yes', 'y'))
+    reason = str(payload.get('reason') or payload.get('message') or '').strip()[:512]
+    svc_ok = svc_complete_web_access_audit_connection_outcome(audit_id, actor['user_id'], ok, reason)
+    if not svc_ok:
+        return jsonify({'success': False, 'message': '감사 기록을 갱신할 수 없습니다.'}), 404
+    return jsonify({'success': True})
+
+
+@api_bp.route('/api/access-control/audit-logs/<int:audit_id>/session-end', methods=['POST'])
+def api_access_control_audit_session_end(audit_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    ok = svc_close_web_access_audit_session(audit_id, actor['user_id'])
+    if not ok:
+        return jsonify({'success': False, 'message': '세션 종료 시각을 기록할 수 없습니다.'}), 404
+    return jsonify({'success': True})
 
 
 @api_bp.route('/api/access-control/notifications', methods=['GET'])

@@ -4,3 +4,5 @@ out/
 .env
 .DS_Store
 *.log
+# Fetched before `npm run dist:win` (see scripts/download-putty.js)
+resources/putty/putty.exe

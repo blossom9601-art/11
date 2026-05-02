@@ -1,7 +1,10 @@
-﻿import re, sys
-content = open("app/routes/api.py", encoding="utf-8").read()
-print("Total chars:", len(content))
-# find route decorators
-idx = content.find("api_bp")
-print("first api_bp at:", idx)
-print("context:", repr(content[idx:idx+100]))
+﻿import paramiko
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect("192.168.56.108", username="root", password="123456", timeout=15)
+_, out, err = ssh.exec_command("find /opt/blossom/web/instance -name '*.db'")
+print("DB files:", out.read().decode())
+_, out, err = ssh.exec_command("sqlite3 /opt/blossom/web/instance/access_control.db 'PRAGMA table_info(web_access_request);'")
+print("PRAGMA:", out.read().decode())
+print("ERR:", err.read().decode())
+ssh.close()

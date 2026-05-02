@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260502-1">
+    <link rel="stylesheet" href="/static/css/addon_application.css?v=20260502-3">
     <!-- FullCalendar: use global bundle (includes plugins/styles via injectStyles). -->
     <script src="/static/vendor/fullcalendar/6.1.15/index.global.min.js?{{ calendar_vendor_version }}"></script>
     <script src="/static/vendor/fullcalendar/6.1.15/locales-all.global.min.js?{{ calendar_vendor_version }}"></script>
@@ -104,7 +104,11 @@
                                 <label for="sch-name">일정 이름 <span class="required">*</span></label>
                                 <div class="schedule-title-row">
                                     <input id="sch-name" class="form-input" placeholder="일정 제목을 입력하세요" required />
-                                    <button type="button" id="sch-important-btn" class="important-btn" aria-pressed="false">중요</button>
+                                    <button type="button" id="sch-important-btn" class="important-btn" aria-pressed="false" aria-label="중요" title="중요">
+                                        <svg class="important-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M2.59 12 4 8H.923c-.619 0-1.062-.597-.883-1.19L2.697 0H7L5.308 4h2.786c.722 0 1.153.804.754 1.406L3.789 12H2.59Zm20.687-.859c-1.18-2.706-2.294-5.262-3.476-6.722C17.696 1.61 14.489 0 11 0c-.634 0-1.275.074-1.907.186l-.771 1.823c.981.077 1.86.646 2.331 1.522.507.945.454 2.086-.138 2.98l-.08.112L4.776 14H.423c.413 1.46 1.123 2.831 2.12 4.028.295.354.458.802.458 1.263V24h13v-3h2.247c1.5 0 2.778-1.121 2.974-2.606L21.671 15h2.33v-2.212l-.724-1.647Z"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                             <div class="form-row">
@@ -131,6 +135,7 @@
                                 <label for="sch-type-trigger">일정 유형</label>
                                 <div class="type-select-wrap">
                                     <input type="hidden" id="sch-type" value="">
+                                    <input type="hidden" id="sch-color" value="#6366f1">
                                     <div class="dropdown-field" data-dropdown="type">
                                         <button type="button" class="dropdown-trigger" id="sch-type-trigger" aria-haspopup="listbox" aria-expanded="false">
                                             <span id="sch-type-selected" class="dropdown-value placeholder">선택</span>
@@ -152,7 +157,12 @@
                                             </ul>
                                         </div>
                                     </div>
-                                    <span id="type-dot" class="type-dot" aria-hidden="true"></span>
+                                    <button type="button" id="sch-color-btn" class="schedule-color-button" aria-haspopup="dialog" aria-expanded="false" aria-label="일정 색상 선택" title="일정 색상 선택">
+                                        <span id="type-dot" class="type-dot" aria-hidden="true"></span>
+                                    </button>
+                                    <div id="sch-color-panel" class="schedule-color-panel" role="dialog" aria-label="일정 색상 선택" hidden>
+                                        <div id="sch-color-palette" class="schedule-color-palette" role="radiogroup" aria-label="일정 색상"></div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="form-row" style="grid-column: 1 / -1;">
@@ -203,25 +213,15 @@
                                     </select>
                                 </div>
                                 <div id="sch-repeat-weekdays" class="schedule-repeat-weekdays" hidden>
-                                    <label><input type="checkbox" value="SU">일</label>
-                                    <label><input type="checkbox" value="MO">월</label>
-                                    <label><input type="checkbox" value="TU">화</label>
-                                    <label><input type="checkbox" value="WE">수</label>
-                                    <label><input type="checkbox" value="TH">목</label>
-                                    <label><input type="checkbox" value="FR">금</label>
-                                    <label><input type="checkbox" value="SA">토</label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="SU"><span>일</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="MO"><span>월</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="TU"><span>화</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="WE"><span>수</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="TH"><span>목</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="FR"><span>금</span></label>
+                                    <label class="schedule-weekday-chip"><input type="checkbox" value="SA"><span>토</span></label>
                                 </div>
                                 <div id="sch-repeat-month-policy" class="schedule-repeat-policy" hidden>월말 보정: 없는 날짜는 해당 월의 마지막 날짜로 표시</div>
-                            </div>
-                            <div class="form-row" style="grid-column: 1 / -1;">
-                                <label for="sch-attendee-input">참석자</label>
-                                <div class="schedule-token-field">
-                                    <div class="schedule-token-input-row">
-                                        <input type="text" id="sch-attendee-input" class="form-input" placeholder="참석자 이름을 입력하고 추가하세요" autocomplete="off">
-                                        <button type="button" class="btn-secondary" id="sch-attendee-add">추가</button>
-                                    </div>
-                                    <div class="schedule-token-list" id="sch-attendee-list" aria-label="선택된 참석자"></div>
-                                </div>
                             </div>
                             <div class="form-row">
                                 <label for="sch-reminder">알림</label>
@@ -232,13 +232,6 @@
                                     <option value="1시간 전">1시간 전</option>
                                     <option value="1일 전">1일 전</option>
                                 </select>
-                            </div>
-                            <div class="form-row schedule-color-field schedule-wide-row">
-                                <label for="sch-color">일정 색상</label>
-                                <div class="schedule-color-row">
-                                    <input type="hidden" id="sch-color" value="#6366f1">
-                                    <div id="sch-color-palette" class="schedule-color-palette" role="radiogroup" aria-label="일정 색상"></div>
-                                </div>
                             </div>
                             <!-- 설명 -->
                             <div class="form-row" style="grid-column: 1 / -1;">
