@@ -22,8 +22,8 @@ mkdir -p /var/log/lumina
 mkdir -p /var/lib/lumina
 
 # Copy agent files (from web deployment package)
-cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/common/*.py /opt/lumina/common/ 2>/dev/null || true
-cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/linux/*.py /opt/lumina/linux/ 2>/dev/null || true
-cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/linux/collectors/*.py /opt/lumina/linux/collectors/ 2>/dev/null || true
+cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/lumina_server_agent/common/*.py /opt/lumina/common/ 2>/dev/null || true
+cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/lumina_server_agent/linux/*.py /opt/lumina/linux/ 2>/dev/null || true
+cp /opt/blossom/lumina/cli/lumina_cli/../../../agents/lumina_server_agent/linux/collectors/*.py /opt/lumina/linux/collectors/ 2>/dev/null || true
 
 echo "Agent files installed to /opt/lumina/"

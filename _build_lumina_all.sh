@@ -25,6 +25,7 @@ fi
 
 DEPLOY="$PROJECT_ROOT/deploy"
 AGENTS="$PROJECT_ROOT/agents"
+AGENT_SRC="$AGENTS/lumina_server_agent"
 TOOLS="$PROJECT_ROOT/tools"
 WORKDIR="/tmp/lumina-rpm-build-$$"
 TOPDIR="$WORKDIR/rpmbuild"
@@ -44,22 +45,22 @@ SRC="$TOPDIR/SOURCES"
 ###############################################################################
 echo "[1/6] 소스 파일 복사 중..."
 
-# ── common (agents/common/) ──────────────────────────────
+# ── common (agents/lumina_server_agent/common/) ──────────────────────────────
 mkdir -p "$SRC/common"
-cp "$AGENTS/common/__init__.py"   "$SRC/common/"
-cp "$AGENTS/common/config.py"     "$SRC/common/"
-cp "$AGENTS/common/collector.py"  "$SRC/common/"
-cp "$AGENTS/common/crypto.py"     "$SRC/common/"
-cp "$AGENTS/common/masking.py"    "$SRC/common/"
+cp "$AGENT_SRC/common/__init__.py"   "$SRC/common/"
+cp "$AGENT_SRC/common/config.py"     "$SRC/common/"
+cp "$AGENT_SRC/common/collector.py"  "$SRC/common/"
+cp "$AGENT_SRC/common/crypto.py"     "$SRC/common/"
+cp "$AGENT_SRC/common/masking.py"    "$SRC/common/"
 
-# ── linux agent (agents/linux/) ──────────────────────────
+# ── linux agent (agents/lumina_server_agent/linux/) ──────────────────────────
 mkdir -p "$SRC/linux/collectors"
-cp "$AGENTS/linux/__init__.py"               "$SRC/linux/" 2>/dev/null || touch "$SRC/linux/__init__.py"
-cp "$AGENTS/linux/agent.py"                  "$SRC/linux/"
-cp "$AGENTS/linux/collectors/__init__.py"    "$SRC/linux/collectors/" 2>/dev/null || touch "$SRC/linux/collectors/__init__.py"
-cp "$AGENTS/linux/collectors/interface.py"   "$SRC/linux/collectors/"
-cp "$AGENTS/linux/collectors/account.py"     "$SRC/linux/collectors/"
-cp "$AGENTS/linux/collectors/package.py"     "$SRC/linux/collectors/"
+cp "$AGENT_SRC/linux/__init__.py"               "$SRC/linux/" 2>/dev/null || touch "$SRC/linux/__init__.py"
+cp "$AGENT_SRC/linux/agent.py"                  "$SRC/linux/"
+cp "$AGENT_SRC/linux/collectors/__init__.py"    "$SRC/linux/collectors/" 2>/dev/null || touch "$SRC/linux/collectors/__init__.py"
+cp "$AGENT_SRC/linux/collectors/interface.py"   "$SRC/linux/collectors/"
+cp "$AGENT_SRC/linux/collectors/account.py"     "$SRC/linux/collectors/"
+cp "$AGENT_SRC/linux/collectors/package.py"     "$SRC/linux/collectors/"
 
 # ── conf ─────────────────────────────────────────────────
 mkdir -p "$SRC/conf"

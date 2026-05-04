@@ -29,7 +29,7 @@ ls -lh "$TOPDIR/RPMS/noarch/"
 
 # Windows로 복사
 cp "$TOPDIR/RPMS/noarch/"*.rpm "$DEST/"
-cp /mnt/c/Users/ME/Desktop/blossom/agents/linux/dist/lumina-agent* "$DEST/" 2>/dev/null || true
+cp /mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/dist/lumina-agent* "$DEST/" 2>/dev/null || true
 echo ""
 echo "===== deploy/rpm/RPMS/ ====="
 ls -lh "$DEST/"

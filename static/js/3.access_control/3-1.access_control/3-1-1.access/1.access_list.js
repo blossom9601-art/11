@@ -353,7 +353,6 @@
 			return '<div class="ac-action-box ac-action-box--web">' +
 				'<div class="ac-web-action-main">' +
 					'<div><strong>WEB 접속</strong><span class="access-target-text">' + esc(ep.url || endpointTarget(ep)) + '</span></div>' +
-					'<p class="ac-web-external-hint">새 탭에서 열립니다. 탭 안에서 사용자가 다른 도메인으로 이동하는 것은 브라우저 보안상 여기서 막을 수 없습니다. 진입 URL을 최소화하거나, 방화벽·ZTN·역프록시·가상 브라우저 등 보안 정책과 함께 운용하세요.</p>' +
 				'</div>' +
 				'<button type="button" class="action-chip action-primary action-chip-lg" data-action="connect" data-id="' + esc(item.id) + '" data-ep-idx="' + idx + '">' +
 					'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>접속</span>' +
@@ -469,7 +468,7 @@
 			reason: reason != null ? String(reason).slice(0, 512) : ''
 		}).catch(function () {});
 	}
-	/** Windows: 데스크톱 PuTTY/plink 또는 blossom-ssh 프로토콜. 그 외: ssh URL 이동. */
+	/** Windows SSH: Blossom Chat preload가 있으면 IPC(openSsh) 우선 — 없으면 OS의 blossom-ssh:// 로 PuTTY (Lumina Gate PC 에이전트 또는 Blossom 설치 프로그램이 등록). */
 	function launchSshSession(item, ep, auditId) {
 		if (!item || !ep || String(ep.kind || '').toUpperCase() !== 'SSH') return;
 		var aid = auditId != null ? auditId : state.pendingSshAuditId;

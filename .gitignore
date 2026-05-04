@@ -40,3 +40,7 @@ uploads/
 # Environment variables
 .env
 .flaskenv
+deploy/rpm/.lumina_gate_env
+
+# Lumina Gate PC agent: PuTTY staging dir (build_setup.ps1 copies from Blossom Chat resources)
+agents/lumina_pc_agent/windows/putty_bundle/

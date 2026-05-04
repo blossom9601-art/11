@@ -8,7 +8,7 @@
 set -euo pipefail
 
 AGENTS=/mnt/c/Users/ME/Desktop/blossom/agents
-DEST=/mnt/c/Users/ME/Desktop/blossom/agents/linux/dist
+DEST=/mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/dist
 WORKDIR=/tmp/lumina-agent-build
 VERSION="1.0.3"
 RELEASE="1"

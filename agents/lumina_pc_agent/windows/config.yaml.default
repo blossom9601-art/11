@@ -1,0 +1,17 @@
+# gate_server_ip가 비었을 때는 아래 gate_server_url 또는 gate-server-host.txt(ProgramData 폴더)를 사용합니다.
+gate_server_ip: ""
+gate_server_port: 8443
+gate_server_url: "https://192.168.56.110:8443"
+agent_id: ""
+token: ""
+policy_poll_interval_seconds: 60
+heartbeat_interval_seconds: 30
+log_flush_interval_seconds: 10
+log_level: "warning"
+verify_tls: false
+language: ko
+
+# WinDivert (WFP divert) 필터링: Program Files\LuminaGateAgent 에 WinDivert.dll 배포
+web_guard_enabled: true
+web_guard_exempt_gate: true
+windivert_dll_path: ""

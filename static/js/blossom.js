@@ -4489,6 +4489,21 @@ document.addEventListener('DOMContentLoaded', () => {
             + '</div>';
     }
 
+    /**
+     * 접근제어 감사 등: 알림/삭제 모달이 body 직계가 아니라 `.access-audit-modals` 안에 있음.
+     * SPA 가 main 만 교체할 때 이 래퍼를 옮기지 않으면 `#system-message-modal` 이 사라져 네이티브 alert 로 떨어짐.
+     */
+    function __spaSyncAccessAuditModals(parsedDoc) {
+        if (!parsedDoc) return;
+        try {
+            var cur = document.querySelector('body > .access-audit-modals');
+            var next = parsedDoc.querySelector('body > .access-audit-modals');
+            if (cur && next) cur.replaceWith(next);
+            else if (!cur && next) document.body.appendChild(next);
+            else if (cur && !next) cur.remove();
+        } catch (_e) {}
+    }
+
     function __spaSwapMain(html, href) {
         var parser = new DOMParser();
         var doc = parser.parseFromString(html, 'text/html');
@@ -4555,6 +4570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             var modalSel = 'body > .modal-overlay-full, body > .modal-overlay, body > .server-edit-modal, body > .server-add-modal, body > .system-edit-modal';
             Array.from(document.querySelectorAll(modalSel)).forEach(function (el) { try { el.remove(); } catch (_e) {} });
             Array.from(doc.querySelectorAll(modalSel)).forEach(function (el) { try { document.body.appendChild(el); } catch (_e) {} });
+            __spaSyncAccessAuditModals(doc);
             if (!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
         } catch (_e) {}
 
@@ -4894,6 +4910,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 var modalSel = 'body > .modal-overlay-full, body > .modal-overlay, body > .server-edit-modal, body > .server-add-modal, body > .system-edit-modal';
                 Array.from(document.querySelectorAll(modalSel)).forEach(function (el) { try { el.remove(); } catch (_e) {} });
                 Array.from(doc.querySelectorAll(modalSel)).forEach(function (el) { try { document.body.appendChild(el); } catch (_e) {} });
+                __spaSyncAccessAuditModals(doc);
                 if (!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
             } catch (_e) {}
 
@@ -5073,6 +5090,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 var modalSel = 'body > .modal-overlay-full, body > .modal-overlay, body > .server-edit-modal, body > .server-add-modal, body > .system-edit-modal';
                 Array.from(document.querySelectorAll(modalSel)).forEach(function (el) { try { el.remove(); } catch (_e) {} });
                 Array.from(doc.querySelectorAll(modalSel)).forEach(function (el) { try { document.body.appendChild(el); } catch (_e) {} });
+                __spaSyncAccessAuditModals(doc);
                 if (!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
             } catch (_e) {}
 
@@ -5665,6 +5683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     curModals.forEach(el => { try { el.remove(); } catch (_e) {} });
                     const nextModals = Array.from(doc.querySelectorAll(modalSel));
                     nextModals.forEach(el => { try { document.body.appendChild(el); } catch (_e) {} });
+                    __spaSyncAccessAuditModals(doc);
                     if (!document.querySelector('.modal-overlay-full.show')) {
                         document.body.classList.remove('modal-open');
                     }
@@ -6204,9 +6223,8 @@ document.addEventListener('DOMContentLoaded', () => {
             curModals.forEach(el => { try { el.remove(); } catch (_e) {} });
             const nextModals = Array.from(nextDoc.querySelectorAll('body > .modal-overlay-full, body > .server-edit-modal, body > .server-add-modal, body > .system-edit-modal'));
             nextModals.forEach(el => { try { document.body.appendChild(el); } catch (_e) {} });
+            __spaSyncAccessAuditModals(nextDoc);
         } catch (_e) {}
-
-        // Reset modal-open state if any overlay was removed.
         try {
             if (!document.querySelector('.modal-overlay-full.show')) {
                 document.body.classList.remove('modal-open');

@@ -6,6 +6,7 @@ SERVERS = [
     {"name": "ttt1 (DB)",  "ip": "192.168.56.107"},
     {"name": "ttt2 (AP)",  "ip": "192.168.56.106"},
     {"name": "ttt3 (WEB)", "ip": "192.168.56.108"},
+    {"name": "ttt5 (Gate)", "ip": "192.168.56.110"},
 ]
 
 TIMEZONE = "Asia/Seoul"

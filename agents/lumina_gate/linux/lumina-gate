@@ -1,0 +1,1145 @@
+#!/usr/bin/env python3
+"""Lumina Gate API server for PC agents.
+
+This server intentionally uses only the Python standard library so the RPM has
+minimal runtime dependencies. It provides the PC agent registration, policy,
+heartbeat, exception request, and web/block log ingestion endpoints required by
+LuminaGateAgent.
+"""
+
+import argparse
+import errno
+import hashlib
+import hmac
+import json
+import logging
+import os
+import secrets
+import shutil
+import signal
+import socket
+import ssl
+import subprocess
+import sys
+import threading
+import time
+import unicodedata
+import urllib.error
+import urllib.request
+import uuid
+from datetime import datetime, timezone
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from urllib.parse import parse_qs, urlparse
+
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+
+# Keep deployment/rpm/lumina-gate.spec "Version:" in sync (RPM package name).
+VERSION = "1.3.13"
+DEFAULT_CONFIG_PATH = "/etc/lumina-gate/config.yaml"
+
+DEFAULT_TLS_DIR = "/etc/lumina-gate/tls"
+
+DEFAULT_CONFIG = {
+    "listen_host": "0.0.0.0",
+    "listen_port": 8443,
+    "tls_enabled": True,
+    "tls_cert_file": f"{DEFAULT_TLS_DIR}/server.crt",
+    "tls_key_file": f"{DEFAULT_TLS_DIR}/server.key",
+    "data_dir": "/var/lib/lumina-gate",
+    "log_dir": "/var/log/lumina-gate",
+    "log_level": "info",
+    "policy_file": "/etc/lumina-gate/policy.json",
+    "default_policy_action": "ALLOW",
+    "web_sync_url": "",
+    "web_sync_token": "",
+    "web_sync_verify_tls": True,
+    # >0 일 때 에이전트 전체 스냅샷을 주기적으로 WEB에 재전송 (하트비트 동기 실패 보정용)
+    "web_sync_push_interval_seconds": 0,
+    # Blossom WEB 에서 에이전트별 웹 차단 오버레이를 푸시할 때 Authorization Bearer 에 사용 (<token> 과 동일 문자열을 WEB 환경 변수에 두면 된다.)
+    "policy_sync_token": "",
+}
+
+DEFAULT_POLICY = {
+    "policy_version": "1",
+    "default_action": "ALLOW",
+    "rules": [],
+    "updated_at": "",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def local_now_iso() -> str:
+    """Wall-clock ISO timestamp in this host's configured timezone (for operator-facing timestamps)."""
+
+    return datetime.now().astimezone().isoformat(timespec="milliseconds")
+
+
+def merged_agent_version_label(rec: Dict[str, Any]) -> str:
+    """Single display string: runtime/agent version plus optional policy tag (+p{N})."""
+
+    core = str(rec.get("agent_version") or rec.get("version") or "").strip()
+    inst = str(rec.get("install_version") or "").strip()
+    pv = str(rec.get("policy_version") or "").strip()
+    base = core or inst
+    if pv in ("", "0", "-", "?", "NONE", "none"):
+        pv = ""
+    if not pv:
+        return base
+    suffix = f"+p{pv}"
+    if base.endswith(suffix) or pv in base:
+        return base
+    return base + suffix if base else suffix.lstrip("+")
+
+
+def parse_scalar(raw: str) -> Any:
+    value = raw.strip()
+    if not value:
+        return ""
+    if value[0:1] in ('"', "'") and value[-1:] == value[0]:
+        return value[1:-1]
+    lowered = value.lower()
+    if lowered in ("true", "yes", "on"):
+        return True
+    if lowered in ("false", "no", "off"):
+        return False
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
+def load_config(path: str) -> Dict[str, Any]:
+    config = dict(DEFAULT_CONFIG)
+    if not os.path.exists(path):
+        return config
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or ":" not in stripped:
+                continue
+            key, raw_value = stripped.split(":", 1)
+            key = key.strip()
+            if key:
+                config[key] = parse_scalar(raw_value)
+    return config
+
+
+def ensure_directory(path: str, mode: int = 0o750) -> None:
+    os.makedirs(path, mode=mode, exist_ok=True)
+
+
+def setup_logging(config: Dict[str, Any]) -> None:
+    ensure_directory(str(config["log_dir"]))
+    level_name = str(config.get("log_level") or "info").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    log_path = os.path.join(str(config["log_dir"]), "lumina-gate.log")
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(log_path, encoding="utf-8")],
+    )
+
+
+def atomic_write_json(path: str, data: Any, mode: int = 0o640) -> None:
+    directory = os.path.dirname(path)
+    ensure_directory(directory)
+    temp_path = f"{path}.tmp.{os.getpid()}"
+    with open(temp_path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=2, sort_keys=True)
+        fh.write("\n")
+    os.chmod(temp_path, mode)
+    os.replace(temp_path, path)
+
+
+def load_json_file(path: str, default: Any) -> Any:
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return default
+    except Exception:
+        logging.exception("Failed to read JSON file: %s", path)
+        return default
+
+
+class StateStore:
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.config = config
+        self.data_dir = str(config["data_dir"])
+        self.policy_file = str(config.get("policy_file") or os.path.join(self.data_dir, "policy.json"))
+        self.agent_overlay_path = os.path.join(self.data_dir, "agent_policy_overlay.json")
+        self.agents_path = os.path.join(self.data_dir, "agents.json")
+        self.events_path = os.path.join(self.data_dir, "events.ndjson")
+        self.heartbeats_path = os.path.join(self.data_dir, "heartbeats.ndjson")
+        self.exceptions_path = os.path.join(self.data_dir, "exceptions.ndjson")
+        self.lock = threading.RLock()
+        ensure_directory(self.data_dir)
+        self.agents = load_json_file(self.agents_path, {})
+        self.event_ids = self._load_event_ids()
+        self._ensure_policy_file()
+
+    def _load_event_ids(self) -> Set[str]:
+        event_ids = set()  # type: Set[str]
+        if not os.path.exists(self.events_path):
+            return event_ids
+        try:
+            with open(self.events_path, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        row = json.loads(line)
+                    except Exception:
+                        continue
+                    event_id = row.get("event_id")
+                    if event_id:
+                        event_ids.add(str(event_id))
+        except Exception:
+            logging.exception("Failed to load event ids")
+        return event_ids
+
+    def _ensure_policy_file(self) -> None:
+        if os.path.exists(self.policy_file):
+            return
+        policy = dict(DEFAULT_POLICY)
+        policy["default_action"] = str(self.config.get("default_policy_action") or "ALLOW").upper()
+        policy["updated_at"] = utc_now()
+        atomic_write_json(self.policy_file, policy)
+
+    def save_agents(self) -> None:
+        atomic_write_json(self.agents_path, self.agents)
+
+    def register_agent(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        with self.lock:
+            requested = str(payload.get("agent_id") or "").strip()
+            agent_id = requested or f"pc-{uuid.uuid4().hex}"
+            token = secrets.token_urlsafe(32)
+            record = dict(payload)
+            record.update(
+                {
+                    "agent_id": agent_id,
+                    "token": token,
+                    "registered_at": self.agents.get(agent_id, {}).get("registered_at") or local_now_iso(),
+                    "last_registered_at": local_now_iso(),
+                    "version": payload.get("agent_version") or payload.get("install_version") or "",
+                }
+            )
+            self.agents[agent_id] = record
+            self.save_agents()
+            return {
+                "agent_id": agent_id,
+                "token": token,
+                "policy_version": self.policy_for_agent(agent_id).get("policy_version", "1"),
+            }
+
+    def authenticate(self, agent_id: str, token: str) -> bool:
+        with self.lock:
+            return bool(agent_id and token and self.agents.get(agent_id, {}).get("token") == token)
+
+    def touch_agent(self, agent_id: str, values: Dict[str, Any]) -> None:
+        with self.lock:
+            record = self.agents.get(agent_id)
+            if not record:
+                return
+            record.update(values)
+            record["last_seen_at"] = local_now_iso()
+            self.save_agents()
+
+    def policy(self) -> Dict[str, Any]:
+        policy = load_json_file(self.policy_file, DEFAULT_POLICY)
+        if not isinstance(policy, dict):
+            policy = dict(DEFAULT_POLICY)
+        if not policy.get("updated_at"):
+            policy["updated_at"] = utc_now()
+        if not policy.get("policy_version"):
+            policy["policy_version"] = "1"
+        return policy
+
+    def policy_for_agent(self, agent_id: str) -> Dict[str, Any]:
+        aid = str(agent_id or "").strip()
+        overlays = load_json_file(self.agent_overlay_path, {})
+        if not isinstance(overlays, dict):
+            overlays = {}
+        entry = overlays.get(aid)
+        if isinstance(entry, dict) and entry:
+            merged = dict(entry)
+            merged.setdefault("updated_at", utc_now())
+            return merged
+        return self.policy()
+
+    def upsert_agent_policy_overlay(self, agent_id: str, policy_payload: Dict[str, Any]) -> None:
+        aid = str(agent_id or "").strip()
+        if not aid:
+            return
+        sanitized = dict(policy_payload or {})
+        for k in tuple(sanitized.keys()):
+            if isinstance(k, str) and k.startswith("_"):
+                sanitized.pop(k, None)
+        with self.lock:
+            overlays = load_json_file(self.agent_overlay_path, {})
+            if not isinstance(overlays, dict):
+                overlays = {}
+            overlays[aid] = sanitized
+            atomic_write_json(self.agent_overlay_path, overlays)
+
+    def remove_agent_policy_overlay(self, agent_id: str) -> None:
+        aid = str(agent_id or "").strip()
+        if not aid:
+            return
+        with self.lock:
+            overlays = load_json_file(self.agent_overlay_path, {})
+            if not isinstance(overlays, dict):
+                overlays = {}
+            if aid not in overlays:
+                return
+            overlays.pop(aid, None)
+            atomic_write_json(self.agent_overlay_path, overlays)
+
+    def append_json_line(self, path: str, data: Dict[str, Any]) -> None:
+        ensure_directory(os.path.dirname(path))
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(data, ensure_ascii=False, sort_keys=True))
+            fh.write("\n")
+
+    def ingest_event(self, kind: str, agent_id: str, payload: Dict[str, Any]) -> Tuple[bool, bool]:
+        with self.lock:
+            event_id = str(payload.get("event_id") or "").strip()
+            if event_id and event_id in self.event_ids:
+                return True, True
+            row = dict(payload)
+            row["kind"] = kind
+            row["agent_id"] = agent_id
+            row["received_at"] = local_now_iso()
+            self.append_json_line(self.events_path, row)
+            if event_id:
+                self.event_ids.add(event_id)
+            return True, False
+
+    def heartbeat(self, agent_id: str, payload: Dict[str, Any]) -> None:
+        row = dict(payload)
+        row["agent_id"] = agent_id
+        row["received_at"] = local_now_iso()
+        with self.lock:
+            self.append_json_line(self.heartbeats_path, row)
+            self.touch_agent(
+                agent_id,
+                {
+                    "hostname": payload.get("hostname"),
+                    "current_user": payload.get("current_user"),
+                    "agent_version": payload.get("agent_version"),
+                    "policy_version": payload.get("policy_version"),
+                    "service_status": payload.get("service_status"),
+                    "last_error": payload.get("last_error"),
+                },
+            )
+
+    def exception_request(self, agent_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = f"exc-{uuid.uuid4().hex}"
+        row = dict(payload)
+        row["request_id"] = request_id
+        row["agent_id"] = agent_id
+        row["received_at"] = local_now_iso()
+        with self.lock:
+            self.append_json_line(self.exceptions_path, row)
+        return {"request_id": request_id, "status": "RECEIVED"}
+
+
+def json_response(handler: BaseHTTPRequestHandler, status: int, body: Dict[str, Any]) -> None:
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(data)))
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
+def _truthy_yaml_scalar(value: Any) -> bool:
+    lowered = str(value).strip().lower()
+    return lowered not in ("", "false", "0", "no", "off")
+
+
+def sanitize_agent_snapshot(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove secrets before logging or syncing to Blossom WEB."""
+
+    return {k: v for k, v in record.items() if k != "token"}
+
+
+def push_agent_snapshot_to_web(config: Dict[str, Any], agent_record: Optional[Dict[str, Any]]) -> Tuple[bool, str]:
+    """POST one sanitized agent snapshot to Blossom internal sync URL. Used by heartbeat and CLI."""
+
+    url = str(config.get("web_sync_url") or "").strip()
+    token = str(config.get("web_sync_token") or "").strip()
+    if not url or not token:
+        return False, "web_sync_url or web_sync_token is empty"
+    if not agent_record:
+        return False, "no agent record"
+    snapshot = sanitize_agent_snapshot(agent_record)
+    snapshot = dict(snapshot)
+    merged_ver = merged_agent_version_label(snapshot)
+    snapshot["agent_version"] = merged_ver[:128]
+    snapshot["install_version"] = ""
+    snapshot["policy_version"] = ""
+
+    verify_tls = _truthy_yaml_scalar(config.get("web_sync_verify_tls", True))
+    payload = json.dumps(snapshot, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json; charset=utf-8")
+    req.add_header("Authorization", "Bearer " + token)
+    context: Optional[ssl.SSLContext] = None
+    lowered = urlparse(url).scheme.lower()
+    if lowered == "https" and not verify_tls:
+        context = ssl._create_unverified_context()
+    try:
+        with urllib.request.urlopen(req, timeout=15, context=context) as resp:
+            code_attr = getattr(resp, "status", None)
+            if code_attr is None and callable(getattr(resp, "getcode", None)):
+                code_attr = resp.getcode()
+            code = int(code_attr if code_attr is not None else 200)
+            body = ""
+            try:
+                body = resp.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                pass
+            if not (200 <= code < 300):
+                return False, f"HTTP {code} {body}"
+            return True, f"HTTP {code}"
+    except urllib.error.HTTPError as exc:
+        try:
+            err_body = exc.read().decode("utf-8", errors="replace")[:500]
+        except Exception:
+            err_body = str(exc)
+        return False, f"HTTP {exc.code}: {err_body}"
+    except (urllib.error.URLError, OSError) as exc:
+        return False, str(exc)
+
+
+def _schedule_agent_web_sync(config: Dict[str, Any], agent_record: Optional[Dict[str, Any]]) -> None:
+    """Push asynchronously after agent register / heartbeat."""
+
+    url = str(config.get("web_sync_url") or "").strip()
+    token = str(config.get("web_sync_token") or "").strip()
+    if not url or not token or not agent_record:
+        return
+
+    def job() -> None:
+        ok, msg = push_agent_snapshot_to_web(config, agent_record)
+        if not ok:
+            logging.warning(
+                "web_sync failed agent_id=%s: %s",
+                str(agent_record.get("agent_id") or ""),
+                msg,
+            )
+
+    threading.Thread(target=job, daemon=True, name="lumina-gate-web-sync").start()
+
+
+def periodic_web_push_thread_body(config: Dict[str, Any], store: "StateStore", stopping: threading.Event) -> None:
+    try:
+        raw = int(config.get("web_sync_push_interval_seconds") or 0)
+    except (TypeError, ValueError):
+        return
+    if raw <= 0:
+        return
+    interval_sec = max(60, raw)
+    while not stopping.wait(timeout=float(interval_sec)):
+        try:
+            with store.lock:
+                agents_snapshot = {k: dict(v) for k, v in store.agents.items()}
+        except Exception:
+            logging.exception("periodic_web_push: snapshot failed")
+            continue
+        for aid, rec in sorted(agents_snapshot.items()):
+            if stopping.is_set():
+                break
+            ok, msg = push_agent_snapshot_to_web(config, rec)
+            if not ok:
+                logging.warning("periodic web_sync agent_id=%s failed: %s", aid, msg)
+
+
+class GateHandler(BaseHTTPRequestHandler):
+    server_version = f"LuminaGate/{VERSION}"
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        logging.info("%s - %s", self.address_string(), fmt % args)
+
+    @property
+    def store(self) -> StateStore:
+        return self.server.store  # type: ignore[attr-defined]
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path in ("/", "/health", "/api/pc-agent/ping"):
+            json_response(
+                self,
+                HTTPStatus.OK,
+                {"success": True, "item": {"service": "lumina-gate", "version": VERSION, "time": local_now_iso()}},
+            )
+            return
+        if parsed.path == "/api/pc-agent/policy":
+            query = parse_qs(parsed.query)
+            agent_id, token, _ = self.auth_fields({}, query=query)
+            if not self.authorized(agent_id, token, b""):
+                return
+            policy = self.store.policy_for_agent(agent_id)
+            self.store.touch_agent(agent_id, {"last_policy_at": local_now_iso(), "policy_version": policy.get("policy_version")})
+            json_response(self, HTTPStatus.OK, {"success": True, "item": policy})
+            return
+        json_response(self, HTTPStatus.NOT_FOUND, {"success": False, "error": "not_found"})
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        raw_body = self.read_body()
+        payload = self.parse_json(raw_body)
+        if payload is None:
+            json_response(self, HTTPStatus.BAD_REQUEST, {"success": False, "error": "invalid_json"})
+            return
+        if parsed.path == "/api/internal/policy-sync":
+            self.handle_internal_policy_sync(payload)
+            return
+        if parsed.path == "/api/pc-agent/register":
+            item = self.store.register_agent(payload)
+            logging.info("registered agent_id=%s hostname=%s", item.get("agent_id"), payload.get("hostname"))
+            aid = str(item.get("agent_id") or "").strip()
+            if aid:
+                _schedule_agent_web_sync(self.store.config, dict(self.store.agents.get(aid, {})))
+            json_response(self, HTTPStatus.OK, {"success": True, "item": item})
+            return
+
+        agent_id, token, payload = self.auth_fields(payload)
+        if not self.authorized(agent_id, token, raw_body):
+            return
+
+        if parsed.path == "/api/pc-agent/log/web-access":
+            _, duplicate = self.store.ingest_event("web_access", agent_id, payload)
+            json_response(self, HTTPStatus.OK, {"success": True, "item": {"duplicate": duplicate}})
+            return
+        if parsed.path == "/api/pc-agent/log/block":
+            _, duplicate = self.store.ingest_event("block", agent_id, payload)
+            json_response(self, HTTPStatus.OK, {"success": True, "item": {"duplicate": duplicate}})
+            return
+        if parsed.path == "/api/pc-agent/heartbeat":
+            self.store.heartbeat(agent_id, payload)
+            _schedule_agent_web_sync(self.store.config, dict(self.store.agents.get(agent_id, {})))
+            json_response(self, HTTPStatus.OK, {"success": True, "item": {"received_at": local_now_iso()}})
+            return
+        if parsed.path == "/api/pc-agent/request/exception":
+            item = self.store.exception_request(agent_id, payload)
+            json_response(self, HTTPStatus.OK, {"success": True, "item": item})
+            return
+        json_response(self, HTTPStatus.NOT_FOUND, {"success": False, "error": "not_found"})
+
+    def handle_internal_policy_sync(self, payload: Dict[str, Any]) -> None:
+        """Bearer must match ``policy_sync_token`` in config (Blossom LUMINA_GATE_POLICY_TOKEN 등)."""
+
+        cfg_tok = str(self.store.config.get("policy_sync_token") or "").strip()
+        if not cfg_tok:
+            json_response(
+                self,
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"success": False, "error": "policy_sync_disabled"},
+            )
+            return
+        auth_hdr = str(self.headers.get("Authorization") or "")
+        bearer = ""
+        if auth_hdr.lower().startswith("bearer "):
+            bearer = auth_hdr[7:].strip()
+        if len(bearer) != len(cfg_tok) or not secrets.compare_digest(bearer.encode("utf-8"), cfg_tok.encode("utf-8")):
+            json_response(self, HTTPStatus.UNAUTHORIZED, {"success": False, "error": "unauthorized"})
+            return
+        aid_raw = payload.get("agent_id")
+        aid = str(aid_raw).strip() if aid_raw not in (None, "") else ""
+        if not aid:
+            json_response(self, HTTPStatus.BAD_REQUEST, {"success": False, "error": "missing_agent_id"})
+            return
+        clear_flag = payload.get("clear")
+        clear = False
+        if clear_flag is True or (isinstance(clear_flag, str) and clear_flag.lower() in ("1", "true", "yes")):
+            clear = True
+        if clear:
+            self.store.remove_agent_policy_overlay(aid)
+            pv = self.store.policy_for_agent(aid).get("policy_version", "1")
+            self.store.touch_agent(aid, {"last_policy_sync_at": local_now_iso(), "policy_version_from_web": pv})
+            logging.info("policy-sync overlay cleared agent_id=%s", aid)
+            json_response(
+                self,
+                HTTPStatus.OK,
+                {"success": True, "item": {"agent_id": aid, "cleared": True, "policy_version": pv}},
+            )
+            return
+        pol_raw = payload.get("policy")
+        if not isinstance(pol_raw, dict) or not pol_raw:
+            json_response(self, HTTPStatus.BAD_REQUEST, {"success": False, "error": "missing_policy"})
+            return
+        self.store.upsert_agent_policy_overlay(aid, pol_raw)
+        merged = self.store.policy_for_agent(aid)
+        pv = merged.get("policy_version", "1")
+        self.store.touch_agent(aid, {"last_policy_sync_at": local_now_iso(), "policy_version_from_web": pv})
+        logging.info("policy-sync pushed agent_id=%s policy_version=%s", aid, pv)
+        json_response(
+            self,
+            HTTPStatus.OK,
+            {"success": True, "item": {"agent_id": aid, "policy_version": pv}},
+        )
+
+    def read_body(self) -> bytes:
+        length = int(self.headers.get("Content-Length") or "0")
+        return self.rfile.read(length) if length else b"{}"
+
+    def parse_json(self, raw_body: bytes) -> Optional[Dict[str, Any]]:
+        try:
+            data = json.loads(raw_body.decode("utf-8") or "{}")
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
+    def auth_fields(self, payload: Dict[str, Any], query: Optional[Dict[str, Iterable[str]]] = None) -> Tuple[str, str, Dict[str, Any]]:
+        query = query or {}
+        agent_id = self.headers.get("X-Agent-Id") or payload.get("agent_id") or first_query(query, "agent_id") or ""
+        token = self.headers.get("X-Agent-Token") or self.headers.get("Authorization", "").replace("Bearer ", "")
+        token = token or payload.get("token") or first_query(query, "token") or ""
+        return str(agent_id).strip(), str(token).strip(), payload
+
+    def authorized(self, agent_id: str, token: str, raw_body: bytes) -> bool:
+        if not self.store.authenticate(agent_id, token):
+            json_response(self, HTTPStatus.UNAUTHORIZED, {"success": False, "error": "unauthorized"})
+            return False
+        signature = self.headers.get("X-Signature") or ""
+        timestamp = self.headers.get("X-Timestamp") or ""
+        if signature and timestamp:
+            message = timestamp.encode("utf-8") + b"." + raw_body
+            expected = hmac.new(token.encode("utf-8"), message, hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(expected, signature):
+                json_response(self, HTTPStatus.UNAUTHORIZED, {"success": False, "error": "invalid_signature"})
+                return False
+        return True
+
+
+def first_query(query: Dict[str, Iterable[str]], key: str) -> str:
+    values = query.get(key) or []
+    if isinstance(values, list) and values:
+        return str(values[0])
+    return ""
+
+
+def agents_json_path(config: Dict[str, Any]) -> str:
+    return os.path.join(str(config["data_dir"]), "agents.json")
+
+
+def _char_display_width(ch: str) -> int:
+    if not ch:
+        return 0
+    ea = unicodedata.east_asian_width(ch)
+    if ea in ("F", "W"):
+        return 2
+    return 1
+
+
+def _text_display_width(s: str) -> int:
+    return sum(_char_display_width(c) for c in s)
+
+
+def _truncate_visual(text: str, max_visual: int) -> str:
+    t = str(text or "").replace("\n", " ").replace("\r", "").replace("|", "/")
+    if max_visual <= 0:
+        return ""
+    pieces: List[str] = []
+    w = 0
+    suffix = "..."
+    sw = sum(_char_display_width(c) for c in suffix)
+    for ch in t:
+        cw = _char_display_width(ch)
+        if w + cw > max_visual:
+            if w + sw <= max_visual:
+                return "".join(pieces) + suffix
+            return "".join(pieces)
+        pieces.append(ch)
+        w += cw
+    return "".join(pieces)
+
+
+def _pad_visual(text: str, target_visual_width: int) -> str:
+    tv = max(0, _text_display_width(text))
+    if tv >= target_visual_width:
+        return text
+    return text + (" " * (target_visual_width - tv))
+
+
+def print_registered_agents_table(headers: Tuple[str, ...], data_rows: List[Tuple[str, ...]], *, max_cell_visual: int = 48) -> None:
+    """ASCII table with column widths aligned to terminal display columns (handles wide Unicode)."""
+
+    ncol = len(headers)
+    if ncol == 0:
+        return
+
+    hdr_fit = [_truncate_visual(headers[i], max_cell_visual) for i in range(ncol)]
+    row_fit: List[List[str]] = []
+    for row in data_rows:
+        row_fit.append([_truncate_visual(row[i] if i < len(row) else "", max_cell_visual) for i in range(ncol)])
+
+    widths = [_text_display_width(hdr_fit[i]) for i in range(ncol)]
+    for fitted in row_fit:
+        for i in range(ncol):
+            widths[i] = max(widths[i], _text_display_width(fitted[i]))
+            widths[i] = min(widths[i], max_cell_visual)
+
+    def sep_line() -> str:
+        # +-------+-------+ (one '+' per corner/junction; do not prefix each segment with '+')
+        segs = ["-" * (widths[j] + 2) for j in range(ncol)]
+        return "+" + "+".join(segs) + "+"
+
+    top = sep_line()
+    hdr_row = "|" + "|".join(f" {_pad_visual(hdr_fit[i], widths[i])} " for i in range(ncol)) + "|"
+    mid = sep_line()
+
+    print(top)
+    print(hdr_row)
+    if not row_fit:
+        print(mid)
+        return
+    print(mid)
+    for fitted in row_fit:
+        body = "|" + "|".join(f" {_pad_visual(fitted[i], widths[i])} " for i in range(ncol)) + "|"
+        print(body)
+    print(mid)
+
+
+def cmd_check(config: Dict[str, Any]) -> int:
+    """One-shot local linkage: listeners + HTTPS ping + agents.json count."""
+
+    path = agents_json_path(config)
+    blob = load_json_file(path, {})
+    n_agents = 0
+    if isinstance(blob, dict):
+        for _vid, row in blob.items():
+            if isinstance(row, dict):
+                n_agents += 1
+    lh = str(config.get("listen_host") or "")
+    lp = int(config.get("listen_port") or 8443)
+
+    print(f"Lumina Gate check ({VERSION})")
+    print(f"  agents.json: {path}")
+    print(f"  registered_agents.count: {n_agents}")
+    print(f"  listen (configured): https://{lh}:{lp}")
+
+    web_sync_url = str(config.get("web_sync_url") or "").strip()
+    web_sync_token = str(config.get("web_sync_token") or "").strip()
+    web_sync_verify = _truthy_yaml_scalar(config.get("web_sync_verify_tls", True))
+    print(f"  web_sync_url: {web_sync_url or '(not set)'}")
+    print(f"  web_sync_token: {'set' if web_sync_token else '(not set)'}")
+    print(f"  web_sync_verify_tls: {str(web_sync_verify).lower()}")
+
+    tcp_ok = False
+    try:
+        sock = socket.create_connection(("127.0.0.1", lp), timeout=4)
+        sock.close()
+        tcp_ok = True
+        print(f"  tcp_port {lp}: open (localhost)")
+    except OSError as exc:
+        print(f"  tcp_port {lp}: closed or filtered ({exc})")
+
+    ping_ok = False
+    detail = ""
+    try:
+        url = f"https://127.0.0.1:{lp}/api/pc-agent/ping"
+        req = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+        ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=6, context=ctx) as resp:
+            b = resp.read().decode("utf-8", errors="replace").strip()
+            detail = b[:240]
+            if '"success"' in b and ("true" in b.lower()):
+                ping_ok = True
+    except Exception as exc:
+        detail = str(exc)
+
+    print(f"  https_ping: {'OK' if ping_ok else 'FAIL'}")
+    if detail:
+        print(f"    {detail}")
+    print(
+        "Agents appear only after LuminaGateAgent successfully POSTs to /api/pc-agent/register on this gateway.",
+        file=sys.stderr,
+    )
+    return 0 if tcp_ok and ping_ok else 1
+
+
+def cmd_list_agents(config: Dict[str, Any], fmt: str) -> int:
+    """Print registered agents from data_dir/agents.json (secrets stripped)."""
+
+    path = agents_json_path(config)
+    blob = load_json_file(path, {})
+    if blob is None or not isinstance(blob, dict):
+        print(f"agents file missing or invalid: {path}", file=sys.stderr)
+        return 2
+    rows: List[Dict[str, Any]] = []
+    for aid in sorted(blob.keys()):
+        rec = blob.get(aid)
+        if not isinstance(rec, dict):
+            continue
+        rows.append(sanitize_agent_snapshot(dict(rec)))
+    if fmt == "json":
+        exported: List[Dict[str, Any]] = []
+        for rec in rows:
+            out = dict(rec)
+            out.pop("token", None)
+            merged = merged_agent_version_label(out)
+            out.pop("install_version", None)
+            out.pop("policy_version", None)
+            out.pop("version", None)
+            out["agent_version"] = merged
+            exported.append(out)
+        print(json.dumps({"agents_path": path, "count": len(exported), "agents": exported}, ensure_ascii=False, indent=2))
+        return 0
+    cols = ("agent_id", "hostname", "current_user", "agent_version", "last_seen_at", "ip_address")
+    cols_heading = (
+        "Agent ID",
+        "Hostname",
+        "Windows user",
+        "Agent version",
+        "Last seen",
+        "IP address",
+    )
+
+    def narrow_cell(key: str, rec: Dict[str, Any]) -> str:
+        if key == "agent_version":
+            raw = merged_agent_version_label(rec)
+        else:
+            raw = rec.get(key)
+        s = str(raw or "").replace("\t", " ").strip()
+        if len(s) > 500:
+            s = s[:497] + "..."
+        return s
+
+    sorted_recs = sorted(rows, key=lambda r: str(r.get("agent_id") or ""))
+
+    if fmt == "tsv":
+        print("\t".join(cols))
+        for rec in sorted_recs:
+            print("\t".join(narrow_cell(c, rec) for c in cols))
+        return 0
+
+    matrix: List[Tuple[str, ...]] = [tuple(narrow_cell(c, rec) for c in cols) for rec in sorted_recs]
+    print_registered_agents_table(cols_heading, matrix, max_cell_visual=56)
+    return 0
+
+
+def cmd_push_web_sync_all(config: Dict[str, Any]) -> int:
+    """POST every cached agent snapshot to Blossom (same payload as heartbeat hook)."""
+
+    path = agents_json_path(config)
+    blob = load_json_file(path, {})
+    if blob is None or not isinstance(blob, dict):
+        print(f"agents file missing or invalid: {path}", file=sys.stderr)
+        return 2
+    if not str(config.get("web_sync_url") or "").strip():
+        print("web_sync_url is not set", file=sys.stderr)
+        return 2
+    if not str(config.get("web_sync_token") or "").strip():
+        print("web_sync_token is not set", file=sys.stderr)
+        return 2
+    errs = 0
+    total = 0
+    matrix: List[Tuple[str, ...]] = []
+    for aid in sorted(blob.keys()):
+        rec = blob.get(aid)
+        if not isinstance(rec, dict):
+            continue
+        total += 1
+        ok, msg = push_agent_snapshot_to_web(config, dict(rec))
+        flag = "OK" if ok else "FAIL"
+        detail = str(msg or "").replace("\t", " ").strip()
+        if len(detail) > 500:
+            detail = detail[:497] + "..."
+        matrix.append((flag, str(aid), detail))
+        if not ok:
+            errs += 1
+    cols_heading = ("Status", "Agent ID", "Detail")
+    print_registered_agents_table(cols_heading, matrix, max_cell_visual=56)
+    print(f"# done: {total} agents, errors={errs}", file=sys.stderr)
+    return 0 if errs == 0 else 1
+
+
+def ensure_https_server_material(config: Dict[str, Any]) -> None:
+    """lumina-gate serve always uses TLS on listen_host:listen_port; create key+cert if missing."""
+
+    cert_opt = str(config.get("tls_cert_file") or "").strip()
+    key_opt = str(config.get("tls_key_file") or "").strip()
+    cert_path = cert_opt or os.path.join(DEFAULT_TLS_DIR, "server.crt")
+    key_path = key_opt or os.path.join(DEFAULT_TLS_DIR, "server.key")
+    config["tls_cert_file"] = cert_path
+    config["tls_key_file"] = key_path
+    config["tls_enabled"] = True
+
+    parent_dirs = {d for d in (os.path.dirname(cert_path), os.path.dirname(key_path)) if d}
+    for dirname in sorted(parent_dirs):
+        ensure_directory(dirname, 0o755)
+    if os.path.isfile(cert_path) and os.path.isfile(key_path):
+        return
+
+    openssl = shutil.which("openssl")
+    if not openssl:
+        raise RuntimeError(
+            "lumina-gate requires HTTPS but openssl is not in PATH "
+            f"and TLS files are missing ({cert_path}, {key_path})."
+        )
+
+    fqdn = socket.getfqdn() or "localhost"
+    try:
+        subprocess.run(
+            [
+                openssl,
+                "req",
+                "-x509",
+                "-nodes",
+                "-newkey",
+                "rsa:2048",
+                "-keyout",
+                key_path,
+                "-out",
+                cert_path,
+                "-days",
+                "825",
+                "-subj",
+                "/CN=%s/O=lumina-gate-selfsigned" % (fqdn.replace("/", "_"),),
+            ],
+            check=True,
+            stdin=subprocess.DEVNULL,
+            timeout=120,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError, ValueError) as exc:
+        raise RuntimeError(
+            "Could not generate self-signed TLS key/cert; "
+            f"ensure {DEFAULT_TLS_DIR} is writable by root."
+        ) from exc
+    os.chmod(key_path, 0o640)
+    os.chmod(cert_path, 0o644)
+    logging.warning(
+        "auto-generated self-signed TLS cert (%s); install real PKI for production.",
+        cert_path,
+    )
+
+
+def build_server(config: Dict[str, Any], store: StateStore) -> ThreadingHTTPServer:
+    address = (str(config["listen_host"]), int(config["listen_port"]))
+    httpd = ThreadingHTTPServer(address, GateHandler)
+    httpd.store = store  # type: ignore[attr-defined]
+    if not bool(config.get("tls_enabled")):
+        raise RuntimeError("internal error: HTTPS is required but tls_enabled became false")
+
+    cert_file = str(config.get("tls_cert_file") or "").strip()
+    key_file = str(config.get("tls_key_file") or "").strip()
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_file, key_file)
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+    return httpd
+
+
+def config_path_default() -> str:
+    return (os.environ.get("LUMINA_GATE_CONFIG") or "").strip() or DEFAULT_CONFIG_PATH
+
+
+def peel_config_prefix(argv: List[str]) -> Tuple[str, List[str]]:
+    """Strip leading global --config / -c; default from config_path_default()."""
+
+    cfg = config_path_default()
+    idx = 0
+    while idx < len(argv):
+        tok = argv[idx]
+        if tok in ("--config", "-c") and idx + 1 < len(argv):
+            cfg = argv[idx + 1]
+            idx += 2
+            continue
+        if tok.startswith("--config="):
+            cfg = tok.split("=", 1)[1]
+            idx += 1
+            continue
+        break
+    return cfg, argv[idx:]
+
+
+def print_cli_usage() -> None:
+    print(f"""lumina-gate - PC agent gateway CLI (lumina-gate {VERSION})
+
+Usage:
+  lumina-gate [--config PATH] serve          HTTPS API (TLS required)
+  lumina-gate [--config PATH] check          local listen + HTTPS ping + agents.json count
+  lumina-gate [--config PATH] list [--json | --agents-format {{table,tsv,json}}]
+  lumina-gate [--config PATH] push-sync       POST cached agents to Blossom web_sync_*
+  lumina-gate [--config PATH] help
+  lumina-gate -V | --version
+
+Shortcuts: lumina-gate sync  == push-sync
+
+Config: {DEFAULT_CONFIG_PATH} (or env LUMINA_GATE_CONFIG)
+
+list: PCs that successfully called POST /api/pc-agent/register on this gateway
+      (read from data_dir/agents.json). Default stdout is an ASCII-framed table
+      (--agents-format table). Use --agents-format tsv or --json for scripts.
+      Secret/token fields are never printed.
+
+check: TCP reachability on listen_port (localhost), GET https://localhost:PORT/api/pc-agent/ping
+       (HTTPS, no auth), and registered agent count.
+
+serve: first start may auto-create a self-signed cert under /etc/lumina-gate/tls/
+       if tls_cert_file/tls_key_file are missing; replace with real PKI for production.
+
+Note: if systemd already runs lumina-gate on listen_port, do not start serve twice;
+      use lumina-gate list or push-sync instead.""".rstrip())
+
+
+def normalize_legacy_argv(rest: List[str]) -> List[str]:
+    """Map deprecated flags (--list-agents etc.) onto subcommands."""
+
+    if rest[:1] == ["--list-agents"]:
+        return ["list"] + rest[1:]
+    if rest[:1] == ["--push-web-sync-all"]:
+        return ["push-sync"] + rest[1:]
+    return rest
+
+
+def cmd_run_server(cfg_path: str) -> int:
+    config = load_config(cfg_path)
+    setup_logging(config)
+    ensure_https_server_material(config)
+    store = StateStore(config)
+    try:
+        httpd = build_server(config, store)
+    except OSError as exc:
+        en = getattr(exc, "errno", None)
+        if en == errno.EADDRINUSE:
+            host = str(config.get("listen_host") or "0.0.0.0")
+            port = int(config.get("listen_port") or 8443)
+            print(
+                (
+                    "[lumina-gate] Address already in use (%s:%s).\n"
+                    "The systemd service is probably already binding this port:\n"
+                    "  systemctl status lumina-gate\n"
+                    "For diagnostics use: lumina-gate list\n"
+                    "To test serve by hand after stopping service: systemctl stop lumina-gate"
+                )
+                % (host, port),
+                file=sys.stderr,
+            )
+            return 1
+        raise
+    stopping = threading.Event()
+    threading.Thread(
+        target=periodic_web_push_thread_body,
+        args=(config, store, stopping),
+        daemon=True,
+        name="lumina-gate-periodic-web-sync",
+    ).start()
+
+    def stop_handler(signum: int, _frame: Any) -> None:
+        logging.info("received signal %s; stopping", signum)
+        stopping.set()
+        threading.Thread(target=httpd.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+    logging.info(
+        "Lumina Gate %s listening on https://%s:%s",
+        VERSION,
+        config["listen_host"],
+        config["listen_port"],
+    )
+    web_sync_url = str(config.get("web_sync_url") or "").strip()
+    web_sync_token = str(config.get("web_sync_token") or "").strip()
+    if web_sync_url and web_sync_token:
+        logging.info("web_sync enabled url=%s", web_sync_url)
+    else:
+        logging.warning("web_sync disabled: web_sync_url or web_sync_token is empty")
+    httpd.serve_forever(poll_interval=0.5)
+    httpd.server_close()
+    logging.info("Lumina Gate stopped")
+    return 0
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args_in = argv if argv is not None else sys.argv[1:]
+
+    if args_in in (["-V"], ["--version"]):
+        print(VERSION)
+        return 0
+
+    cfg_path, rest = peel_config_prefix(list(args_in))
+    rest = normalize_legacy_argv(rest)
+
+    if rest in (["-h"], ["--help"]):
+        print_cli_usage()
+        return 0
+    if not rest:
+        return cmd_run_server(cfg_path)
+
+    cmd_or = rest[0]
+    tail = rest[1:]
+
+    if cmd_or in ("help",):
+        if tail:
+            print(f"lumina-gate help: unused arguments: {' '.join(tail)}", file=sys.stderr)
+            return 2
+        print_cli_usage()
+        return 0
+
+    sub = cmd_or
+    if sub == "sync":
+        sub = "push-sync"
+
+    if sub == "serve":
+        if tail:
+            print(f"lumina-gate serve: unused arguments: {' '.join(tail)}", file=sys.stderr)
+            return 2
+        return cmd_run_server(cfg_path)
+
+    if sub == "check":
+        if tail:
+            print(f"lumina-gate check: unused arguments: {' '.join(tail)}", file=sys.stderr)
+            return 2
+        cfg = load_config(cfg_path)
+        return cmd_check(cfg)
+
+    if sub == "list":
+        lp = argparse.ArgumentParser(prog="lumina-gate list")
+        lp.add_argument(
+            "--json",
+            "-j",
+            action="store_true",
+            help="same as --agents-format json",
+        )
+        lp.add_argument(
+            "--agents-format",
+            "--format",
+            dest="agents_format",
+            choices=("table", "json", "tsv"),
+            default="table",
+            help="table: ASCII-framed columns (default); tsv: tab-separated; json: JSON",
+        )
+        la = lp.parse_args(tail)
+        if la.json:
+            agents_fmt = "json"
+        else:
+            agents_fmt = la.agents_format
+        cfg = load_config(cfg_path)
+        return cmd_list_agents(cfg, agents_fmt)
+
+    if sub == "push-sync":
+        if tail:
+            print(f"lumina-gate push-sync: unused arguments: {' '.join(tail)}", file=sys.stderr)
+            return 2
+        cfg = load_config(cfg_path)
+        setup_logging(cfg)
+        return cmd_push_web_sync_all(cfg)
+
+    # Legacy: unrecognized subcommands fail above.
+    print(f"lumina-gate: unknown command {cmd_or!r}. Try lumina-gate help", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

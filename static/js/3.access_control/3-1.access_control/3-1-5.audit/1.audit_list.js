@@ -14,12 +14,18 @@
 		agentLoaded: false,
 		selectedAgent: null,
 		selectedUser: null,
-		userResults: []
+		userResults: [],
+		bulkAgentIds: [],
+		lastAgentExportRows: [],
+		exportAgentRowsAll: [],
+		agentSortKey: '',
+		agentSortDir: 'asc'
 	};
 	var PAGE_SIZE_LIMIT = 200;
 	var searchTimer = null;
 	var agentSearchTimer = null;
 	var userSearchTimer = null;
+	var agentMappingSelectSyncTimer = null;
 	var DEFAULT_ACTOR_AVATAR = '/static/image/svg/profil/free-icon-bussiness-man.svg';
 
 	function qs(id) { return document.getElementById(id); }
@@ -38,13 +44,14 @@
 	}
 	function fetchJson(url, options) {
 		var opts = options || {};
+		var errorDefault = opts.errorDefault != null ? opts.errorDefault : '감사 기록을 불러오지 못했습니다.';
 		opts.credentials = opts.credentials || 'same-origin';
 		opts.cache = opts.cache || 'no-store';
 		opts.headers = Object.assign({ 'Accept': 'application/json' }, csrfHeader(), opts.headers || {});
 		return fetch(url, opts).then(function (res) {
 			return res.json().catch(function () { return {}; }).then(function (data) {
 				if (!res.ok || data.success === false) {
-					throw new Error((data && (data.message || data.error)) || '감사 기록을 불러오지 못했습니다.');
+					throw new Error((data && (data.message || data.error)) || errorDefault);
 				}
 				return data;
 			});
@@ -53,6 +60,34 @@
 	function formatDateTime(value) {
 		if (!value) return '-';
 		return String(value).replace('T', ' ').slice(0, 19);
+	}
+	function showAuditMessage(message, title) {
+		var titleEl = qs('message-title');
+		var contentEl = qs('message-content');
+		var el = qs('system-message-modal');
+		if (titleEl) titleEl.textContent = title || '안내';
+		if (contentEl) contentEl.textContent = String(message || '');
+		if (!el) {
+			window.alert(String(message || ''));
+			return;
+		}
+		document.body.classList.add('modal-open');
+		el.classList.add('show');
+		el.setAttribute('aria-hidden', 'false');
+	}
+	function auditModalsPreventBodyUnlock() {
+		return !!(document.querySelector('#system-message-modal.show') ||
+			document.querySelector('#system-delete-modal.show') ||
+			document.querySelector('#agent-map-modal.show') ||
+			document.querySelector('#agent-pc-download-modal.show'));
+	}
+	function closeAuditMessageModal() {
+		var el = qs('system-message-modal');
+		if (!el) return;
+		el.classList.remove('show');
+		el.setAttribute('aria-hidden', 'true');
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+		else document.body.classList.add('modal-open');
 	}
 	function actionClass(value) {
 		if (value === '접속') return 'audit-action-access';
@@ -135,12 +170,6 @@
 		try { return number.toLocaleString('ko-KR'); }
 		catch (_) { return String(number); }
 	}
-	function calcRate(part, total) {
-		part = parseInt(part, 10) || 0;
-		total = parseInt(total, 10) || 0;
-		if (!total) return 0;
-		return Math.max(0, Math.min(100, Math.round((part / total) * 100)));
-	}
 	function csvCell(value) {
 		if (value === null || value === undefined) return '';
 		var text = String(value).replace(/"/g, '""');
@@ -204,11 +233,11 @@
 				rows = rows.filter(function (r) { return selSet[String(r.id)]; });
 			}
 			if (!rows.length) {
-				window.alert(selected.length ? '선택한 항목이 내려받을 데이터에 없습니다. (다른 페이지에 있을 수 있습니다.)' : '내려받을 데이터가 없습니다.');
+				showAuditMessage(selected.length ? '선택한 항목이 내려받을 데이터에 없습니다. (다른 페이지에 있을 수 있습니다.)' : '내려받을 데이터가 없습니다.', '안내');
 				return;
 			}
 			if (data.export_truncated) {
-				window.alert('조건에 맞는 기록이 많아 최대 ' + (data.export_max || 5000) + '건만 포함합니다.');
+				showAuditMessage('조건에 맞는 기록이 많아 최대 ' + (data.export_max || 5000) + '건만 포함합니다.', '안내');
 			}
 			function csvCell(v) {
 				if (v === null || v === undefined) return '';
@@ -249,7 +278,7 @@
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 		}).catch(function (err) {
-			window.alert(err.message || 'CSV 다운로드에 실패했습니다.');
+			showAuditMessage(err.message || 'CSV 다운로드에 실패했습니다.', '안내');
 		});
 	}
 	function pageRows() {
@@ -411,6 +440,10 @@
 		var mapping = qs('agent-mapping-filter');
 		if (keyword && String(keyword.value || '').trim()) params.set('keyword', String(keyword.value || '').trim());
 		if (mapping && String(mapping.value || '').trim()) params.set('mapping_state', String(mapping.value || '').trim());
+		if (state.agentSortKey) {
+			params.set('sort', state.agentSortKey);
+			params.set('order', state.agentSortDir === 'desc' ? 'desc' : 'asc');
+		}
 		params.set('page', String(state.agentPage));
 		params.set('page_size', String(state.agentPageSize));
 		return params.toString();
@@ -421,41 +454,59 @@
 		var mapping = qs('agent-mapping-filter');
 		if (keyword && String(keyword.value || '').trim()) params.set('keyword', String(keyword.value || '').trim());
 		if (mapping && String(mapping.value || '').trim()) params.set('mapping_state', String(mapping.value || '').trim());
+		if (state.agentSortKey) {
+			params.set('sort', state.agentSortKey);
+			params.set('order', state.agentSortDir === 'desc' ? 'desc' : 'asc');
+		}
 		params.set('export', '1');
 		params.set('page', '1');
 		params.set('page_size', '5000');
 		return params.toString();
 	}
-	function downloadAgentCsv() {
+	function downloadAgentCsv(onlySelected) {
 		var query = buildAgentExportQuery();
-		fetchJson('/api/access-control/pc-agents' + (query ? '?' + query : '')).then(function (data) {
-			var rows = data.rows || [];
+		var onlySel = onlySelected === true;
+		var sel = [];
+		Array.prototype.forEach.call(document.querySelectorAll('.agent-row-check:checked'), function (c) {
+			var v = String(c.value || '').trim();
+			if (v) sel.push(v);
+		});
+		if (onlySel && !sel.length) {
+			showAuditMessage('선택된 PC 에이전트가 없습니다.', '안내');
+			return;
+		}
+
+		function processRows(rows) {
+			state.lastAgentExportRows = rows.slice();
 			if (!rows.length) {
-				window.alert('내려받을 PC 에이전트 데이터가 없습니다.');
+				showAuditMessage(onlySel ? '선택한 항목이 내려받을 데이터에 없습니다.' : '내려받을 PC 에이전트 데이터가 없습니다.', '안내');
 				return;
 			}
-			if (data.export_truncated) {
-				window.alert('조건에 맞는 PC 에이전트가 많아 최대 ' + formatNumber(data.export_max || 5000) + '건만 포함합니다.');
+			if (state.exportAgentRowsAll && state.exportAgentRowsAll.export_truncated) {
+				showAuditMessage('조건에 맞는 PC 에이전트가 많아 최대 ' + formatNumber(state.exportAgentRowsAll.export_max || 5000) + '건만 포함합니다.', '안내');
 			}
-			var headers = ['상태', 'PC명', '에이전트 ID', '현재 로그인', '사용자 연결', '연결 사번', '부서', '버전', '정책', '마지막 하트비트', '서비스 상태', 'IP', 'MAC', '오류', '등록 일시', '수정 일시', '메모'];
+			var headers = [
+				'연동 상태', 'PC 이름', '에이전트 ID', 'PC 사용자', '에이전트 상태', '에이전트 버전',
+				'부서', '사번', '이름', '마지막 하트비트', 'IP 주소', 'MAC 주소',
+				'등록 일시', '수정 일시', '매핑 메모'
+			];
 			var lines = [headers.map(csvCell).join(',')];
 			rows.forEach(function (row) {
 				var user = row.mapped_user || {};
+				var version = row.agent_version_display != null ? String(row.agent_version_display) : (row.agent_version || '-');
 				lines.push([
 					row.sync_status || '',
 					row.hostname || '',
 					row.agent_id || '',
 					row.current_user || '',
-					user.name || row.mapped_name || '',
-					user.emp_no || row.mapped_emp_no || '',
+					row.operation_status || '',
+					version,
 					user.department || row.mapped_department || '',
-					row.agent_version || row.install_version || '',
-					row.policy_version || '',
+					user.emp_no || row.mapped_emp_no || '',
+					user.name || row.mapped_name || '',
 					formatDateTime(row.last_seen_at),
-					row.service_status || '',
 					row.ip_address || '',
 					row.mac_address || '',
-					row.last_error || '',
 					formatDateTime(row.created_at),
 					formatDateTime(row.updated_at),
 					row.mapping_note || ''
@@ -473,19 +524,39 @@
 			anchor.click();
 			document.body.removeChild(anchor);
 			URL.revokeObjectURL(url);
-		}).catch(function (err) {
-			window.alert(err.message || 'PC 에이전트 CSV 다운로드에 실패했습니다.');
-		});
+		}
+
+		fetchJson('/api/access-control/pc-agents' + (query ? '?' + query : ''), { errorDefault: 'PC 에이전트 CSV를 내려받지 못했습니다.' })
+			.then(function (data) {
+				state.exportAgentRowsAll = data;
+				var rows = data.rows || [];
+				var selSet;
+				if (onlySel) {
+					selSet = {};
+					sel.forEach(function (id) { selSet[String(id)] = true; });
+					rows = rows.filter(function (r) { return selSet[String(r.id)]; });
+				}
+				processRows(rows);
+			})
+			.catch(function (err) {
+				showAuditMessage(err.message || 'PC 에이전트 CSV 다운로드에 실패했습니다.', '안내');
+			});
 	}
 	function agentTotalPages() {
 		return Math.max(1, Math.ceil(state.agentTotal / state.agentPageSize));
 	}
-	function setAgentEmptyState(title, desc) {
-		var empty = qs('agent-empty');
-		var titleEl = empty ? empty.querySelector('h3') : null;
-		var descEl = empty ? empty.querySelector('p') : null;
-		if (titleEl) titleEl.textContent = title || 'PC 에이전트가 없습니다.';
-		if (descEl) descEl.textContent = desc || '에이전트가 연동되면 이곳에서 사용자를 연결할 수 있습니다.';
+	function setAgentEmptyState(mode) {
+		var titleEl = qs('agent-empty-title');
+		var lead = qs('agent-empty-lead');
+		var hint = "에이전트 리스트가 나타나면 '연동'을 진행해주세요.";
+		if (!titleEl || !lead) return;
+		if (mode === 'loading' || mode === 'error' || mode === 'empty') {
+			titleEl.textContent = 'PC 에이전트 내역이 없습니다.';
+			lead.textContent = hint;
+			return;
+		}
+		titleEl.textContent = 'PC 에이전트';
+		lead.textContent = '';
 	}
 	function setAgentSearchLoading(isLoading) {
 		var wrapper = qs('agent-search-wrapper');
@@ -517,29 +588,6 @@
 			count.classList.add('is-updating');
 		}
 	}
-	function renderAgentSummary(data) {
-		var summary = (data && data.summary) || {};
-		var statusCounts = summary.status_counts || summary.visible_status_counts || {};
-		var total = parseInt(summary.total_count, 10);
-		var normal = parseInt(statusCounts['정상'], 10) || 0;
-		var mapped = parseInt(summary.mapped_count != null ? summary.mapped_count : summary.visible_mapped_count, 10) || 0;
-		var unmapped = parseInt(summary.unmapped_count != null ? summary.unmapped_count : summary.visible_unmapped_count, 10) || 0;
-		var normalRate;
-		var mappedRate;
-		if (!isFinite(total)) total = parseInt(data && data.total, 10) || 0;
-		normalRate = calcRate(normal, total);
-		mappedRate = calcRate(mapped, total);
-		if (qs('agent-kpi-total')) qs('agent-kpi-total').textContent = formatNumber(total) + '대';
-		if (qs('agent-kpi-copy')) {
-			qs('agent-kpi-copy').textContent = total ?
-				(formatNumber(normal) + '대 연동 양호 · ' + formatNumber(mapped) + '대 사용자 연결 · ' + formatNumber(unmapped) + '대 연결 대기') :
-				'연동된 PC 에이전트가 없습니다.';
-		}
-		if (qs('agent-kpi-normal-rate')) qs('agent-kpi-normal-rate').textContent = normalRate + '%';
-		if (qs('agent-kpi-mapped-rate')) qs('agent-kpi-mapped-rate').textContent = mappedRate + '%';
-		if (qs('agent-kpi-normal-bar')) qs('agent-kpi-normal-bar').style.width = normalRate + '%';
-		if (qs('agent-kpi-mapped-bar')) qs('agent-kpi-mapped-bar').style.width = mappedRate + '%';
-	}
 	function agentStatusClass(status) {
 		if (status === '정상') return 'agent-status-normal';
 		if (status === '지연') return 'agent-status-delay';
@@ -550,13 +598,89 @@
 	}
 	function agentStatusCell(row) {
 		var status = row.sync_status || '확인필요';
-		return '<span class="agent-status-badge ' + agentStatusClass(status) + '">' + esc(status) + '</span>';
+		var cls = agentStatusClass(status);
+		var t = esc(status);
+		return '<span class="agent-status-with-dot">' +
+			'<span class="agent-status-dot ' + cls + '" aria-hidden="true"></span>' +
+			'<span class="agent-status-text">' + t + '</span></span>';
 	}
-	function mappedUserCell(row) {
+	function operationStatusClass(label) {
+		if (label === '활성') return 'agent-op-active';
+		if (label === '오류') return 'agent-op-error';
+		return 'agent-op-inactive';
+	}
+	function operationStatusCell(row) {
+		var v = row.operation_status || '비활성';
+		var cls = operationStatusClass(v);
+		var t = esc(v);
+		return '<span class="agent-op-with-dot">' +
+			'<span class="agent-op-dot ' + cls + '" aria-hidden="true"></span>' +
+			'<span class="agent-op-text">' + t + '</span></span>';
+	}
+	function mappedDeptEmpName(row) {
 		var user = row.mapped_user || null;
-		if (!user || !user.id) return '<span class="agent-unmapped">연결 대기</span>';
-		return '<span class="agent-user-name">' + esc(user.name || user.emp_no || '-') + '</span>' +
-			'<span class="agent-meta">' + esc((user.department || '부서 미지정') + ' · ' + (user.emp_no || '-')) + '</span>';
+		var dept = (user && user.department ? String(user.department).trim() : '') || '';
+		var emp = (user && user.emp_no ? String(user.emp_no).trim() : '') || '';
+		var name = (user && user.name ? String(user.name).trim() : '') || '';
+		if (!user || !user.id) {
+			dept = '';
+			emp = '';
+			name = '';
+		}
+		return {
+			dept: dept || '-',
+			emp_no: emp || '-',
+			name: name || '-'
+		};
+	}
+	function getSelectedAgentIds() {
+		var out = [];
+		var seen = {};
+		function push(id) {
+			var v = String(id || '').trim();
+			if (v && !seen[v]) { seen[v] = 1; out.push(v); }
+		}
+		Array.prototype.forEach.call(document.querySelectorAll('.agent-row-check:checked'), function (c) {
+			push(c.value);
+		});
+		if (!out.length) {
+			Array.prototype.forEach.call(document.querySelectorAll('#agent-table-body tr.selected[data-id]'), function (tr) {
+				push(tr.getAttribute('data-id'));
+			});
+		}
+		return out;
+	}
+	function syncAgentSelectAll() {
+		var selAll = qs('agent-select-all');
+		var checks = document.querySelectorAll('.agent-row-check');
+		var checked = document.querySelectorAll('.agent-row-check:checked');
+		if (!selAll) return;
+		selAll.checked = checks.length > 0 && checked.length === checks.length;
+		selAll.indeterminate = checked.length > 0 && checked.length < checks.length;
+	}
+	function handleAgentSortHeaderActivate(sortKey) {
+		if (!sortKey) return;
+		if (state.agentSortKey === sortKey) {
+			state.agentSortDir = state.agentSortDir === 'asc' ? 'desc' : 'asc';
+		} else {
+			state.agentSortKey = sortKey;
+			state.agentSortDir = 'asc';
+		}
+		updateAgentSortIndicators();
+		loadAgents(true);
+	}
+	function updateAgentSortIndicators() {
+		var table = qs('agent-table');
+		if (!table) return;
+		Array.prototype.forEach.call(table.querySelectorAll('.agent-th-sortable[data-agent-sort]'), function (cell) {
+			cell.classList.remove('sort-active-asc', 'sort-active-desc');
+			var ind = cell.querySelector('.agent-sort-ind');
+			if (ind) ind.textContent = '';
+			if (state.agentSortKey && cell.getAttribute('data-agent-sort') === state.agentSortKey) {
+				cell.classList.add(state.agentSortDir === 'asc' ? 'sort-active-asc' : 'sort-active-desc');
+				if (ind) ind.textContent = state.agentSortDir === 'asc' ? '↑' : '↓';
+			}
+		});
 	}
 	function renderAgentPageNumbers(pages) {
 		var box = qs('agent-page-numbers');
@@ -588,39 +712,41 @@
 		var tableWrap = qs('agent-table-wrap');
 		var empty = qs('agent-empty');
 		if (!body || !tableWrap || !empty) return;
+		updateAgentSortIndicators();
 		setAgentCount(state.agentTotal || 0);
 		if (!state.agents.length) {
 			body.innerHTML = '';
 			tableWrap.hidden = true;
 			empty.hidden = false;
 			renderAgentPagination();
+			if (state.scope === 'agent') scheduleAgentMappingSelectWidthSync();
 			return;
 		}
 		tableWrap.hidden = false;
 		empty.hidden = true;
 		body.innerHTML = state.agents.map(function (row) {
-			var host = row.hostname || row.agent_id || '-';
-			var version = row.agent_version || row.install_version || '-';
-			var policy = row.policy_version || '-';
-			var network = '<span class="agent-host-name">' + esc(row.ip_address || '-') + '</span>' +
-				'<span class="agent-meta">' + esc(row.mac_address || '-') + '</span>';
-			var error = row.last_error || '-';
+			var m = mappedDeptEmpName(row);
+			var version = row.agent_version_display != null ? String(row.agent_version_display) : (row.agent_version || '-');
 			var currentUser = row.current_user || '-';
-			var clearButton = row.mapped_user_id ? '<button type="button" class="agent-row-action danger" data-agent-action="clear" data-agent-id="' + esc(row.id || '') + '">해제</button>' : '';
-			return '<tr>' +
+			return '<tr data-id="' + esc(row.id || '') + '">' +
+				'<td class="agent-col-check"><input type="checkbox" class="agent-row-check" value="' + esc(row.id || '') + '" data-id="' + esc(row.id || '') + '" aria-label="PC 에이전트 선택"></td>' +
 				'<td class="agent-col-status">' + agentStatusCell(row) + '</td>' +
-				'<td class="agent-col-host"><span class="agent-host-name">' + esc(host) + '</span><span class="agent-meta">' + esc(row.agent_id || '-') + '</span></td>' +
+				'<td class="agent-col-hostname"><span class="audit-cell-ellipsis">' + esc(row.hostname || '-') + '</span></td>' +
+				'<td class="agent-col-agent-id"><span class="audit-cell-ellipsis">' + esc(row.agent_id || '-') + '</span></td>' +
 				'<td class="agent-col-current-user"><span class="audit-cell-ellipsis" title="' + esc(currentUser) + '">' + esc(currentUser) + '</span></td>' +
-				'<td class="agent-col-mapped-user">' + mappedUserCell(row) + '</td>' +
+				'<td class="agent-col-op-status">' + operationStatusCell(row) + '</td>' +
 				'<td class="agent-col-version"><span class="audit-cell-ellipsis">' + esc(version) + '</span></td>' +
-				'<td class="agent-col-policy"><span class="audit-cell-ellipsis">' + esc(policy) + '</span></td>' +
-				'<td class="agent-col-last-seen"><span class="audit-cell-ellipsis">' + esc(formatDateTime(row.last_seen_at)) + '</span><span class="agent-meta">' + esc(row.service_status || '-') + '</span></td>' +
-				'<td class="agent-col-network">' + network + '</td>' +
-				'<td class="agent-col-error"><span class="audit-cell-ellipsis" title="' + esc(error) + '">' + esc(error) + '</span></td>' +
-				'<td class="agent-col-action"><div class="agent-action-group"><button type="button" class="agent-row-action" data-agent-action="map" data-agent-id="' + esc(row.id || '') + '">연결</button>' + clearButton + '</div></td>' +
+				'<td class="agent-col-dept"><span class="audit-cell-ellipsis">' + esc(m.dept) + '</span></td>' +
+				'<td class="agent-col-emp-no"><span class="audit-resource-name">' + esc(m.emp_no) + '</span></td>' +
+				'<td class="agent-col-user-name"><span class="audit-cell-ellipsis">' + esc(m.name) + '</span></td>' +
+				'<td class="agent-col-last-seen"><span class="audit-cell-ellipsis">' + esc(formatDateTime(row.last_seen_at)) + '</span></td>' +
+				'<td class="agent-col-ip"><span class="audit-cell-ellipsis">' + esc(row.ip_address || '-') + '</span></td>' +
+				'<td class="agent-col-mac"><span class="audit-cell-ellipsis">' + esc(row.mac_address || '-') + '</span></td>' +
 			'</tr>';
 		}).join('');
+		syncAgentSelectAll();
 		renderAgentPagination();
+		if (state.scope === 'agent') scheduleAgentMappingSelectWidthSync();
 	}
 	function loadAgents(resetPage) {
 		if (resetPage) state.agentPage = 1;
@@ -631,26 +757,28 @@
 		if (body) body.innerHTML = '';
 		if (wrap) wrap.hidden = true;
 		if (empty) empty.hidden = false;
-		setAgentEmptyState('PC 에이전트를 불러오는 중입니다.', '잠시만 기다려 주세요.');
+		setAgentEmptyState('loading');
 		setAgentSearchLoading(true);
-		return fetchJson('/api/access-control/pc-agents' + (query ? '?' + query : '')).then(function (data) {
+		return fetchJson('/api/access-control/pc-agents' + (query ? '?' + query : ''), {
+			errorDefault: 'PC 에이전트 목록을 불러오지 못했습니다.'
+		}).then(function (data) {
 			state.agents = data.rows || [];
 			state.agentTotal = data.total || 0;
 			state.agentPage = data.page || state.agentPage;
 			state.agentPageSize = safePageSize(data.page_size || state.agentPageSize);
 			state.agentLoaded = true;
 			if (qs('agent-page-size')) qs('agent-page-size').value = String(state.agentPageSize);
-			setAgentEmptyState('PC 에이전트가 없습니다.', '에이전트가 연동되면 이곳에서 사용자를 연결할 수 있습니다.');
+			if (!state.agents.length) {
+				setAgentEmptyState('empty');
+			}
 			setAgentSearchLoading(false);
-			renderAgentSummary(data);
 			renderAgentRows();
 		}).catch(function (err) {
 			state.agents = [];
 			state.agentTotal = 0;
 			setAgentSearchLoading(false);
 			setAgentCount(0);
-			renderAgentSummary({ summary: {} });
-			setAgentEmptyState(err.message || 'PC 에이전트를 불러오지 못했습니다.', '잠시 후 다시 시도하세요.');
+			setAgentEmptyState('error');
 			renderAgentRows();
 		});
 	}
@@ -671,50 +799,31 @@
 		state.agents = state.agents.map(function (row) {
 			return String(row.id || '') === String(item.id || '') ? item : row;
 		});
-		renderAgentSummary({
-			summary: {
-				visible_status_counts: state.agents.reduce(function (acc, row) {
-					var status = row.sync_status || '확인필요';
-					acc[status] = (acc[status] || 0) + 1;
-					return acc;
-				}, {}),
-				visible_mapped_count: state.agents.filter(function (row) { return !!row.mapped_user_id; }).length,
-				visible_unmapped_count: state.agents.filter(function (row) { return !row.mapped_user_id; }).length
-			}
-		});
 		renderAgentRows();
 	}
-	function userDisplayText(user) {
-		var parts = [];
-		if (user.department) parts.push(user.department);
-		if (user.emp_no) parts.push(user.emp_no);
-		if (user.email) parts.push(user.email);
-		return parts.join(' · ');
-	}
-	function renderSelectedUser() {
-		var box = qs('agent-selected-user');
-		if (!box) return;
-		if (!state.selectedUser) {
-			box.hidden = true;
-			box.innerHTML = '';
-			return;
-		}
-		box.hidden = false;
-		box.innerHTML = esc(state.selectedUser.name || state.selectedUser.emp_no || '-') + '<span class="agent-meta">' + esc(userDisplayText(state.selectedUser) || '-') + '</span>';
-	}
-	function renderUserResults() {
+	function renderUserResults(emptyHintOnly) {
 		var box = qs('agent-user-results');
 		if (!box) return;
+		if (emptyHintOnly) {
+			box.innerHTML = '<div class="agent-user-empty agent-user-results-hint">검색어를 입력하면 부서·사번·이름 결과가 표 형태로 표시됩니다.</div>';
+			return;
+		}
 		if (!state.userResults.length) {
 			box.innerHTML = '<div class="agent-user-empty">검색 결과가 없습니다.</div>';
 			return;
 		}
-		box.innerHTML = state.userResults.map(function (user) {
+		var rows = state.userResults.map(function (user) {
 			var selected = state.selectedUser && String(state.selectedUser.id) === String(user.id);
-			return '<button type="button" class="agent-user-result' + (selected ? ' selected' : '') + '" data-user-id="' + esc(user.id || '') + '" role="option" aria-selected="' + (selected ? 'true' : 'false') + '">' +
-				'<span><strong>' + esc(user.name || user.emp_no || '-') + '</strong><span>' + esc(userDisplayText(user) || '-') + '</span></span>' +
-				'</button>';
+			return '<tr class="agent-user-result-row' + (selected ? ' selected' : '') + '" data-user-id="' + esc(String(user.id || '')) + '" tabindex="0" role="button" aria-pressed="' + (selected ? 'true' : 'false') + '">' +
+				'<td title="' + esc(user.department || '') + '">' + esc(user.department || '-') + '</td>' +
+				'<td title="' + esc(user.emp_no || '') + '">' + esc(user.emp_no || '-') + '</td>' +
+				'<td title="' + esc(user.name || '') + '">' + esc(user.name || '-') + '</td>' +
+				'</tr>';
 		}).join('');
+		box.innerHTML = '<div class="agent-user-results-scroll">' +
+			'<table class="agent-user-results-table">' +
+			'<thead><tr><th scope="col">부서</th><th scope="col">사번</th><th scope="col">이름</th></tr></thead>' +
+			'<tbody>' + rows + '</tbody></table></div>';
 	}
 	function setUserSearchLoading(isLoading) {
 		var box = qs('agent-user-search');
@@ -728,11 +837,16 @@
 		var keyword = input ? String(input.value || '').trim() : '';
 		if (!keyword) {
 			state.userResults = [];
-			renderUserResults();
+			if (state.selectedUser && state.selectedUser.id) {
+				state.userResults = [state.selectedUser];
+				renderUserResults();
+			} else {
+				renderUserResults(true);
+			}
 			return;
 		}
 		setUserSearchLoading(true);
-		fetchJson('/api/user-profiles?q=' + encodeURIComponent(keyword) + '&limit=20').then(function (data) {
+		fetchJson('/api/user-profiles?q=' + encodeURIComponent(keyword) + '&limit=50').then(function (data) {
 			state.userResults = data.items || data.rows || [];
 			setUserSearchLoading(false);
 			renderUserResults();
@@ -746,18 +860,6 @@
 		if (userSearchTimer) window.clearTimeout(userSearchTimer);
 		userSearchTimer = window.setTimeout(loadMappingUsers, 220);
 	}
-	function renderAgentMapTarget(agent) {
-		var box = qs('agent-map-target');
-		if (!box || !agent) return;
-		box.innerHTML = [
-			['PC명', agent.hostname || '-'],
-			['에이전트 ID', agent.agent_id || '-'],
-			['현재 로그인', agent.current_user || '-'],
-			['마지막 하트비트', formatDateTime(agent.last_seen_at)]
-		].map(function (item) {
-			return '<div class="agent-target-field"><span>' + esc(item[0]) + '</span><strong>' + esc(item[1]) + '</strong></div>';
-		}).join('');
-	}
 	function selectMappingUser(userId) {
 		var id = String(userId || '');
 		var found = null;
@@ -766,22 +868,74 @@
 		});
 		if (!found) return;
 		state.selectedUser = found;
-		renderSelectedUser();
 		renderUserResults();
 	}
-	function openAgentMap(agent) {
+	function renderAgentMapTargetPanel() {
+		var box = qs('agent-map-target');
+		if (!box) return;
+		var ids = state.bulkAgentIds || [];
+		if (ids.length === 1 && state.selectedAgent) {
+			var agent = state.selectedAgent;
+			box.innerHTML = [
+				['PC 이름', agent.hostname || '-'],
+				['에이전트 ID', agent.agent_id || '-'],
+				['현재 로그인', agent.current_user || '-'],
+				['마지막 하트비트', formatDateTime(agent.last_seen_at)]
+			].map(function (item) {
+				return '<div class="agent-target-field"><span>' + esc(item[0]) + '</span><span class="agent-target-value">' + esc(item[1]) + '</span></div>';
+			}).join('');
+			return;
+		}
+		if (!ids.length) {
+			box.innerHTML = '';
+			return;
+		}
+		var labels = ids.map(function (id) {
+			var r = findAgent(id);
+			return r ? (r.hostname || r.agent_id || id) : id;
+		});
+		var parts = labels.slice(0, 10).map(function (t) { return esc(String(t)); });
+		var suffix = ids.length > 10 ? ' 외 ' + (ids.length - 10) + '대' : '';
+		box.innerHTML = '<div class="agent-target-field agent-target-summary"><span>선택된 PC</span><span class="agent-target-value">' + esc(String(ids.length)) + '대</span></div>' +
+			'<div class="agent-target-summary-names">' + parts.join(', ') + suffix + '</div>';
+	}
+	function refreshAgentMapModalChrome() {
+		var sub = qs('agent-map-subtitle');
+		if (sub) {
+			sub.textContent = (state.bulkAgentIds && state.bulkAgentIds.length > 1) ?
+				('선택한 ' + state.bulkAgentIds.length + '대의 PC 에이전트에 동일한 조직 사용자를 연결합니다.') :
+				'PC 에이전트와 조직 사용자를 연결합니다.';
+		}
+		var clearBtn = qs('agent-map-clear');
+		if (clearBtn) {
+			var one = state.bulkAgentIds && state.bulkAgentIds.length === 1;
+			var first = one ? findAgent(state.bulkAgentIds[0]) : null;
+			var mapped = !!(first && first.mapped_user && first.mapped_user.id);
+			clearBtn.hidden = !mapped;
+		}
+	}
+	function openAgentMapForSelection(ids) {
 		var modal = qs('agent-map-modal');
 		var search = qs('agent-user-search');
-		if (!modal || !agent) return;
-		state.selectedAgent = agent;
-		state.selectedUser = agent.mapped_user || null;
+		if (!modal || !ids || !ids.length) return;
+		state.bulkAgentIds = ids.map(function (x) { return String(x); });
+		state.selectedAgent = state.bulkAgentIds.length === 1 ? findAgent(state.bulkAgentIds[0]) : null;
+		var ag = state.selectedAgent;
+		state.selectedUser = (ag && ag.mapped_user && ag.mapped_user.id) ? ag.mapped_user : null;
 		state.userResults = [];
-		renderAgentMapTarget(agent);
+		renderAgentMapTargetPanel();
+		refreshAgentMapModalChrome();
 		if (search) search.value = '';
-		if (qs('agent-map-note')) qs('agent-map-note').value = agent.mapping_note || '';
-		if (qs('agent-map-clear')) qs('agent-map-clear').hidden = !agent.mapped_user_id;
-		renderSelectedUser();
-		renderUserResults();
+		if (qs('agent-map-note')) qs('agent-map-note').value = (ag && ag.mapping_note) ? ag.mapping_note : '';
+		if (state.selectedUser && state.selectedUser.id) {
+			state.userResults = [state.selectedUser];
+		}
+		if (state.userResults.length) {
+			renderUserResults();
+		} else {
+			renderUserResults(true);
+		}
+		document.body.classList.add('modal-open');
 		modal.classList.add('show');
 		modal.setAttribute('aria-hidden', 'false');
 		modal.style.display = 'flex';
@@ -796,41 +950,183 @@
 		state.selectedAgent = null;
 		state.selectedUser = null;
 		state.userResults = [];
+		state.bulkAgentIds = [];
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+		else document.body.classList.add('modal-open');
 	}
 	function saveAgentMapping() {
 		var button = qs('agent-map-save');
 		var note = qs('agent-map-note');
-		if (!state.selectedAgent) return;
+		var ids = (state.bulkAgentIds && state.bulkAgentIds.length) ? state.bulkAgentIds.slice() : [];
+		if (!ids.length) return;
 		if (!state.selectedUser || !state.selectedUser.id) {
-			window.alert('연결할 사용자를 선택하세요.');
+			showAuditMessage('연결할 사용자를 선택하세요.', '안내');
 			return;
 		}
+		var noteBody = note ? String(note.value || '') : '';
+		var uid = state.selectedUser.id;
 		if (button) button.disabled = true;
-		fetchJson('/api/access-control/pc-agents/' + encodeURIComponent(state.selectedAgent.id) + '/user', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ user_id: state.selectedUser.id, mapping_note: note ? note.value : '' })
-		}).then(function (data) {
-			if (button) button.disabled = false;
-			updateAgentInState(data.item);
-			closeAgentMap();
-		}).catch(function (err) {
-			if (button) button.disabled = false;
-			window.alert(err.message || '사용자 연결을 저장하지 못했습니다.');
-		});
+		function chain(i) {
+			if (i >= ids.length) {
+				if (button) button.disabled = false;
+				closeAgentMap();
+				loadAgents(false);
+				return;
+			}
+			fetchJson('/api/access-control/pc-agents/' + encodeURIComponent(ids[i]) + '/user', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ user_id: uid, mapping_note: noteBody }),
+				errorDefault: '사용자 연결을 등록하지 못했습니다.'
+			}).then(function () {
+				chain(i + 1);
+			}).catch(function (err) {
+				if (button) button.disabled = false;
+				showAuditMessage(err.message || '사용자 연결을 등록하지 못했습니다.', '안내');
+			});
+		}
+		chain(0);
 	}
 	function clearAgentMapping(agent) {
 		var target = agent || state.selectedAgent;
 		if (!target || !target.id) return;
 		if (!window.confirm('사용자 연결을 해제할까요?')) return;
 		fetchJson('/api/access-control/pc-agents/' + encodeURIComponent(target.id) + '/user', {
-			method: 'DELETE'
+			method: 'DELETE',
+			errorDefault: '사용자 연결을 해제하지 못했습니다.'
 		}).then(function (data) {
 			updateAgentInState(data.item);
 			closeAgentMap();
 		}).catch(function (err) {
-			window.alert(err.message || '사용자 연결을 해제하지 못했습니다.');
+			showAuditMessage(err.message || '사용자 연결을 해제하지 못했습니다.', '안내');
 		});
+	}
+	function openAgentPcDownloadModal() {
+		var sub = qs('agent-pc-download-subtitle');
+		var total = state.agentTotal || 0;
+		var selectedCount = getSelectedAgentIds().length;
+		if (sub) {
+			sub.textContent = selectedCount > 0 ?
+				('선택된 ' + formatNumber(selectedCount) + '개 또는 전체 ' + formatNumber(total) + '개 결과 중 범위를 선택하세요.') :
+				('현재 결과 ' + formatNumber(total) + '개 항목을 CSV로 내보냅니다.');
+		}
+		var rowSelected = qs('agent-pc-csv-range-row-selected');
+		var optSelected = qs('agent-pc-csv-range-selected');
+		var optAll = qs('agent-pc-csv-range-all');
+		if (rowSelected) rowSelected.hidden = !(selectedCount > 0);
+		if (optSelected) {
+			optSelected.disabled = !(selectedCount > 0);
+			optSelected.checked = selectedCount > 0;
+		}
+		if (optAll) optAll.checked = !(selectedCount > 0);
+		var dm = qs('agent-pc-download-modal');
+		if (!dm) return;
+		document.body.classList.add('modal-open');
+		dm.classList.add('show');
+		dm.setAttribute('aria-hidden', 'false');
+		dm.style.display = 'flex';
+	}
+	function closeAgentPcDownloadModal() {
+		var dm = qs('agent-pc-download-modal');
+		if (!dm) return;
+		dm.classList.remove('show');
+		dm.setAttribute('aria-hidden', 'true');
+		dm.style.display = '';
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+		else document.body.classList.add('modal-open');
+	}
+	function openAgentBulkDeleteModal() {
+		var ids = getSelectedAgentIds();
+		if (!ids.length) {
+			showAuditMessage('삭제처리할 행을 먼저 선택하세요.', '안내');
+			return;
+		}
+		var sub = qs('delete-subtitle');
+		if (sub) sub.textContent = '선택된 ' + ids.length + '대의 PC 에이전트를 정말 삭제처리하시겠습니까?';
+		var m = qs('system-delete-modal');
+		if (!m) return;
+		document.body.classList.add('modal-open');
+		m.classList.add('show');
+		m.setAttribute('aria-hidden', 'false');
+		m.style.display = 'flex';
+	}
+	function closeAgentBulkDeleteModal() {
+		var m = qs('system-delete-modal');
+		if (!m) return;
+		m.classList.remove('show');
+		m.setAttribute('aria-hidden', 'true');
+		m.style.display = '';
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+		else document.body.classList.add('modal-open');
+	}
+	function performAgentBulkDelete() {
+		var ids = getSelectedAgentIds();
+		if (!ids.length) { closeAgentBulkDeleteModal(); return; }
+		var btn = qs('system-delete-confirm');
+		if (btn) btn.disabled = true;
+		var body = {
+			agent_ids: ids.map(function (x) { return parseInt(x, 10); }).filter(function (n) { return !isNaN(n) && n > 0; })
+		};
+		fetchJson('/api/access-control/pc-agents/delete', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+			errorDefault: '삭제 처리에 실패했습니다.'
+		}).then(function () {
+			if (btn) btn.disabled = false;
+			closeAgentBulkDeleteModal();
+			loadAgents(false);
+		}).catch(function (err) {
+			if (btn) btn.disabled = false;
+			showAuditMessage(err.message || '삭제 처리에 실패했습니다.', '안내');
+		});
+	}
+	function resetAgentMappingFilterSelectWidth() {
+		var mf = qs('agent-mapping-filter');
+		var mapWrap = mf ? mf.closest('.audit-page-size-selector') : null;
+		if (!mapWrap) return;
+		mapWrap.style.width = '';
+		mapWrap.style.maxWidth = '';
+		mapWrap.style.minWidth = '';
+		mapWrap.style.flex = '';
+		mapWrap.style.boxSizing = '';
+	}
+	function scheduleAgentMappingSelectWidthSync() {
+		if (agentMappingSelectSyncTimer) window.clearTimeout(agentMappingSelectSyncTimer);
+		agentMappingSelectSyncTimer = window.setTimeout(function () {
+			agentMappingSelectSyncTimer = null;
+			syncAgentMappingFilterToPageSizeSelect();
+		}, 48);
+	}
+	function syncAgentMappingFilterToPageSizeSelect() {
+		var pageSel = qs('agent-page-size');
+		var mapSel = qs('agent-mapping-filter');
+		var pgWrap = pageSel ? pageSel.closest('.audit-page-size-selector') : null;
+		var mapWrap = mapSel ? mapSel.closest('.audit-page-size-selector') : null;
+		var agentPane = qs('agent-list-pane');
+		if (!pageSel || !mapSel || !pgWrap || !mapWrap || !agentPane || agentPane.hidden || state.scope !== 'agent') {
+			resetAgentMappingFilterSelectWidth();
+			return;
+		}
+		if (!mapWrap.classList.contains('agent-filter-selector')) return;
+		pgWrap.style.width = '';
+		mapWrap.style.flex = '0 0 auto';
+		var w = pgWrap.offsetWidth;
+		if (!w) {
+			scheduleAgentMappingSelectWidthSync();
+			return;
+		}
+		mapWrap.style.width = w + 'px';
+		mapWrap.style.maxWidth = w + 'px';
+		mapWrap.style.boxSizing = 'border-box';
+	}
+	function resetAgentFilters() {
+		var kw = qs('agent-keyword-filter');
+		var mf = qs('agent-mapping-filter');
+		if (kw) kw.value = '';
+		if (mf) mf.value = '';
+		setAgentSearchClearVisible();
+		loadAgents(true);
 	}
 	function showScope(scope) {
 		var nextScope = scope === 'agent' ? 'agent' : 'access';
@@ -848,7 +1144,11 @@
 		if (state.scope === 'agent') {
 			if (!state.agentLoaded) loadAgents(true);
 			else renderAgentRows();
+			window.requestAnimationFrame(function () {
+				window.requestAnimationFrame(syncAgentMappingFilterToPageSizeSelect);
+			});
 		} else {
+			resetAgentMappingFilterSelectWidth();
 			setCount();
 		}
 	}
@@ -916,12 +1216,30 @@
 		var agentKeyword = qs('agent-keyword-filter');
 		var agentClear = qs('agent-search-clear');
 		var agentMapping = qs('agent-mapping-filter');
-		var agentRefresh = qs('agent-refresh-btn');
-		var agentDownload = qs('agent-download-btn');
+		var agentReset = qs('agent-reset-btn');
 		var agentBody = qs('agent-table-body');
 		var modal = qs('agent-map-modal');
 		var userSearch = qs('agent-user-search');
 		var userResults = qs('agent-user-results');
+		var agentTable = qs('agent-table');
+		if (agentTable) {
+			Array.prototype.forEach.call(agentTable.querySelectorAll('.agent-th-sortable[data-agent-sort]'), function (th) {
+				th.setAttribute('tabindex', '0');
+			});
+			agentTable.addEventListener('click', function (event) {
+				if (event.target.closest('#agent-select-all') || event.target.closest('input[type="checkbox"]')) return;
+				var th = event.target.closest('.agent-th-sortable[data-agent-sort]');
+				if (!th || !agentTable.contains(th)) return;
+				handleAgentSortHeaderActivate(th.getAttribute('data-agent-sort'));
+			});
+			agentTable.addEventListener('keydown', function (event) {
+				if (event.key !== 'Enter' && event.key !== ' ') return;
+				var th = event.target.closest('.agent-th-sortable[data-agent-sort]');
+				if (!th || !agentTable.contains(th)) return;
+				event.preventDefault();
+				handleAgentSortHeaderActivate(th.getAttribute('data-agent-sort'));
+			});
+		}
 		qs('audit-reset-btn').addEventListener('click', resetFilters);
 		if (qs('audit-download-btn')) qs('audit-download-btn').addEventListener('click', downloadCsv);
 		if (keyword) {
@@ -967,14 +1285,14 @@
 			});
 		}
 		if (agentMapping) agentMapping.addEventListener('change', function () { loadAgents(true); });
-		if (agentDownload) agentDownload.addEventListener('click', downloadAgentCsv);
 		if (agentPageSize) {
 			agentPageSize.addEventListener('change', function () {
 				state.agentPageSize = safePageSize(agentPageSize.value);
-				loadAgents(true);
+				loadAgents(true).finally(function () { scheduleAgentMappingSelectWidthSync(); });
 			});
 		}
-		if (agentRefresh) agentRefresh.addEventListener('click', function () { loadAgents(false); });
+		window.addEventListener('resize', scheduleAgentMappingSelectWidthSync);
+		if (agentReset) agentReset.addEventListener('click', resetAgentFilters);
 		if (qs('agent-first')) qs('agent-first').addEventListener('click', function () {
 			if (state.agentPage > 1) { state.agentPage = 1; loadAgents(false); }
 		});
@@ -998,18 +1316,25 @@
 			});
 		}
 		if (agentBody) {
+			agentBody.addEventListener('change', function (event) {
+				var cb = event.target.closest('.agent-row-check');
+				if (!cb) return;
+				var tr = cb.closest('tr');
+				if (tr) tr.classList.toggle('selected', cb.checked);
+				syncAgentSelectAll();
+			});
 			agentBody.addEventListener('click', function (event) {
-				var button = event.target.closest('[data-agent-action]');
-				var agent;
-				if (!button) return;
-				agent = findAgent(button.getAttribute('data-agent-id'));
-				if (!agent) return;
-				if (button.getAttribute('data-agent-action') === 'clear') clearAgentMapping(agent);
-				else openAgentMap(agent);
+				if (event.target.closest('.agent-row-check')) return;
+				var tr = event.target.closest('tr[data-id]');
+				if (!tr) return;
+				var cbox = tr.querySelector('.agent-row-check');
+				if (!cbox) return;
+				cbox.checked = !cbox.checked;
+				tr.classList.toggle('selected', cbox.checked);
+				syncAgentSelectAll();
 			});
 		}
 		if (qs('agent-map-close')) qs('agent-map-close').addEventListener('click', closeAgentMap);
-		if (qs('agent-map-cancel')) qs('agent-map-cancel').addEventListener('click', closeAgentMap);
 		if (qs('agent-map-save')) qs('agent-map-save').addEventListener('click', saveAgentMapping);
 		if (qs('agent-map-clear')) qs('agent-map-clear').addEventListener('click', function () { clearAgentMapping(); });
 		if (modal) {
@@ -1030,11 +1355,82 @@
 		}
 		if (userResults) {
 			userResults.addEventListener('click', function (event) {
-				var button = event.target.closest('.agent-user-result[data-user-id]');
-				if (!button) return;
-				selectMappingUser(button.getAttribute('data-user-id'));
+				var row = event.target.closest('.agent-user-result-row[data-user-id]');
+				if (!row) return;
+				selectMappingUser(row.getAttribute('data-user-id'));
+			});
+			userResults.addEventListener('keydown', function (event) {
+				if (event.key !== 'Enter' && event.key !== ' ') return;
+				var row = event.target.closest('.agent-user-result-row[data-user-id]');
+				if (!row) return;
+				event.preventDefault();
+				selectMappingUser(row.getAttribute('data-user-id'));
 			});
 		}
+		var agentSelectAll = qs('agent-select-all');
+		if (agentSelectAll) {
+			agentSelectAll.addEventListener('change', function () {
+				var checked = agentSelectAll.checked;
+				Array.prototype.forEach.call(document.querySelectorAll('#agent-table-body tr[data-id]'), function (tr) {
+					var cb = tr.querySelector('.agent-row-check');
+					if (!cb) return;
+					cb.checked = checked;
+					tr.classList.toggle('selected', checked);
+				});
+				syncAgentSelectAll();
+			});
+		}
+		var delModal = qs('system-delete-modal');
+		if (delModal) {
+			delModal.addEventListener('click', function (event) {
+				var t = event.target;
+				if (t.closest && t.closest('[data-modal-close="1"]')) { closeAgentBulkDeleteModal(); return; }
+				if (t === delModal) closeAgentBulkDeleteModal();
+			});
+		}
+		var delConfirm = qs('system-delete-confirm');
+		if (delConfirm) delConfirm.addEventListener('click', performAgentBulkDelete);
+		var pcDl = qs('agent-pc-download-modal');
+		if (pcDl) {
+			pcDl.addEventListener('click', function (event) {
+				if (event.target === pcDl) closeAgentPcDownloadModal();
+			});
+		}
+		if (qs('agent-pc-download-close')) qs('agent-pc-download-close').addEventListener('click', closeAgentPcDownloadModal);
+		if (qs('agent-pc-download-confirm')) qs('agent-pc-download-confirm').addEventListener('click', function () {
+			var selOpt = qs('agent-pc-csv-range-selected');
+			var onlySel = !!(selOpt && selOpt.checked);
+			closeAgentPcDownloadModal();
+			downloadAgentCsv(onlySel);
+		});
+		if (qs('system-message-close')) qs('system-message-close').addEventListener('click', closeAuditMessageModal);
+		if (qs('system-message-ok')) qs('system-message-ok').addEventListener('click', closeAuditMessageModal);
+		var msgModal = qs('system-message-modal');
+		if (msgModal) {
+			msgModal.addEventListener('click', function (event) {
+				if (event.target === msgModal) closeAuditMessageModal();
+			});
+		}
+		document.addEventListener('keydown', function (event) {
+			if (event.key !== 'Escape') return;
+			var msgEl = qs('system-message-modal');
+			if (msgEl && msgEl.classList.contains('show')) {
+				closeAuditMessageModal();
+				return;
+			}
+			var pcm = qs('agent-pc-download-modal');
+			if (pcm && pcm.classList.contains('show')) {
+				closeAgentPcDownloadModal();
+				return;
+			}
+			var adm = qs('system-delete-modal');
+			if (adm && adm.classList.contains('show')) {
+				closeAgentBulkDeleteModal();
+				return;
+			}
+			var gmap = qs('agent-map-modal');
+			if (gmap && gmap.classList.contains('show')) closeAgentMap();
+		});
 		if (pageSize) {
 			pageSize.addEventListener('change', function () {
 				state.pageSize = safePageSize(pageSize.value);
@@ -1071,6 +1467,29 @@
 		}
 		qs('audit-table-body').addEventListener('change', function (event) {
 			if (event.target && event.target.classList.contains('audit-row-check')) syncSelectAll();
+		});
+		document.body.addEventListener('click', function (event) {
+			var pane = qs('agent-list-pane');
+			if (!pane || pane.hidden) return;
+			var tgt = event.target;
+			if (!tgt || !tgt.closest) return;
+			if (tgt.closest('#agent-download-btn')) {
+				event.preventDefault();
+				openAgentPcDownloadModal();
+				return;
+			}
+			if (tgt.closest('#agent-delete-btn')) {
+				openAgentBulkDeleteModal();
+				return;
+			}
+			if (tgt.closest('#agent-map-toolbar-btn')) {
+				var ids = getSelectedAgentIds();
+				if (!ids.length) {
+					showAuditMessage('PC 에이전트를 선택하세요.', '안내');
+					return;
+				}
+				openAgentMapForSelection(ids);
+			}
 		});
 	}
 	document.addEventListener('DOMContentLoaded', function () {

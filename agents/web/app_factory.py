@@ -26,6 +26,7 @@ LUMINA_SERVERS = [
     {"hostname": "ttt1", "purpose": "Lumina DB",  "ip": "192.168.56.107", "account": "root", "password": "123456"},
     {"hostname": "ttt2", "purpose": "Lumina AP",  "ip": "192.168.56.106", "account": "root", "password": "123456"},
     {"hostname": "ttt3", "purpose": "Lumina WEB", "ip": "192.168.56.108", "account": "root", "password": "123456"},
+    {"hostname": "ttt5", "purpose": "Lumina Gate", "ip": "192.168.56.110", "account": "root", "password": "123456"},
 ]
 
 
@@ -63,8 +64,10 @@ def _apply_ntp_to_server(server, ntp_servers, timezone):
     server_lines = "\\n".join("server %s iburst" % s for s in ntp_servers)
     # Remove old server/pool lines, prepend new ones
     script = (
-        "sed -i '/^server /d;/^pool /d' /etc/chrony.conf 2>/dev/null || true; "
-        "sed -i '1i\\%s' /etc/chrony.conf 2>/dev/null || true; "
+        "CONF=/etc/chrony.conf; [ -f \"$CONF\" ] || CONF=/etc/chrony/chrony.conf; "
+        "[ -f \"$CONF\" ] || exit 1; "
+        "sed -i '/^server /d;/^pool /d' \"$CONF\" 2>/dev/null || true; "
+        "sed -i '1i\\%s' \"$CONF\" 2>/dev/null || true; "
         "systemctl restart chronyd 2>/dev/null || systemctl restart chrony 2>/dev/null || true"
     ) % server_lines
 
@@ -1604,7 +1607,7 @@ def create_app():
             session["msg"] = "NTP saved locally. Remote errors: %s" % fail_msgs
             session["msg_cls"] = "msg-err"
         else:
-            session["msg"] = "NTP configuration saved and applied to all servers (DB/AP/WEB)."
+            session["msg"] = "NTP configuration saved and applied to all registered Lumina servers (DB, AP, WEB, Gate)."
             session["msg_cls"] = "msg-ok"
 
         return redirect(url_for("settings_page"))

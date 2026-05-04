@@ -1,0 +1,35 @@
+# Lumina Gate API Server configuration (RPM installs /usr/bin/lumina-gate)
+#
+# CLI (경로 불필요):
+#   lumina-gate list              등록 에이전트 표(기본, +---+---+ 프레임) — json/tsv 도 가능
+#   lumina-gate push-sync          Blossom web_sync 로 전체 재전송
+#   lumina-gate serve              HTTP 서버 (systemctl 이 사용)
+
+# --- Blossom 웹 접근제어 "PC 에이전트" 자동 노출 ---
+# 게이트는 등록/하트비트 시 각 에이전트 스냅샷을 아래 URL로 POST 합니다(Bearer = web_sync_token).
+# Blossom 쪽에는 동일 문자열을 LUMINA_GATE_WEB_SYNC_SECRET 로 설정해야 합니다.
+# 예:
+# web_sync_token은 배포 대상에서만 설정합니다. 저장소에는 secret을 남기지 않습니다.
+#
+# 초기 또는 동기 장애 시 수동 재전송: lumina-gate push-sync
+# 선택: 장애 보정 주기 재전송(초 단위). 0 = 비활성, 양수일 때 최소 60초 간격 적용됨.
+web_sync_url: "https://192.168.56.108/api/internal/lumina-gate/pc-agent-sync"
+web_sync_token: ""
+web_sync_verify_tls: false
+web_sync_push_interval_seconds: 300
+
+# --- Blossom 접근제어 → 에이전트별 차단 오버레이 ---
+# Blossom(LUMINA_GATE_POLICY_TOKEN 또는 LUMINA_GATE_PUSH_TOKEN)과 같은 값을 Bearer 로 사용합니다.
+# 비어 두면 게이트는 ``/api/internal/policy-sync`` 요청을 거절합니다(503).
+policy_sync_token: ""
+
+listen_host: "0.0.0.0"
+listen_port: 8443
+tls_enabled: true
+tls_cert_file: "/etc/lumina-gate/tls/server.crt"
+tls_key_file: "/etc/lumina-gate/tls/server.key"
+data_dir: "/var/lib/lumina-gate"
+log_dir: "/var/log/lumina-gate"
+log_level: "info"
+policy_file: "/etc/lumina-gate/policy.json"
+default_policy_action: "ALLOW"

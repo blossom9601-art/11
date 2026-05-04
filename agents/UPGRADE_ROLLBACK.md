@@ -13,13 +13,13 @@
 업그레이드:
 
 ```bash
-sudo bash agents/linux/upgrade_lumina_agent.sh --source /tmp/lumina-agent
+sudo bash agents/lumina_server_agent/linux/upgrade_lumina_agent.sh --source /tmp/lumina-agent
 ```
 
 롤백:
 
 ```bash
-sudo bash agents/linux/upgrade_lumina_agent.sh --rollback /var/backups/lumina-agent/20260412_123000
+sudo bash agents/lumina_server_agent/linux/upgrade_lumina_agent.sh --rollback /var/backups/lumina-agent/20260412_123000
 ```
 
 ## 3. Windows 단일 호스트
@@ -27,20 +27,20 @@ sudo bash agents/linux/upgrade_lumina_agent.sh --rollback /var/backups/lumina-ag
 업그레이드:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\agents\windows\upgrade_lumina_agent.ps1 -SourceDir C:\Temp\lumina-agent
+powershell -ExecutionPolicy Bypass -File .\agents\lumina_server_agent\windows\upgrade_lumina_agent.ps1 -SourceDir C:\Temp\lumina-agent
 ```
 
 롤백:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\agents\windows\upgrade_lumina_agent.ps1 -Rollback -BackupDir C:\ProgramData\Lumina\backups\20260412_123000
+powershell -ExecutionPolicy Bypass -File .\agents\lumina_server_agent\windows\upgrade_lumina_agent.ps1 -Rollback -BackupDir C:\ProgramData\Lumina\backups\20260412_123000
 ```
 
 ## 4. Linux 병렬 배포 예시
 
 ```bash
 for host in host1 host2 host3; do
-  scp -r agents/common agents/linux "$host:/tmp/lumina-agent/"
+  scp -r agents/lumina_server_agent/common agents/lumina_server_agent/linux "$host:/tmp/lumina-agent/"
   ssh "$host" "sudo bash /tmp/lumina-agent/linux/upgrade_lumina_agent.sh --source /tmp/lumina-agent"
 done
 ```

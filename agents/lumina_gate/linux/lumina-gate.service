@@ -1,0 +1,15 @@
+[Unit]
+Description=Lumina Gate API Server
+After=network.target
+
+[Service]
+Type=simple
+Environment=LUMINA_GATE_CONFIG=/etc/lumina-gate/config.yaml
+ExecStart=/usr/bin/lumina-gate serve
+Restart=always
+RestartSec=5
+User=root
+WorkingDirectory=/opt/lumina-gate
+
+[Install]
+WantedBy=multi-user.target

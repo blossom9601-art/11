@@ -9,12 +9,32 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 
 FILES = [
     (
+        "static/js/blossom.js",
+        "/opt/blossom/web/static/js/blossom.js",
+    ),
+    (
+        "static/image/svg/free-icon-font-message-circle-refresh1.svg",
+        "/opt/blossom/web/static/image/svg/free-icon-font-message-circle-refresh1.svg",
+    ),
+    (
         "static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js",
         "/opt/blossom/web/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js",
     ),
     (
         "static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js",
         "/opt/blossom/web/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js",
+    ),
+    (
+        "static/image/logo/gate/png/lumina-gate-reference-64.png",
+        "/opt/blossom/web/static/image/logo/gate/png/lumina-gate-reference-64.png",
+    ),
+    (
+        "static/image/svg/control/free-icon-font-plug-connection.svg",
+        "/opt/blossom/web/static/image/svg/control/free-icon-font-plug-connection.svg",
+    ),
+    (
+        "static/css/system.css",
+        "/opt/blossom/web/static/css/system.css",
     ),
     (
         "static/css/3.access_control/access_control.css",
@@ -28,10 +48,22 @@ FILES = [
         "app/templates/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.html",
         "/opt/blossom/web/app/templates/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.html",
     ),
+    (
+        "app/templates/layouts/_message_modal.html",
+        "/opt/blossom/web/app/templates/layouts/_message_modal.html",
+    ),
+    (
+        "app/templates/layouts/_download_modal_range.html",
+        "/opt/blossom/web/app/templates/layouts/_download_modal_range.html",
+    ),
     ("app/routes/api.py", "/opt/blossom/web/app/routes/api.py"),
     (
         "app/services/web_access_control_service.py",
         "/opt/blossom/web/app/services/web_access_control_service.py",
+    ),
+    (
+        "app/services/lumina_gate_policy_sync_service.py",
+        "/opt/blossom/web/app/services/lumina_gate_policy_sync_service.py",
     ),
     (
         "app/templates/authentication/11-3.admin/11-3-3.setting/12.access_control.html",
@@ -108,7 +140,9 @@ def main() -> None:
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(HOST, username=USER, password=PASSWORD, timeout=15)
-    _, _, _ = ssh.exec_command("mkdir -p /opt/blossom/web/docs")
+    _, _, _ = ssh.exec_command(
+        "mkdir -p /opt/blossom/web/docs /opt/blossom/web/static/image/svg/control /opt/blossom/web/static/image/logo/gate/png"
+    )
     sftp = ssh.open_sftp()
     for loc, rem in FILES:
         lp = os.path.join(BASE, *loc.split("/"))

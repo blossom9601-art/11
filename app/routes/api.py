@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, session, current_app, send_from_directory, send_file
 import logging
 import mimetypes
+import hmac
 import os
 import sqlite3
 import uuid
@@ -217,6 +218,7 @@ from app.services.web_access_control_service import (
     list_requests as svc_list_web_access_requests,
     list_resources as svc_list_web_access_resources,
     map_pc_agent_user as svc_map_pc_agent_user,
+    soft_delete_pc_agents as svc_soft_delete_pc_agents,
     normalize_grant_date_key as svc_normalize_grant_date_key,
     reject_request as svc_reject_web_access_request,
     revoke_grant as svc_revoke_web_access_grant,
@@ -38078,6 +38080,52 @@ def api_access_control_audit_logs():
     return jsonify({'success': True, **result})
 
 
+@api_bp.route('/api/internal/lumina-gate/pc-agent-sync', methods=['POST'])
+def api_internal_lumina_gate_pc_agent_sync():
+    """Lumina PC AP (lumina-gate) pushes agent snapshots into WEB SQLite (pc_agent_device).
+
+    동일한 값을 게이트 `web_sync_token` 과 WEB 환경 변수 `LUMINA_GATE_WEB_SYNC_SECRET` 에 설정해야 합니다.
+    """
+    secret = (os.environ.get('LUMINA_GATE_WEB_SYNC_SECRET') or '').strip()
+    if not secret:
+        return jsonify({'success': False, 'message': 'LUMINA_GATE_WEB_SYNC_SECRET 가 설정되지 않아 동기화가 비활성화 상태입니다.'}), 503
+
+    auth = request.headers.get('Authorization', '')
+    tok = ''
+    if auth.lower().startswith('bearer '):
+        tok = auth[7:].strip()
+    if not tok:
+        tok = (request.headers.get('X-Lumina-Gate-Sync-Token') or '').strip()
+    if not tok:
+        return jsonify({'success': False, 'message': '동기화 토큰이 필요합니다.'}), 401
+
+    if len(tok) != len(secret):
+        return jsonify({'success': False, 'message': '유효하지 않은 동기화 토큰입니다.'}), 401
+
+    if not hmac.compare_digest(tok, secret):
+        return jsonify({'success': False, 'message': '유효하지 않은 동기화 토큰입니다.'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_upsert_pc_agent(payload, actor=None)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logging.getLogger(__name__).exception('lumina-gate pc-agent-sync upsert failed')
+        return jsonify({'success': False, 'message': 'PC 에이전트 동기화 처리 중 서버 오류가 발생했습니다.'}), 500
+
+    agent_id = item.get('agent_id') if isinstance(item, dict) else ''
+    agent_pk = item.get('id') if isinstance(item, dict) else None
+    if agent_pk:
+        try:
+            from app.services.lumina_gate_policy_sync_service import schedule_push_for_pc_agent_row
+
+            schedule_push_for_pc_agent_row(int(agent_pk))
+        except Exception:
+            logging.getLogger(__name__).exception('lumina-gate policy enqueue after gate pc-agent-sync failed')
+    return jsonify({'success': True, 'item': {'id': agent_pk, 'agent_id': agent_id}})
+
+
 @api_bp.route('/api/access-control/pc-agents', methods=['GET'])
 def api_access_control_pc_agents():
     actor, err = _web_access_current_actor()
@@ -38092,6 +38140,8 @@ def api_access_control_pc_agents():
     filters = {
         'keyword': request.args.get('keyword') or '',
         'mapping_state': request.args.get('mapping_state') or '',
+        'sort': request.args.get('sort') or '',
+        'order': request.args.get('order') or '',
     }
     if export_all:
         filters['export_all'] = True
@@ -38119,6 +38169,14 @@ def api_access_control_pc_agent_upsert():
         item = svc_upsert_pc_agent(payload, actor=actor)
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
+    agent_pk = item.get('id') if isinstance(item, dict) else None
+    if agent_pk:
+        try:
+            from app.services.lumina_gate_policy_sync_service import schedule_push_for_pc_agent_row
+
+            schedule_push_for_pc_agent_row(int(agent_pk))
+        except Exception:
+            logging.getLogger(__name__).exception('lumina-gate policy enqueue after admin pc-agent upsert failed')
     return jsonify({'success': True, 'item': item})
 
 
@@ -38164,6 +38222,29 @@ def api_access_control_pc_agent_user_mapping_delete(agent_id: int):
     except ValueError as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400
     return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/pc-agents/delete', methods=['POST'])
+def api_access_control_pc_agents_bulk_delete():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 PC 에이전트를 삭제할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    raw_ids = payload.get('agent_ids') or payload.get('ids') or []
+    if not isinstance(raw_ids, list):
+        return jsonify({'success': False, 'message': '삭제할 에이전트 id 목록이 올바르지 않습니다.'}), 400
+    try:
+        deleted = svc_soft_delete_pc_agents(raw_ids, actor=actor)
+    except Exception:
+        logging.getLogger(__name__).exception('pc-agents bulk delete failed')
+        return jsonify({'success': False, 'message': '삭제 처리 중 오류가 발생했습니다.'}), 500
+    return jsonify({'success': True, 'deleted': deleted})
 
 
 @api_bp.route('/api/access-control/audit-logs/<int:audit_id>/connect-account', methods=['POST'])

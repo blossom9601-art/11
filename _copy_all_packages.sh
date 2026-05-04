@@ -7,8 +7,8 @@ mkdir -p "$DEST"
 cp /tmp/lumina-rpm-build/rpmbuild/RPMS/noarch/*.rpm "$DEST/" 2>/dev/null || true
 
 # 에이전트 RPM + DEB
-cp /mnt/c/Users/ME/Desktop/blossom/agents/linux/dist/lumina-agent-*.rpm "$DEST/" 2>/dev/null || true
-cp /mnt/c/Users/ME/Desktop/blossom/agents/linux/dist/lumina-agent_*.deb "$DEST/" 2>/dev/null || true
+cp /mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/dist/lumina-agent-*.rpm "$DEST/" 2>/dev/null || true
+cp /mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/dist/lumina-agent_*.deb "$DEST/" 2>/dev/null || true
 
 echo "=== 전체 패키지 결과물 ==="
 ls -lh "$DEST/"

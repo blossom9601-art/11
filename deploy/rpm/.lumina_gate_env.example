@@ -1,0 +1,16 @@
+# Copy to `.lumina_gate_env` (same folder). That file is gitignored.
+#
+# 레포 루트에서:  python _build_lumina_gate_rpm.py
+# → 원격 호스트에서 rpmbuild 후 rpm -Uvh (설치) + 로컬 deploy/rpm/RPMS 에 RPM 복사
+
+LUMINA_GATE_HOST=192.168.56.110
+LUMINA_GATE_USER=root
+
+# 비밀번호 방식(root 로그인) — 키를 쓰면 아래 줄은 비워도 됩니다.
+LUMINA_GATE_PASSWORD=
+
+# 또는 개인키 경로 (Windows 예시)
+#LUMINA_GATE_KEYFILE=C:\Users\ME\.ssh\id_ed25519
+
+# 원격에는 설치하지 않고 RPM만 받을 때:
+#LUMINA_GATE_BUILD_ONLY=1

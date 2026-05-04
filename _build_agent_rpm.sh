@@ -46,9 +46,9 @@ echo "결과물:"
 find "$TOPDIR/RPMS" -name "*.rpm" -exec echo "  → {}" \;
 
 # 결과물을 Windows 쪽으로 복사
-DEST=/mnt/c/Users/ME/Desktop/blossom/agents/linux/rpmbuild/RPMS
+DEST=/mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/rpmbuild/RPMS
 mkdir -p "$DEST"
 find "$TOPDIR/RPMS" -name "*.rpm" -exec cp {} "$DEST/" \;
 echo ""
-echo "Windows 경로로 복사 완료: agents/linux/rpmbuild/RPMS/"
+echo "Windows 경로로 복사 완료: agents/lumina_server_agent/linux/rpmbuild/RPMS/"
 ls -la "$DEST/"

@@ -1,7 +1,8 @@
+import logging
 import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Set
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -112,12 +113,40 @@ def _resolve_db_path(app=None) -> str:
     return os.path.join(_app.instance_path, 'blossom.db')
 
 
+def _effective_flask_app(app=None):
+    """Request context or explicit app for reading SQLALCHEMY_DATABASE_URI."""
+
+    if app is not None:
+        return app
+    try:
+        from flask import has_app_context, current_app as _ca
+
+        if has_app_context():
+            return _ca._get_current_object()
+    except Exception:
+        pass
+    return None
+
+
+def _primary_db_is_sqlite(app) -> bool:
+    try:
+        uri = str(app.config.get('SQLALCHEMY_DATABASE_URI') or '').strip().lower()
+    except Exception:
+        return False
+    return uri.startswith('sqlite')
+
+
 def _get_connection(app=None) -> sqlite3.Connection:
     db_path = _resolve_db_path(app)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
     conn.execute('PRAGMA journal_mode=WAL')
+    eff_app = _effective_flask_app(app)
+    # MySQL/Postgres: 접근제어용 blossom.db 에 PC 조회 시 org_user JOIN 이 필요하지만 Flask org_user 가
+    # 그 DB 에 없거나 예전 테이블이면 500 이 난다. 연결마다 테이블/컬럼 보강.
+    if eff_app is not None and not _primary_db_is_sqlite(eff_app):
+        _ensure_sqlite_org_user_for_pc_agent_join(conn)
     return conn
 
 
@@ -246,6 +275,50 @@ def _to_int_or_none(value: Any) -> Optional[int]:
         return int(str(value).strip())
     except (TypeError, ValueError):
         return None
+
+
+_log = logging.getLogger(__name__)
+
+
+def _lumina_gate_schedule_pc_agent_row(agent_pk: Any, app=None) -> None:
+    try:
+        from app.services.lumina_gate_policy_sync_service import schedule_push_for_pc_agent_row
+
+        pid = _to_int_or_none(agent_pk)
+        if pid:
+            schedule_push_for_pc_agent_row(int(pid), app=app)
+    except Exception:
+        _log.exception('lumina-gate policy: schedule pc_agent row failed')
+
+
+def _lumina_gate_schedule_push_mapped_users(user_ids: Iterable[Any], app=None) -> None:
+    try:
+        from app.services.lumina_gate_policy_sync_service import schedule_push_for_mapped_user_ids
+
+        uids = [u for u in (_to_int_or_none(x) for x in user_ids) if u is not None]
+        if not uids:
+            return
+        schedule_push_for_mapped_user_ids(uids, app=app)
+    except Exception:
+        _log.exception('lumina-gate policy: schedule mapped users failed')
+
+
+def _lumina_gate_schedule_users_for_resource(resource_id: Any, app=None) -> None:
+    try:
+        from app.services.lumina_gate_policy_sync_service import schedule_users_for_resource
+
+        schedule_users_for_resource(resource_id, app=app)
+    except Exception:
+        _log.exception('lumina-gate policy: schedule by resource failed')
+
+
+def _lumina_gate_schedule_full_mapped_resync(app=None) -> None:
+    try:
+        from app.services.lumina_gate_policy_sync_service import schedule_full_mapped_resync
+
+        schedule_full_mapped_resync(app=app)
+    except Exception:
+        _log.exception('lumina-gate policy: schedule full mapped resync failed')
 
 
 def _ensure_resource_extra_columns(conn: sqlite3.Connection) -> None:
@@ -411,9 +484,71 @@ def _create_pc_agent_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_sqlite_org_user_for_pc_agent_join(conn: sqlite3.Connection) -> None:
+    """접근제어 SQLite 의 PC 에이전트 조회에서 org_user 에 LEFT JOIN 한다.
+
+    SQLALCHEMY_DATABASE_URI 가 Postgres/MySQL 등이면 접근제어 DB 는 instance/blossom.db 로
+    분리된다. 초기 마이그레이션 미적용 시 테이블이 없거나, 예전 생성분에 nickname 등이 없어도
+    JOIN 예외가 나지 않도록 보강한다.
+    Flask 가 같은 SQLite 에 이미 만든 정식 org_user 가 있어도 IF NOT EXISTS 로 유지된다.
+    """
+
+    conn.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS org_user (
+            id INTEGER PRIMARY KEY,
+            emp_no TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL DEFAULT '',
+            nickname TEXT NOT NULL DEFAULT '',
+            department TEXT NOT NULL DEFAULT '',
+            profile_image TEXT NOT NULL DEFAULT ''
+        )
+        '''
+    )
+    try:
+        rows = conn.execute('PRAGMA table_info(org_user)').fetchall()
+    except sqlite3.Error:
+        return
+    existing: Set[str] = {str(r[1]) for r in rows}
+    missing = (
+        ('emp_no', "TEXT NOT NULL DEFAULT ''"),
+        ('name', "TEXT NOT NULL DEFAULT ''"),
+        ('nickname', "TEXT NOT NULL DEFAULT ''"),
+        ('department', "TEXT NOT NULL DEFAULT ''"),
+        ('profile_image', "TEXT NOT NULL DEFAULT ''"),
+    )
+    for col, ddl in missing:
+        if col in existing:
+            continue
+        try:
+            conn.execute(f'ALTER TABLE org_user ADD COLUMN {col} {ddl}')
+        except sqlite3.OperationalError:
+            pass
+
+
 def _pc_agent_text(value: Any, max_len: int = 255) -> str:
     text = str(value or '').strip()
     return text[:max_len]
+
+
+def _merged_pc_agent_display_version(agent_ver: Any, install_ver: Any, policy_ver: Any, max_len: int = 128) -> str:
+    """Collapse install + policy telemetry into one agent_version string (e.g. 1.3.18+p1)."""
+
+    core = _pc_agent_text(agent_ver, 96).strip()
+    inst = _pc_agent_text(install_ver, 64).strip()
+    pv_raw = _pc_agent_text(policy_ver, 64).strip()
+    if pv_raw in ('', '0', '-') or pv_raw.lower() == 'none':
+        pv_raw = ''
+    base = core or inst
+    if not pv_raw:
+        text = base
+    else:
+        suffix = f'+p{pv_raw}'
+        if base.endswith(suffix) or pv_raw in base:
+            text = base
+        else:
+            text = base + suffix if base else suffix.lstrip('+')
+    return _pc_agent_text(text, max_len)
 
 
 def _parse_pc_agent_time(value: Any) -> Optional[datetime]:
@@ -451,6 +586,28 @@ def _pc_agent_sync_status(item: Dict[str, Any]) -> str:
     return '끊김'
 
 
+def _pc_agent_operation_status(sync_status: str) -> str:
+    """UI용 에이전트 상태 — 활성/비활성/오류."""
+
+    s = str(sync_status or '').strip()
+    if s == '오류':
+        return '오류'
+    if s == '정상':
+        return '활성'
+    return '비활성'
+
+
+def _pc_agent_version_display_field(value: Any) -> str:
+    """통합 문자열(agent_version+p정책 등) 표시 시 정책 접미사 제외."""
+
+    raw = str(value or '').strip()
+    if not raw:
+        return '-'
+    idx = raw.find('+')
+    head = raw[:idx].strip() if idx > 0 else raw.strip()
+    return head if head else raw
+
+
 def _pc_agent_item(row: sqlite3.Row) -> Dict[str, Any]:
     item = _dict(row) or {}
     user_id = _to_int_or_none(item.get('mapped_user_id'))
@@ -464,6 +621,8 @@ def _pc_agent_item(row: sqlite3.Row) -> Dict[str, Any]:
             'profile_image': item.get('user_profile_image') or '',
         }
     item['sync_status'] = _pc_agent_sync_status(item)
+    item['operation_status'] = _pc_agent_operation_status(item['sync_status'])
+    item['agent_version_display'] = _pc_agent_version_display_field(item.get('agent_version'))
     return item
 
 
@@ -491,6 +650,44 @@ def get_pc_agent(agent_pk: int, app=None) -> Optional[Dict[str, Any]]:
     return _pc_agent_item(row) if row else None
 
 
+def _pc_agent_list_order_clause(filters: Dict[str, Any]) -> str:
+    """Build ORDER BY for PC agent listing (whitelist only; used with joined org_user alias u)."""
+
+    sort_key = str(filters.get('sort') or '').strip().lower()
+    order_raw = str(filters.get('order') or 'asc').strip().lower()
+    direction = 'DESC' if order_raw == 'desc' else 'ASC'
+    # Mirrors _pc_agent_sync_status thresholds (≈3m / ≈15m) using SQLite julianday.
+    hb_rank = (
+        "(CASE "
+        "WHEN TRIM(COALESCE(a.last_error,''))!='' THEN 99 "
+        "WHEN TRIM(LOWER(COALESCE(a.service_status,''))) NOT IN ('running','run','active','정상','') "
+        "AND TRIM(COALESCE(a.service_status,''))!='' THEN 99 "
+        "WHEN TRIM(COALESCE(a.last_seen_at,''))='' THEN 0 "
+        "WHEN (julianday('now') - julianday(REPLACE(SUBSTR(TRIM(COALESCE(a.last_seen_at,'')),1,19),'T',' '))) * 86400 <= 180 THEN 4 "
+        "WHEN (julianday('now') - julianday(REPLACE(SUBSTR(TRIM(COALESCE(a.last_seen_at,'')),1,19),'T',' '))) * 86400 <= 900 THEN 3 "
+        'ELSE 2 END)'
+    )
+    expressions: Dict[str, str] = {
+        'mapping': '(CASE WHEN a.mapped_user_id IS NOT NULL THEN 1 ELSE 0 END)',
+        'sync': hb_rank,
+        'op': hb_rank,
+        'hostname': "LOWER(COALESCE(a.hostname,''))",
+        'agent_id': "LOWER(COALESCE(a.agent_id,''))",
+        'current_user': "LOWER(COALESCE(a.current_user,''))",
+        'agent_version': "LOWER(COALESCE(a.agent_version,''))",
+        'dept': "LOWER(TRIM(COALESCE(u.department, a.mapped_department, '')))",
+        'emp_no': "LOWER(TRIM(COALESCE(u.emp_no, a.mapped_emp_no, '')))",
+        'user_name': "LOWER(TRIM(COALESCE(NULLIF(u.name,''), NULLIF(u.nickname,''), NULLIF(a.mapped_name,''), '')))",
+        'last_seen': "LOWER(TRIM(COALESCE(a.last_seen_at,'')))",
+        'ip': "LOWER(COALESCE(a.ip_address,''))",
+        'mac': "LOWER(COALESCE(a.mac_address,''))",
+    }
+    expr = expressions.get(sort_key)
+    if not expr:
+        return ' ORDER BY COALESCE(NULLIF(a.last_seen_at, \'\'), a.updated_at, a.created_at) DESC, a.id DESC'
+    return f' ORDER BY {expr} {direction}, a.id DESC'
+
+
 def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page_size: int = 20, app=None) -> Dict[str, Any]:
     filters = filters or {}
     try:
@@ -511,13 +708,13 @@ def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page
             AND (
                 a.agent_id LIKE ? OR a.hostname LIKE ? OR a.current_user LIKE ?
                 OR a.ip_address LIKE ? OR a.mac_address LIKE ? OR a.agent_version LIKE ?
-                OR a.policy_version LIKE ? OR a.last_error LIKE ?
+                OR a.last_error LIKE ?
                 OR COALESCE(u.name, '') LIKE ? OR COALESCE(u.nickname, '') LIKE ?
                 OR COALESCE(u.emp_no, '') LIKE ? OR COALESCE(u.department, '') LIKE ?
                 OR a.mapped_name LIKE ? OR a.mapped_emp_no LIKE ? OR a.mapped_department LIKE ?
             )
         '''
-        params.extend([like] * 15)
+        params.extend([like] * 14)
     mapping_state = str(filters.get('mapping_state') or '').strip()
     if mapping_state == 'mapped':
         where += ' AND a.mapped_user_id IS NOT NULL'
@@ -535,8 +732,9 @@ def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page
         total_pages = max(1, (total + page_size - 1) // page_size)
         page = min(page, total_pages)
         offset = (page - 1) * page_size
+        order_clause = _pc_agent_list_order_clause(filters)
         rows = conn.execute(
-            _pc_agent_select_sql() + where + ' ORDER BY COALESCE(NULLIF(a.last_seen_at, \'\'), a.updated_at, a.created_at) DESC, a.id DESC LIMIT ? OFFSET ?',
+            _pc_agent_select_sql() + where + order_clause + ' LIMIT ? OFFSET ?',
             params + [page_size, offset],
         ).fetchall()
         summary_rows = conn.execute(
@@ -575,6 +773,8 @@ def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page
 
 
 def upsert_pc_agent(payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = None, app=None) -> Dict[str, Any]:
+    """Insert or merge PC agent telemetry rows. Admin user mappings (mapped_*) remain unchanged on update."""
+
     agent_id = _pc_agent_text(payload.get('agent_id') or payload.get('agentId'), 128)
     if not agent_id:
         raise ValueError('agent_id가 필요합니다.')
@@ -587,7 +787,7 @@ def upsert_pc_agent(payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = N
         'mac_address': _pc_agent_text(payload.get('mac_address') or payload.get('macAddress'), 64),
         'os_name': _pc_agent_text(payload.get('os_name') or payload.get('osName'), 128),
         'os_version': _pc_agent_text(payload.get('os_version') or payload.get('osVersion'), 128),
-        'agent_version': _pc_agent_text(payload.get('agent_version') or payload.get('agentVersion') or payload.get('version'), 64),
+        'agent_version': _pc_agent_text(payload.get('agent_version') or payload.get('agentVersion') or payload.get('version'), 96),
         'install_version': _pc_agent_text(payload.get('install_version') or payload.get('installVersion'), 64),
         'service_status': _pc_agent_text(payload.get('service_status') or payload.get('serviceStatus'), 64),
         'policy_version': _pc_agent_text(payload.get('policy_version') or payload.get('policyVersion'), 64),
@@ -597,6 +797,14 @@ def upsert_pc_agent(payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = N
         'last_registered_at': _pc_agent_text(payload.get('last_registered_at') or payload.get('lastRegisteredAt'), 64),
         'last_error': _pc_agent_text(payload.get('last_error') or payload.get('lastError'), 512),
     }
+    merged_ver = _merged_pc_agent_display_version(
+        values['agent_version'],
+        values['install_version'],
+        values['policy_version'],
+    )
+    values['agent_version'] = merged_ver
+    values['install_version'] = ''
+    values['policy_version'] = ''
     if not values['last_seen_at'] and payload.get('heartbeat'):
         values['last_seen_at'] = now
     with _get_connection(app) as conn:
@@ -665,6 +873,7 @@ def map_pc_agent_user(agent_pk: int, user_id: int, actor: Dict[str, Any], mappin
         )
         conn.commit()
     item = get_pc_agent(aid, app=app)
+    _lumina_gate_schedule_pc_agent_row(aid, app=app)
     return item or {}
 
 
@@ -690,7 +899,32 @@ def clear_pc_agent_user(agent_pk: int, actor: Optional[Dict[str, Any]] = None, a
         )
         conn.commit()
     item = get_pc_agent(aid, app=app)
+    _lumina_gate_schedule_pc_agent_row(aid, app=app)
     return item or {}
+
+
+def soft_delete_pc_agents(agent_pks: List[Any], actor: Optional[Dict[str, Any]] = None, app=None) -> int:
+    """PC 에이전트 행을 숨김(is_deleted). actor 는 추후 감사용으로 유지."""
+
+    _ = actor
+    ids = sorted({_to_int_or_none(x) for x in (agent_pks or []) if _to_int_or_none(x)})
+    if not ids:
+        return 0
+    placeholders = ','.join(['?'] * len(ids))
+    now = _now()
+    with _get_connection(app) as conn:
+        cur = conn.execute(
+            f'''UPDATE {PC_AGENT_TABLE}
+                   SET is_deleted = 1, updated_at = ?
+                 WHERE id IN ({placeholders}) AND is_deleted = 0''',
+            [now] + list(ids),
+        )
+        conn.commit()
+        deleted = getattr(cur, 'rowcount', -1)
+        try:
+            return int(deleted) if deleted is not None and deleted >= 0 else 0
+        except (TypeError, ValueError):
+            return 0
 
 
 def _request_item_status_from_request(status: str) -> str:
@@ -1031,6 +1265,7 @@ def init_web_access_control_tables(app=None) -> None:
         _create_endpoint_table(conn)
         _create_delegation_table(conn)
         _create_pc_agent_table(conn)
+        _ensure_sqlite_org_user_for_pc_agent_join(conn)
         _migrate_endpoints_from_resource(conn)
         _backfill_endpoint_access_columns(conn)
         _backfill_audit_access_columns(conn)
@@ -1476,6 +1711,8 @@ def expire_due_grants(app=None) -> int:
                 (REQUEST_STATUS_EXPIRED, _now(), GRANT_STATUS_EXPIRED)
             )
         conn.commit()
+        if updated:
+            _lumina_gate_schedule_full_mapped_resync(app)
         return updated
 
 
@@ -1664,7 +1901,9 @@ def create_resource(payload: Dict[str, Any], actor: str, app=None) -> Dict[str, 
         resource_id = cur.lastrowid
         _replace_endpoints(conn, resource_id, raw_endpoints)
         conn.commit()
-    return get_resource(resource_id, app) or {}
+    out = get_resource(resource_id, app) or {}
+    _lumina_gate_schedule_users_for_resource(resource_id, app=app)
+    return out
 
 
 def update_resource(resource_id: int, payload: Dict[str, Any], actor: str, app=None) -> Optional[Dict[str, Any]]:
@@ -1769,7 +2008,9 @@ def update_resource(resource_id: int, payload: Dict[str, Any], actor: str, app=N
         if raw_endpoints is not None:
             _replace_endpoints(conn, resource_id, raw_endpoints)
         conn.commit()
-    return get_resource(resource_id, app)
+    res = get_resource(resource_id, app)
+    _lumina_gate_schedule_users_for_resource(resource_id, app=app)
+    return res
 
 
 def soft_delete_resource(resource_id: int, actor: str, app=None) -> bool:
@@ -2638,6 +2879,7 @@ def approve_request(request_id: int, actor: Dict[str, Any], opinion: str = '', i
                 _insert_audit(conn, actor, item['resource_id'], request_id, '승인', '성공', opinion.strip(), {'grant_end_date': current['request_end_date'], 'item_id': item['id'], 'request_type': request_type})
         _sync_request_status_from_items(conn, request_id, actor)
         conn.commit()
+    _lumina_gate_schedule_push_mapped_users([current.get('requester_user_id')], app=app)
     return get_request(request_id, app)
 
 
@@ -2806,13 +3048,15 @@ def list_grants(user_id: Optional[int] = None, department_id: Optional[int] = No
 
 
 def revoke_grant(grant_id: int, actor: Dict[str, Any], app=None) -> bool:
+    grant_user_id: Optional[int] = None
     with _get_connection(app) as conn:
         row = conn.execute(
-            f'SELECT resource_id, source_request_id FROM {GRANT_TABLE} WHERE id = ? AND is_deleted = 0',
+            f'SELECT resource_id, source_request_id, user_id FROM {GRANT_TABLE} WHERE id = ? AND is_deleted = 0',
             (grant_id,)
         ).fetchone()
         if not row:
             return False
+        grant_user_id = _to_int_or_none(row['user_id'])
         cur = conn.execute(
             f'''
             UPDATE {GRANT_TABLE}
@@ -2826,7 +3070,10 @@ def revoke_grant(grant_id: int, actor: Dict[str, Any], app=None) -> bool:
         )
         _insert_audit(conn, actor, row['resource_id'], row['source_request_id'], '권한회수', '성공', '', {})
         conn.commit()
-        return (cur.rowcount or 0) > 0
+        ok = (cur.rowcount or 0) > 0
+    if ok and grant_user_id is not None:
+        _lumina_gate_schedule_push_mapped_users([grant_user_id], app=app)
+    return ok
 
 
 def touch_access(

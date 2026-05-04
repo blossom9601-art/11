@@ -9,11 +9,12 @@
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260503agentkpi1">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260504agentmapfont">
 	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260503agentkpi1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260503agentmapuid" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -40,7 +41,7 @@
 							<div class="search-container audit-search" role="search">
 								<div class="search-input-wrapper" id="audit-search-wrapper">
 									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-									<input type="text" id="audit-keyword-filter" placeholder="이름, 부서, 사번, 자원 이름, 접속 URL/IP, 접속 IP 검색" class="search-input" aria-label="감사 기록 검색" autocomplete="off">
+									<input type="text" id="audit-keyword-filter" class="search-input" aria-label="감사 기록 검색" autocomplete="off">
 									<button type="button" class="search-clear-btn" id="audit-search-clear" title="지우기" aria-label="검색어 지우기">
 										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
 									</button>
@@ -66,7 +67,7 @@
 								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
 							</button>
 							<button type="button" class="header-btn" id="audit-reset-btn" title="초기화" aria-label="필터 초기화">
-								<img src="/static/image/svg/refresh-ccw.svg" alt="초기화" class="header-icon">
+								<img src="/static/image/svg/free-icon-font-message-circle-refresh1.svg" alt="초기화" class="header-icon">
 							</button>
 						</div>
 					</div>
@@ -116,29 +117,6 @@
 				</div>
 
 				<div class="tab-pane agent-tab-pane" id="agent-list-pane" hidden>
-					<div class="agent-kpi-panel" aria-label="PC 에이전트 KPI">
-						<div class="agent-kpi-visual" aria-hidden="true">
-							<img src="/static/image/svg/free-icon-font-analyse1.svg" alt="" class="agent-kpi-icon" loading="lazy">
-						</div>
-						<div class="agent-kpi-content">
-							<div class="agent-kpi-head">
-								<span class="agent-kpi-eyebrow">PC 에이전트 KPI</span>
-								<strong id="agent-kpi-total">0대</strong>
-							</div>
-							<p class="agent-kpi-copy" id="agent-kpi-copy">연동 데이터를 불러오고 있습니다.</p>
-							<div class="agent-kpi-bars" aria-label="PC 에이전트 지표">
-								<div class="agent-kpi-bar-group">
-									<div class="agent-kpi-bar-label"><span>연동 안정률</span><strong id="agent-kpi-normal-rate">0%</strong></div>
-									<div class="agent-kpi-bar"><i id="agent-kpi-normal-bar"></i></div>
-								</div>
-								<div class="agent-kpi-bar-group">
-									<div class="agent-kpi-bar-label"><span>사용자 연결률</span><strong id="agent-kpi-mapped-rate">0%</strong></div>
-									<div class="agent-kpi-bar"><i id="agent-kpi-mapped-bar"></i></div>
-								</div>
-							</div>
-						</div>
-					</div>
-
 					<div class="tab-header audit-tab-header agent-tab-header">
 						<div class="tab-header-left">
 							<h2>PC 에이전트 <span class="count-badge" id="agent-count">0</span></h2>
@@ -147,7 +125,7 @@
 							<div class="search-container audit-search" role="search">
 								<div class="search-input-wrapper" id="agent-search-wrapper">
 									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-									<input type="text" id="agent-keyword-filter" placeholder="PC명, 로그인 사용자, IP, 사번, 이름 검색" class="search-input" aria-label="PC 에이전트 검색" autocomplete="off">
+									<input type="text" id="agent-keyword-filter" class="search-input" aria-label="PC 에이전트 검색" autocomplete="off">
 									<button type="button" class="search-clear-btn" id="agent-search-clear" title="지우기" aria-label="검색어 지우기">
 										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
 									</button>
@@ -155,10 +133,10 @@
 								</div>
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector agent-filter-selector">
-								<select id="agent-mapping-filter" class="page-size-select" aria-label="사용자 연결 상태">
-									<option value="">전체 연결</option>
-									<option value="mapped">연결됨</option>
-									<option value="unmapped">연결 대기</option>
+								<select id="agent-mapping-filter" class="page-size-select" aria-label="연동 상태 필터">
+									<option value="">전체</option>
+									<option value="mapped">연결</option>
+									<option value="unmapped">대기</option>
 								</select>
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector">
@@ -170,41 +148,50 @@
 									<option value="100">100 개</option>
 								</select>
 							</div>
+							<button type="button" class="header-btn" id="agent-reset-btn" title="초기화" aria-label="PC 에이전트 검색 초기화">
+								<img src="/static/image/svg/free-icon-font-message-circle-refresh1.svg" alt="초기화" class="header-icon">
+							</button>
+							<button type="button" class="header-btn" id="agent-delete-btn" title="삭제" aria-label="선택한 PC 에이전트 삭제처리">
+								<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="header-icon" aria-hidden="true">
+							</button>
+							<button type="button" class="header-btn agent-map-toolbar-btn" id="agent-map-toolbar-btn" title="매핑" aria-label="선택한 PC 에이전트 사용자 매핑">
+								<img src="/static/image/svg/control/free-icon-font-plug-connection.svg" alt="" class="header-icon agent-map-toolbar-icon" aria-hidden="true">
+							</button>
 							<button type="button" class="header-btn" id="agent-download-btn" title="CSV 다운로드" aria-label="PC 에이전트 CSV 다운로드">
 								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
-							</button>
-							<button type="button" class="header-btn" id="agent-refresh-btn" title="새로고침" aria-label="PC 에이전트 새로고침">
-								<img src="/static/image/svg/refresh-ccw.svg" alt="새로고침" class="header-icon">
 							</button>
 						</div>
 					</div>
 
 					<div class="system-table-container audit-table-container agent-table-container" id="agent-table-wrap">
-						<table class="system-data-table audit-table agent-table" id="agent-table">
+						<table class="system-data-table audit-table agent-table server-data-table" id="agent-table">
 							<thead>
 								<tr>
-									<th class="agent-col-status">상태</th>
-									<th class="agent-col-host">PC명</th>
-									<th class="agent-col-current-user">현재 로그인</th>
-									<th class="agent-col-mapped-user">연결 사용자</th>
-									<th class="agent-col-version">버전</th>
-									<th class="agent-col-policy">정책</th>
-									<th class="agent-col-last-seen">마지막 하트비트</th>
-									<th class="agent-col-network">IP/MAC</th>
-									<th class="agent-col-error">오류</th>
-									<th class="agent-col-action">관리</th>
+									<th class="agent-col-check"><input type="checkbox" id="agent-select-all" aria-label="PC 에이전트 전체 선택"></th>
+									<th class="agent-col-status agent-th-sortable" data-agent-sort="sync" scope="col" title="정렬"><span class="agent-th-inner">연동 상태 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-hostname agent-th-sortable" data-agent-sort="hostname" scope="col" title="정렬"><span class="agent-th-inner">PC 이름 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-agent-id agent-th-sortable" data-agent-sort="agent_id" scope="col" title="정렬"><span class="agent-th-inner">에이전트 ID <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-current-user agent-th-sortable" data-agent-sort="current_user" scope="col" title="정렬"><span class="agent-th-inner">PC 사용자 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-op-status agent-th-sortable" data-agent-sort="op" scope="col" title="정렬"><span class="agent-th-inner">에이전트 상태 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-version agent-th-sortable" data-agent-sort="agent_version" scope="col" title="정렬"><span class="agent-th-inner">에이전트 버전 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-dept agent-th-sortable" data-agent-sort="dept" scope="col" title="정렬"><span class="agent-th-inner">부서 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-emp-no agent-th-sortable" data-agent-sort="emp_no" scope="col" title="정렬"><span class="agent-th-inner">사번 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-user-name agent-th-sortable" data-agent-sort="user_name" scope="col" title="정렬"><span class="agent-th-inner">이름 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-last-seen agent-th-sortable" data-agent-sort="last_seen" scope="col" title="정렬"><span class="agent-th-inner">마지막 하트비트 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-ip agent-th-sortable" data-agent-sort="ip" scope="col" title="정렬"><span class="agent-th-inner">IP 주소 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
+									<th class="agent-col-mac agent-th-sortable" data-agent-sort="mac" scope="col" title="정렬"><span class="agent-th-inner">MAC 주소 <span class="agent-sort-ind" aria-hidden="true"></span></span></th>
 								</tr>
 							</thead>
 							<tbody id="agent-table-body"></tbody>
 						</table>
 					</div>
-					<div id="agent-empty" class="system-empty audit-empty" hidden role="status" aria-live="polite">
+					<div id="agent-empty" class="system-empty" hidden role="status" aria-live="polite">
 						<div class="empty-illustration">
 							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
 						</div>
 						<div class="empty-text">
-							<h3>PC 에이전트가 없습니다.</h3>
-								<p>에이전트가 연동되면 이곳에서 사용자를 연결할 수 있습니다.</p>
+							<h3 id="agent-empty-title">PC 에이전트</h3>
+							<p id="agent-empty-lead" class="agent-empty-lead"></p>
 						</div>
 					</div>
 					<div class="modern-pagination audit-pagination" id="agent-pagination">
@@ -219,7 +206,10 @@
 					</div>
 				</div>
 			</div>
-
+		</div>
+	</main>
+	<div class="access-audit-modals">
+			{% include 'layouts/_message_modal.html' %}
 			<div class="modal-overlay-full agent-map-modal" id="agent-map-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agent-map-title">
 				<div class="agent-map-dialog" role="document">
 					<div class="agent-map-header">
@@ -230,28 +220,80 @@
 						<button type="button" class="agent-map-close" id="agent-map-close" aria-label="닫기">×</button>
 					</div>
 					<div class="agent-map-body">
-						<div class="agent-map-target" id="agent-map-target"></div>
-						<label class="agent-map-label" for="agent-user-search">사용자 검색</label>
-						<div class="agent-user-search-box">
-							<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-							<input type="text" id="agent-user-search" autocomplete="off" placeholder="이름, 사번, 부서, 이메일 검색" aria-label="연결할 사용자 검색">
-							<div class="search-loader" id="agent-user-search-loader" aria-hidden="true"></div>
-						</div>
-						<div class="agent-user-results" id="agent-user-results" role="listbox" aria-label="사용자 검색 결과"></div>
-						<div class="agent-selected-user" id="agent-selected-user" hidden></div>
-						<label class="agent-map-label" for="agent-map-note">매핑 메모</label>
-						<textarea id="agent-map-note" rows="3" maxlength="500" placeholder="필요 시 매핑 근거를 남기세요."></textarea>
+						<section class="agent-map-section agent-map-section--agent" aria-labelledby="agent-map-section-agent-heading">
+							<div class="agent-map-section-head">
+								<h3 id="agent-map-section-agent-heading" class="agent-map-section-title">에이전트 정보</h3>
+								<img src="/static/image/logo/gate/png/lumina-gate-reference-64.png" alt="Lumina Gate" class="agent-map-gate-logo" width="44" height="44" loading="lazy">
+							</div>
+							<div class="agent-map-target" id="agent-map-target"></div>
+						</section>
+						<section class="agent-map-section agent-map-section--search" aria-labelledby="agent-map-section-search-heading">
+							<h3 id="agent-map-section-search-heading" class="agent-map-section-title">사용자 검색</h3>
+							<div class="agent-user-search-box">
+								<input type="text" id="agent-user-search" autocomplete="off" placeholder="부서, 사번, 이름 등으로 검색" aria-label="연결할 사용자 검색">
+								<div class="agent-user-search-suffix">
+									<div class="search-loader" id="agent-user-search-loader" aria-hidden="true"></div>
+									<span class="agent-user-search-icon-wrap" aria-hidden="true"><img src="/static/image/svg/list/free-icon-search.svg" alt="" class="agent-user-search-mag"></span>
+								</div>
+							</div>
+							<div class="agent-user-results" id="agent-user-results" role="region" aria-label="사용자 검색 결과"></div>
+						</section>
+						<section class="agent-map-section agent-map-section--memo" aria-labelledby="agent-map-section-memo-heading">
+							<h3 id="agent-map-section-memo-heading" class="agent-map-section-title">매핑 메모</h3>
+							<label class="visually-hidden" for="agent-map-note">메모 입력</label>
+							<textarea id="agent-map-note" rows="3" maxlength="500" placeholder="필요 시 매핑 근거를 남기세요."></textarea>
+						</section>
 					</div>
 					<div class="agent-map-footer">
 						<button type="button" class="secondary-btn" id="agent-map-clear">매핑 해제</button>
 						<div class="agent-map-footer-actions">
-							<button type="button" class="secondary-btn" id="agent-map-cancel">취소</button>
-							<button type="button" class="primary-btn" id="agent-map-save">저장</button>
+							<button type="button" class="agent-map-register-btn" id="agent-map-save">등록</button>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	</main>
+			<!-- PC 에이전트 삭제 확인 (공통 삭제 모달 · ID는 blossom 정규화·물리 서버 페이지와 동일) -->
+			<div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+				<div class="server-add-content">
+					<div class="server-add-header">
+						<div class="server-add-title dispose-title">
+							<h3>삭제처리</h3>
+							<p class="server-add-subtitle" id="delete-subtitle">선택된 0대의 PC 에이전트를 정말 삭제처리하시겠습니까?</p>
+						</div>
+						<button class="close-btn" type="button" id="system-delete-close" data-modal-close="1" title="닫기">
+							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+					</div>
+					<div class="server-add-body">
+						<div class="dispose-content">
+							<div class="dispose-text">
+								<p>삭제처리는 목록에서 PC 에이전트를 더 이상 표시하지 않습니다.</p>
+								<p>동일 PC가 게이트로 다시 등록하면 새 행으로 나타날 수 있습니다.</p>
+							</div>
+							<div class="dispose-illust">
+								<img src="/static/image/svg/list/free-sticker-option.svg" alt="" loading="lazy" />
+							</div>
+						</div>
+					</div>
+					<div class="server-add-actions align-right">
+						<div class="action-buttons right">
+							<button type="button" class="btn-secondary" id="system-delete-cancel" data-modal-close="1">취소</button>
+							<button type="button" class="btn-primary" id="system-delete-confirm">확인</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			{% set dlm_modal_id = 'agent-pc-download-modal' %}
+			{% set dlm_title_id = 'agent-pc-download-title' %}
+			{% set dlm_subtitle_id = 'agent-pc-download-subtitle' %}
+			{% set dlm_close_id = 'agent-pc-download-close' %}
+			{% set dlm_confirm_id = 'agent-pc-download-confirm' %}
+			{% set dlm_range_name = 'agent-pc-csv-range' %}
+			{% set dlm_row_all_id = 'agent-pc-csv-range-row-all' %}
+			{% set dlm_row_selected_id = 'agent-pc-csv-range-row-selected' %}
+			{% set dlm_all_id = 'agent-pc-csv-range-all' %}
+			{% set dlm_selected_id = 'agent-pc-csv-range-selected' %}
+			{% include 'layouts/_download_modal_range.html' %}
+	</div>
 </body>
 </html>

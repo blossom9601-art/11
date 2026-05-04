@@ -8,6 +8,7 @@ set -euo pipefail
 
 DEPLOY=/mnt/c/Users/ME/Desktop/blossom/deploy
 AGENTS=/mnt/c/Users/ME/Desktop/blossom/agents
+AGENT_SRC="$AGENTS/lumina_server_agent"
 WORKDIR=/tmp/lumina-rpm-build
 TOPDIR="$WORKDIR/rpmbuild"
 
@@ -24,11 +25,11 @@ SRC="$TOPDIR/SOURCES"
 ###############################################################################
 echo "[1/5] 소스 파일 복사 중..."
 
-# ── common (agents/common/) ──────────────────────────────
+# ── common (agents/lumina_server_agent/common/) ──────────────────────────────
 mkdir -p "$SRC/common"
-cp "$AGENTS/common/__init__.py"  "$SRC/common/"
-cp "$AGENTS/common/config.py"    "$SRC/common/"
-cp "$AGENTS/common/collector.py" "$SRC/common/"
+cp "$AGENT_SRC/common/__init__.py"  "$SRC/common/"
+cp "$AGENT_SRC/common/config.py"    "$SRC/common/"
+cp "$AGENT_SRC/common/collector.py" "$SRC/common/"
 
 # ── conf ─────────────────────────────────────────────────
 mkdir -p "$SRC/conf"

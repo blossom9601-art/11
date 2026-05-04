@@ -2,7 +2,7 @@
 set -e
 SERVER=192.168.56.104
 PASS=123456
-RPM=/mnt/c/Users/ME/Desktop/blossom/agents/linux/dist/lumina-agent-1.0.3-1.noarch.rpm
+RPM=/mnt/c/Users/ME/Desktop/blossom/agents/lumina_server_agent/linux/dist/lumina-agent-1.0.3-1.noarch.rpm
 
 sshpass -p "$PASS" scp -o StrictHostKeyChecking=no "$RPM" root@$SERVER:/tmp/
 
