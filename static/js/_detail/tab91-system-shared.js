@@ -99,6 +99,11 @@ function getFromSession(key) {
         return toInt(o && o.id);
     } catch (_) { return 0; }
 }
+function getBodyDataInt(name) {
+    try {
+        return toInt(document.body && document.body.dataset ? document.body.dataset[name] : '');
+    } catch (_) { return 0; }
+}
 
 /* ======================================================================
    Column Presets
@@ -140,6 +145,7 @@ var PRESETS = {
         /* ID 해석: 업무 그룹은 body data-attr / query / sessionStorage */
         resolveId: function (root) {
             return toInt(root.dataset.entityId)
+                || getBodyDataInt('catDetailId')
                 || getQueryParamInt(['id', 'group_id', 'groupId'])
                 || getFromSession('work_group_selected_row')
                 || 0;

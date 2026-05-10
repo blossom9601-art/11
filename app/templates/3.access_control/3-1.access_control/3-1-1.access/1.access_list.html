@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -7,9 +7,9 @@
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260504_ssh_lumina1">
-	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260504_ssh_lumina1" defer></script>
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260507_ssh_policy3" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -20,7 +20,6 @@
 				<div>
 					<h1>접근제어 접속</h1>
 					<p>승인된 자원을 찾고, 한 화면에서 접속까지 바로 실행합니다.</p>
-					<p class="ac-page-ssh-note" role="note">Windows에서 <strong>SSH</strong>는 브라우저가 OS에 등록된 <code>blossom-ssh://</code> 링크로 PuTTY를 띄웁니다. Blossom Chat이 없어도 되도록 <strong>Lumina 게이트 PC 에이전트</strong> 설치본에 동일 번들·프로토콜이 포함됩니다. 에이전트 설치 후 한 번 로그온 사용자로 트레이가 시작되면 대부분의 계정에서 핸들러가 잡힙니다.</p>
 				</div>
 			</div>
 			<div class="access-connect-layout">
@@ -42,11 +41,11 @@
 					<form class="access-filter access-connect-filter" id="access-filter-form">
 						<div>
 							<label for="access-search-name">검색</label>
-							<input id="access-search-name" name="searchName" type="text" placeholder="자원명, URL, IP" autocomplete="off">
+							<input id="access-search-name" class="ac-search-input" name="searchName" type="text" placeholder="자원명, URL, IP" autocomplete="off">
 						</div>
 						<div>
 							<label for="access-type-filter">유형</label>
-							<select id="access-type-filter" name="resourceType">
+							<select id="access-type-filter" class="ac-dropdown-input search-select" name="resourceType" data-searchable-scope="page" data-placeholder="유형">
 								<option value="">전체</option>
 								<option value="WEB">WEB</option>
 								<option value="SSH">SSH</option>
@@ -54,7 +53,7 @@
 						</div>
 						<div>
 							<label for="access-status-filter">상태</label>
-							<select id="access-status-filter" name="accessStatus">
+							<select id="access-status-filter" class="ac-dropdown-input search-select" name="accessStatus" data-searchable-scope="page" data-placeholder="상태">
 								<option value="">전체</option>
 								<option value="사용 가능">사용 가능</option>
 								<option value="만료 예정">만료 예정</option>

@@ -50,7 +50,7 @@
           }
           function loadLottieAndRender(){
             try{
-              var script = document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js'; script.async=true;
+              var script = document.createElement('script'); script.src='/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie'; script.async=true;
               script.onload=function(){ if(!renderLottie()) renderImageFallback(); }; script.onerror=function(){ renderImageFallback(); }; document.head.appendChild(script);
             }catch(_){ renderImageFallback(); }
           }
@@ -176,36 +176,110 @@
         function escapeHtml(str){
           var div=document.createElement('div'); div.appendChild(document.createTextNode(str)); return div.innerHTML;
         }
+        function sanitizeString(val){
+          return (val == null ? '' : String(val)).trim();
+        }
+        function renderLogoFileInput(value){
+          var src = sanitizeString(value);
+          var preview = src
+            ? '<div class="vendor-logo-preview"><img src="'+escapeHtml(src)+'" alt="로고 미리보기"></div>'
+            : '<div class="vendor-logo-preview" hidden><img alt="로고 미리보기"></div>';
+          return '<input name="logo_url" type="hidden" value="'+escapeHtml(src)+'">'
+            + '<div class="vendor-logo-field'+(src ? ' has-file' : '')+'">'
+            + preview
+            + '<label class="vendor-logo-upload-btn" title="로고 첨부" aria-label="로고 첨부"><input name="logo_file" type="file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="vendor-logo-file-input" hidden><img src="/static/image/svg/free-icon-font-folder-open.svg" alt="" class="vendor-logo-upload-icon" aria-hidden="true"></label>'
+            + '<span class="vendor-logo-file-name">'+(src ? '' : '선택된 파일 없음')+'</span>'
+            + '</div>';
+        }
+        async function uploadVendorLogo(file){
+          if(!file) return '';
+          var formData = new FormData();
+          formData.append('file', file);
+          formData.append('scope', 'maintenance');
+          var response = await fetch('/api/vendor-logo/upload', {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{ 'X-Requested-With':'XMLHttpRequest' },
+            body: formData
+          });
+          var data = null;
+          try{ data = await response.json(); }catch(_){}
+          if(!response.ok || (data && data.success === false)){
+            throw new Error((data && (data.message || data.error)) || '로고 업로드 중 오류가 발생했습니다.');
+          }
+          return (data && data.url) || '';
+        }
+        function bindLogoPreviewHandlers(){
+          if(form && form._vendorLogoPreviewBound) return;
+          if(form) form._vendorLogoPreviewBound = true;
+          if(!form) return;
+          form.addEventListener('change', function(event){
+            var input = event.target;
+            if(!input || !input.classList || !input.classList.contains('vendor-logo-file-input')) return;
+            var file = input.files && input.files[0] ? input.files[0] : null;
+            var field = input.closest('.vendor-logo-field');
+            if(!field) return;
+            var preview = field.querySelector('.vendor-logo-preview');
+            var img = preview ? preview.querySelector('img') : null;
+            var fileName = field.querySelector('.vendor-logo-file-name');
+            if(file){
+              if(img) img.src = URL.createObjectURL(file);
+              if(preview) preview.hidden = false;
+              if(fileName) fileName.textContent = '';
+              field.classList.add('has-file');
+            } else {
+              if(preview) preview.hidden = true;
+              if(fileName) fileName.textContent = '선택된 파일 없음';
+              field.classList.remove('has-file');
+            }
+          });
+        }
 
         function openModal(){
           var v = getVendorData();
           if(!v){ alert('유지보수사 정보를 불러오는 중입니다.'); return; }
           if(form) form.innerHTML = '';
+          ['hardware_qty','software_qty','component_qty'].forEach(function(name){
+            if(!form) return;
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = name;
+            hidden.value = String(v && v[name] != null ? v[name] : 0);
+            form.appendChild(hidden);
+          });
           var fields = [
+            { name:'logo', label:'로고', value: v.logo_url || v.logo || '', wide:false, required:false, type:'logo' },
             { name:'vendor', label:'유지보수사', value: v.vendor || v.maintenance_name || '', wide:false, required:true, type:'input' },
             { name:'address', label:'주소', value: v.address || '', wide:false, required:false, type:'input' },
             { name:'business_number', label:'사업자번호', value: v.business_number || v.business_no || '', wide:false, required:false, type:'input' },
             { name:'call_center', label:'고객센터', value: v.call_center || '', wide:false, required:false, type:'input' },
-            { name:'note', label:'비고', value: v.note || v.remark || '', wide:true, required:false, type:'textarea' }
+            { name:'manager_count', label:'담당자수', value: v.manager_count || 0, wide:false, required:false, type:'number' },
+            { name:'note', label:'비고', value: v.note || v.remark || '', wide:false, required:false, type:'textarea', afterGrid:true }
           ];
           var section = document.createElement('div'); section.className='form-section';
           section.innerHTML='<div class="section-header"><h4>유지보수사</h4></div>';
           var grid = document.createElement('div'); grid.className='form-grid';
           fields.forEach(function(f){
             var row = document.createElement('div');
-            row.className = f.wide ? 'form-row form-row-wide' : 'form-row';
+            row.className = f.type === 'logo' ? 'form-row vendor-logo-row' : (f.wide ? 'form-row form-row-wide' : 'form-row');
             var reqSpan = f.required ? '<span class="required">*</span>' : '';
             var inputHtml = '';
             if(f.type==='textarea'){
               inputHtml = '<textarea name="'+f.name+'" class="form-input textarea-large" rows="6">'+escapeHtml(String(f.value))+'</textarea>';
+            } else if(f.type==='logo'){
+              inputHtml = renderLogoFileInput(f.value);
+            } else if(f.type==='number'){
+              inputHtml = '<input name="'+f.name+'" type="number" min="0" step="1" class="form-input qty-dashed-lock" value="'+escapeHtml(String(f.value || 0))+'" placeholder="0">';
             } else {
               inputHtml = '<input name="'+f.name+'" class="form-input" value="'+escapeHtml(String(f.value))+'" data-fk-ignore="1">';
             }
             row.innerHTML = '<label>'+f.label+reqSpan+'</label>'+inputHtml;
-            grid.appendChild(row);
+            if(f.afterGrid){ section.appendChild(row); }
+            else { grid.appendChild(row); }
           });
-          section.appendChild(grid);
+          section.insertBefore(grid, section.firstChild.nextSibling);
           if(form) form.appendChild(section);
+          bindLogoPreviewHandlers();
           modal.setAttribute('aria-hidden','false');
           modal.classList.add('show');
           document.body.style.overflow='hidden';
@@ -215,13 +289,29 @@
           modal.classList.remove('show');
           document.body.style.overflow='';
         }
-        function saveRecord(){
+        async function saveRecord(){
           var vid = _getVid();
           if(!vid){ alert('유지보수사 ID를 확인할 수 없습니다.'); return; }
           if(!form) return;
           var fd = new FormData(form);
           var payload = {};
-          fd.forEach(function(val, key){ payload[key] = val; });
+          var uploadFile = null;
+          fd.forEach(function(val, key){
+            if(key === 'logo_file'){
+              if(val && val.name) uploadFile = val;
+              return;
+            }
+            payload[key] = (val == null ? '' : String(val)).trim();
+          });
+          if(uploadFile){
+            try{
+              payload.logo_url = await uploadVendorLogo(uploadFile);
+              payload.logo = payload.logo_url;
+            }catch(e){
+              alert(e.message || '로고 업로드 중 오류가 발생했습니다.');
+              return;
+            }
+          }
           if(!(payload.vendor||'').trim()){ alert('유지보수사명을 입력하세요.'); return; }
           fetch('/api/vendor-maintenance/'+vid, {
             method:'PUT',
@@ -248,9 +338,12 @@
                 Object.assign(ctx, {
                   vendor: payload.vendor,
                   maintenance_name: payload.vendor,
+                  logo_url: payload.logo_url,
+                  logo: payload.logo_url,
                   address: payload.address,
                   business_number: payload.business_number,
                   call_center: payload.call_center,
+                  manager_count: payload.manager_count,
                   note: payload.note
                 });
                 sessionStorage.setItem('maintenance:context', JSON.stringify(ctx));
@@ -269,9 +362,6 @@
         modal.addEventListener('click', function(e){ if(e.target === modal) closeModal(); });
       })();
 
-        });
-      })();
-
       // ── 유지보수 비용 통계 (월별 에어리어 차트) ──────────────────────────────
       (function renderCostStats(){
         var vid = _getVid();
@@ -279,7 +369,13 @@
         var emptyEl = document.getElementById('cost-empty');
         var yearSel = document.getElementById('cost-year-select');
         if(!chartEl) return;
-        if(!vid){ if(emptyEl) emptyEl.style.display=''; return; }
+        if(!vid){
+          if(emptyEl){
+            emptyEl.style.display='';
+            try{ showNoDataImage(emptyEl,'비용 데이터가 없습니다.'); }catch(_){}
+          }
+          return;
+        }
 
         var MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 

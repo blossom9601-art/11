@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -31,7 +32,7 @@
                 ] %}
                 <div class="system-tabs" role="tablist" aria-label="시스템 관리 탭">
                     {% for key, label in tabs %}
-                    <a class="system-tab-btn {{ 'active' if current_key == key else ''}}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    <a class="system-tab-btn {{ 'active' if current_key == key else ''}}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 <!-- 향후 다른 탭 (예: 통계, 로그 등) 추가 예정 -->
                 </div>
@@ -152,14 +153,14 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
         <script>
-            window.__HW_STORAGE_BACKUP_DETAIL_URL = "{{ url_for('pages.show', key='hw_storage_backup_detail') }}";
+            window.__HW_STORAGE_BACKUP_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='hw_storage_backup_detail') }}";
         </script>
         <script>
             window.__FK_PRELOAD = {{ (fk_preload or {}) | tojson }};
         </script>
-        <script src="/static/js/2.hardware/2-2.storage/2-2-2.backup/1.backup_list.js?v=1.2.31"></script>
+        <script src="/static/js/2.hardware/2-2.storage/2-2-2.backup/1.backup_list.js?v=rackfix20260510"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">

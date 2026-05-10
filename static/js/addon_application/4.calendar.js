@@ -274,15 +274,26 @@
       const bodyEl = document.getElementById('cal-confirm-body');
       if (titleEl) titleEl.textContent = title || '일정 삭제';
       if (bodyEl) bodyEl.textContent = message || '';
-      if (modal) { modal.style.display = 'flex'; modal.setAttribute('aria-hidden', 'false'); }
+      if (modal) {
+        modal.classList.add('show');
+        modal.style.display = '';
+        modal.removeAttribute('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+      }
     });
   }
   function _resolveCalConfirm(val) {
     const modal = document.getElementById('cal-confirm-modal');
-    if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+    if (modal) {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
     if (_calConfirmResolve) { _calConfirmResolve(val); _calConfirmResolve = null; }
   }
-  (function _bindCalConfirm() {
+  function bindCalendarCalConfirmUi() {
+    if (window.__blossomCalendarCalConfirmBound) return;
+    window.__blossomCalendarCalConfirmBound = true;
     document.getElementById('cal-confirm-ok')?.addEventListener('click', () => _resolveCalConfirm(true));
     document.getElementById('cal-confirm-cancel')?.addEventListener('click', () => _resolveCalConfirm(false));
     document.getElementById('cal-confirm-close')?.addEventListener('click', () => _resolveCalConfirm(false));
@@ -291,11 +302,12 @@
       modal.addEventListener('click', (e) => { if (e.target === modal) _resolveCalConfirm(false); });
     }
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal && modal.style.display !== 'none') {
+      const m = document.getElementById('cal-confirm-modal');
+      if (e.key === 'Escape' && m && m.classList.contains('show')) {
         _resolveCalConfirm(false);
       }
     });
-  })();
+  }
 
   function apiGetSchedule(id) {
     const url = `${getSchedulesBase()}/${id}`;
@@ -348,6 +360,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     const calendarEl = document.getElementById('calendar');
     if (!calendarEl) return;
+    bindCalendarCalConfirmUi();
     resolveCalendarConfig();
     calendarContainerEl = calendarEl.closest('.calendar-container') || calendarEl.parentElement || calendarEl;
     // New: sticky icons as draggable external events
@@ -399,11 +412,15 @@
   const repeatEndTypeSelect = document.getElementById('sch-repeat-end-type');
   const repeatUntilInput = document.getElementById('sch-repeat-until');
   const repeatCountInput = document.getElementById('sch-repeat-count');
-  const repeatCustomWrap = document.getElementById('sch-repeat-custom');
-  const repeatIntervalInput = document.getElementById('sch-repeat-interval');
-  const repeatFrequencySelect = document.getElementById('sch-repeat-frequency');
   const repeatWeekdaysWrap = document.getElementById('sch-repeat-weekdays');
   const repeatMonthPolicy = document.getElementById('sch-repeat-month-policy');
+  const repeatModal = document.getElementById('schedule-repeat-modal');
+  const repeatModalOk = document.getElementById('schedule-repeat-modal-ok');
+  const repeatModalCancel = document.getElementById('schedule-repeat-modal-cancel');
+  const repeatModalClose = document.getElementById('schedule-repeat-modal-close');
+  const repeatOpenBtn = document.getElementById('sch-repeat-open-btn');
+  const repeatSummaryEl = document.getElementById('sch-repeat-summary');
+  let repeatModalSnapshot = null;
   const inputLocation = document.getElementById('sch-location');
   const btnSave = document.getElementById('sch-save-btn');
   const btnCancel = document.getElementById('sch-cancel-btn');
@@ -568,6 +585,14 @@
       return ['daily', 'weekly', 'monthly', 'yearly'].includes(token) ? token : 'daily';
     }
 
+    /** API의 repeat_type custom → 폼의 매일/매주/매월/매년 프리셋으로 표시 */
+    function repeatUiPresetFromStored(storedType, rule) {
+      const t = normalizeRepeatType(storedType);
+      if (t !== 'custom') return t;
+      const freq = repeatRuleFrequency('custom', rule);
+      return ['daily', 'weekly', 'monthly', 'yearly'].includes(freq) ? freq : 'weekly';
+    }
+
     function repeatRuleUntil(rule) {
       const raw = String((rule && (rule.untilDate || rule.until_date || rule.until)) || '').trim();
       const match = raw.match(/^\d{4}-\d{2}-\d{2}/);
@@ -594,12 +619,7 @@
     }
 
     function effectiveRepeatFrequencyFromForm() {
-      const repeatType = normalizeRepeatType(repeatSelect?.value || 'none');
-      if (repeatType === 'custom') {
-        const frequency = String(repeatFrequencySelect?.value || 'daily').toLowerCase();
-        return ['daily', 'weekly', 'monthly', 'yearly'].includes(frequency) ? frequency : 'daily';
-      }
-      return repeatType;
+      return normalizeRepeatType(repeatSelect?.value || 'none');
     }
 
     function syncRepeatUi(options) {
@@ -609,30 +629,36 @@
       const frequency = effectiveRepeatFrequencyFromForm();
       const enabled = repeatType !== 'none';
       if (repeatEndTypeSelect) repeatEndTypeSelect.hidden = !enabled;
-      if (repeatUntilInput) repeatUntilInput.hidden = !enabled || endType !== 'until';
+      if (repeatUntilInput) {
+        const hideUntil = !enabled || endType !== 'until';
+        repeatUntilInput.hidden = hideUntil;
+        if (hideUntil) {
+          try { repeatUntilInput._flatpickr?.close(); } catch (_) {}
+        }
+      }
       if (repeatCountInput) repeatCountInput.hidden = !enabled || endType !== 'count';
-      if (repeatCustomWrap) repeatCustomWrap.hidden = repeatType !== 'custom';
       if (repeatWeekdaysWrap) repeatWeekdaysWrap.hidden = !enabled || frequency !== 'weekly';
       if (repeatMonthPolicy) repeatMonthPolicy.hidden = !enabled || (frequency !== 'monthly' && frequency !== 'yearly');
       if (enabled && frequency === 'weekly' && !opts.keepWeekdays && !selectedRepeatWeekdays().length) {
         setRepeatWeekdays([repeatWeekdayForInput(inputStartTime?.value || '')]);
       }
+      syncRepeatUntilFlatpickr();
     }
 
     function setRepeatFields(event) {
       const props = event && event.extendedProps ? event.extendedProps : {};
-      const repeatType = normalizeRepeatType(props.repeatType || props.repeat_type || 'none');
+      const storedType = normalizeRepeatType(props.repeatType || props.repeat_type || 'none');
       const rule = normalizeRepeatRule(props.repeatRule || props.repeat_rule || {});
-      if (repeatSelect) repeatSelect.value = repeatType;
+      const uiPreset = repeatUiPresetFromStored(storedType, rule);
+      if (repeatSelect) repeatSelect.value = uiPreset;
       if (repeatEndTypeSelect) repeatEndTypeSelect.value = repeatRuleEndType(rule);
-      if (repeatIntervalInput) repeatIntervalInput.value = String(repeatRuleInterval(rule));
-      if (repeatFrequencySelect) repeatFrequencySelect.value = repeatRuleFrequency(repeatType, rule);
       if (repeatUntilInput) repeatUntilInput.value = repeatRuleUntil(rule);
       if (repeatCountInput) repeatCountInput.value = String(repeatRuleCount(rule));
       const defaultWeekday = repeatWeekdayForInput(inputStartTime?.value || '');
       const ruleDays = Array.isArray(rule.daysOfWeek) ? rule.daysOfWeek : (Array.isArray(rule.days_of_week) ? rule.days_of_week : []);
       setRepeatWeekdays(ruleDays.length ? ruleDays : [defaultWeekday]);
       syncRepeatUi({ keepWeekdays: true });
+      updateRepeatSummaryText();
     }
 
     function buildRepeatPayloadFromForm(startValue, existingRule) {
@@ -641,12 +667,7 @@
         return { repeat_type: 'none', repeat_rule: {} };
       }
       const frequency = effectiveRepeatFrequencyFromForm();
-      const interval = repeatType === 'custom'
-        ? parseInt(String(repeatIntervalInput?.value || '1'), 10)
-        : 1;
-      if (!Number.isFinite(interval) || interval < 1) {
-        throw new Error('반복 주기는 1 이상이어야 합니다.');
-      }
+      const interval = 1;
       const endType = String(repeatEndTypeSelect?.value || 'never').toLowerCase();
       const startKey = String(startValue || '').slice(0, 10);
       const rule = { interval, frequency, endType };
@@ -680,7 +701,6 @@
       const type = normalizeRepeatType(repeatType);
       if (type === 'none') return '반복 안 함';
       const normalizedRule = normalizeRepeatRule(rule || {});
-      const frequency = repeatRuleFrequency(type, normalizedRule);
       const base = {
         daily: '매일',
         weekly: '매주',
@@ -689,8 +709,14 @@
       }[type] || '사용자 지정';
       let label = base;
       if (type === 'custom') {
-        const unit = { daily: '일', weekly: '주', monthly: '개월', yearly: '년' }[frequency] || '일';
-        label = `${repeatRuleInterval(normalizedRule)}${unit}마다`;
+        const freq = repeatRuleFrequency(type, normalizedRule);
+        const iv = repeatRuleInterval(normalizedRule);
+        if (freq === 'weekly') {
+          label = iv === 1 ? '매주' : `${iv}주마다`;
+        } else {
+          const unit = { daily: '일', monthly: '개월', yearly: '년' }[freq] || '일';
+          label = iv === 1 && freq === 'daily' ? '매일' : `${iv}${unit}마다`;
+        }
       }
       const endType = repeatRuleEndType(normalizedRule);
       if (endType === 'until') {
@@ -700,6 +726,135 @@
         label += ` · ${repeatRuleCount(normalizedRule)}회`;
       }
       return label;
+    }
+
+    function captureRepeatState() {
+      return {
+        repeatType: normalizeRepeatType(repeatSelect?.value || 'none'),
+        endType: String(repeatEndTypeSelect?.value || 'never').toLowerCase(),
+        until: repeatUntilInput ? String(repeatUntilInput.value || '') : '',
+        count: repeatCountInput ? String(repeatCountInput.value || '10') : '10',
+        weekdays: selectedRepeatWeekdays().slice(),
+      };
+    }
+
+    function applyRepeatState(snapshot) {
+      if (!snapshot) return;
+      if (repeatSelect) repeatSelect.value = snapshot.repeatType;
+      if (repeatEndTypeSelect) repeatEndTypeSelect.value = snapshot.endType;
+      if (repeatUntilInput) repeatUntilInput.value = snapshot.until || '';
+      if (repeatCountInput) repeatCountInput.value = snapshot.count || '10';
+      setRepeatWeekdays(snapshot.weekdays || []);
+      syncRepeatUi({ keepWeekdays: true });
+    }
+
+    function repeatSummaryFromForm() {
+      const repeatType = normalizeRepeatType(repeatSelect?.value || 'none');
+      if (repeatType === 'none') return '반복 안 함';
+      const frequency = effectiveRepeatFrequencyFromForm();
+      const interval = 1;
+      const endType = String(repeatEndTypeSelect?.value || 'never').toLowerCase();
+      const rule = { interval, frequency, endType };
+      if (endType === 'until') {
+        const until = String(repeatUntilInput?.value || '').trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(until)) rule.untilDate = until;
+      } else if (endType === 'count') {
+        const count = parseInt(String(repeatCountInput?.value || '10'), 10);
+        rule.count = Number.isFinite(count) && count > 0 ? count : 10;
+      }
+      if (frequency === 'weekly') {
+        const days = selectedRepeatWeekdays();
+        if (days.length) rule.daysOfWeek = days;
+      }
+      if (frequency === 'monthly' || frequency === 'yearly') {
+        rule.monthDayPolicy = 'clamp';
+      }
+      return repeatLabel(repeatType, rule);
+    }
+
+    function updateRepeatSummaryText() {
+      if (!repeatSummaryEl) return;
+      try {
+        repeatSummaryEl.textContent = repeatSummaryFromForm();
+      } catch (_) {
+        repeatSummaryEl.textContent = '반복 안 함';
+      }
+      const rt = normalizeRepeatType(repeatSelect?.value || 'none');
+      if (repeatOpenBtn) {
+        repeatOpenBtn.classList.toggle('is-active', rt !== 'none');
+      }
+    }
+
+    function isRepeatModalVisible() {
+      if (!repeatModal) return false;
+      return repeatModal.classList.contains('show') || repeatModal.style.display === 'block';
+    }
+
+    function forceCloseRepeatModal() {
+      repeatModalSnapshot = null;
+      try {
+        repeatUntilInput?._flatpickr?.close();
+      } catch (_) {}
+      try {
+        document.body.classList.remove('repeat-submodal-open');
+      } catch (_) {}
+      if (!repeatModal) return;
+      repeatModal.classList.remove('show');
+      repeatModal.style.display = 'none';
+      repeatModal.setAttribute('aria-hidden', 'true');
+      if (repeatOpenBtn) repeatOpenBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function closeRepeatModal(opts) {
+      const restore = opts && opts.restore;
+      if (restore && repeatModalSnapshot) {
+        applyRepeatState(repeatModalSnapshot);
+      }
+      repeatModalSnapshot = null;
+      try {
+        repeatUntilInput?._flatpickr?.close();
+      } catch (_) {}
+      try {
+        document.body.classList.remove('repeat-submodal-open');
+      } catch (_) {}
+      if (!repeatModal) return;
+      repeatModal.classList.remove('show');
+      repeatModal.style.display = 'none';
+      repeatModal.setAttribute('aria-hidden', 'true');
+      if (repeatOpenBtn) repeatOpenBtn.setAttribute('aria-expanded', 'false');
+      try {
+        if (restore && repeatOpenBtn && typeof repeatOpenBtn.focus === 'function') {
+          repeatOpenBtn.focus({ preventScroll: true });
+        }
+      } catch (_) {}
+    }
+
+    function confirmRepeatModal() {
+      updateRepeatSummaryText();
+      closeRepeatModal({ restore: false });
+      try {
+        if (repeatOpenBtn && typeof repeatOpenBtn.focus === 'function') {
+          repeatOpenBtn.focus({ preventScroll: true });
+        }
+      } catch (_) {}
+    }
+
+    function openRepeatModal() {
+      if (!repeatModal || modalCtx.mode === 'view') return;
+      repeatModalSnapshot = captureRepeatState();
+      syncRepeatUi({ keepWeekdays: true });
+      try {
+        document.body.classList.add('repeat-submodal-open');
+      } catch (_) {}
+      repeatModal.classList.add('show');
+      repeatModal.style.display = 'block';
+      repeatModal.setAttribute('aria-hidden', 'false');
+      if (repeatOpenBtn) repeatOpenBtn.setAttribute('aria-expanded', 'true');
+      setTimeout(() => {
+        try {
+          repeatSelect?.focus();
+        } catch (_) {}
+      }, 0);
     }
 
     const DEFAULT_PROFILE_IMAGE = '/static/image/svg/profil/free-icon-bussiness-man.svg';
@@ -945,8 +1100,6 @@
         repeatEndTypeSelect,
         repeatUntilInput,
         repeatCountInput,
-        repeatIntervalInput,
-        repeatFrequencySelect,
       ].filter(Boolean);
       controls.forEach((el) => {
         try { el.disabled = isReadOnly; } catch (_) {}
@@ -970,6 +1123,9 @@
         repeatWeekdaysWrap.querySelectorAll('input').forEach((input) => {
           input.disabled = isReadOnly;
         });
+      }
+      if (repeatOpenBtn) {
+        try { repeatOpenBtn.disabled = isReadOnly; } catch (_) {}
       }
       if (typeDropdownTrigger) {
         typeDropdownTrigger.disabled = isReadOnly;
@@ -1081,7 +1237,7 @@
                   const selectedMode = getShareModeValue();
                   const shareModeLabel = SHARE_MODE_LABELS[selectedMode] || '-';
                   const shareTargetsLabel = Array.isArray(modalCtx.shares) && modalCtx.shares.length
-                    ? modalCtx.shares.map((c) => c.label).filter(Boolean).join(', ')
+                    ? modalCtx.shares.map((c) => shareChipSummary(c)).filter(Boolean).join(', ')
                     : '';
                   populateViewFromModalState({
                     typeLabel: selectType?.value || type || '-',
@@ -1166,6 +1322,7 @@
   } catch (_) {}
       if (btnDelete) {
         btnDelete.style.display = modalCtx.canDelete ? 'inline-flex' : 'none';
+        try { btnDelete.disabled = false; } catch (_) {}
       }
       setModalReadOnly(mode === 'view');
       setModalViewMode(mode === 'view');
@@ -1179,7 +1336,7 @@
         const selectedMode = getShareModeValue();
         const shareModeLabel = SHARE_MODE_LABELS[selectedMode] || '-';
         const shareTargetsLabel = Array.isArray(modalCtx.shares) && modalCtx.shares.length
-          ? modalCtx.shares.map((c) => c.label).filter(Boolean).join(', ')
+          ? modalCtx.shares.map((c) => shareChipSummary(c)).filter(Boolean).join(', ')
           : '';
         populateViewFromModalState({
           typeLabel: selectType?.value || type || '-',
@@ -1196,6 +1353,7 @@
     }
 
     function closeModal() {
+      forceCloseRepeatModal();
       closeDatePickers();
       closeActiveDropdown();
   // Move focus outside the modal BEFORE hiding it to avoid aria-hidden warnings.
@@ -1533,11 +1691,16 @@
       const chips = [];
       const deptPayload = ensureShareDeptPayloadArray();
       deptPayload.forEach((entry, index) => {
-        chips.push({ type: 'dept', index, label: shareDeptLabel(entry) });
+        chips.push({ type: 'dept', index, label: shareDeptLabel(entry), badge: '팀' });
       });
       const userPayload = ensureSharePayloadArray();
       userPayload.forEach((entry, index) => {
-        chips.push({ type: 'user', index, label: shareUserLabel(entry) });
+        chips.push({
+          type: 'user',
+          index,
+          label: shareUserLabel(entry),
+          badge: shareUserTeamBadge(entry),
+        });
       });
       modalCtx.shares = chips;
     }
@@ -1750,10 +1913,16 @@
         return;
       }
       const html = list.map((chip) => {
-        const badge = chip.type === 'dept' ? '팀' : '사용자';
+        const badgeText =
+          chip.type === 'dept'
+            ? (chip.badge || '팀')
+            : String(chip.badge || '').trim();
+        const badgeHtml = badgeText
+          ? `<span class="share-chip-badge">${escapeHtml(badgeText)}</span>`
+          : '';
         return `
           <span class="share-chip share-chip-${chip.type}" data-share-type="${chip.type}" data-share-index="${chip.index}">
-            <span class="share-chip-badge">${badge}</span>
+            ${badgeHtml}
             <span class="share-chip-label">${escapeHtml(chip.label)}</span>
             <button class="remove" data-share-type="${chip.type}" data-share-index="${chip.index}" aria-label="제거">×</button>
           </span>
@@ -2065,11 +2234,28 @@
     renderColorPalette();
     setTypeValue(selectType?.value || '');
     setRepeatFields(null);
-    [repeatSelect, repeatEndTypeSelect, repeatFrequencySelect].filter(Boolean).forEach((control) => {
-      control.addEventListener('change', () => syncRepeatUi());
+    updateRepeatSummaryText();
+    [repeatSelect, repeatEndTypeSelect].filter(Boolean).forEach((control) => {
+      control.addEventListener('change', () => {
+        syncRepeatUi();
+        if (!isRepeatModalVisible()) updateRepeatSummaryText();
+      });
     });
-    repeatWeekdaysWrap?.addEventListener('change', () => syncRepeatUi({ keepWeekdays: true }));
-    inputStartTime?.addEventListener('change', () => syncRepeatUi());
+    repeatWeekdaysWrap?.addEventListener('change', () => {
+      syncRepeatUi({ keepWeekdays: true });
+      if (!isRepeatModalVisible()) updateRepeatSummaryText();
+    });
+    inputStartTime?.addEventListener('change', () => {
+      syncRepeatUi();
+      updateRepeatSummaryText();
+    });
+    repeatOpenBtn?.addEventListener('click', () => openRepeatModal());
+    repeatModalOk?.addEventListener('click', () => confirmRepeatModal());
+    repeatModalCancel?.addEventListener('click', () => closeRepeatModal({ restore: true }));
+    repeatModalClose?.addEventListener('click', () => closeRepeatModal({ restore: true }));
+    repeatModal?.addEventListener('click', (event) => {
+      if (event.target === repeatModal) closeRepeatModal({ restore: true });
+    });
     setShareModeValue(getShareModeValue());
     if (shareModeChips.length) {
       shareModeChips.forEach((chip) => {
@@ -2096,6 +2282,11 @@
       return '-';
     }
 
+    function shareUserTeamBadge(entry) {
+      if (!entry || !entry.user) return '';
+      return String(entry.user.department || '').trim();
+    }
+
     function shareDeptLabel(entry) {
       if (!entry) return '팀';
       const deptId = Number(entry.dept_id || entry.id);
@@ -2107,6 +2298,17 @@
       }
       if (entry.dept_name) return entry.dept_name;
       return deptId ? `팀 #${deptId}` : '팀';
+    }
+
+    function shareChipSummary(chip) {
+      if (!chip) return '';
+      if (chip.type === 'dept') {
+        return String(chip.label || '').trim();
+      }
+      const team = String(chip.badge || '').trim();
+      const name = String(chip.label || '').trim();
+      if (team && name) return `${team} ${name}`;
+      return name || team;
     }
 
     // Time validation helpers
@@ -2190,6 +2392,7 @@
     function closeDatePickers() {
       try { inputStartTime?._flatpickr?.close(); } catch (_) {}
       try { inputEndTime?._flatpickr?.close(); } catch (_) {}
+      try { repeatUntilInput?._flatpickr?.close(); } catch (_) {}
     }
 
     inputStartTime?.addEventListener('change', () => {
@@ -2309,6 +2512,19 @@
       container.appendChild(btn);
     }
 
+    /** 비용관리 OPEX(opex_contracts.js stylizeCalendar)와 동일 패턴 */
+    function stylizeRepeatUntilFlatpickr(instance) {
+      if (!instance) return;
+      try {
+        instance.set('position', 'auto');
+      } catch (_) {}
+      const cal = instance.calendarContainer;
+      if (!cal) return;
+      cal.classList.add('blossom-date-popup', 'calendar-repeat-until-popup', 'arrowTop');
+      cal.classList.remove('arrowBottom', 'schedule-repeat-fp-cal');
+      ensureFpTodayButton(instance);
+    }
+
     function syncFlatpickrValues() {
       try {
         if (inputStartTime?._flatpickr && inputStartTime.value) {
@@ -2348,6 +2564,67 @@
         ensureEndAlignedWithStart({ forceOneHourGap: true });
         validateTimes();
       }
+    }
+
+    function repeatUntilMinDateStr() {
+      const raw = String(inputStartTime?.value || '').trim();
+      const d = raw.slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+      try {
+        const fromCtx = String(modalCtx?.startStr || '').trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(fromCtx)) return fromCtx;
+      } catch (_) {}
+      return null;
+    }
+
+    function syncRepeatUntilFlatpickr() {
+      try {
+        const fp = repeatUntilInput?._flatpickr;
+        if (!fp || !repeatUntilInput) return;
+        const v = String(repeatUntilInput.value || '').trim().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          fp.setDate(v, false, 'Y-m-d');
+        } else {
+          fp.clear(false);
+        }
+      } catch (_) {}
+    }
+
+    async function initRepeatUntilFlatpickr() {
+      if (!repeatUntilInput || !repeatModal) return;
+      try {
+        await ensureFlatpickrAssets();
+      } catch (err) {
+        console.warn('Repeat until Flatpickr assets failed', err);
+        return;
+      }
+      if (!window.flatpickr || repeatUntilInput._flatpickr) return;
+      const locale = (window.flatpickr?.l10ns?.ko) || 'ko';
+      window.flatpickr(repeatUntilInput, {
+        locale,
+        enableTime: false,
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        disableMobile: true,
+        appendTo: document.body,
+        positionElement: repeatUntilInput,
+        clickOpens: true,
+        onReady: (selectedDates, dateStr, instance) => {
+          stylizeRepeatUntilFlatpickr(instance);
+        },
+        onOpen: (selectedDates, dateStr, instance) => {
+          stylizeRepeatUntilFlatpickr(instance);
+          const md = repeatUntilMinDateStr();
+          if (md) instance.set('minDate', md);
+          else instance.set('minDate', null);
+        },
+        onValueUpdate: (selectedDates, dateStr) => {
+          if (dateStr) repeatUntilInput.value = String(dateStr).slice(0, 10);
+          else repeatUntilInput.value = '';
+          updateRepeatSummaryText();
+        },
+      });
+      syncRepeatUntilFlatpickr();
     }
 
     async function initScheduleDatePickers() {
@@ -2401,6 +2678,7 @@
     }
 
     initScheduleDatePickers();
+    initRepeatUntilFlatpickr().catch(() => {});
 
     function getScheduleIdFromEvent(ev) {
       if (!ev) return null;
@@ -2617,12 +2895,13 @@
     });
 
     btnDelete?.addEventListener('click', async function () {
-      if (!modalCtx.canDelete || !modalCtx.eventId) return;
+      const deleteId = modalCtx.eventId || getScheduleIdFromEvent(modalCtx.sourceEvent);
+      if (!modalCtx.canDelete || !deleteId) return;
       const confirmed = await showCalConfirm('선택한 일정을 삭제하시겠습니까?', '일정 삭제');
       if (!confirmed) return;
       try {
         setModalBusy(true);
-        await apiDeleteSchedule(modalCtx.eventId);
+        await apiDeleteSchedule(deleteId);
         await refreshCalendarEvents();
         closeModal();
       } catch (err) {
@@ -3166,8 +3445,13 @@
       return base;
     }
 
-    // Close modal with Escape
+    // Close modal with Escape (반복 서브 모달이 열려 있으면 우선 닫기)
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isRepeatModalVisible()) {
+        e.preventDefault();
+        closeRepeatModal({ restore: true });
+        return;
+      }
       const visible = modal && modal.style.display === 'block';
       if (visible && e.key === 'Escape') closeModal();
     });

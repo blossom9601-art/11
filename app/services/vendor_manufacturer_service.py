@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from flask import current_app
+from app.services.public_id_service import make_public_id
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +146,12 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         return {}
     return {
         'id': row['id'],
+        'public_id': make_public_id(TABLE_NAME, 'ven', row['id']),
         'manufacturer_code': row['manufacturer_code'],
         'manufacturer_name': row['manufacturer_name'],
         'vendor': row['manufacturer_name'],
+        'logo_url': row['logo_url'] or '',
+        'logo': row['logo_url'] or '',
         'address': row['address'] or '',
         'business_number': row['business_no'] or '',
         'call_center': row['call_center'] or '',
@@ -164,6 +168,41 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
+def sync_manufacturer_display_name(
+    conn: sqlite3.Connection,
+    manufacturer_code: str,
+    display_name: Any,
+) -> None:
+    """Preserve user-entered casing for an existing manufacturer.
+
+    Software category rows store only manufacturer_code. When a user selects or
+    enters "RedHat" for an existing "REDHAT" code, keep the master display name
+    aligned so future list reads render the same casing.
+    """
+    code = (manufacturer_code or '').strip()
+    name = _normalize_name(display_name)
+    if not code or not name:
+        return
+
+    row = conn.execute(
+        f"SELECT id, manufacturer_name FROM {TABLE_NAME} WHERE manufacturer_code = ? AND is_deleted = 0",
+        (code,),
+    ).fetchone()
+    if not row:
+        return
+
+    current_name = _normalize_name(row['manufacturer_name'])
+    if current_name == name:
+        return
+    if current_name.lower() != name.lower():
+        return
+
+    conn.execute(
+        f"UPDATE {TABLE_NAME} SET manufacturer_name = ? WHERE id = ?",
+        (name, row['id']),
+    )
+
+
 def init_vendor_manufacturer_table(app=None) -> None:
     app = app or current_app
     try:
@@ -174,6 +213,7 @@ def init_vendor_manufacturer_table(app=None) -> None:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     manufacturer_code TEXT NOT NULL UNIQUE,
                     manufacturer_name TEXT NOT NULL,
+                    logo_url TEXT,
                     address TEXT,
                     business_no TEXT,
                     call_center TEXT,
@@ -195,6 +235,8 @@ def init_vendor_manufacturer_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{TABLE_NAME}_deleted ON {TABLE_NAME}(is_deleted)"
             )
+            if not _table_has_column(conn, TABLE_NAME, 'logo_url'):
+                conn.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN logo_url TEXT")
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
     except Exception:
@@ -458,6 +500,7 @@ def backfill_vendor_manufacturers(app=None, *, actor: str = 'system') -> int:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 manufacturer_code TEXT NOT NULL UNIQUE,
                 manufacturer_name TEXT NOT NULL,
+                logo_url TEXT,
                 address TEXT,
                 business_no TEXT,
                 call_center TEXT,
@@ -473,6 +516,8 @@ def backfill_vendor_manufacturers(app=None, *, actor: str = 'system') -> int:
             )
             """
         )
+        if not _table_has_column(conn, TABLE_NAME, 'logo_url'):
+            conn.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN logo_url TEXT")
 
         codes: List[str] = []
         for table in _table_names(conn):
@@ -514,6 +559,7 @@ def _prepare_payload(data: Dict[str, Any], *, require_all: bool = False) -> Dict
     payload: Dict[str, Any] = {}
     mapping = {
         'manufacturer_name': ['manufacturer_name', 'vendor'],
+        'logo_url': ['logo_url', 'logo'],
         'address': ['address'],
         'business_no': ['business_no', 'business_number'],
         'call_center': ['call_center'],
@@ -548,13 +594,14 @@ def list_vendors(app=None, *, search: Optional[str] = None, include_deleted: boo
             clauses.append('(' + ' OR '.join([
                 'manufacturer_name LIKE ?',
                 'manufacturer_code LIKE ?',
+                'logo_url LIKE ?',
                 'address LIKE ?',
                 'business_no LIKE ?',
                 'call_center LIKE ?'
             ]) + ')')
-            params.extend([like] * 5)
+            params.extend([like] * 6)
         query = (
-            f"SELECT id, manufacturer_code, manufacturer_name, address, business_no, call_center, "
+            f"SELECT id, manufacturer_code, manufacturer_name, logo_url, address, business_no, call_center, "
             f"hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE {' AND '.join(clauses)} ORDER BY id DESC"
         )
@@ -580,13 +627,14 @@ def create_vendor(data: Dict[str, Any], actor: str, app=None) -> Dict[str, Any]:
         conn.execute(
             f"""
             INSERT INTO {TABLE_NAME}
-                (manufacturer_code, manufacturer_name, address, business_no, call_center,
+                (manufacturer_code, manufacturer_name, logo_url, address, business_no, call_center,
                  hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             """,
             (
                 code[:60],
                 name,
+                payload.get('logo_url'),
                 payload.get('address'),
                 payload.get('business_no'),
                 payload.get('call_center'),
@@ -609,7 +657,7 @@ def get_vendor(record_id: int, app=None) -> Optional[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
         row = conn.execute(
-            f"SELECT id, manufacturer_code, manufacturer_name, address, business_no, call_center, "
+            f"SELECT id, manufacturer_code, manufacturer_name, logo_url, address, business_no, call_center, "
             f"hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE id = ?",
             (record_id,),
@@ -628,7 +676,7 @@ def get_vendor_by_code(manufacturer_code: str, app=None, *, include_deleted: boo
         if not include_deleted:
             clauses.append('is_deleted = 0')
         row = conn.execute(
-            f"SELECT id, manufacturer_code, manufacturer_name, address, business_no, call_center, "
+            f"SELECT id, manufacturer_code, manufacturer_name, logo_url, address, business_no, call_center, "
             f"hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE {' AND '.join(clauses)}",
             params,
@@ -660,6 +708,7 @@ def update_vendor(record_id: int, data: Dict[str, Any], actor: str, app=None) ->
         for column in (
             'manufacturer_name',
             'manufacturer_code',
+            'logo_url',
             'address',
             'business_no',
             'call_center',

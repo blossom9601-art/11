@@ -445,7 +445,9 @@ body.page-storage-assign-info .detail-section h3 .page-size-selector{ right: 128
 .page-storage-assign-info .asg-submodal{
   position:fixed;
   inset:0;
-  background:rgba(15, 23, 42, 0.45);
+  background:var(--modal-overlay, rgba(15, 23, 42, 0.28));
+  backdrop-filter:blur(var(--modal-blur, 5px));
+  -webkit-backdrop-filter:blur(var(--modal-blur, 5px));
   display:none;
   align-items:center;
   justify-content:center;

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/category2.css?v=20260414">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260509_category_tabs_unified">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -35,7 +35,7 @@
                         ('cat_business_group', '업무 그룹')
                     ] %}
                     {% for key, label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -133,10 +133,10 @@
         </main>
         <script>
             // 업무 그룹 상세 페이지 기본 URL (행 클릭 시 사용)
-            window.__CAT_BUSINESS_GROUP_DETAIL_URL = "{{ url_for('pages.show', key='cat_business_group_detail') }}";
+            window.__CAT_BUSINESS_GROUP_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='cat_business_group_detail') }}";
         </script>
-        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
-    <script src="/static/js/9.category/9-1.business/9-1-5.work_group/1.work_group_list.js?v=20260419_wg_status_plain5"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+        <script src="/static/js/9.category/9-1.business/9-1-5.work_group/1.work_group_list.js?v=20260509_secure_urls"></script>
 
     <!-- 업무 그룹 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -155,9 +155,9 @@
                                 <div class="form-row"><label>업무 상태<span class="required">*</span></label>
                                     <select name="work_status" class="form-input" required>
                                         <option value="">선택</option>
-                                        <option value="정상">정상</option>
-                                        <option value="보류">보류</option>
-                                        <option value="폐기">폐기</option>
+                                        <option value="운영">운영</option>
+                                        <option value="임시">임시</option>
+                                        <option value="종료">종료</option>
                                     </select>
                                 </div>
                                 <div class="form-row"><label>업무 그룹<span class="required">*</span></label><input name="wc_name" class="form-input" placeholder="업무 그룹명" required></div>
@@ -167,7 +167,7 @@
                                         <option value="">선택</option>
                                     </select>
                                 </div>
-                                <div class="form-row"><label>업무 우선순위</label><input name="work_priority" class="form-input" placeholder="업무 우선순위"></div>
+                                <div class="form-row"><label>업무 우선순위</label><input name="work_priority" type="text" inputmode="numeric" autocomplete="off" class="form-input" placeholder="숫자"></div>
                             </div>
                             <div class="form-row"><label>비고</label><textarea name="note" class="form-input textarea-large" rows="6" placeholder="비고"></textarea></div>
                         </div>

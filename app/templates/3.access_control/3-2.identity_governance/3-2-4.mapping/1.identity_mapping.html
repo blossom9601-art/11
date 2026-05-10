@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507sshcmd2">
+	<link rel="stylesheet" href="/static/css/3.access_control/identity_governance.css?v=20260505b">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<script src="/static/js/3.access_control/3-2.identity_governance/3-2-4.mapping/1.identity_mapping.js?v=20260505b" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content identity-page identity-mapping-page">
+		<div class="content-wrapper">
+			<div class="page-header ac-page-header">
+				<div class="page-utility-right" data-info-key="identity_governance.mapping"></div>
+				<div>
+					<h1>계정 매핑 관리</h1>
+					<p>관리자 중심으로 사용자와 서비스 계정, SourceAccount 연결을 관리합니다.</p>
+				</div>
+			</div>
+
+			<div class="identity-three-column">
+				<section class="identity-list-pane">
+					<div class="identity-list-pane-head"><h2>관리자 <span class="count-badge" id="identity-admin-count">0</span></h2></div>
+					<div class="identity-list" id="identity-admin-list"></div>
+					<div class="identity-pagination identity-list-pagination" id="identity-admin-pagination">
+						<span id="identity-admin-page-info">0개 항목</span>
+						<div class="resource-page-actions">
+							<button type="button" class="action-chip action-muted" id="identity-admin-prev">이전</button>
+							<div class="resource-page-numbers" id="identity-admin-page-numbers" aria-label="관리자 페이지 번호"></div>
+							<button type="button" class="action-chip action-muted" id="identity-admin-next">다음</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="identity-list-pane">
+					<div class="identity-list-pane-head"><h2>관리 사용자 <span class="count-badge" id="identity-admin-user-count">0</span></h2></div>
+					<div class="identity-inline-form">
+						<select id="identity-user-add-select" aria-label="사용자 선택"></select>
+						<button type="button" class="identity-secondary-btn" id="identity-user-add-btn">추가</button>
+					</div>
+					<div class="identity-list" id="identity-admin-user-list"></div>
+					<div class="identity-pagination identity-list-pagination" id="identity-admin-user-pagination">
+						<span id="identity-admin-user-page-info">0개 항목</span>
+						<div class="resource-page-actions">
+							<button type="button" class="action-chip action-muted" id="identity-admin-user-prev">이전</button>
+							<div class="resource-page-numbers" id="identity-admin-user-page-numbers" aria-label="관리 사용자 페이지 번호"></div>
+							<button type="button" class="action-chip action-muted" id="identity-admin-user-next">다음</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="identity-list-pane">
+					<div class="identity-list-pane-head"><h2>계정 목록 <span class="count-badge" id="identity-service-account-count">0</span></h2></div>
+					<div class="identity-inline-form">
+						<select id="identity-service-assign-select" aria-label="서비스 계정 선택"></select>
+						<button type="button" class="identity-secondary-btn" id="identity-service-assign-btn">서비스 계정 할당</button>
+					</div>
+					<div class="identity-inline-form">
+						<select id="identity-source-connect-select" aria-label="미매핑 SourceAccount 선택"></select>
+						<button type="button" class="identity-secondary-btn" id="identity-source-connect-btn">계정 연결</button>
+					</div>
+					<div class="identity-list" id="identity-service-account-list"></div>
+					<div class="identity-pagination identity-list-pagination" id="identity-service-account-pagination">
+						<span id="identity-service-account-page-info">0개 항목</span>
+						<div class="resource-page-actions">
+							<button type="button" class="action-chip action-muted" id="identity-service-account-prev">이전</button>
+							<div class="resource-page-numbers" id="identity-service-account-page-numbers" aria-label="계정 목록 페이지 번호"></div>
+							<button type="button" class="action-chip action-muted" id="identity-service-account-next">다음</button>
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<div class="identity-subpanels">
+				<section class="identity-panel">
+					<div class="identity-panel-head">
+						<div><h2>AD 그룹 기반 관리 <span class="count-badge" id="identity-ad-group-count">0</span></h2></div>
+						<div class="identity-mini-actions">
+							<button type="button" class="identity-secondary-btn" id="identity-ad-sync-btn">그룹 동기화</button>
+						</div>
+					</div>
+					<form class="identity-form-grid" id="identity-ad-group-form" autocomplete="off">
+						<div><label for="identity-ad-group-name">그룹명</label><input id="identity-ad-group-name" name="group_name" maxlength="255"></div>
+						<div><label for="identity-ad-domain-name">도메인</label><input id="identity-ad-domain-name" name="domain_name" maxlength="255"></div>
+						<div><label for="identity-ad-manager">관리자</label><select id="identity-ad-manager" name="manager_admin_id"></select></div>
+						<div><label for="identity-ad-map-account">통합계정</label><select id="identity-ad-map-account"></select></div>
+						<div class="wide identity-mini-actions">
+							<button type="submit" class="identity-secondary-btn">그룹 추가</button>
+							<select id="identity-ad-group-map-select" aria-label="AD 그룹 매핑 선택"></select>
+							<input id="identity-ad-permission" placeholder="권한" maxlength="255">
+							<button type="button" class="identity-primary-btn" id="identity-ad-map-btn">그룹 매핑</button>
+						</div>
+					</form>
+					<div class="identity-table-wrap">
+						<table class="identity-table">
+							<thead><tr><th>도메인</th><th>그룹</th><th>관리자</th><th>매핑</th><th>동기화</th><th>상태</th></tr></thead>
+							<tbody id="identity-ad-group-body"></tbody>
+						</table>
+					</div>
+					<div class="identity-pagination" id="identity-ad-group-pagination">
+						<span id="identity-ad-group-page-info">0개 항목</span>
+						<div class="resource-page-actions">
+							<button type="button" class="action-chip action-muted" id="identity-ad-group-prev">이전</button>
+							<div class="resource-page-numbers" id="identity-ad-group-page-numbers" aria-label="AD 그룹 페이지 번호"></div>
+							<button type="button" class="action-chip action-muted" id="identity-ad-group-next">다음</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="identity-panel">
+					<div class="identity-panel-head">
+						<div><h2>권한 검토 <span class="count-badge" id="identity-review-count">0</span></h2></div>
+						<div class="identity-mini-actions">
+							<button type="button" class="identity-secondary-btn" id="identity-review-create-btn">검토 요청</button>
+						</div>
+					</div>
+					<div class="identity-inline-form">
+						<input id="identity-review-name" aria-label="검토명" placeholder="검토명">
+						<select id="identity-review-admin" aria-label="검토 관리자"></select>
+					</div>
+					<div class="identity-table-wrap">
+						<table class="identity-table">
+							<thead><tr><th>검토명</th><th>관리자</th><th>항목</th><th>기한</th><th>상태</th><th>결과</th><th>액션</th></tr></thead>
+							<tbody id="identity-review-body"></tbody>
+						</table>
+					</div>
+					<div class="identity-pagination" id="identity-review-pagination">
+						<span id="identity-review-page-info">0개 항목</span>
+						<div class="resource-page-actions">
+							<button type="button" class="action-chip action-muted" id="identity-review-prev">이전</button>
+							<div class="resource-page-numbers" id="identity-review-page-numbers" aria-label="권한 검토 페이지 번호"></div>
+							<button type="button" class="action-chip action-muted" id="identity-review-next">다음</button>
+						</div>
+					</div>
+				</section>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

@@ -197,6 +197,69 @@ def test_internal_gate_pc_agent_sync_upserts_agent(monkeypatch, app):
         assert listed['total'] >= 1
 
 
+def test_internal_gate_ssh_command_events_and_admin_history(monkeypatch, app):
+    monkeypatch.setenv('LUMINA_GATE_WEB_SYNC_SECRET', 'sync-secret-test')
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        admin = UserProfile(
+            emp_no='PCSSHADM',
+            name='PC SSH Admin',
+            role='ADMIN',
+            department='IT',
+            email='pc-ssh-admin@example.com',
+        )
+        db.session.add(admin)
+        db.session.commit()
+        item = service.create_resource(
+            {
+                'resource_name': 'API-SSH-COMMAND-TEST',
+                'category': '내부 서비스',
+                'endpoints': [{'label': 'SSH', 'kind': 'SSH', 'protocol': 'SSH', 'host': '10.0.0.40', 'port': 22, 'is_primary': 1}],
+            },
+            'pytest',
+            app,
+        )
+        actor = {'user_id': admin.id, 'emp_no': admin.emp_no, 'name': admin.name, 'role': admin.role}
+        with service._get_connection(app) as conn:
+            conn.execute(
+                f'''
+                INSERT INTO {service.GRANT_TABLE}
+                    (resource_id, user_id, grant_status, grant_start_date, grant_end_date, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (item['id'], admin.id, service.GRANT_STATUS_ACTIVE, '2000-01-01', '9999-12-31', 'pytest', 'pytest'),
+            )
+            conn.commit()
+        out = service.touch_access(item['id'], admin.id, actor, endpoint_id=item['endpoints'][0]['id'], app=app)
+        aid = out['audit_log_id']
+        admin_id = admin.id
+
+    client = app.test_client()
+    rv = client.post(
+        '/api/internal/lumina-gate/ssh-command-events',
+        json={
+            'audit_log_id': aid,
+            'agent_id': 'gate-cmd-api',
+            'commands': [
+                {'command': 'id', 'occurred_at': '2026-05-04T12:01:01'},
+                {'command': 'uptime', 'occurred_at': '2026-05-04T12:01:02'},
+            ],
+        },
+        headers={'Authorization': 'Bearer sync-secret-test'},
+    )
+    assert rv.status_code == 200
+    assert rv.get_json()['inserted'] == 2
+
+    with client.session_transaction() as session:
+        session['emp_no'] = 'PCSSHADM'
+        session['user_profile_id'] = admin_id
+    history = client.get(f'/api/access-control/audit-logs/{aid}/activity-history')
+    assert history.status_code == 200
+    body = history.get_json()
+    assert body['total'] == 2
+    assert [row['command_text'] for row in body['rows']] == ['id', 'uptime']
+
+
 def test_pc_agent_list_hostname_sort(app):
     with app.app_context():
         service.init_web_access_control_tables(app)

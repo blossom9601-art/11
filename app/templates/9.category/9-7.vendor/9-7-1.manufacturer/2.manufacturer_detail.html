@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,10 +9,10 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=20260510_modal_gap_fix2">
     <link rel="stylesheet" href="/static/css/detail7.css?v=1.1">
-    <script src="/static/vendor/lottie/lottie.min.5.12.2.js"></script>
-    <script src="/static/js/9.category/9-7.vendor/9-7-1.manufacturer/2.manufacturer_detail.js?v=1.6"></script>
+    <script src="/static/vendor/lottie/lottie.min.5.12.2.js?v=5.12.2"></script>
+    <script src="/static/js/9.category/9-7.vendor/9-7-1.manufacturer/2.manufacturer_detail.js?v=20260510_deleg_27a"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -23,7 +23,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -35,14 +35,14 @@
 
             <!-- 소프트웨어 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_detail') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_detail' %}active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_manager') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_manager' %}active{% endif %}">담당자</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_hardware') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_hardware' %}active{% endif %}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_software') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_software' %}active{% endif %}">소프트웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_component') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_component' %}active{% endif %}">컴포넌트</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_task') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_task' %}active{% endif %}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_log') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_log' %}active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_manufacturer_file') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_file' %}active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_detail') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_manager') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_manager' %}active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_hardware') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_hardware' %}active{% endif %}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_software') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_software' %}active{% endif %}">소프트웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_component') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_component' %}active{% endif %}">컴포넌트</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_task') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_task' %}active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_log') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_file') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_manufacturer_file' %}active{% endif %}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -87,7 +87,7 @@
                                             <li class="legend-item"><span class="legend-dot" id="sys-dot-comp"></span><span class="legend-host">컴포넌트</span><span class="legend-size" id="sys-comp-legend">0 (0%)</span></li>
                                         </ul>
                                     </div>
-                                    <p id="sys-empty" class="info-desc" style="display:none">할당 시스템 내역이 없습니다.<br>시스템 탭에서 시스템을 할당하세요.</p>
+                                    <div id="sys-empty" class="info-desc" style="display:none" role="status" aria-live="polite">할당 시스템 내역이 없습니다.<br>시스템 탭에서 시스템을 할당하세요.</div>
                                 </div>
                             </div>
 
@@ -101,7 +101,7 @@
                                         <div class="pie-chart" id="stat-pie" aria-label="상태 분포 그래프" style="display:none"></div>
                                         <ul class="pie-legend" id="stat-legend" style="display:none"></ul>
                                     </div>
-                                    <p id="stat-empty" class="info-desc" style="display:none">상태 데이터가 없습니다.</p>
+                                    <div id="stat-empty" class="info-desc" style="display:none" role="status" aria-live="polite">상태 데이터가 없습니다.</div>
                                 </div>
                             </div>
 
@@ -111,7 +111,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 제조사 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

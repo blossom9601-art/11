@@ -1,4 +1,4 @@
-// onpremise_detail.js: On-premise Server Detail page behaviors (modal removed)
+﻿// onpremise_detail.js: On-premise Server Detail page behaviors (modal removed)
 
 (function(){
     // Early: apply saved sidebar state to prevent flash
@@ -61,63 +61,223 @@
           if(endEl && !endEl._flatpickr){ window.flatpickr(endEl, opts); }
         }).catch(function(){});
       }
+
+      function applyExactEditModalLayout(root){
+        try{
+          var modal = document.getElementById(EDIT_MODAL_ID);
+          if(modal) modal.classList.add('category-detail-edit-modal');
+          var form = root || document.getElementById(EDIT_FORM_ID);
+          if(!form) return;
+          form.querySelectorAll('.form-grid').forEach(function(grid){
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'minmax(0, 1fr) minmax(0, 1fr)';
+            grid.style.gap = '18px';
+            grid.style.columnGap = '18px';
+            grid.style.rowGap = '18px';
+            grid.style.alignItems = 'start';
+          });
+          form.querySelectorAll('.form-row').forEach(function(row){
+            row.style.display = 'flex';
+            row.style.flexDirection = 'column';
+            row.style.gap = '6px';
+            row.style.margin = '0';
+            row.style.minWidth = '0';
+            row.style.width = '100%';
+          });
+          form.querySelectorAll('.form-row > label').forEach(function(label){
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.margin = '0';
+            label.style.padding = '0';
+            label.style.minHeight = '18px';
+            label.style.lineHeight = '18px';
+          });
+          form.querySelectorAll('.form-row > input.form-input, .form-row > select.form-input, .form-row > .fk-searchable-control .fk-searchable-display').forEach(function(field){
+            field.style.width = '100%';
+            field.style.maxWidth = '100%';
+            field.style.height = '46px';
+            field.style.minHeight = '46px';
+            field.style.margin = '0';
+            field.style.boxSizing = 'border-box';
+            if(field.matches && field.matches('input.form-input, select.form-input')){
+              field.style.lineHeight = '20px';
+            }else{
+              field.style.lineHeight = '46px';
+            }
+          });
+          form.querySelectorAll('.fk-searchable-control').forEach(function(control){
+            control.style.width = '100%';
+            control.style.maxWidth = '100%';
+            control.style.minWidth = '0';
+            control.style.margin = '0';
+            control.style.boxSizing = 'border-box';
+          });
+          form.querySelectorAll('.form-row > textarea.form-input').forEach(function(field){
+            field.style.width = '100%';
+            field.style.maxWidth = '100%';
+            field.style.minHeight = '160px';
+            field.style.margin = '0';
+            field.style.boxSizing = 'border-box';
+          });
+          form.querySelectorAll('.form-section .form-grid + .form-row').forEach(function(row){
+            row.style.marginTop = '18px';
+          });
+        }catch(_){}
+      }
+
+      function scheduleExactEditModalLayout(){
+        try{
+          var form = document.getElementById(EDIT_FORM_ID);
+          applyExactEditModalLayout(form);
+          setTimeout(function(){ applyExactEditModalLayout(form); }, 0);
+          setTimeout(function(){ applyExactEditModalLayout(form); }, 120);
+          setTimeout(function(){ applyExactEditModalLayout(form); }, 400);
+        }catch(_){}
+      }
+
       // Helper: render an animated no-data image (Lottie JSON preferred) into a container (MEMORY style)
       function showNoDataImage(container, altText){
         try{
           if(!container) return;
+          if(container.getAttribute('data-bls-no-data-loading') === '1'){
+            return;
+          }
+          if(container.getAttribute('data-bls-no-data-anim') === '1'){
+            if(container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback) svg')){
+              return;
+            }
+            container.removeAttribute('data-bls-no-data-anim');
+          }
+          container.setAttribute('data-bls-no-data-rendered', '1');
+          container.setAttribute('data-bls-no-data-owner', 'detail-page');
+          container.style.display = 'flex';
+          container.style.alignItems = 'center';
+          container.style.justifyContent = 'center';
+          container.style.minHeight = '170px';
+          container.style.height = '170px';
+          container.style.padding = '0';
+          container.style.boxSizing = 'border-box';
           container.innerHTML = '';
           var wrap = document.createElement('span');
           wrap.style.display = 'flex';
           wrap.style.alignItems = 'center';
           wrap.style.justifyContent = 'center';
-          wrap.style.padding = '12px 0';
-          wrap.style.minHeight = '140px';
+          wrap.style.padding = '6px 0';
+          wrap.style.minHeight = '0';
           wrap.style.width = '100%';
           wrap.style.boxSizing = 'border-box';
           wrap.style.flexDirection = 'column';
           var jsonPath = '/static/image/svg/free-animated-no-data.json';
+          function appendInlineFallback(){
+            var existing = wrap.querySelector('.bls-detail-no-data-fallback');
+            if(existing) return existing;
+            var fallbackBox = document.createElement('span');
+            fallbackBox.className = 'bls-detail-no-data-anim bls-detail-no-data-fallback';
+            fallbackBox.setAttribute('aria-hidden', 'true');
+            fallbackBox.style.display = 'inline-flex';
+            fallbackBox.style.alignItems = 'center';
+            fallbackBox.style.justifyContent = 'center';
+            fallbackBox.style.width = '150px';
+            fallbackBox.style.height = '110px';
+            fallbackBox.innerHTML = '<svg viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="데이터 없음"><rect x="20" y="28" width="80" height="58" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3"/><path d="M38 48h44M38 62h28" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/><circle cx="86" cy="82" r="16" fill="#fff" stroke="#94a3b8" stroke-width="3"/><path d="M78 82h16" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/></svg>';
+            wrap.appendChild(fallbackBox);
+            return fallbackBox;
+          }
           function renderLottie(){
             try{
               if(!window.lottie){ return false; }
+              if(container.getAttribute('data-bls-no-data-anim') === '1'){
+                return !!container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback) svg');
+              }
+              if(container.getAttribute('data-bls-no-data-loading') === '1') return true;
+              var fallback = appendInlineFallback();
               var animBox = document.createElement('span');
+              animBox.className = 'bls-detail-no-data-anim';
               animBox.style.display = 'inline-block';
-              animBox.style.width = '240px';
+              animBox.style.width = '160px';
               animBox.style.maxWidth = '100%';
-              animBox.style.height = '180px';
+              animBox.style.height = '115px';
               animBox.style.pointerEvents = 'none';
               var altMsg = altText || '데이터 없음';
               animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
-              wrap.appendChild(animBox);
+              wrap.insertBefore(animBox, fallback || null);
               try{
-                window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, path: jsonPath });
-                var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
+                var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='4px'; capWrap.style.textAlign='center';
                 (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
-                wrap.appendChild(capWrap); container.appendChild(wrap); return true;
+                wrap.appendChild(capWrap); container.appendChild(wrap);
+                container.setAttribute('data-bls-no-data-loading', '1');
+                fetch(jsonPath + '?v=20260510_detail_lottie', { cache: 'no-store' })
+                  .then(function(res){ if(!res.ok) throw new Error('no-data json load failed'); return res.json(); })
+                  .then(function(animationData){
+                    var anim = window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, animationData: animationData });
+                    animBox.setAttribute('data-lottie-json', jsonPath);
+                    function removeFallback(){
+                      try{
+                        if(animBox.querySelector('svg')){
+                          container.setAttribute('data-bls-no-data-anim', '1');
+                          container.removeAttribute('data-bls-no-data-loading');
+                          if(fallback && fallback.parentNode) fallback.parentNode.removeChild(fallback);
+                        }
+                      }catch(_r){}
+                    }
+                    try{
+                      anim.addEventListener('DOMLoaded', function(){
+                        removeFallback();
+                      });
+                    }catch(_evt){
+                      removeFallback();
+                    }
+                    setTimeout(removeFallback, 250);
+                    setTimeout(removeFallback, 800);
+                    setTimeout(function(){
+                      if(!animBox.querySelector('svg')){
+                        container.removeAttribute('data-bls-no-data-loading');
+                        renderImageFallback();
+                      }
+                    }, 1600);
+                  })
+                  .catch(function(){
+                    container.removeAttribute('data-bls-no-data-loading');
+                    if(!animBox.querySelector('svg') && animBox.parentNode) animBox.parentNode.removeChild(animBox);
+                    renderImageFallback();
+                  });
+                return true;
               }catch(_a){ return false; }
             }catch(_){ return false; }
           }
           function loadLottieAndRender(){
             try{
-              var script = document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js'; script.async=true;
+              var script = document.createElement('script'); script.src='/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie'; script.async=true;
               script.onload=function(){ if(!renderLottie()) renderImageFallback(); }; script.onerror=function(){ renderImageFallback(); }; document.head.appendChild(script);
             }catch(_){ renderImageFallback(); }
           }
           function renderImageFallback(){
             try{
-              var img = document.createElement('img'); var altMsg = altText || '데이터 없음'; img.alt = (altMsg+'').split('\n')[0]; img.style.maxWidth='240px'; img.style.width='100%'; img.style.height='auto';
-              var candidates = [
-                '/blossom/static/image/svg/free-animated-no-data/no-data.svg','/blossom/static/image/svg/free-animated-no-data/animated.svg','/blossom/static/image/svg/free-animated-no-data/animation.svg','/blossom/static/image/svg/free-animated-no-data/index.svg','/blossom/static/image/svg/free-animated-no-data.svg','/blossom/static/image/svg/free-animated-no-data/no-data.gif','/blossom/static/image/svg/free-animated-no-data.gif',
-                '/static/image/svg/free-animated-no-data/no-data.svg','/static/image/svg/free-animated-no-data/animated.svg','/static/image/svg/free-animated-no-data/animation.svg','/static/image/svg/free-animated-no-data/index.svg','/static/image/svg/free-animated-no-data.svg','/static/image/svg/free-animated-no-data/no-data.gif','/static/image/svg/free-animated-no-data.gif'
-              ];
-              var idx=0; function setNext(){ if(idx>=candidates.length) return; img.src=candidates[idx++]; }
-              img.onerror=function(){ setNext(); }; setNext(); wrap.appendChild(img);
-              var capWrap=document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
+              var altMsg = altText || '데이터 없음';
+              appendInlineFallback();
+              var capWrap=document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='4px'; capWrap.style.textAlign='center';
               (altMsg+'').split('\n').forEach(function(line, i){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = i===0 ? '14px' : '13px'; cap.style.color='#64748b'; capWrap.appendChild(cap); });
               wrap.appendChild(capWrap); container.appendChild(wrap);
             }catch(_f){ }
           }
           if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderImageFallback(); } }
         }catch(_){ }
+      }
+
+      function forceVisibleNoDataImages(){
+        try{
+          [
+            { id:'stat-empty', msg:'할당 하드웨어 자산이 없습니다.' },
+            { id:'group-empty', msg:'할당 하드웨어 자산이 없습니다.' },
+            { id:'ver-empty', msg:'할당 하드웨어 자산의\n소프트웨어 버전 정보가 없습니다.' }
+          ].forEach(function(item){
+            var el = document.getElementById(item.id);
+            if(!el) return;
+            var hidden = el.hidden || el.style.display === 'none';
+            if(hidden) return;
+            if(el.getAttribute('data-bls-no-data-anim') !== '1') showNoDataImage(el, item.msg);
+          });
+        }catch(_){}
       }
       // Helper: reflect computed total count into the OS quantity field
       function setOsQuantity(n){
@@ -218,12 +378,21 @@
           var emptyVer = document.getElementById('ver-empty');
           var verDonut = document.getElementById('ver-donut');
           var verLegend = document.getElementById('ver-legend');
+          function hidePieWrap(el){
+            try{
+              var card = el && el.closest ? el.closest('.basic-info-card-content') : null;
+              var wrap = card ? card.querySelector('.pie-wrap') : null;
+              if(wrap) wrap.style.display = 'none';
+            }catch(_){}
+          }
           function showPieEmpty(msg){
+            hidePieWrap(emptyPie);
             if(emptyPie){ emptyPie.style.display=''; try{ showNoDataImage(emptyPie, msg); }catch(_){} }
             if(pie){ pie.style.visibility='hidden'; pie.style.display='none'; }
             if(legendPie) legendPie.style.display='none';
           }
           function showGroupEmpty(msg){
+            hidePieWrap(emptyGroup);
             if(emptyGroup){ emptyGroup.style.display=''; try{ if(typeof showNoDataImage==='function') showNoDataImage(emptyGroup, msg); }catch(_){} }
             if(groupPie) groupPie.style.display='none';
             if(groupLegend) groupLegend.style.display='none';
@@ -237,6 +406,7 @@
           if(!serverCode){
             showPieEmpty('할당 하드웨어 자산이 없습니다.');
             showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+            forceVisibleNoDataImages();
             return;
           }
           fetch('/api/hardware/model-assets?server_code=' + encodeURIComponent(serverCode))
@@ -245,6 +415,7 @@
               if(!data.success || !data.items || !data.items.length){
                 showPieEmpty('할당 하드웨어 자산이 없습니다.');
                 showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+                forceVisibleNoDataImages();
                 return;
               }
               var items = data.items;
@@ -305,7 +476,7 @@
               opOrder.forEach(function(name){ if(opMap[name]) opEntries.push({label:name, count:opMap[name]}); });
               Object.keys(opMap).forEach(function(k){ if(opOrder.indexOf(k)===-1) opEntries.push({label:k, count:opMap[k]}); });
               var gTotal = opEntries.reduce(function(s,e){ return s+e.count; }, 0);
-              if(!gTotal){ showGroupEmpty('할당 하드웨어 자산이 없습니다.'); return; }
+              if(!gTotal){ showGroupEmpty('할당 하드웨어 자산이 없습니다.'); forceVisibleNoDataImages(); return; }
               if(emptyGroup) emptyGroup.style.display='none';
               var fallbackColors = ['#ef4444','#94a3b8','#8b5cf6','#ec4899'];
               var gradParts = [], segData = [], degCur = 0, fcIdx = 0;
@@ -340,6 +511,7 @@
             .catch(function(){
               showPieEmpty('하드웨어 자산 조회 중 오류가 발생했습니다.');
               showGroupEmpty('하드웨어 자산 조회 중 오류가 발생했습니다.');
+              forceVisibleNoDataImages();
             });
         }catch(_){}
       })();
@@ -657,6 +829,11 @@
       var EDIT_CLOSE_ID = 'system-edit-close';
       var EDIT_SAVE_ID = 'system-edit-save';
 
+      try{
+        var editModalForClass = document.getElementById(EDIT_MODAL_ID);
+        if(editModalForClass) editModalForClass.classList.add('category-detail-edit-modal');
+      }catch(_){}
+
       // --- Vendor search-select helpers (mirroring list page) ---
       var _vendorNameOptions = [];
       var _vendorDataLoaded = false;
@@ -679,6 +856,7 @@
           var cur = String(sel.value||'').trim();
           sel.innerHTML = _buildVendorOptionsHtml(cur);
           try{ if(window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll==='function') window.BlossomSearchableSelect.syncAll(form); }catch(_){}
+          scheduleExactEditModalLayout();
         }
         if(_vendorDataLoaded){ doSync(); return; }
         fetch('/api/vendor-manufacturers', {credentials:'same-origin'})
@@ -703,7 +881,7 @@
         if(unit==='TB') return val*1024; return val; // treat GB as base
       }
       function formatGBToPretty(gb){ if(!isFinite(gb)) return ''; if(gb>=1024) return (Math.round(gb/102.4)/10)+' TB'; return Math.round(gb)+' GB'; }
-  
+
       // Fallback column labels if a global COLUMN_META is not present
       var COLUMN_META = window.COLUMN_META || {
         work_status: { label: '업무 상태' },
@@ -784,13 +962,24 @@
           recompute();
           return; // skip legacy build
         }
-        // Build OS category edit form identical to the OS list page
+        // Build hardware category edit form identical to the list page
         var LABELS = {
-          model:'모델명', vendor:'제조사', release_date:'릴리즈 일자', eosl:'EOSL 일자', note:'비고'
+          model:'모델명', vendor:'제조사', hw_type:'유형', release_date:'릴리즈 일자', eosl:'EOSL 일자', note:'비고'
         };
+        var REQUIRED_FIELDS = { model: true, vendor: true, hw_type: true };
+        function labelHtml(col){
+          return LABELS[col] + (REQUIRED_FIELDS[col] ? '<span class="required">*</span>' : '');
+        }
         function generateOsField(col, value){
           if(col==='release_date' || col==='eosl'){
             return '<input name="'+col+'" type="text" class="form-input date-input" value="'+(value||'')+'" placeholder="YYYY-MM-DD">';
+          }
+          if(col==='hw_type'){
+            var typeValue = String(value||'').trim();
+            if(typeValue === '물리서버') typeValue = '서버';
+            var opts = ['', '서버', '클라우드', '프레임', '워크스테이션'];
+            var labels = { '':'선택', '서버':'물리서버', '클라우드':'클라우드', '프레임':'프레임', '워크스테이션':'가상서버' };
+            return '<select name="hw_type" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>' + opts.map(function(o){ return '<option value="'+o+'" '+(o===typeValue?'selected':'')+'>'+labels[o]+'</option>'; }).join('') + '</select>';
           }
           if(col==='note'){
             return '<textarea name="note" class="form-input textarea-large" rows="6">'+(value||'')+'</textarea>';
@@ -805,24 +994,31 @@
         var current = {
           model: getText('os-model'),
           vendor: getText('os-vendor'),
+          hw_type: getText('os-type'),
           release_date: getText('os-release-date'),
           eosl: getText('os-eosl'),
           note: getText('os-note')
         };
         form.innerHTML = '';
         var section=document.createElement('div'); section.className='form-section';
-        section.innerHTML = '<div class="section-header"><h4>운영체제</h4></div>';
+        section.innerHTML = '<div class="section-header"><h4>하드웨어</h4></div>';
         var grid=document.createElement('div'); grid.className='form-grid';
-        ['model','vendor','release_date','eosl','note'].forEach(function(c){
+        ['model','vendor','hw_type','release_date','eosl'].forEach(function(c){
           var wrap=document.createElement('div');
-          wrap.className = (c==='note') ? 'form-row form-row-wide' : 'form-row';
-          wrap.innerHTML = '<label>'+LABELS[c]+'</label>'+generateOsField(c, current[c]||'');
+          wrap.className = 'form-row';
+          wrap.innerHTML = '<label>'+labelHtml(c)+'</label>'+generateOsField(c, current[c]||'');
           grid.appendChild(wrap);
         });
         section.appendChild(grid);
+        ['model','vendor','hw_type'].forEach(function(name){ var requiredInput = grid.querySelector('[name="'+name+'"]'); if(requiredInput) requiredInput.required = true; });
+        var noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = '<label>'+LABELS.note+'</label>'+generateOsField('note', current.note||'');
+        section.appendChild(noteRow);
         form.appendChild(section);
+        scheduleExactEditModalLayout();
       }
-  
+
       function attachSecurityScoreRecalc(formId){
         var form=document.getElementById(formId); if(!form) return;
         var scoreInput=form.querySelector('input[name="security_score"]'); if(!scoreInput) return;
@@ -836,7 +1032,7 @@
         ['confidentiality','integrity','availability'].forEach(function(n){ var el=form.querySelector('[name="'+n+'"]'); if(el) el.addEventListener('change',recompute); });
         recompute();
       }
-  
+
       function enforceVirtualizationDash(form){
         if(!form) return; var virt=form.querySelector('[name="virtualization"]'); if(!virt) return;
         var v=String(virt.value||'').trim();
@@ -852,7 +1048,7 @@
         }
       }
       function attachVirtualizationHandler(formId){ var form=document.getElementById(formId); if(!form) return; var sel=form.querySelector('[name="virtualization"]'); if(!sel) return; sel.addEventListener('change', function(){ enforceVirtualizationDash(form); }); enforceVirtualizationDash(form); }
-  
+
       function updatePageFromForm(){
         var form=document.getElementById(EDIT_FORM_ID); if(!form) return;
         // Tab31 basic-storage support
@@ -999,6 +1195,7 @@
         function closeModal(){
           console.log('[hw-edit] closeModal called');
           var el = document.getElementById(EDIT_MODAL_ID); if(!el) return;
+          try{ if(el.contains(document.activeElement)) document.activeElement.blur(); }catch(_){}
           el.classList.remove('show');
           el.style.display = 'none';
           el.setAttribute('aria-hidden','true');
@@ -1072,8 +1269,10 @@
           var el = document.getElementById(EDIT_MODAL_ID); if(!el) return;
           document.body.classList.add('modal-open');
           el.style.display = 'block';
+          el.classList.add('category-detail-edit-modal');
           el.classList.add('show');
           el.setAttribute('aria-hidden','false');
+          scheduleExactEditModalLayout();
           // Wire buttons directly on the DOM elements (bypass delegation)
           wireModalButtons();
         }
@@ -1117,47 +1316,52 @@
 
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-  
-  
-  
-  
+
+
+
+
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-  
+
+
       // [Removed legacy Change Log implementation]
-  
+
+      try{
+        forceVisibleNoDataImages();
+        setTimeout(forceVisibleNoDataImages, 250);
+        setTimeout(forceVisibleNoDataImages, 900);
+        setTimeout(forceVisibleNoDataImages, 1800);
+      }catch(_){}
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',__detailInit);}else{__detailInit();}
 document.addEventListener('blossom:pageLoaded',function(){try{__detailInit();}catch(_){}});
 window.addEventListener('pageshow',function(e){if(e.persisted){try{__detailInit();}catch(_){}}});
-  
+
     // No modal APIs to expose
   })();
-  

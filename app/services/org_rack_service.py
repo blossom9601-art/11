@@ -232,14 +232,32 @@ def init_org_rack_table(app=None) -> None:
         raise
 
 
-def list_org_racks(app=None, search: Optional[str] = None, include_deleted: bool = False, center_code: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_org_racks(
+    app=None,
+    search: Optional[str] = None,
+    include_deleted: bool = False,
+    center_code: Optional[str] = None,
+    center_matches: Optional[Sequence[str]] = None,
+) -> List[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
         clauses = ['1=1']
         params: List[Any] = []
         if not include_deleted:
             clauses.append('is_deleted = 0')
-        if center_code:
+        clean_matches: List[str] = []
+        if center_matches:
+            seen_mc = set()
+            for raw in center_matches:
+                c = (raw or '').strip()
+                if c and c not in seen_mc:
+                    seen_mc.add(c)
+                    clean_matches.append(c)
+        if clean_matches:
+            placeholders = ','.join(['?'] * len(clean_matches))
+            clauses.append(f'center_code IN ({placeholders})')
+            params.extend(clean_matches)
+        elif center_code:
             clauses.append('center_code = ?')
             params.append(center_code.strip())
         if search:

@@ -8,6 +8,8 @@
  */
 
 (function(){
+    /** 카테고리>비즈니스 표시 이름 상한 (서버: business_work_display_name) */
+    const BUSINESS_WORK_LABEL_MAX_LEN = 16;
     // External dependencies
     const LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
     const XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
@@ -767,7 +769,7 @@
 
     function generateFieldInput(col,value=''){
         if(col==='wc_name'){
-            return `<input name="wc_name" class="form-input" value="${value??''}" required>`;
+            return `<input name="wc_name" class="form-input" value="${value??''}" required maxlength="${BUSINESS_WORK_LABEL_MAX_LEN}">`;
         }
         if(col==='note'){
             return `<textarea name="${col}" class="form-input textarea-large" rows="6">${value??''}</textarea>`;
@@ -1164,6 +1166,10 @@
             const data = collectForm(form);
             const payload = preparePayload(data);
             if(!payload.wc_name){ showMessage('업무 분류명을 입력하세요.', '안내'); return; }
+            if(String(payload.wc_name).trim().length > BUSINESS_WORK_LABEL_MAX_LEN){
+                showMessage(`업무 분류는 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력해 주세요.`, '안내');
+                return;
+            }
             if(hasDuplicateBusinessName(payload.wc_name)){
                 showMessage('이미 존재하는 업무 분류입니다.\n\n중복 등록은 허용되지 않습니다.', '오류');
                 return;
@@ -1190,6 +1196,10 @@
             const formData = collectForm(form);
             const payload = preparePayload(formData);
             if(!payload.wc_name){ showMessage('업무 분류명을 입력하세요.', '안내'); return; }
+            if(String(payload.wc_name).trim().length > BUSINESS_WORK_LABEL_MAX_LEN){
+                showMessage(`업무 분류는 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력해 주세요.`, '안내');
+                return;
+            }
             if(hasDuplicateBusinessName(payload.wc_name, state.data[index].id)){
                 showMessage('이미 존재하는 업무 분류입니다.\n\n중복 수정은 허용되지 않습니다.', '오류');
                 return;
@@ -1347,6 +1357,10 @@
                         for(let c=0; c<header.length; c++){
                             const label = header[c]; const key = HEADER_KO_TO_KEY[label];
                             rec[key] = String(row[c]??'').trim();
+                        }
+                        const wcTrim = String(rec.wc_name || '').trim();
+                        if(wcTrim.length > BUSINESS_WORK_LABEL_MAX_LEN){
+                            errors.push(`Row ${r+1}: 업무 분류는 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력하세요.`);
                         }
                         // Validation rules (software)
                         ['lic_total','lic_assigned','lic_idle'].forEach(k=>{

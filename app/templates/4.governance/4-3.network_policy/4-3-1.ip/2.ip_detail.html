@@ -18,7 +18,7 @@
 
     <main class="main-content">
         <div class="content-wrapper">
-            <a href="{{ url_for('pages.show', key='gov_ip_policy') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -29,10 +29,10 @@
             </div>
 
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='gov_ip_policy_detail') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_detail' %} active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='gov_ip_policy_ip_range') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_ip_range' %} active{% endif %}">IP 범위</a>
-                <a href="{{ url_for('pages.show', key='gov_ip_policy_log') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_log' %} active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='gov_ip_policy_file') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_file' %} active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy_detail') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy_ip_range') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_ip_range' %} active{% endif %}">IP 범위</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy_log') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy_file') }}" class="server-detail-tab-btn{% if current_key == 'gov_ip_policy_file' %} active{% endif %}">구성/파일</a>
             </div>
 
             <div class="server-detail-content">
@@ -101,7 +101,7 @@
         </div>
     </div>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>

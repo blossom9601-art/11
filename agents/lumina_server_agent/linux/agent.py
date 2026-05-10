@@ -43,6 +43,15 @@ except ImportError:
     from collectors.storage import StorageCollector
     from collectors.package import PackageCollector
 
+try:
+    from linux.account_dispatch import dispatch_from_json_file, dispatch_to_worker
+except ImportError:
+    try:
+        from account_dispatch import dispatch_from_json_file, dispatch_to_worker
+    except ImportError:
+        dispatch_from_json_file = None  # type: ignore
+        dispatch_to_worker = None  # type: ignore
+
 logger = logging.getLogger("lumina")
 
 _running = True
@@ -216,9 +225,72 @@ def run_once(config):
         logger.info("Collection complete -> %s", out_path)
 
 
+def _report_account_job_result(config, hostname, result):
+    # type: (AgentConfig, str, dict) -> None
+    """서버에 계정 작업 실행 결과 보고 (비밀번호는 result에 포함하지 않음)."""
+    if not config.server_host:
+        return
+    try:
+        import ssl
+        url = "%s://%s:%s/api/agent/account-jobs/result" % (
+            config.server_protocol, config.server_host, config.server_port,
+        )
+        body = {"hostname": hostname}
+        for k, v in list(result.items()):
+            if k == "hostname":
+                continue
+            body[k] = v
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=data, headers=_auth_headers(config), method="POST",
+        )
+        ctx = _build_ssl_context(config)
+        opener = _build_opener(config, ssl_context=ctx)
+        resp = opener.open(req, timeout=config.read_timeout)
+        try:
+            if resp.status >= 400:
+                logger.warning("account-jobs/result HTTP %s", resp.status)
+        finally:
+            resp.close()
+    except Exception as e:
+        logger.warning("account job result report failed: %s", e)
+
+
+def _run_server_account_jobs(config, jobs):
+    # type: (AgentConfig, list) -> None
+    """Heartbeat에서 받은 account_jobs 봉투를 Root Worker로 실행 후 서버에 보고."""
+    if not jobs:
+        return
+    if dispatch_to_worker is None:
+        logger.warning("account_dispatch unavailable, skipping server account jobs")
+        return
+    import socket as _sock
+    hn = (config.hostname or _sock.gethostname()).strip()
+    for envelope in jobs:
+        if not isinstance(envelope, dict):
+            continue
+        rid = envelope.get("requestId") or envelope.get("request_id")
+        logger.info("account job from server: requestId=%s action=%s", rid, envelope.get("action"))
+        try:
+            result = dispatch_to_worker(config, envelope)
+        except Exception:
+            logger.exception("account job execution failed requestId=%s", rid)
+            result = {
+                "protoVersion": envelope.get("protoVersion", 1),
+                "requestId": rid or "",
+                "ok": False,
+                "errorCode": "agent_exception",
+                "exitCode": -1,
+            }
+        if rid and not result.get("requestId"):
+            result = dict(result)
+            result["requestId"] = rid
+        _report_account_job_result(config, hn, result)
+
+
 def _send_heartbeat(config):
     # type: (AgentConfig) -> None
-    """서버에 heartbeat 전송"""
+    """서버에 heartbeat 전송; 응답에 account_jobs 가 있으면 실행·보고."""
     if not config.server_host:
         return
     import ssl as _ssl
@@ -234,7 +306,17 @@ def _send_heartbeat(config):
         ctx = _build_ssl_context(config)
         opener = _build_opener(config, ssl_context=ctx)
         resp = opener.open(req, timeout=config.connect_timeout)
-        resp.close()
+        try:
+            raw = resp.read().decode("utf-8", errors="replace")
+        finally:
+            resp.close()
+        try:
+            data = json.loads(raw)
+        except (TypeError, ValueError):
+            return
+        if isinstance(data, dict) and data.get("success"):
+            jobs = data.get("account_jobs") or []
+            _run_server_account_jobs(config, jobs)
     except Exception:
         pass
 
@@ -268,6 +350,12 @@ def main():
     parser.add_argument("--once", action="store_true", help="Collect once and exit")
     parser.add_argument("--setup", action="store_true", help="Configure server connection and exit")
     parser.add_argument("--conf", default=None, help="Config file path")
+    parser.add_argument(
+        "--account-request",
+        metavar="FILE",
+        default=None,
+        help="Send one account-control JSON envelope to Root Worker (UDS) and print result",
+    )
     args = parser.parse_args()
 
     _setup_logging()  # basic logging before config load
@@ -278,6 +366,15 @@ def main():
     for h in logger.handlers[:]:
         logger.removeHandler(h)
     _setup_logging(config)
+
+    if args.account_request:
+        if dispatch_from_json_file is None:
+            logger.error("account dispatch module not available")
+            sys.exit(2)
+        result = dispatch_from_json_file(config, args.account_request)
+        out = json.dumps(result, ensure_ascii=False, indent=2)
+        print(out)
+        sys.exit(0 if result.get("ok") else 1)
 
     # --setup 모드: 대화형 설정 후 종료
     if args.setup:

@@ -360,8 +360,10 @@
     let allUserProfilesPromise = null;
     let allUserProfilesCache = null;
 
-    async function loadFkSource(sourceKey){
-        if(fkSourceCache.has(sourceKey)){
+    async function loadFkSource(sourceKey, options){
+        const forceRefresh = !!options?.forceRefresh;
+        const bypassSharedCache = sourceKey === 'ORG_RACK' || forceRefresh;
+        if(!forceRefresh && fkSourceCache.has(sourceKey)){
             return fkSourceCache.get(sourceKey);
         }
         const config = FK_SOURCE_CONFIG[sourceKey];
@@ -370,9 +372,9 @@
             return [];
         }
         try{
-            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            var __c = !bypassSharedCache && window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
             const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
-            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
+            if(!bypassSharedCache && !__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             const rawItems = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             let items = rawItems;
             // Scope SAN model list to this page's san_type.
@@ -1246,8 +1248,44 @@
         return [{ parentField: 'location_place', childField: 'location_pos' }];
     }
 
-    function extractCenterCodeFromRackRecord(item){
-        return String(item?.center_code || item?.centerCode || item?.center || '').trim();
+    function collectCenterMatchTokens(){
+        const tokens = new Set();
+        Array.from(arguments).forEach(value => {
+            const token = String(value == null ? '' : value).trim();
+            if(token) tokens.add(token);
+        });
+        return tokens;
+    }
+
+    function getCenterMatchTokensFromCenterValue(centerValue){
+        const normalized = String(centerValue || '').trim();
+        const tokens = collectCenterMatchTokens(normalized);
+        const centers = fkSourceCache.get('ORG_CENTER') || [];
+        (Array.isArray(centers) ? centers : []).forEach(item => {
+            const itemTokens = collectCenterMatchTokens(
+                item?.center_code,
+                item?.centerCode,
+                item?.center_name,
+                item?.centerName,
+                item?.name
+            );
+            if(normalized && itemTokens.has(normalized)){
+                itemTokens.forEach(token => tokens.add(token));
+            }
+        });
+        return tokens;
+    }
+
+    function getCenterMatchTokensFromRackRecord(item){
+        return collectCenterMatchTokens(
+            item?.center_code,
+            item?.centerCode,
+            item?.center,
+            item?.center_name,
+            item?.centerName,
+            item?.location_place,
+            item?.locationPlace
+        );
     }
 
     function buildRackOptionsMarkupForCenter(centerCode, selectedValue, placeholderLabel){
@@ -1270,9 +1308,10 @@
         const labelKey = spec.labelKey || sourceConfig.labelKey || 'name';
         const formatter = spec.optionFormatter || ((item, value, label) => defaultFkFormatter(value, label));
 
+        const centerTokens = getCenterMatchTokensFromCenterValue(normalizedCenter);
         const filtered = (Array.isArray(records) ? records : []).filter(item => {
-            const rackCenter = extractCenterCodeFromRackRecord(item);
-            return rackCenter && rackCenter === normalizedCenter;
+            const rackCenters = getCenterMatchTokensFromRackRecord(item);
+            return Array.from(rackCenters).some(token => centerTokens.has(token));
         });
 
         const options = [];
@@ -1303,13 +1342,17 @@
         return html;
     }
 
-    function refreshRackSelectForCenter(rackSelect, centerCode, options){
+    async function refreshRackSelectForCenter(rackSelect, centerCode, options){
         if(!rackSelect) return;
         const normalizedCenter = String(centerCode || '').trim();
         const keepValue = !!options?.keepValue;
         const placeholder = rackSelect.getAttribute('data-placeholder') || FK_FIELD_SPECS.location_pos?.placeholder || '랙 선택';
         const initialValue = rackSelect.getAttribute('data-initial-value') || '';
         const currentValue = keepValue ? (rackSelect.value || initialValue) : '';
+
+        if(normalizedCenter){
+            await loadFkSource('ORG_RACK', { forceRefresh: true });
+        }
 
         rackSelect.innerHTML = buildRackOptionsMarkupForCenter(normalizedCenter, currentValue, placeholder);
 

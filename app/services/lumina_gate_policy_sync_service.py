@@ -201,8 +201,26 @@ def _effective_flask_app_for_gate_sync(app=None):
     return svc._effective_flask_app(app)
 
 
+def _policy_sync_enabled(app=None) -> bool:
+    try:
+        from app.services import web_access_control_service as svc
+
+        policy = svc.get_default_policy(app) or {}
+        return bool(
+            svc._to_bool(policy.get('lumina_gate_enabled', 1))
+            and svc._to_bool(policy.get('lumina_gate_auto_push_enabled', 1))
+        )
+    except Exception:
+        logger.exception('[lumina-gate-policy] failed to read policy sync setting')
+        return True
+
+
 def sync_one_pc_agent_pk(agent_pk: int, app=None) -> None:
     from app.services import web_access_control_service as svc
+
+    if not _policy_sync_enabled(app):
+        logger.debug('[lumina-gate-policy] skip sync: disabled by access-control policy')
+        return
 
     try:
         with svc._get_connection(app) as conn:
@@ -237,6 +255,9 @@ def sync_one_pc_agent_pk(agent_pk: int, app=None) -> None:
 
 
 def schedule_push_for_pc_agent_row(agent_pk: int, app=None) -> None:
+    if not _policy_sync_enabled(app):
+        logger.debug('[lumina-gate-policy] skip schedule agent=%s: disabled by access-control policy', agent_pk)
+        return
     flask_app = _effective_flask_app_for_gate_sync(app)
 
     def job() -> None:
@@ -272,6 +293,9 @@ def sync_mapped_users(agent_ids_users: Iterable[int], app=None) -> None:
 
 
 def schedule_push_for_mapped_user_ids(user_ids: Iterable[int], app=None) -> None:
+    if not _policy_sync_enabled(app):
+        logger.debug('[lumina-gate-policy] skip mapped-user schedule: disabled by access-control policy')
+        return
     flask_app = _effective_flask_app_for_gate_sync(app)
 
     def job() -> None:
@@ -281,6 +305,9 @@ def schedule_push_for_mapped_user_ids(user_ids: Iterable[int], app=None) -> None
 
 
 def schedule_full_mapped_resync(app=None) -> None:
+    if not _policy_sync_enabled(app):
+        logger.debug('[lumina-gate-policy] skip full resync: disabled by access-control policy')
+        return
     flask_app = _effective_flask_app_for_gate_sync(app)
 
     def job() -> None:
@@ -304,6 +331,10 @@ def schedule_full_mapped_resync(app=None) -> None:
 
 def schedule_users_for_resource(resource_id: int, app=None) -> None:
     from app.services import web_access_control_service as svc
+
+    if not _policy_sync_enabled(app):
+        logger.debug('[lumina-gate-policy] skip resource schedule: disabled by access-control policy')
+        return
 
     rid = svc._to_int_or_none(resource_id)
     if not rid:

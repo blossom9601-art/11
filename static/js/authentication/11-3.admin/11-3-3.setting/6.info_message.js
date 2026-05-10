@@ -7,7 +7,7 @@
 	'use strict';
 
 	var API  = '/api/info-messages';
-	var HDRS = { 'Content-Type': 'application/json' };
+	var HDRS = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
 	var COL_COUNT = 8;
 
 	/* ── 대분류/중분류 매핑 ── */

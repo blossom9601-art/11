@@ -668,23 +668,14 @@
                        : rawVal);
                     let cellValue = highlight(displayVal, col);
                 if(col === 'model'){
-                    // 상세 페이지 동적 딥링크 생성 (Unix / High Availability 패턴 동일): 비어있지 않은 필드만 query에 추가
-                    const base = window.__CPU_DETAIL_URL || '#';
-                    const qParts = [];
-                    ['id','model','spec','vendor','part_no'].forEach(k=>{
-                        const v = row[k];
-                        if(v != null){
-                            const s = String(v).trim();
-                            if(s !== '') qParts.push(encodeURIComponent(k)+'='+encodeURIComponent(s));
-                        }
-                    });
-                    const href = base + (qParts.length ? ('?'+qParts.join('&')) : '');
+                    const publicId = String(row.public_id || '').trim();
+                    const href = publicId ? ('/b/' + encodeURIComponent(publicId)) : '#';
                     // 행 전체 payload JSON (sessionStorage 전달용) -> 안전 escape (<,>,&) 처리
                     let payload = '{}';
                     try { payload = JSON.stringify(row).replace(/[<>&]/g, c=>({'<':'\\u003c','>':'\\u003e','&':'\\u0026'}[c])); } catch(_e){}
                     // Attribute에 넣기 위해 따옴표 추가 escape
                     payload = payload.replace(/"/g,'&quot;');
-                    cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-row-payload="${payload}">${cellValue}</a>`;
+                    cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row-payload="${payload}">${cellValue}</a>`;
                 }
                 return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
             }).join('');

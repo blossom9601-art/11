@@ -1001,7 +1001,7 @@ function initWorkDashboard() {
     document.addEventListener('blossom:pageLoaded', function(ev) {
       try {
         var href = (ev && ev.detail && ev.detail.href) ? String(ev.detail.href) : '';
-        if (href.indexOf('/p/cat_business_dashboard') < 0) return;
+        if (href.indexOf('/b/cat_business_dashboard') < 0 && href.indexOf('/p/cat_business_dashboard') < 0) return;
       } catch (_) {
         return;
       }

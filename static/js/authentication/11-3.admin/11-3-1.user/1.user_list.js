@@ -10,12 +10,16 @@
 (function(){
     'use strict';
 
-    // Idempotency guard: prevent double initialization when SPA loader re-injects this script
-    if(window.__userListInitialized){
-        console.warn('[user_list] initialization skipped (already initialized)');
-        return;
+    function markUserListInitialized(){
+        const root = document.getElementById('system-list-pane') || document.getElementById('system-table') || document.body;
+        if(!root) return true;
+        if(root.getAttribute('data-user-list-initialized') === '1'){
+            console.warn('[user_list] initialization skipped (same DOM)');
+            return false;
+        }
+        root.setAttribute('data-user-list-initialized', '1');
+        return true;
     }
-    window.__userListInitialized = true;
 
     // -------------------- 상수/상태 --------------------
     const COUNT_ID = 'system-count';
@@ -751,6 +755,74 @@
                 ensureAdminAvatarSync();
             })
             .catch(err => { console.error('[user_list] fetch error', err); showMessage('오류','사용자 목록 로드 실패: '+err.message); });
+    }
+
+    function initPasswordResetActions(){
+        const tbody = document.getElementById(TBODY_ID);
+        if(!tbody || tbody.__passwordResetBound) return;
+        tbody.__passwordResetBound = true;
+        tbody.addEventListener('submit', function(e){
+            const form = e.target;
+            if(!form || !form.classList || !form.classList.contains('admin-actions')) return;
+            const actionPath = new URL(form.getAttribute('action') || '', location.origin).pathname;
+            if(actionPath !== '/admin/auth/password_reset' && actionPath !== '/admin/auth/password_reset/') return;
+            e.preventDefault();
+            e.stopPropagation();
+            const empNoInput = form.querySelector('input[name="emp_no"]');
+            const empNo = empNoInput ? empNoInput.value.trim() : '';
+            if(!empNo){ showMessage('알림','사번이 비어 있습니다.'); return; }
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if(submitBtn && submitBtn.disabled) return;
+            if(submitBtn) submitBtn.disabled = true;
+            apiPost('/admin/auth/password_reset', { emp_no: empNo })
+                .then(resp => {
+                    if(resp.status !== 'ok'){
+                        showMessage('오류','비밀번호 초기화 실패: '+(resp.message || resp.error || '알 수 없는 오류'));
+                        return;
+                    }
+                    fetchUsers(empNo);
+                    showMessage('완료', resp.message || `${empNo} 비밀번호가 재설정되었습니다.`);
+                })
+                .catch(err => {
+                    console.error('[password_reset] error', err);
+                    showMessage('오류','비밀번호 초기화 실패: '+err.message);
+                })
+                .finally(() => { if(submitBtn) submitBtn.disabled = false; });
+        });
+    }
+
+    function initLockResetActions(){
+        const tbody = document.getElementById(TBODY_ID);
+        if(!tbody || tbody.__lockResetBound) return;
+        tbody.__lockResetBound = true;
+        tbody.addEventListener('submit', function(e){
+            const form = e.target;
+            if(!form || !form.classList || !form.classList.contains('admin-actions')) return;
+            const actionPath = new URL(form.getAttribute('action') || '', location.origin).pathname;
+            if(actionPath !== '/admin/auth/locked' && actionPath !== '/admin/auth/locked/') return;
+            e.preventDefault();
+            e.stopPropagation();
+            const empNoInput = form.querySelector('input[name="emp_no"]');
+            const empNo = empNoInput ? empNoInput.value.trim() : '';
+            if(!empNo){ showMessage('알림','사번이 비어 있습니다.'); return; }
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if(submitBtn && submitBtn.disabled) return;
+            if(submitBtn) submitBtn.disabled = true;
+            apiPost('/admin/auth/locked', { emp_no: empNo })
+                .then(resp => {
+                    if(resp.status !== 'ok'){
+                        showMessage('오류','잠금 초기화 실패: '+(resp.message || resp.error || '알 수 없는 오류'));
+                        return;
+                    }
+                    fetchUsers(empNo);
+                    showMessage('완료', resp.message || `${empNo} 실패/잠금 정보가 초기화되었습니다.`);
+                })
+                .catch(err => {
+                    console.error('[lock_reset] error', err);
+                    showMessage('오류','잠금 초기화 실패: '+err.message);
+                })
+                .finally(() => { if(submitBtn) submitBtn.disabled = false; });
+        });
     }
 
     // 헤더 아바타와 ADMIN 행 프로필 이미지 불일치시 헤더 갱신
@@ -1854,6 +1926,7 @@
     }
 
     function init(){
+        if(!markUserListInitialized()) return;
         if(!initState()) return;
         bindEvents();
         initRowSelection();
@@ -1864,6 +1937,8 @@
         initDeleteProcessing();
         initAddModal();
         initProfilePicker();
+        initLockResetActions();
+        initPasswordResetActions();
         initEditModal();
         fetchUsers();
     }

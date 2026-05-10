@@ -2709,7 +2709,9 @@ body.wf-editor-active {
     transition: background 0.2s;
 }
 .wf-thumb-modal.show {
-    background: rgba(0,0,0,0.45);
+    background: var(--modal-overlay, rgba(15,23,42,.28));
+    backdrop-filter: blur(var(--modal-blur, 5px));
+    -webkit-backdrop-filter: blur(var(--modal-blur, 5px));
 }
 .wf-thumb-modal-box {
     background: #fff;

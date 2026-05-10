@@ -18,58 +18,50 @@
 
   function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', fn); else fn(); document.addEventListener('blossom:pageLoaded',function(){try{fn();}catch(_){}}); }
   ready(function(){
-      // Helper: render an animated no-data image (Lottie JSON preferred) into a container
-      function showNoDataImage(container, altText){
+      /**
+       * 통계 빈 슬롯(#sys-empty / #stat-empty)은 blossom.js §27a 가 공통 처리한다.
+       * 예전에는 data-bls-mfg-empty + 제조사 전용 fetch/Lottie 로 막았는데,
+       * Lottie만 실패할 때 §27a 가 스킵되어 '글자만 나오고 애니 없음'이 영구히 고착된다.
+       */
+      function rescanDetailStatEmpty(){
         try{
-          if(!container) return;
-          container.innerHTML = '';
-          var wrap = document.createElement('span');
-          wrap.style.display = 'flex'; wrap.style.alignItems = 'center'; wrap.style.justifyContent = 'center';
-          wrap.style.padding = '12px 0'; wrap.style.minHeight = '140px'; wrap.style.width = '100%';
-          wrap.style.boxSizing = 'border-box'; wrap.style.flexDirection = 'column';
-          var jsonPath = '/static/image/svg/free-animated-no-data.json';
-          function renderLottie(){
-            try{
-              if(!window.lottie) return false;
-              var animBox = document.createElement('span');
-              animBox.style.display = 'inline-block'; animBox.style.width = '240px'; animBox.style.maxWidth = '100%';
-              animBox.style.height = '180px'; animBox.style.pointerEvents = 'none';
-              var altMsg = altText || '데이터 없음';
-              animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
-              wrap.appendChild(animBox);
-              try{
-                window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, path: jsonPath });
-                var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
-                (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
-                wrap.appendChild(capWrap); container.appendChild(wrap); return true;
-              }catch(_a){ return false; }
-            }catch(_){ return false; }
+          if(typeof window.__blsRescanDetailStatEmpty === 'function'){
+            window.__blsRescanDetailStatEmpty();
+          } else {
+            document.dispatchEvent(new CustomEvent('bls-detail-stat-empty'));
           }
-          function loadLottieAndRender(){
-            try{
-              var script = document.createElement('script'); script.src='/static/vendor/lottie/lottie.min.5.12.2.js'; script.async=true;
-              script.onload=function(){ if(!renderLottie()) renderImageFallback(); }; script.onerror=function(){ renderImageFallback(); }; document.head.appendChild(script);
-            }catch(_){ renderImageFallback(); }
-          }
-          function renderImageFallback(){
-            try{
-              var img = document.createElement('img'); var altMsg = altText || '데이터 없음'; img.alt = (altMsg+'').split('\n')[0]; img.style.maxWidth='240px'; img.style.width='100%'; img.style.height='auto';
-              var candidates = [
-                '/static/image/svg/free-animated-no-data/no-data.svg','/static/image/svg/free-animated-no-data.svg',
-                '/static/image/svg/free-animated-no-data/no-data.gif','/static/image/svg/free-animated-no-data.gif'
-              ];
-              var idx=0; function setNext(){ if(idx>=candidates.length) return; img.src=candidates[idx++]; }
-              img.onerror=function(){ setNext(); }; setNext(); wrap.appendChild(img);
-              var capWrap=document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='8px'; capWrap.style.textAlign='center';
-              (altMsg+'').split('\n').forEach(function(line, i){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = i===0 ? '14px' : '13px'; cap.style.color='#64748b'; capWrap.appendChild(cap); });
-              wrap.appendChild(capWrap); container.appendChild(wrap);
-            }catch(_f){ }
-          }
-          if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderImageFallback(); } }
-        }catch(_){ }
+        }catch(_){}
       }
 
-      // Render vendor system stats pie chart (HW / SW / Component) or no-data animation
+      function revealVendorStatEmpty(el, message){
+        try{
+          if(!el) return;
+          var msg = (message || '데이터가 없습니다.').trim();
+          el.removeAttribute('data-bls-no-data-rendered');
+          el.removeAttribute('data-bls-no-data-loading');
+          el.removeAttribute('data-bls-no-data-anim');
+          el.removeAttribute('data-bls-no-data-owner');
+          el.removeAttribute('data-bls-mfg-empty');
+          el.innerHTML = '';
+          el.style.display = '';
+          el.setAttribute('data-bls-empty-message', msg);
+          requestAnimationFrame(rescanDetailStatEmpty);
+          setTimeout(rescanDetailStatEmpty, 120);
+          setTimeout(rescanDetailStatEmpty, 500);
+        }catch(_e){}
+      }
+
+      function hideVendorStatEmpty(el){
+        try{
+          if(!el) return;
+          el.style.display = 'none';
+          el.removeAttribute('data-bls-empty-message');
+          el.removeAttribute('data-bls-mfg-empty');
+          el.innerHTML = '';
+        }catch(_e){}
+      }
+
+      // Render vendor system stats pie chart (HW / SW / Component) or empty → §27a Lottie
       function applyVendorSystemStats(hwQty, swQty, compQty){
         try{
           var hwEl = document.getElementById('mf-hardware-qty'); if(hwEl) hwEl.textContent = String(hwQty);
@@ -84,11 +76,10 @@
           if(total <= 0){
             if(pieWrap){ pieWrap.style.display='none'; }
             if(empty){
-              empty.style.display='';
-              try{ showNoDataImage(empty, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.'); }catch(_s){}
+              revealVendorStatEmpty(empty, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.');
             }
           } else {
-            if(empty){ empty.style.display='none'; }
+            if(empty){ hideVendorStatEmpty(empty); }
             if(pieWrap){ pieWrap.style.display=''; }
             if(pie){ pie.style.display=''; pie.style.visibility=''; }
             if(legendEl){ legendEl.style.display=''; }
@@ -116,7 +107,7 @@
 
 
           function showStatEmpty(msg){
-            if(emptyPie){ emptyPie.style.display=''; try{ showNoDataImage(emptyPie, msg); }catch(_){} }
+            if(emptyPie){ revealVendorStatEmpty(emptyPie, msg); }
             if(pie){ pie.style.display='none'; }
             if(legendPie) legendPie.style.display='none';
           }
@@ -143,7 +134,7 @@
           if(!stTotal){
             showStatEmpty('할당 자산이 없습니다.');
           } else {
-            if(emptyPie) emptyPie.style.display='none';
+            if(emptyPie) hideVendorStatEmpty(emptyPie);
             if(pie){ pie.style.display='block'; pie.style.width='220px'; pie.style.height='220px'; pie.style.borderRadius='50%'; }
             if(legendPie) legendPie.style.display='';
             var stGrad = [], stSegs = [], stDeg = 0;
@@ -290,38 +281,115 @@
         var form = document.getElementById('system-edit-form');
         if(!editBtn || !modal) return;
 
+        function sanitizeString(val){
+          return (val == null ? '' : String(val)).trim();
+        }
+        function renderLogoFileInput(value){
+          var src = sanitizeString(value);
+          var preview = src
+            ? '<div class="vendor-logo-preview"><img src="'+escapeHtml(src)+'" alt="로고 미리보기"></div>'
+            : '<div class="vendor-logo-preview" hidden><img alt="로고 미리보기"></div>';
+          return '<input name="logo_url" type="hidden" value="'+escapeHtml(src)+'">'
+            + '<div class="vendor-logo-field'+(src ? ' has-file' : '')+'">'
+            + preview
+            + '<label class="vendor-logo-upload-btn" title="로고 첨부" aria-label="로고 첨부"><input name="logo_file" type="file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="vendor-logo-file-input" hidden><img src="/static/image/svg/free-icon-font-folder-open.svg" alt="" class="vendor-logo-upload-icon" aria-hidden="true"></label>'
+            + '<span class="vendor-logo-file-name">'+(src ? '' : '선택된 파일 없음')+'</span>'
+            + '</div>';
+        }
+        async function uploadVendorLogo(file){
+          if(!file) return '';
+          var formData = new FormData();
+          formData.append('file', file);
+          formData.append('scope', 'manufacturer');
+          var response = await fetch('/api/vendor-logo/upload', {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{ 'X-Requested-With':'XMLHttpRequest' },
+            body: formData
+          });
+          var data = null;
+          try{ data = await response.json(); }catch(_){}
+          if(!response.ok || (data && data.success === false)){
+            throw new Error((data && (data.message || data.error)) || '로고 업로드 중 오류가 발생했습니다.');
+          }
+          return (data && data.url) || '';
+        }
+        function bindLogoPreviewHandlers(){
+          if(form && form._vendorLogoPreviewBound) return;
+          if(form) form._vendorLogoPreviewBound = true;
+          if(!form) return;
+          form.addEventListener('change', function(event){
+            var input = event.target;
+            if(!input || !input.classList || !input.classList.contains('vendor-logo-file-input')) return;
+            var file = input.files && input.files[0] ? input.files[0] : null;
+            var field = input.closest('.vendor-logo-field');
+            if(!field) return;
+            var preview = field.querySelector('.vendor-logo-preview');
+            var img = preview ? preview.querySelector('img') : null;
+            var fileName = field.querySelector('.vendor-logo-file-name');
+            if(file){
+              if(img) img.src = URL.createObjectURL(file);
+              if(preview) preview.hidden = false;
+              if(fileName) fileName.textContent = '';
+              field.classList.add('has-file');
+            } else {
+              if(preview) preview.hidden = true;
+              if(fileName) fileName.textContent = '선택된 파일 없음';
+              field.classList.remove('has-file');
+            }
+          });
+        }
+
         function openModal(){
           if(!_vendorData){ alert('제조사 정보를 불러오는 중입니다.'); return; }
           // Build edit form
           if(form) form.innerHTML = '';
           var v = _vendorData;
+          var hiddenFields = {
+            hardware_qty: _liveCounts.hw,
+            software_qty: _liveCounts.sw,
+            component_qty: _liveCounts.comp
+          };
+          Object.keys(hiddenFields).forEach(function(name){
+            if(!form) return;
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = name;
+            hidden.value = String(hiddenFields[name] || 0);
+            form.appendChild(hidden);
+          });
           var fields = [
+            { name:'logo', label:'로고', value: v.logo_url || v.logo || '', wide:false, required:false, type:'logo' },
             { name:'vendor', label:'제조사', value: v.vendor || v.manufacturer_name || '', wide:false, required:true, type:'input' },
             { name:'address', label:'주소', value: v.address || '', wide:false, required:false, type:'input' },
             { name:'business_number', label:'사업자번호', value: v.business_number || v.business_no || '', wide:false, required:false, type:'input' },
             { name:'call_center', label:'고객센터', value: v.call_center || '', wide:false, required:false, type:'input' },
-            { name:'note', label:'비고', value: v.note || v.remark || '', wide:true, required:false, type:'textarea' }
+            { name:'note', label:'비고', value: v.note || v.remark || '', wide:false, required:false, type:'textarea', afterGrid:true }
           ];
           var section = document.createElement('div'); section.className='form-section';
           section.innerHTML='<div class="section-header"><h4>제조사</h4></div>';
           var grid = document.createElement('div'); grid.className='form-grid';
           fields.forEach(function(f){
             var row = document.createElement('div');
-            row.className = f.wide ? 'form-row form-row-wide' : 'form-row';
+            row.className = f.type === 'logo' ? 'form-row vendor-logo-row' : (f.wide ? 'form-row form-row-wide' : 'form-row');
             var reqSpan = f.required ? '<span class="required">*</span>' : '';
             var inputHtml = '';
             if(f.type==='textarea'){
               inputHtml = '<textarea name="'+f.name+'" class="form-input textarea-large" rows="6">'+escapeHtml(String(f.value))+'</textarea>';
+            } else if(f.type==='logo'){
+              inputHtml = renderLogoFileInput(f.value);
             } else if(f.type==='number'){
               inputHtml = '<input name="'+f.name+'" type="number" min="0" step="1" class="form-input" value="'+(f.value??0)+'">';
             } else {
               inputHtml = '<input name="'+f.name+'" class="form-input" value="'+escapeHtml(String(f.value))+'" data-fk-ignore="1">';
             }
             row.innerHTML = '<label>'+f.label+reqSpan+'</label>'+inputHtml;
-            grid.appendChild(row);
+            if(f.afterGrid){ section.appendChild(row); }
+            else { grid.appendChild(row); }
           });
-          section.appendChild(grid);
+          section.insertBefore(grid, section.firstChild.nextSibling);
           if(form) form.appendChild(section);
+          bindLogoPreviewHandlers();
           modal.setAttribute('aria-hidden','false');
           modal.classList.add('show');
           document.body.style.overflow='hidden';
@@ -331,12 +399,28 @@
           modal.classList.remove('show');
           document.body.style.overflow='';
         }
-        function saveRecord(){
+        async function saveRecord(){
           if(!_vendorId){ alert('제조사 ID를 확인할 수 없습니다.'); return; }
           if(!form) return;
           var fd = new FormData(form);
           var payload = {};
-          fd.forEach(function(val, key){ payload[key] = val; });
+          var uploadFile = null;
+          fd.forEach(function(val, key){
+            if(key === 'logo_file'){
+              if(val && val.name) uploadFile = val;
+              return;
+            }
+            payload[key] = (val == null ? '' : String(val)).trim();
+          });
+          if(uploadFile){
+            try{
+              payload.logo_url = await uploadVendorLogo(uploadFile);
+              payload.logo = payload.logo_url;
+            }catch(e){
+              alert(e.message || '로고 업로드 중 오류가 발생했습니다.');
+              return;
+            }
+          }
           // Require vendor name
           if(!(payload.vendor||'').trim()){ alert('제조사명을 입력하세요.'); return; }
           // Preserve live qty counts (not in the form)
@@ -354,6 +438,8 @@
               _vendorData = Object.assign({}, _vendorData, {
                 vendor: payload.vendor,
                 manufacturer_name: payload.vendor,
+                logo_url: payload.logo_url,
+                logo: payload.logo_url,
                 address: payload.address,
                 business_number: payload.business_number,
                 call_center: payload.call_center,
@@ -374,6 +460,8 @@
                 var ctx = JSON.parse(sessionStorage.getItem('manufacturer:context')||'{}');
                 Object.assign(ctx, {
                   vendor: payload.vendor,
+                  logo_url: payload.logo_url,
+                  logo: payload.logo_url,
                   address: payload.address,
                   business_number: payload.business_number,
                   call_center: payload.call_center,
@@ -443,7 +531,7 @@
               try{
                 if(window.lottie){ cb && cb(); return; }
                 var s=document.createElement('script');
-                s.src='/static/vendor/lottie/lottie.min.5.12.2.js';
+                s.src='/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie';
                 s.async=true; s.onload=function(){ cb && cb(); };
                 document.head.appendChild(s);
               }catch(_){ /* no-op */ }

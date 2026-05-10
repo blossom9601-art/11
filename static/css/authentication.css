@@ -110,7 +110,7 @@
 /* ═══ MFA 로그인 모달 (sign-in 페이지) ═══ */
 .mfa-modal-overlay {
     display:none; position:fixed; inset:0; z-index:9999;
-    background:rgba(15,23,42,0.55); backdrop-filter:blur(6px);
+    background:var(--modal-overlay, rgba(15,23,42,.28)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); backdrop-filter:blur(var(--modal-blur, 5px));
     align-items:center; justify-content:center;
     animation:mfa-fadeIn .25s ease;
 }
@@ -296,7 +296,7 @@
 .sec-attempt-chart-wrap canvas { flex:1; width:100%; min-height:140px; display:block; }
 
 /* 적용 범위 안내 모달 */
-.sec-apply-modal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.5); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+.sec-apply-modal { display:none; position:fixed; inset:0; z-index:9999; background:var(--modal-overlay, rgba(15,23,42,.28)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); backdrop-filter:blur(var(--modal-blur, 5px)); align-items:center; justify-content:center; }
 .sec-apply-modal[aria-hidden="false"] { display:flex; }
 .sec-apply-modal-card { background:#fff; border-radius:16px; padding:24px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(15,23,42,.2); }
 .sec-apply-modal-card h3 { margin:0 0 16px; font-size:17px; color:#0f172a; }
@@ -472,10 +472,10 @@
 @media (max-width:600px){ .server-data-table thead { display:none; } .server-data-table tbody tr { display:block; border:1px solid #e2e8f0; margin-bottom:8px; border-radius:8px; padding:8px 12px; } .server-data-table tbody td { display:flex; justify-content:space-between; gap:12px; padding:4px 0; } .server-data-table tbody td:first-child { display:none; } }
 
 /* ================= Modal 스타일 (서버 페이지 category2.css와 동일하게) ================ */
-.server-add-modal, .server-edit-modal { display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:150; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+.server-add-modal, .server-edit-modal { display:none; position:fixed; inset:0; width:100%; height:100%; background:var(--modal-overlay, rgba(15,23,42,.28)); z-index:150; backdrop-filter:blur(var(--modal-blur, 5px)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); }
 .server-add-modal.show, .server-edit-modal.show { display:block; }
 .modal-overlay-full { position:fixed !important; inset:0 !important; width:100% !important; height:100% !important; }
-.modal-overlay-full { background:rgba(17,24,39,0.55); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); z-index:1300; }
+.modal-overlay-full { background:var(--modal-overlay, rgba(15,23,42,.28)); backdrop-filter:blur(var(--modal-blur, 5px)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); z-index:1300; }
 .modal-overlay-full .server-add-content, .modal-overlay-full .server-edit-content { z-index:1310; }
 .modal-overlay-full.show { display:block; }
 /* 모달 내부 투명 배경 글로벌 리셋(blossom.css .main-content * 대응) */

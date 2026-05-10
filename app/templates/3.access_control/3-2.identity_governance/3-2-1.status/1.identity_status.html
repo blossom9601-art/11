@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507sshcmd2">
+	<link rel="stylesheet" href="/static/css/3.access_control/identity_governance.css?v=20260505b">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<script src="/static/js/3.access_control/3-2.identity_governance/3-2-1.status/1.identity_status.js?v=20260505b" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content identity-page identity-status-page">
+		<div class="content-wrapper">
+			<div class="page-header ac-page-header">
+				<div class="page-utility-right" data-info-key="identity_governance.status"></div>
+				<div>
+					<h1>통합계정 현황</h1>
+					<p>서버 수집 계정과 AD·WEB·VPN·스토리지 계정을 통합계정 기준으로 관리합니다.</p>
+				</div>
+			</div>
+
+			<div class="identity-kpi-row" aria-label="통합계정 요약">
+				<div class="identity-kpi"><span>통합계정</span><strong id="identity-kpi-total">0</strong></div>
+				<div class="identity-kpi"><span>개인 계정</span><strong id="identity-kpi-personal">0</strong></div>
+				<div class="identity-kpi"><span>서비스 계정</span><strong id="identity-kpi-service">0</strong></div>
+				<div class="identity-kpi"><span>미매핑 SourceAccount</span><strong id="identity-kpi-unmapped">0</strong></div>
+			</div>
+
+			<section class="identity-panel">
+				<div class="identity-panel-head">
+					<div>
+						<h2>통합계정 목록 <span class="count-badge" id="identity-account-count">0</span></h2>
+					</div>
+					<div class="identity-toolbar" role="search">
+						<input type="text" id="identity-search" aria-label="통합계정 검색" placeholder="계정명·소유자·시스템 검색" autocomplete="off">
+						<select id="identity-type-filter" aria-label="계정유형 필터">
+							<option value="">유형 전체</option>
+							<option value="SERVICE">서비스 계정</option>
+							<option value="PERSONAL">개인 계정</option>
+						</select>
+						<select id="identity-system-filter" aria-label="시스템유형 필터">
+							<option value="">시스템 전체</option>
+						</select>
+						<select id="identity-status-filter" aria-label="상태 필터">
+							<option value="">상태 전체</option>
+							<option value="ACTIVE">ACTIVE</option>
+							<option value="INACTIVE">INACTIVE</option>
+						</select>
+						<button type="button" class="identity-secondary-btn" id="identity-sync-btn">동기화</button>
+						<button type="button" class="identity-secondary-btn" id="identity-source-add-btn">수동 계정</button>
+						<button type="button" class="identity-secondary-btn" id="identity-reset-btn">초기화</button>
+					</div>
+				</div>
+				<div class="identity-table-wrap">
+					<table class="identity-table" id="identity-account-table">
+						<thead>
+							<tr>
+								<th>계정명</th>
+								<th>계정유형</th>
+								<th>소유자</th>
+								<th>연결 시스템 수</th>
+								<th>권한 요약</th>
+								<th>상태</th>
+								<th>AD 연동</th>
+								<th>액션</th>
+							</tr>
+						</thead>
+						<tbody id="identity-account-body"></tbody>
+					</table>
+				</div>
+				<div id="identity-account-empty" class="identity-empty" hidden>등록된 통합계정이 없습니다.</div>
+				<div class="identity-pagination" id="identity-account-pagination">
+					<span id="identity-account-page-info">0개 항목</span>
+					<div class="resource-page-actions">
+						<button type="button" class="action-chip action-muted" id="identity-account-prev">이전</button>
+						<div class="resource-page-numbers" id="identity-account-page-numbers" aria-label="통합계정 페이지 번호"></div>
+						<button type="button" class="action-chip action-muted" id="identity-account-next">다음</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="identity-panel">
+				<div class="identity-panel-head">
+					<div>
+						<h2>미매핑 계정 <span class="count-badge" id="identity-unmapped-count">0</span></h2>
+					</div>
+					<div class="identity-toolbar">
+						<select id="identity-unmapped-system-filter" aria-label="미매핑 시스템 필터">
+							<option value="">시스템 전체</option>
+						</select>
+					</div>
+				</div>
+				<div class="identity-table-wrap">
+					<table class="identity-table" id="identity-unmapped-table">
+						<thead>
+							<tr>
+								<th>시스템유형</th>
+								<th>시스템명</th>
+								<th>계정ID</th>
+								<th>접속정보</th>
+								<th>권한</th>
+								<th>수집여부</th>
+								<th>액션</th>
+							</tr>
+						</thead>
+						<tbody id="identity-unmapped-body"></tbody>
+					</table>
+				</div>
+				<div id="identity-unmapped-empty" class="identity-empty" hidden>미매핑 계정이 없습니다.</div>
+				<div class="identity-pagination" id="identity-unmapped-pagination">
+					<span id="identity-unmapped-page-info">0개 항목</span>
+					<div class="resource-page-actions">
+						<button type="button" class="action-chip action-muted" id="identity-unmapped-prev">이전</button>
+						<div class="resource-page-numbers" id="identity-unmapped-page-numbers" aria-label="미매핑 계정 페이지 번호"></div>
+						<button type="button" class="action-chip action-muted" id="identity-unmapped-next">다음</button>
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<div class="identity-modal" id="identity-detail-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="identity-detail-title">
+		<div class="identity-modal-dialog" role="document">
+			<div class="identity-modal-head">
+				<h2 id="identity-detail-title">통합계정 상세</h2>
+				<button type="button" class="identity-modal-close" data-identity-close="identity-detail-modal" aria-label="닫기">×</button>
+			</div>
+			<div id="identity-detail-summary" class="identity-detail-list"></div>
+			<div class="identity-table-wrap">
+				<table class="identity-table">
+					<thead>
+						<tr>
+							<th>시스템유형</th>
+							<th>시스템명</th>
+							<th>계정ID</th>
+							<th>접속정보</th>
+							<th>권한</th>
+							<th>수집여부</th>
+							<th>상태</th>
+						</tr>
+					</thead>
+					<tbody id="identity-detail-source-body"></tbody>
+				</table>
+			</div>
+			<div class="identity-modal-foot">
+				<button type="button" class="identity-secondary-btn" data-identity-close="identity-detail-modal">닫기</button>
+			</div>
+		</div>
+		</div>
+
+		<div class="identity-modal" id="identity-source-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="identity-source-title">
+		<div class="identity-modal-dialog" role="document">
+			<div class="identity-modal-head">
+				<h2 id="identity-source-title">수동 SourceAccount 등록</h2>
+				<button type="button" class="identity-modal-close" data-identity-close="identity-source-modal" aria-label="닫기">×</button>
+			</div>
+			<form id="identity-source-form" autocomplete="off">
+				<div class="identity-form-grid">
+					<div><label for="source-system-type">시스템유형</label><select id="source-system-type" name="system_type"></select></div>
+					<div><label for="source-system-name">시스템명</label><input id="source-system-name" name="system_name" required maxlength="255"></div>
+					<div><label for="source-account-id">계정ID</label><input id="source-account-id" name="account_id" required maxlength="255"></div>
+					<div><label for="source-privilege">권한</label><input id="source-privilege" name="privilege" maxlength="255" placeholder="root / admin / user"></div>
+					<div class="wide"><label for="source-access-info">접속정보</label><input id="source-access-info" name="access_info" maxlength="500" placeholder="IP 또는 URL"></div>
+				</div>
+			</form>
+			<div class="identity-modal-foot">
+				<button type="button" class="identity-secondary-btn" data-identity-close="identity-source-modal">취소</button>
+				<button type="submit" form="identity-source-form" class="identity-primary-btn">등록</button>
+			</div>
+		</div>
+		</div>
+	</main>
+</body>
+</html>

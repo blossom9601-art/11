@@ -7,6 +7,41 @@ def test_org_rack_list_empty(client):
     assert payload['total'] == 0
 
 
+def test_org_rack_list_center_match_multi(client):
+    base = {
+        'business_status_code': 'STAT_RUN',
+        'business_name': '테스트 업무',
+        'manufacturer_code': 'VEN_HPE',
+        'rack_model': 'DL360',
+        'serial_number': 'SN-TEST',
+        'rack_position': 'P1',
+        'system_height_u': 4,
+        'system_dept_code': 'DEPT_INFRA',
+        'system_manager_id': 1001,
+        'service_dept_code': 'DEPT_SERVICE',
+        'service_manager_id': 2001,
+    }
+    r1 = client.post(
+        '/api/org-racks',
+        json={**base, 'rack_code': 'RACK_MATCH_A', 'center_code': 'CTR_ALPHA', 'rack_position': 'A1'},
+    )
+    r2 = client.post(
+        '/api/org-racks',
+        json={**base, 'rack_code': 'RACK_MATCH_B', 'center_code': 'CTR_BETA', 'rack_position': 'B1'},
+    )
+    assert r1.status_code == 201 and r2.status_code == 201
+    list_resp = client.get('/api/org-racks?center_match=CTR_ALPHA&center_match=CTR_BETA')
+    assert list_resp.status_code == 200
+    body = list_resp.get_json()
+    assert body['success'] is True
+    assert body['total'] == 2
+    codes = sorted(item['rack_code'] for item in body['items'])
+    assert codes == ['RACK_MATCH_A', 'RACK_MATCH_B']
+    ids = [item['id'] for item in body['items']]
+    del_resp = client.post('/api/org-racks/bulk-delete', json={'ids': ids})
+    assert del_resp.status_code == 200
+
+
 def test_org_rack_crud_flow(client):
     create_payload = {
         'rack_code': 'RACK_FC_A01',
@@ -61,8 +96,9 @@ def test_org_rack_crud_flow(client):
     assert list_after.status_code == 200
     assert list_after.get_json()['total'] == 0
 
-    # hard delete: record should be completely gone even with include_deleted
+    # bulk-delete API는 행을 물리 삭제하지 않고 is_deleted=1 로 표시한다.
     list_deleted = client.get('/api/org-racks?include_deleted=1')
     assert list_deleted.status_code == 200
     deleted_payload = list_deleted.get_json()
-    assert deleted_payload['total'] == 0
+    assert deleted_payload['total'] == 1
+    assert deleted_payload['items'][0]['is_deleted'] == 1

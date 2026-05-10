@@ -7,6 +7,8 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from flask import current_app
+from app.services.public_id_service import make_public_id
+from .vendor_manufacturer_service import sync_manufacturer_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +145,7 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     name = row['ha_name'] or ''
     return {
         'id': row['id'],
+        'public_id': make_public_id(TABLE_NAME, 'ha', row['id']),
         'ha_code': row['ha_code'],
         'ha_name': name,
         'model': name,
@@ -205,12 +208,14 @@ def _resolve_manufacturer_code(conn: sqlite3.Connection, payload: Dict[str, Any]
         ).fetchone()
         if not row:
             raise ValueError('등록되지 않은 제조사 코드입니다.')
+        sync_manufacturer_display_name(conn, row['manufacturer_code'], payload.get('manufacturer_name'))
         return row['manufacturer_code']
     name = (payload.get('manufacturer_name') or '').strip()
     if not name:
         raise ValueError('제조사 정보를 입력하세요.')
     row = conn.execute(
-        f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} WHERE manufacturer_name = ? AND is_deleted = 0",
+        f"SELECT manufacturer_code FROM {MANUFACTURER_TABLE} "
+        f"WHERE LOWER(TRIM(manufacturer_name)) = LOWER(TRIM(?)) AND is_deleted = 0",
         (name,),
     ).fetchone()
     if not row:
@@ -256,6 +261,7 @@ def _resolve_manufacturer_code(conn: sqlite3.Connection, payload: Dict[str, Any]
                 (legacy_name,),
             ).fetchone()
     if row:
+        sync_manufacturer_display_name(conn, row['manufacturer_code'], name)
         return row['manufacturer_code']
     raise ValueError('제조사 정보를 찾을 수 없습니다.')
 

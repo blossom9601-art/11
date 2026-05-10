@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/category2.css?v=20260414i">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260509_category_tabs_unified">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -36,7 +36,7 @@
                         ('cat_component_etc', 'ETC')
                     ] %}
                     {% for k, label in tabs %}
-                    <a class="system-tab-btn{% if current_key == k %} active{% endif %}" role="tab" aria-selected="{{ 'true' if current_key == k else 'false' }}" href="{{ url_for('pages.show', key=k) }}">{{ label }}</a>
+                    <a class="system-tab-btn{% if current_key == k %} active{% endif %}" role="tab" aria-selected="{{ 'true' if current_key == k else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=k) }}">{{ label }}</a>
                     {% endfor %}
                 <!-- 향후 다른 탭 (예: 통계, 로그 등) 추가 예정 -->
                 </div>
@@ -122,10 +122,10 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script>
         // NIC 상세 기본 라우트 (unix/disk/memory 패턴 동일)
-        window.__NIC_DETAIL_URL = "{{ url_for('pages.show', key='cat_component_nic_detail') }}";
+        window.__NIC_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='cat_component_nic_detail') }}";
     </script>
     <script src="/static/js/9.category/9-4.component/9-4-5.nic/1.nic_list.js?v=20260414a"></script>
 

@@ -189,9 +189,10 @@
     const UPLOAD_CONFIRM_ID = 'system-upload-confirm';
     // Upload template (Manufacturer schema)
     const UPLOAD_HEADERS_KO = [
-        '제조사','주소','사업자번호','고객센터','하드웨어(수량)','소프트웨어(수량)','컴포넌트(수량)','비고'
+        '로고','제조사','주소','사업자번호','고객센터','하드웨어(수량)','소프트웨어(수량)','컴포넌트(수량)','비고'
     ];
     const HEADER_KO_TO_KEY = {
+        '로고':'logo_url',
         '제조사':'vendor',
         '주소':'address',
         '사업자번호':'business_number',
@@ -210,19 +211,20 @@
     // "주소", "비고"는 모달에는 유지하지만 목록 화면(테이블)에서는 숨김
     const ALWAYS_HIDDEN_TABLE_COLS = new Set(['address']);
     const BASE_VISIBLE_COLUMNS = [
-        'vendor','business_number','call_center','hardware_qty','software_qty','component_qty'
+        'logo','vendor','business_number','call_center','hardware_qty','software_qty','component_qty'
     ];
     const COLUMN_ORDER = [
-        'vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'
+        'logo','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'
     ];
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '제조사', columns: ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] }
+        { group: '제조사', columns: ['logo','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
     const COLUMN_META = {
+        logo:{label:'로고',group:'제조사'},
         vendor:{label:'제조사',group:'제조사'},
         address:{label:'주소',group:'제조사'},
         business_number:{label:'사업자번호',group:'제조사'},
@@ -283,6 +285,8 @@
         const payload = {
             vendor: vendorName || undefined,
             manufacturer_name: vendorName || undefined,
+            logo_url: sanitizeString(data.logo_url || data.logo),
+            logo: sanitizeString(data.logo || data.logo_url),
             address: sanitizeString(data.address),
             business_number: sanitizeString(data.business_number),
             business_no: sanitizeString(data.business_no),
@@ -319,7 +323,10 @@
         const resolvedId = item.id ?? item.vendor_id ?? item.manufacturer_id ?? item.vendorId ?? null;
         return {
             id: resolvedId,
+            public_id: String(item.public_id || '').trim(),
             vendor: item.vendor || item.manufacturer_name || '',
+            logo: item.logo || item.logo_url || '',
+            logo_url: item.logo_url || item.logo || '',
             address: item.address || '',
             business_number: item.business_number || item.business_no || '',
             call_center: item.call_center || '',
@@ -373,6 +380,25 @@
             throw error;
         }
         return data;
+    }
+
+    async function uploadVendorLogo(file){
+        if(!file) return '';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('scope', 'manufacturer');
+        const response = await fetch('/api/vendor-logo/upload', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        let data = null;
+        try { data = await response.json(); } catch(_e) { data = null; }
+        if(!response.ok || data?.success === false){
+            throw new Error(data?.message || data?.error || '로고 업로드 중 오류가 발생했습니다.');
+        }
+        return data?.url || '';
     }
 
     async function loadVendors(options){
@@ -553,11 +579,15 @@
                     }
                     const displayVal = (rawVal==null || String(rawVal).trim()==='') ? '-' : rawVal;
                     let cellValue = highlight(displayVal, col);
+                    if(col==='logo'){
+                        cellValue = renderVendorLogo(rawVal, row.vendor);
+                    }
                     // linkify vendor to detail page
                     if(col==='vendor' && displayVal !== '-' ){
                         // Clean URL: no id in query string — session stores vendor_id server-side
-                        const injected = (window.__CAT_VENDOR_MANUFACTURER_DETAIL_URL || '/p/cat_vendor_manufacturer_detail');
-                        cellValue = `<a href="${injected}" class="work-name-link" data-id="${row.id??''}" title="제조사 상세로 이동">${cellValue}</a>`;
+                        const publicId = String(row.public_id || '').trim();
+                        const injected = publicId ? `/b/${encodeURIComponent(publicId)}` : (window.__CAT_VENDOR_MANUFACTURER_DETAIL_URL || '/b/cat_vendor_manufacturer_detail');
+                        cellValue = `<a href="${injected}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" title="제조사 상세로 이동">${cellValue}</a>`;
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
                 }).join('')
@@ -580,6 +610,8 @@
                             id: vendorId,
                             vendor_id: vendorId,
                             vendor: row.vendor,
+                            logo: row.logo,
+                            logo_url: row.logo_url,
                             address: row.address,
                             business_number: row.business_number,
                             call_center: row.call_center,
@@ -598,9 +630,9 @@
                         credentials: 'same-origin'
                     }).then(function(res){
                         if(res.ok){ navigateTo(href); }
-                        else { navigateTo(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(vendorId)); }
+                        else { navigateTo(href); }
                     }).catch(function(){
-                        navigateTo(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(vendorId));
+                        navigateTo(href);
                     });
                 });
             }
@@ -679,6 +711,71 @@
 
     function escapeHTML(str){
         return String(str).replace(/[&<>'"]/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[s]));
+    }
+
+    function renderVendorLogo(url, altText){
+        const src = sanitizeString(url);
+        if(!src) return '-';
+        const alt = sanitizeString(altText) || '제조사 로고';
+        return `<img src="${escapeHTML(src)}" alt="${escapeHTML(alt)}" title="${escapeHTML(alt)}" class="vendor-logo-img" loading="lazy" onerror="this.style.display='none';">`;
+    }
+
+    function renderLogoFileInput(value){
+        const src = sanitizeString(value);
+        const preview = src
+            ? `<div class="vendor-logo-preview"><img src="${escapeHTML(src)}" alt="로고 미리보기"></div>`
+            : `<div class="vendor-logo-preview" hidden><img alt="로고 미리보기"></div>`;
+        return `<input name="logo_url" type="hidden" value="${escapeHTML(src)}">`
+            + `<div class="vendor-logo-field${src ? ' has-file' : ''}">`
+            + preview
+            + `<label class="vendor-logo-upload-btn" title="로고 첨부" aria-label="로고 첨부"><input name="logo_file" type="file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="vendor-logo-file-input" hidden><img src="/static/image/svg/free-icon-font-folder-open.svg" alt="" class="vendor-logo-upload-icon" aria-hidden="true"></label>`
+            + `<span class="vendor-logo-file-name">${src ? '' : '선택된 파일 없음'}</span>`
+            + `</div>`;
+    }
+
+    function bindLogoPreviewHandlers(){
+        document.addEventListener('change', (event)=>{
+            const input = event.target;
+            if(!input || !input.classList || !input.classList.contains('vendor-logo-file-input')) return;
+            const file = input.files && input.files[0] ? input.files[0] : null;
+            const field = input.closest('.vendor-logo-field');
+            if(!field) return;
+            const preview = field.querySelector('.vendor-logo-preview');
+            const img = preview ? preview.querySelector('img') : null;
+            const fileName = field.querySelector('.vendor-logo-file-name');
+            if(file){
+                if(img) img.src = URL.createObjectURL(file);
+                if(preview) preview.hidden = false;
+                if(fileName) fileName.textContent = '';
+                field.classList.add('has-file');
+            } else {
+                if(preview) preview.hidden = true;
+                if(fileName) fileName.textContent = '선택된 파일 없음';
+                field.classList.remove('has-file');
+            }
+        });
+    }
+
+    function resetLogoFieldVisuals(form){
+        if(!form) return;
+        form.querySelectorAll('.vendor-logo-field').forEach(field=>{
+            const preview = field.querySelector('.vendor-logo-preview');
+            const img = preview ? preview.querySelector('img') : null;
+            const fileName = field.querySelector('.vendor-logo-file-name');
+            const hidden = field.parentElement ? field.parentElement.querySelector('input[name="logo_url"]') : null;
+            const existing = sanitizeString(hidden?.value);
+            if(existing){
+                if(img) img.src = existing;
+                if(preview) preview.hidden = false;
+                if(fileName) fileName.textContent = '';
+                field.classList.add('has-file');
+            } else {
+                if(img) img.removeAttribute('src');
+                if(preview) preview.hidden = true;
+                if(fileName) fileName.textContent = '선택된 파일 없음';
+                field.classList.remove('has-file');
+            }
+        });
     }
 
     // Pagination UI
@@ -864,9 +961,20 @@
     }
 
     // Add / Edit
-    function collectForm(form){
+    async function collectForm(form){
         const data={};
-        form.querySelectorAll('input,select,textarea').forEach(el=>{ data[el.name]=el.value.trim(); });
+        for(const el of form.querySelectorAll('input,select,textarea')){
+            if(!el.name) continue;
+            if(el.type === 'file'){
+                const file = el.files && el.files[0] ? el.files[0] : null;
+                if(file){
+                    data.logo_url = await uploadVendorLogo(file);
+                    data.logo = data.logo_url;
+                }
+                continue;
+            }
+            data[el.name]=el.value.trim();
+        }
         return data;
     }
 
@@ -882,12 +990,12 @@
             form.appendChild(hid);
         });
 
-    const group = { title:'제조사', cols:['vendor','address','business_number','call_center'] };
+    const group = { title:'제조사', cols:['logo','vendor','address','business_number','call_center'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            wrap.className = 'form-row';
+            wrap.className = c === 'logo' ? 'form-row vendor-logo-row' : 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
         section.appendChild(grid);
@@ -905,6 +1013,9 @@
         if(col==='vendor'){
             // 제조사명은 FK 검색 드롭다운이 아니라 순수 입력값을 받는다.
             return `<input name="vendor" class="form-input" value="${value??''}" data-fk-ignore="1">`;
+        }
+        if(col==='logo'){
+            return renderLogoFileInput(value);
         }
         if(col==='note'){
             return `<textarea name="note" class="form-input textarea-large" rows="6">${value??''}</textarea>`;
@@ -1239,6 +1350,8 @@
         });
     // add modal
     document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> {
+            const form = document.getElementById(ADD_FORM_ID);
+            if(form) resetLogoFieldVisuals(form);
             openModal(ADD_MODAL_ID);
             // Apply dashed-with-lock styling to numeric inputs in Add modal
             ['hardware_qty','software_qty','component_qty'].forEach(name=>{
@@ -1255,13 +1368,14 @@
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
             const form = document.getElementById(ADD_FORM_ID); if(!form) return;
             if(!form.checkValidity()){ form.reportValidity(); return; }
-            const data = collectForm(form);
             const btn = document.getElementById(ADD_SAVE_ID);
             if(btn) btn.disabled = true;
             try{
+                const data = await collectForm(form);
                 await createVendorRecord(data);
                 await loadVendors({ silent: true });
                 form.reset();
+                resetLogoFieldVisuals(form);
                 closeModal(ADD_MODAL_ID);
                 showMessage('제조사가 등록되었습니다.', '완료');
             }catch(err){
@@ -1279,9 +1393,9 @@
             const btn = document.getElementById(EDIT_SAVE_ID);
             const id = parseInt(btn?.getAttribute('data-id')||'-1',10);
             if(!Number.isFinite(id) || id < 0){ showMessage('수정할 제조사를 찾을 수 없습니다.', '안내'); return; }
-            const data = collectForm(form);
             if(btn) btn.disabled = true;
             try{
+                const data = await collectForm(form);
                 await updateVendorRecord(id, data);
                 await loadVendors({ silent: true });
                 closeModal(EDIT_MODAL_ID);
@@ -1541,7 +1655,7 @@
     document.getElementById(DISPOSE_CLOSE_ID)?.addEventListener('click', ()=> closeModal(DISPOSE_MODAL_ID));
         document.getElementById(DISPOSE_CONFIRM_ID)?.addEventListener('click', ()=>{
             // 수집 대상 열: 시스템 제조사, 시스템 모델명, 시스템 일련번호, 시스템 가상화, 시스템 장소, 시스템 위치, 시스템 슬롯, 시스템 크기, 시스템 담당부서, 시스템 담당자
-            const fields = ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'];
+            const fields = ['logo','logo_url','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'];
             const selected = state.data.filter(r=> state.selected.has(r.id)).map(r=>{
                 const obj = { id: r.id };
                 fields.forEach(f=> obj[f] = r[f] ?? '');
@@ -1646,10 +1760,11 @@
         function inputFor(col){
             if(col === 'hardware_qty' || col === 'software_qty' || col === 'component_qty') return `<input type="number" min="0" step="1" class="form-input qty-dashed-lock" data-bulk-field="${col}" placeholder="0">`;
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
+            if(col === 'logo') return `<input class="form-input" data-bulk-field="logo_url" placeholder="로고 첨부">`;
             if(col === 'vendor') return `<input class="form-input" data-bulk-field="vendor" placeholder="값 입력" data-fk-ignore="1">`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'제조사', cols:['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] };
+    const GROUP = { title:'제조사', cols:['logo','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');
@@ -1738,6 +1853,7 @@
         } catch(err){}
         // Load persisted sort (if any)
         loadSortPreference();
+        bindLogoPreviewHandlers();
         bindEvents();
         await loadVendors();
         // Page adornments (animation + popover)

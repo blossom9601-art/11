@@ -29,6 +29,11 @@
 	var DEFAULT_ACTOR_AVATAR = '/static/image/svg/profil/free-icon-bussiness-man.svg';
 
 	function qs(id) { return document.getElementById(id); }
+	function syncSearchSelect(el) {
+		if (window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function') {
+			window.BlossomSearchableSelect.syncAll(el || document);
+		}
+	}
 	function esc(value) {
 		return String(value == null ? '' : value)
 			.replace(/&/g, '&amp;')
@@ -78,6 +83,7 @@
 	function auditModalsPreventBodyUnlock() {
 		return !!(document.querySelector('#system-message-modal.show') ||
 			document.querySelector('#system-delete-modal.show') ||
+			document.querySelector('#audit-activity-modal.show') ||
 			document.querySelector('#agent-map-modal.show') ||
 			document.querySelector('#agent-pc-download-modal.show'));
 	}
@@ -150,6 +156,17 @@
 			'<span class="audit-user-avatar"><img src="' + img + '" alt="" loading="lazy"></span>' +
 			('<div class="audit-user-info"><strong>' + name + '</strong></div>') +
 			'</div></td>';
+	}
+	function activityHistoryCell(row) {
+		var kind = normalizeKind(row);
+		var count = parseInt(row && row.activity_count, 10) || 0;
+		if (kind !== 'SSH' || row.action_type !== '접속') {
+			return '<td class="audit-col-activity-history"><span class="audit-activity-none">-</span></td>';
+		}
+		return '<td class="audit-col-activity-history">' +
+			'<button type="button" class="audit-activity-btn' + (count ? '' : ' is-empty') + '" data-audit-id="' + esc(row.id || '') + '" title="행위 이력 보기" aria-label="행위 이력 보기">' +
+			'<img src="/static/image/svg/free-icon-font-analytics-magnifying-glass.svg" alt="" aria-hidden="true">' +
+			'</button></td>';
 	}
 	function syncSelectAll() {
 		var selectAll = qs('audit-select-all');
@@ -244,7 +261,7 @@
 				var s = String(v).replace(/"/g, '""');
 				return /[",\r\n]/.test(s) ? '"' + s + '"' : s;
 			}
-			var headers = ['접속 일시', '종료 일시', '유형', '작업', '결과', '실패 사유', '부서', '사번', '사용자', '자원 이름', '접속 계정', '접속 URL/IP', '접속 IP'];
+			var headers = ['접속 일시', '종료 일시', '유형', '작업', '결과', '실패 사유', '부서', '사번', '사용자', '자원 이름', '접속 계정', '행위 이력', '접속 URL/IP', '접속 IP'];
 			var lines = [headers.join(',')];
 			rows.forEach(function (row) {
 				var resource = row.resource_name || (row.target_resource_id ? ('자원 #' + row.target_resource_id) : '-');
@@ -260,6 +277,7 @@
 					actorNameText(row),
 					resource,
 					row.connect_account || '',
+					row.activity_count || 0,
 					accessInfo(row),
 					row.ip_address || ''
 				].map(csvCell).join(','));
@@ -376,6 +394,7 @@
 				actorUserCell(row) +
 				'<td class="audit-col-resource"><span class="audit-resource-name">' + esc(resource) + '</span></td>' +
 				'<td class="audit-col-connect-account"><span class="audit-mono">' + esc(row.connect_account || '-') + '</span></td>' +
+				activityHistoryCell(row) +
 				'<td class="audit-col-access-info"><span class="audit-access-info">' + esc(accessInfo(row)) + '</span></td>' +
 				'<td class="audit-col-ip">' + esc(row.ip_address || '-') + '</td>' +
 			'</tr>';
@@ -786,6 +805,78 @@
 		if (agentSearchTimer) window.clearTimeout(agentSearchTimer);
 		agentSearchTimer = window.setTimeout(function () { loadAgents(true); }, 220);
 	}
+	function findAuditRow(auditId) {
+		var id = String(auditId || '');
+		var found = null;
+		state.rows.forEach(function (row) {
+			if (String(row.id || '') === id) found = row;
+		});
+		return found;
+	}
+	function setActivityModalLoading(message) {
+		var empty = qs('audit-activity-empty');
+		var wrap = qs('audit-activity-table-wrap');
+		var body = qs('audit-activity-table-body');
+		if (body) body.innerHTML = '';
+		if (wrap) wrap.hidden = true;
+		if (empty) {
+			empty.hidden = false;
+			empty.textContent = message || '행위 이력을 불러오는 중입니다.';
+		}
+	}
+	function renderActivityHistoryRows(rows) {
+		var empty = qs('audit-activity-empty');
+		var wrap = qs('audit-activity-table-wrap');
+		var body = qs('audit-activity-table-body');
+		if (!body || !wrap || !empty) return;
+		if (!rows || !rows.length) {
+			body.innerHTML = '';
+			wrap.hidden = true;
+			empty.hidden = false;
+			empty.textContent = '기록된 명령어가 없습니다.';
+			return;
+		}
+		empty.hidden = true;
+		wrap.hidden = false;
+		body.innerHTML = rows.map(function (row) {
+			var command = row.command_text || row.command || '';
+			return '<tr>' +
+				'<td class="audit-activity-time">' + esc(formatDateTime(row.occurred_at)) + '</td>' +
+				'<td class="audit-activity-command" title="' + esc(command) + '">' + esc(command || '-') + '</td>' +
+			'</tr>';
+		}).join('');
+	}
+	function openActivityHistoryModal(auditId) {
+		var modal = qs('audit-activity-modal');
+		var subtitle = qs('audit-activity-subtitle');
+		var row = findAuditRow(auditId) || {};
+		var resource = row.resource_name || (row.target_resource_id ? ('자원 #' + row.target_resource_id) : 'SSH 접속');
+		if (!modal || !auditId) return;
+		if (subtitle) {
+			subtitle.textContent = resource + ' · ' + actorNameText(row) + (row.connect_account ? (' · ' + row.connect_account) : '');
+		}
+		document.body.classList.add('modal-open');
+		modal.classList.add('show');
+		modal.setAttribute('aria-hidden', 'false');
+		modal.style.display = 'flex';
+		setActivityModalLoading('행위 이력을 불러오는 중입니다.');
+		fetchJson('/api/access-control/audit-logs/' + encodeURIComponent(auditId) + '/activity-history', {
+			errorDefault: '행위 이력을 불러오지 못했습니다.'
+		}).then(function (data) {
+			renderActivityHistoryRows(data.rows || []);
+		}).catch(function (err) {
+			setActivityModalLoading(err.message || '행위 이력을 불러오지 못했습니다.');
+		});
+	}
+	function closeActivityHistoryModal() {
+		var modal = qs('audit-activity-modal');
+		if (!modal) return;
+		modal.classList.remove('show');
+		modal.setAttribute('aria-hidden', 'true');
+		modal.style.display = '';
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+		else document.body.classList.add('modal-open');
+	}
 	function findAgent(agentId) {
 		var id = String(agentId || '');
 		var found = null;
@@ -1125,6 +1216,7 @@
 		var mf = qs('agent-mapping-filter');
 		if (kw) kw.value = '';
 		if (mf) mf.value = '';
+		syncSearchSelect(mf);
 		setAgentSearchClearVisible();
 		loadAgents(true);
 	}
@@ -1222,6 +1314,7 @@
 		var userSearch = qs('agent-user-search');
 		var userResults = qs('agent-user-results');
 		var agentTable = qs('agent-table');
+		var auditBody = qs('audit-table-body');
 		if (agentTable) {
 			Array.prototype.forEach.call(agentTable.querySelectorAll('.agent-th-sortable[data-agent-sort]'), function (th) {
 				th.setAttribute('tabindex', '0');
@@ -1405,6 +1498,13 @@
 		});
 		if (qs('system-message-close')) qs('system-message-close').addEventListener('click', closeAuditMessageModal);
 		if (qs('system-message-ok')) qs('system-message-ok').addEventListener('click', closeAuditMessageModal);
+		if (qs('audit-activity-close')) qs('audit-activity-close').addEventListener('click', closeActivityHistoryModal);
+		var activityModal = qs('audit-activity-modal');
+		if (activityModal) {
+			activityModal.addEventListener('click', function (event) {
+				if (event.target === activityModal) closeActivityHistoryModal();
+			});
+		}
 		var msgModal = qs('system-message-modal');
 		if (msgModal) {
 			msgModal.addEventListener('click', function (event) {
@@ -1416,6 +1516,11 @@
 			var msgEl = qs('system-message-modal');
 			if (msgEl && msgEl.classList.contains('show')) {
 				closeAuditMessageModal();
+				return;
+			}
+			var ahm = qs('audit-activity-modal');
+			if (ahm && ahm.classList.contains('show')) {
+				closeActivityHistoryModal();
 				return;
 			}
 			var pcm = qs('agent-pc-download-modal');
@@ -1465,9 +1570,17 @@
 				syncSelectAll();
 			});
 		}
-		qs('audit-table-body').addEventListener('change', function (event) {
-			if (event.target && event.target.classList.contains('audit-row-check')) syncSelectAll();
-		});
+		if (auditBody) {
+			auditBody.addEventListener('change', function (event) {
+				if (event.target && event.target.classList.contains('audit-row-check')) syncSelectAll();
+			});
+			auditBody.addEventListener('click', function (event) {
+				var button = event.target.closest('.audit-activity-btn[data-audit-id]');
+				if (!button) return;
+				event.preventDefault();
+				openActivityHistoryModal(button.getAttribute('data-audit-id'));
+			});
+		}
 		document.body.addEventListener('click', function (event) {
 			var pane = qs('agent-list-pane');
 			if (!pane || pane.hidden) return;

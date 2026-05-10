@@ -249,7 +249,7 @@
       method = 'POST';
       body = { version: version, items: items };
     }
-    fetch(url, { method: method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    fetch(url, { method: method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); })
       .then(function (d) { if (d.success) { hideModal('vr-edit-modal'); loadReleaseNotes(); } else alert(d.error || '저장 실패'); })
       .catch(function () { alert('서버 통신 오류'); });
@@ -269,7 +269,7 @@
     function next() {
       if (!remaining.length) { hideModal('vr-delete-modal'); loadReleaseNotes(); return; }
       var v = remaining.shift();
-      fetch('/api/release-notes/' + encodeURIComponent(v), { method: 'DELETE', credentials: 'same-origin' })
+      fetch('/api/release-notes/' + encodeURIComponent(v), { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) { if (!d.success) alert(v + ': ' + (d.error || '삭제 실패')); next(); })
         .catch(function () { alert('서버 통신 오류'); next(); });

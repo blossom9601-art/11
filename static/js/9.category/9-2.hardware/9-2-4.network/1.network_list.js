@@ -607,26 +607,15 @@
                     // Linkify model column to detail page with consistent styling
                     if(col === 'model'){
                         try{
-                            var base = String(window.__HW_NETWORK_DETAIL_URL || '').trim();
-                            if(base){
-                                var u = new URL(base, window.location.origin);
-                                var params = u.searchParams;
-                                params.set('model', String(row.model ?? ''));
-                                params.set('vendor', String(row.vendor ?? ''));
-                                params.set('server_code', String(row.server_code ?? ''));
-                                params.set('hw_type', String(row.hw_type ?? ''));
-                                params.set('release_date', String(row.release_date ?? ''));
-                                params.set('eosl', String(row.eosl ?? ''));
-                                params.set('qty', String(row.qty ?? ''));
-                                params.set('id', String(row.id ?? ''));
-                                params.set('note', String(row.note ?? ''));
-                                var href = u.toString();
-                                cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-row='${JSON.stringify(row).replace(/'/g, "&#39;")}' >${cellValue}</a>`;
+                            var publicId = String(row.public_id || '').trim();
+                            if(publicId){
+                                var href = '/b/' + encodeURIComponent(publicId);
+                                cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row='${JSON.stringify(row).replace(/'/g, "&#39;")}' >${cellValue}</a>`;
                             } else {
-                                cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
+                                cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</a>`;
                             }
                         }catch(_e){
-                            cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
+                            cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</a>`;
                         }
                     }
                     // EOSL status indicator (three colors)
@@ -876,7 +865,7 @@
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.setAttribute('data-fk-ignore', '1');
         form.innerHTML='';
-    const group = { title:'네트워크', cols:['model','vendor','release_date','eosl'] };
+    const group = { title:'네트워크', cols:['model','vendor','hw_type','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
@@ -902,6 +891,11 @@
         if(col==='vendor'){
             const v = String(value ?? '').trim();
             return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${buildVendorOptionsHtml(v, { allowLegacyUnknownSelected: true })}</select>`;
+        }
+        if(col==='hw_type'){
+            const v = String(value??'');
+            const opts = ['', 'L2', 'L3', 'L4', 'L7', '무선장비', '회선장비'];
+            return `<select name="hw_type" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${opts.map(o=>`<option value="${o}" ${o===v?'selected':''}>${o===''?'선택':o}</option>`).join('')}</select>`;
         }
         if(col==='qty'){
             return `<input name="qty" type="number" min="0" step="1" class="form-input" value="${value??''}" placeholder="숫자만">`;

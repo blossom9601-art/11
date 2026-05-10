@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from flask import current_app
+from app.services.public_id_service import make_public_id
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -7,10 +7,11 @@
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.35">
-	<link rel="stylesheet" href="/static/css/authentication/11-3.admin/11-3-3.setting/12.access_control.css?v=20260507ac3">
-	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
-	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/12.access_control.js?v=20260507ac3" defer></script>
+	<link rel="stylesheet" href="/static/css/authentication.css?v=1.0.38">
+	<link rel="stylesheet" href="/static/css/authentication/11-3.admin/11-3-3.setting/12.access_control.css?v=20260507ac15">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<script src="/static/js/ui/searchable_select.js?v=1.2.0" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/12.access_control.js?v=20260507ac13" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -20,7 +21,7 @@
 			<div class="page-header">
 				<div>
 					<h1>접근제어 설정</h1>
-					<p>승인 정책과 WEB 접속 통제를 정의합니다. 감사·접속 이력은 <strong>접근제어 &gt; 감사</strong>에서 조회할 수 있습니다.</p>
+					<p>승인 정책, Lumina Gate 연동, PC 에이전트, SSH 접속, 감사 보존 기준을 정의합니다. 감사·접속 이력은 <strong>접근제어 &gt; 감사</strong>에서 조회할 수 있습니다.</p>
 				</div>
 			</div>
 			<div class="system-tabs" role="tablist" aria-label="사용자 관리 탭">
@@ -52,7 +53,9 @@
 						</div>
 						<button type="button" id="admin-notify-run" class="chip-link">만료 임박 알림 실행</button>
 					</div>
-					<div class="form-grid">
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">승인 단계</h3>
+						<div class="form-grid ac-policy-grid">
 						<div class="form-row">
 							<label for="policy-team-lead">팀장 승인 필요</label>
 							<select id="policy-team-lead" class="form-input" name="team_lead">
@@ -68,18 +71,6 @@
 							</select>
 						</div>
 						<div class="form-row">
-							<label for="policy-default-days">기본 권한 기간(일)</label>
-							<input type="number" id="policy-default-days" class="form-input" name="default_days" min="1" max="365">
-						</div>
-						<div class="form-row">
-							<label for="policy-max-days">최대 권한 기간(일)</label>
-							<input type="number" id="policy-max-days" class="form-input" name="max_days" min="1" max="365">
-						</div>
-						<div class="form-row">
-							<label for="policy-notify-days">만료 전 알림 일수</label>
-							<input type="number" id="policy-notify-days" class="form-input" name="notify_days" min="0" max="30">
-						</div>
-						<div class="form-row">
 							<label for="policy-emergency">긴급 신청 허용</label>
 							<select id="policy-emergency" class="form-input" name="emergency">
 								<option value="1">허용</option>
@@ -93,60 +84,239 @@
 								<option value="0">허용</option>
 							</select>
 						</div>
+						</div>
+					</div>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">권한 기간</h3>
+						<div class="form-grid ac-policy-grid">
+						<div class="form-row">
+							<label for="policy-default-days">기본 권한 기간(일)</label>
+							<select id="policy-default-days" class="form-input" name="default_days">
+								<option value="7">7일</option>
+								<option value="14">14일</option>
+								<option value="30">30일</option>
+								<option value="60">60일</option>
+								<option value="90">90일</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-max-days">최대 권한 기간(일)</label>
+							<select id="policy-max-days" class="form-input" name="max_days">
+								<option value="30">30일</option>
+								<option value="60">60일</option>
+								<option value="90">90일</option>
+								<option value="180">180일</option>
+								<option value="365">365일</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-notify-days">만료 전 알림 일수</label>
+							<select id="policy-notify-days" class="form-input" name="notify_days">
+								<option value="0">알림 안 함</option>
+								<option value="3">3일 전</option>
+								<option value="7">7일 전</option>
+								<option value="14">14일 전</option>
+								<option value="30">30일 전</option>
+							</select>
+						</div>
+						</div>
 					</div>
 					<div class="setting-card-actions ac-card-footer">
 						<p class="ac-card-status" id="admin-policy-status-approval" aria-live="polite"></p>
 						<button type="button" id="admin-save-approval" class="btn-save">
 							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-							승인 정책 저장
+							저장
 						</button>
 					</div>
 				</section>
 
-				<!-- ════════ WEB 통제 ════════ -->
-				<section class="setting-card" id="ac-web-policy-card" aria-labelledby="ac-web-policy-title">
+				<!-- ════════ Lumina Gate / PC 에이전트 ════════ -->
+				<section class="setting-card" id="ac-gate-policy-card" aria-labelledby="ac-gate-policy-title">
 					<div class="setting-card-header">
 						<div>
-							<h2 id="ac-web-policy-title">WEB 접속 통제</h2>
-							<p>사용자 메뉴 <strong>접근제어 &gt; 접속</strong>의 WEB 열기 동작과 호스트 검사를 정합니다.</p>
+							<h2 id="ac-gate-policy-title">Lumina Gate / PC 에이전트</h2>
+							<p>Gate 정책 동기화와 PC 에이전트 등록·매핑 기준을 관리합니다.</p>
 						</div>
 					</div>
-					<details class="ac-roadmap-details">
-						<summary>로드맵 요약 (Phase 1~4)</summary>
-						<ol class="ac-roadmap-list">
-							<li><strong>역할 분리</strong>: Blossom은 권한·프로세스·접속 기록, 실제 URL·네트워크 통제는 프록시/ZTNA/SWG와 병행.</li>
-							<li><strong>호스트 게이트</strong>: 아래 패턴을 채우면, 패턴에 맞는 호스트만 WEB 접속이 진행됩니다.</li>
-							<li><strong>iframe 모드</strong>: 허용 호스트에 한해 이 페이지 안에 임베드(대상이 iframe을 막으면 표시 안 됨).</li>
-							<li><strong>감사</strong>: 상세 클릭 로그는 게이트 로그와 함께 보는 것을 권장.</li>
-						</ol>
-						<p class="ac-roadmap-doc">전체 문서: 저장소 <code class="ac-inline-code">docs/web-access-control-roadmap.md</code></p>
-					</details>
-					<div class="form-grid">
-						<div class="form-row form-row-wide">
-							<label for="policy-web-open-mode">WEB 열기 방식</label>
-							<select id="policy-web-open-mode" class="form-input" name="web_open_mode">
-								<option value="new_tab">새 브라우저 탭</option>
-								<option value="iframe_embed">iframe(접속 페이지 안, 주소창은 Blossom 유지)</option>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">Gate 연동</h3>
+						<div class="form-grid ac-policy-grid">
+						<div class="form-row">
+							<label for="policy-lumina-gate-enabled">Lumina Gate 연동</label>
+							<select id="policy-lumina-gate-enabled" class="form-input" name="lumina_gate_enabled">
+								<option value="1">사용</option>
+								<option value="0">중지</option>
 							</select>
 						</div>
-						<div class="form-row form-row-wide">
-							<label for="policy-web-host-gate">허용 호스트 패턴 (WEB 접속 게이트)</label>
-							<textarea id="policy-web-host-gate" class="form-input ac-textarea-policy" name="web_host_gate" rows="4" placeholder="비우면 검사 안 함. 한 줄에 하나 (예: apps.company.internal)&#10;호스트명에 해당 문자열이 포함되면 통과"></textarea>
+						<div class="form-row">
+							<label for="policy-lumina-gate-auto-push">권한 정책 자동 동기화</label>
+							<select id="policy-lumina-gate-auto-push" class="form-input" name="lumina_gate_auto_push_enabled">
+								<option value="1">사용</option>
+								<option value="0">수동</option>
+							</select>
 						</div>
-						<div class="form-row form-row-wide">
-							<label for="policy-web-iframe-allow">iframe 허용 호스트 패턴</label>
-							<textarea id="policy-web-iframe-allow" class="form-input ac-textarea-policy" name="web_iframe_allow" rows="4" placeholder="iframe 모드일 때만 사용. 비우면 iframe 불가(항상 새 탭).&#10;한 줄에 하나, 호스트 부분 일치"></textarea>
 						</div>
-						<div class="form-row form-row-wide">
-							<label for="policy-web-infra-runbook">인프라/게이트웨이 운영 메모</label>
-							<textarea id="policy-web-infra-runbook" class="form-input ac-textarea-policy" name="web_infra_runbook" rows="5" placeholder="역프록시 URL, 담당, 변경 이력 등 (관리자 참고용, 자동 연동 없음)"></textarea>
+					</div>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">PC 에이전트</h3>
+						<div class="form-grid ac-policy-grid">
+						<div class="form-row">
+							<label for="policy-pc-agent-auto-register">신규 PC 에이전트 자동 등록</label>
+							<select id="policy-pc-agent-auto-register" class="form-input" name="pc_agent_auto_register_enabled">
+								<option value="1">허용</option>
+								<option value="0">차단</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-pc-agent-require-mapping">미매핑 에이전트 정책</label>
+							<select id="policy-pc-agent-require-mapping" class="form-input" name="pc_agent_require_user_mapping">
+								<option value="1">사용자 매핑 전 차단</option>
+								<option value="0">관리자 확인 대상으로만 표시</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-pc-agent-inactive-days">비활성 판단 기준(일)</label>
+							<select id="policy-pc-agent-inactive-days" class="form-input" name="pc_agent_inactive_days">
+								<option value="1">1일</option>
+								<option value="3">3일</option>
+								<option value="7">7일</option>
+								<option value="14">14일</option>
+								<option value="30">30일</option>
+								<option value="60">60일</option>
+								<option value="90">90일</option>
+							</select>
+						</div>
 						</div>
 					</div>
 					<div class="setting-card-actions ac-card-footer">
-						<p class="ac-card-status" id="admin-policy-status-web" aria-live="polite"></p>
-						<button type="button" id="admin-save-web" class="btn-save">
+						<p class="ac-card-status" id="admin-policy-status-gate" aria-live="polite"></p>
+						<button type="button" id="admin-save-gate" class="btn-save">
 							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-							WEB 통제 저장
+							저장
+						</button>
+					</div>
+				</section>
+
+				<!-- ════════ SSH / 감사 정책 ════════ -->
+				<section class="setting-card ac-card-wide" id="ac-audit-policy-card" aria-labelledby="ac-audit-policy-title">
+					<div class="setting-card-header">
+						<div>
+							<h2 id="ac-audit-policy-title">SSH / 감사 정책</h2>
+							<p>SSH 실행 방식과 접속·에이전트 이력의 보존 기준을 관리합니다.</p>
+						</div>
+					</div>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">SSH 실행</h3>
+						<div class="form-grid ac-policy-grid ac-policy-grid-wide">
+						<div class="form-row">
+							<label for="policy-ssh-launch-enabled">SSH 접속 실행</label>
+							<select id="policy-ssh-launch-enabled" class="form-input" name="ssh_launch_enabled">
+								<option value="1">사용</option>
+								<option value="0">중지</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-ssh-connect-account-required">접속 계정 기록</label>
+							<select id="policy-ssh-connect-account-required" class="form-input" name="ssh_connect_account_required">
+								<option value="0">선택 입력</option>
+								<option value="1">필수 입력</option>
+							</select>
+						</div>
+						</div>
+					</div>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">접속 요청 제한</h3>
+						<div class="form-grid ac-policy-grid ac-policy-grid-wide">
+						<div class="form-row">
+							<label for="policy-access-click-cooldown">접속 버튼 재클릭 대기(초)</label>
+							<select id="policy-access-click-cooldown" class="form-input" name="access_click_cooldown_seconds">
+								<option value="0">없음</option>
+								<option value="1">1초</option>
+								<option value="2">2초</option>
+								<option value="3">3초</option>
+								<option value="5">5초</option>
+								<option value="10">10초</option>
+								<option value="30">30초</option>
+								<option value="60">60초</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-access-rate-window">접속 요청 제한 시간(초)</label>
+							<select id="policy-access-rate-window" class="form-input" name="access_rate_limit_window_seconds">
+								<option value="5">5초</option>
+								<option value="10">10초</option>
+								<option value="30">30초</option>
+								<option value="60">60초</option>
+								<option value="120">2분</option>
+								<option value="300">5분</option>
+								<option value="600">10분</option>
+								<option value="1800">30분</option>
+								<option value="3600">1시간</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-access-rate-count">제한 시간 내 허용 횟수</label>
+							<select id="policy-access-rate-count" class="form-input" name="access_rate_limit_max_count">
+								<option value="1">1회</option>
+								<option value="2">2회</option>
+								<option value="3">3회</option>
+								<option value="5">5회</option>
+								<option value="10">10회</option>
+								<option value="20">20회</option>
+								<option value="50">50회</option>
+								<option value="100">100회</option>
+							</select>
+						</div>
+						</div>
+					</div>
+					<div class="ac-policy-group">
+						<h3 class="ac-policy-group-title">감사 보존</h3>
+						<div class="form-grid ac-policy-grid ac-policy-grid-wide">
+						<div class="form-row">
+							<label for="policy-audit-retention-days">접속 감사 로그 보존(일)</label>
+							<select id="policy-audit-retention-days" class="form-input" name="audit_log_retention_days">
+								<option value="30">30일</option>
+								<option value="90">90일</option>
+								<option value="180">180일</option>
+								<option value="365">1년</option>
+								<option value="730">2년</option>
+								<option value="1095">3년</option>
+								<option value="1825">5년</option>
+								<option value="3650">10년</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-agent-retention-days">PC 에이전트 이력 보존(일)</label>
+							<select id="policy-agent-retention-days" class="form-input" name="pc_agent_retention_days">
+								<option value="30">30일</option>
+								<option value="90">90일</option>
+								<option value="180">180일</option>
+								<option value="365">1년</option>
+								<option value="730">2년</option>
+								<option value="1095">3년</option>
+								<option value="1825">5년</option>
+								<option value="3650">10년</option>
+							</select>
+						</div>
+						<div class="form-row">
+							<label for="policy-audit-export-max">CSV 다운로드 최대 건수</label>
+							<select id="policy-audit-export-max" class="form-input" name="audit_export_max_rows">
+								<option value="100">100건</option>
+								<option value="500">500건</option>
+								<option value="1000">1,000건</option>
+								<option value="5000">5,000건</option>
+								<option value="10000">10,000건</option>
+								<option value="20000">20,000건</option>
+								<option value="50000">50,000건</option>
+							</select>
+						</div>
+						</div>
+					</div>
+					<div class="setting-card-actions ac-card-footer">
+						<p class="ac-card-status" id="admin-policy-status-audit" aria-live="polite"></p>
+						<button type="button" id="admin-save-audit" class="btn-save">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+							저장
 						</button>
 					</div>
 				</section>

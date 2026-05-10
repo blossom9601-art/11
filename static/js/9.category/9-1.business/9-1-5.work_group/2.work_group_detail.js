@@ -1,4 +1,4 @@
-// Manufacturer detail: Manager tab logic (clean, manager-only)
+﻿// Manufacturer detail: Manager tab logic (clean, manager-only)
 
 // Early: apply saved sidebar state to <html> before layout to prevent flash
 // and ensure detail.css !important rules (html.sidebar-collapsed) match.
@@ -104,7 +104,7 @@
             }
             function loadLottieAndRender(){
               try{
-                var script = document.createElement('script'); script.src='https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js'; script.async=true;
+                var script = document.createElement('script'); script.src='/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie'; script.async=true;
                 script.onload=function(){ if(!renderLottie()) renderImageFallback(); }; script.onerror=function(){ renderImageFallback(); }; document.head.appendChild(script);
               }catch(_){ renderImageFallback(); }
             }
@@ -227,7 +227,8 @@
             else controlHtml = '<input name="'+c+'" class="form-input" value="'+(data[c]||'')+'">';
             wrap.innerHTML = '<label>'+LABELS[c]+'</label>'+controlHtml; grid.appendChild(wrap);
           });
-          section.appendChild(grid); form.appendChild(section);
+          section.appendChild(grid);
+        ['model','vendor'].forEach(function(name){ var requiredInput = grid.querySelector('[name="'+name+'"]'); if(requiredInput) requiredInput.required = true; }); form.appendChild(section);
         }
             if(window.BlossomTab41System && typeof window.BlossomTab41System.initAllocationTable === 'function'){
               try{ if(window.BlossomTab41System.initAllocationTable()) return; }catch(_){ }
@@ -264,6 +265,8 @@
         if(!isWorkGroupAnyTab) return;
         try { window.__wgNoDataV2 = true; } catch(_f) {}
 
+        var BUSINESS_WORK_LABEL_MAX_LEN = 16;
+
         function safeTrim(v){ return (v==null)?'':String(v).trim(); }
         function fetchJson(url){
           return fetch(url, { method:'GET', headers:{ Accept:'application/json' }, credentials:'same-origin' })
@@ -272,25 +275,17 @@
             });
         }
 
-        // ---- Payload utility helpers (read/write URL params & sessionStorage) ----
+        // ---- Payload utility helpers (server-rendered id + optional session helper cache) ----
         var SESSION_KEY = 'work_group_selected_row';
         function readPayloadFromQuery(){
-          try{
-            var qs = new URLSearchParams((location && location.search) || '');
-            var id = qs.get('id') || qs.get('group_id') || '';
-            if(!id) return null;
-            var p = {};
-            qs.forEach(function(v, k){ p[k] = v; });
-            if(!p.group_id && p.id) p.group_id = p.id;
-            return p;
-          }catch(_){ return null; }
+          return null;
         }
         function readPayloadFromSession(){
           try{
             var raw = sessionStorage.getItem(SESSION_KEY);
             if(!raw) return null;
             var p = JSON.parse(raw);
-            return (p && (p.id || p.group_id)) ? p : null;
+            return (p && (p.id || p.group_id || p.public_id)) ? p : null;
           }catch(_){ return null; }
         }
         function writePayloadToSession(p){
@@ -302,6 +297,7 @@
           var text = function(v){ return (v==null)?'':String(v).trim(); };
           p.id = text(raw.id);
           p.group_id = text(raw.id || raw.group_id);
+          p.public_id = text(raw.public_id || raw.resource_id);
           p.group_code = text(raw.group_code);
           p.wc_name = text(raw.group_name || raw.wc_name);
           p.wc_desc = text(raw.description || raw.wc_desc);
@@ -314,23 +310,26 @@
           p.note = text(raw.remark || raw.note);
           return p;
         }
-        function buildSearchFromPayload(p){
-          if(!p) return '';
-          var qs = new URLSearchParams();
-          ['id','group_id','wc_name','wc_desc','work_status','sys_dept','hw_count','sw_count','work_priority','note'].forEach(function(k){
-            var v = (p[k] != null) ? String(p[k]) : '';
-            if(v) qs.set(k, v);
-          });
-          var s = qs.toString();
-          return s ? ('?' + s) : '';
-        }
-        function ensureTabLinksHaveSearch(search){
+        function ensureSecureTabLinks(publicId){
           try{
-            if(!search) return;
+            publicId = safeTrim(publicId);
+            if(!publicId) return;
+            var tabByKey = {
+              cat_business_group_detail: '',
+              cat_business_group_manager: 'manager',
+              cat_business_group_system: 'system',
+              cat_business_group_service: 'service',
+              cat_business_group_log: 'log',
+              cat_business_group_file: 'file'
+            };
             var links = document.querySelectorAll('.server-detail-tab-btn');
             links.forEach(function(a){
-              var href = (a.getAttribute('href') || '').split('?')[0];
-              a.setAttribute('href', href + search);
+              var href = a.getAttribute('href') || '';
+              var key = Object.keys(tabByKey).find(function(k){ return href.indexOf(k) >= 0; });
+              if(!key && href.indexOf('/business-groups/') >= 0) return;
+              if(!key) return;
+              var tab = tabByKey[key];
+              a.setAttribute('href', '/business-groups/' + encodeURIComponent(publicId) + (tab ? ('?tab=' + tab) : ''));
             });
           }catch(_){}
         }
@@ -343,6 +342,9 @@
 
         function _fallbackStatusColorByName(name){
           var v = safeTrim(name);
+          if(v === '운영') return 'ws-run';
+          if(v === '임시') return 'ws-wait';
+          if(v === '종료') return 'ws-idle';
           if(v === '정상') return 'ws-run';
           if(v === '보류') return 'ws-wait';
           if(v === '폐기') return 'ws-idle';
@@ -350,7 +352,6 @@
           if(v === '유휴') return 'ws-idle';
           if(v === '대기') return 'ws-wait';
           if(v === '점검') return 'ws-wait';
-          if(v === '종료') return 'ws-wait';
           if(v === '예비') return 'ws-idle';
           return 'ws-wait';
         }
@@ -358,9 +359,9 @@
         function getWorkStatusMeta(){
           if(_statusMetaPromise) return _statusMetaPromise;
           _statusMetaPromise = Promise.resolve([
-            { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
-            { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
-            { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+            { status_code: '운영', status_name: '운영', wc_color: 'ws-run' },
+            { status_code: '임시', status_name: '임시', wc_color: 'ws-wait' },
+            { status_code: '종료', status_name: '종료', wc_color: 'ws-idle' }
           ]).then(function(items){
             // Initial render
             renderFromStorage();
@@ -427,13 +428,20 @@
           }catch(_){ }
         }
 
-        // Load payload from URL first; fall back to sessionStorage; then DOM attribute
-        var payload = readPayloadFromQuery() || readPayloadFromSession();
+        // Load payload from server-rendered DOM first; sessionStorage is only a best-effort helper cache.
+        var payload = null;
+        try{
+          var domId0 = document.body && document.body.getAttribute('data-cat-detail-id');
+          var domPublicId0 = document.body && document.body.getAttribute('data-work-group-public-id');
+          if(domId0 && parseInt(domId0,10) > 0) payload = { id: domId0, group_id: domId0, public_id: domPublicId0 || '' };
+        }catch(_){}
+        if(!payload) payload = readPayloadFromQuery() || readPayloadFromSession();
         if(!payload){
           // Last resort: read id from server-side cat_detail_id embedded in body
           try{
             var domId = document.body && document.body.getAttribute('data-cat-detail-id');
-            if(domId && parseInt(domId,10) > 0) payload = { id: domId, group_id: domId };
+            var domPublicId = document.body && document.body.getAttribute('data-work-group-public-id');
+            if(domId && parseInt(domId,10) > 0) payload = { id: domId, group_id: domId, public_id: domPublicId || '' };
           }catch(_){}
         }
         if(payload){
@@ -441,28 +449,12 @@
           applyPayloadToDom(payload);
         }
 
-        function getQueryParams(){
-          try{ return new URLSearchParams((location && location.search) || ''); }catch(_){ return new URLSearchParams(); }
-        }
         function refreshLinksAndUrlFromPayload(p){
-          // Keep page URL clean, but ensure tab links always carry id context.
-          // This avoids intermittent tab redirects when session context is missing.
           try{
-            var gid = '';
-            if (p && (p.group_id || p.id)) {
-              gid = String(p.group_id || p.id).trim();
-            }
-            if (!gid) {
-              var qs = getQueryParams();
-              gid = String(qs.get('id') || qs.get('group_id') || '').trim();
-            }
-            if (!gid) return;
-            ensureTabLinksHaveSearch('?id=' + encodeURIComponent(gid));
+            ensureSecureTabLinks(p && p.public_id);
           }catch(_){ }
         }
 
-        // Keep context across the 7 tabs by appending search to tab links.
-        // If current URL has no search but we have payload, synthesize it.
         refreshLinksAndUrlFromPayload(payload);
 
         // If we only have group_id (or minimal params), hydrate from API so refresh/bookmark works.
@@ -521,28 +513,7 @@
             wrap.style.width = '100%';
             wrap.style.boxSizing = 'border-box';
             wrap.style.flexDirection = 'column';
-            var jsonPath = '/static/image/svg/free-animated-no-data.json';
             var altMsg = altText || '데이터 없음';
-
-            function renderTextOnly(){
-              try{
-                wrap.innerHTML = '';
-                var capWrap=document.createElement('span');
-                capWrap.style.display='block';
-                capWrap.style.marginTop='8px';
-                capWrap.style.textAlign='center';
-                (altMsg+'').split('\n').forEach(function(line, i){
-                  var cap=document.createElement('span');
-                  cap.textContent=line;
-                  cap.style.display='block';
-                  cap.style.fontSize = i===0 ? '14px' : '13px';
-                  cap.style.color='#64748b';
-                  capWrap.appendChild(cap);
-                });
-                wrap.appendChild(capWrap);
-                if(!wrap.parentNode) container.appendChild(wrap);
-              }catch(_t){ }
-            }
 
             function attachCaption(){
               var capWrap = document.createElement('span');
@@ -560,103 +531,28 @@
               wrap.appendChild(capWrap);
             }
 
-            function startLottie(){
+            function renderIsolatedLottie(){
               try{
-                if(!window.lottie){ renderTextOnly(); return; }
-                var animBox = document.createElement('span');
-                animBox.style.display = 'inline-block';
-                animBox.style.width = '240px';
-                animBox.style.maxWidth = '100%';
-                animBox.style.height = '180px';
-                animBox.style.pointerEvents = 'none';
-                animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
-
                 wrap.innerHTML = '';
-                wrap.appendChild(animBox);
+                var frame = document.createElement('iframe');
+                frame.title = (altMsg+'').split('\n')[0];
+                frame.setAttribute('aria-label', frame.title);
+                frame.style.display = 'block';
+                frame.style.width = '240px';
+                frame.style.maxWidth = '100%';
+                frame.style.height = '180px';
+                frame.style.border = '0';
+                frame.style.overflow = 'hidden';
+                frame.style.background = 'transparent';
+                frame.scrolling = 'no';
+                frame.src = '/static/no-data-lottie.html?v=20260509_external_frame';
+                wrap.appendChild(frame);
                 attachCaption();
                 if(!wrap.parentNode) container.appendChild(wrap);
-
-                var anim = window.lottie.loadAnimation({
-                  container: animBox,
-                  renderer: 'svg',
-                  loop: true,
-                  autoplay: true,
-                  path: jsonPath,
-                  rendererSettings: { preserveAspectRatio: 'xMidYMid meet' }
-                });
-
-                try {
-                  setTimeout(function(){
-                    try { anim.goToAndPlay(0, true); } catch(_g2) { try { anim.play(); } catch(_p2) {} }
-                  }, 40);
-                } catch(_t2) {}
-
-                // When the JSON resolves to an empty SVG shell, retry with canvas using same JSON.
-                try {
-                  setTimeout(function(){
-                    try {
-                      var svg = animBox.querySelector('svg');
-                      var vectorCount = svg ? svg.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,image,text,use').length : 0;
-                      if(vectorCount > 2) return;
-                      try { if(anim && anim.destroy) anim.destroy(); } catch(_d) {}
-                      fetch(jsonPath, { credentials:'same-origin' })
-                        .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('json')); })
-                        .then(function(data){
-                          animBox.innerHTML = '';
-                          window.lottie.loadAnimation({
-                            container: animBox,
-                            renderer: 'canvas',
-                            loop: true,
-                            autoplay: true,
-                            animationData: data
-                          });
-                        })
-                        .catch(function(){ renderTextOnly(); });
-                    } catch(_v) { renderTextOnly(); }
-                  }, 1200);
-                } catch(_tv) {}
-              }catch(_){ renderTextOnly(); }
-            }
-
-            function renderLottie(){
-              try{
-                if(!window.lottie){ return false; }
-                startLottie();
                 return true;
               }catch(_){ return false; }
             }
-            function loadScriptOnce(src, onDone){
-              try{
-                if(!src){ onDone(false); return; }
-                var key = 'blsLottieScript:' + src;
-                var prior = document.querySelector('script[data-bls-key="'+key+'"]');
-                if(prior){
-                  if(window.lottie){ onDone(true); return; }
-                  prior.addEventListener('load', function(){ onDone(!!window.lottie); }, { once:true });
-                  prior.addEventListener('error', function(){ onDone(false); }, { once:true });
-                  return;
-                }
-                var script = document.createElement('script');
-                script.src = src;
-                script.async = true;
-                script.setAttribute('data-bls-key', key);
-                script.onload = function(){ onDone(!!window.lottie); };
-                script.onerror = function(){ onDone(false); };
-                document.head.appendChild(script);
-              }catch(_){ onDone(false); }
-            }
-            function loadLottieAndRender(){
-              try{
-                loadScriptOnce('/static/js/vendor/lottie.min.js?v=5.12.2', function(okLocal){
-                  if(okLocal && renderLottie()) return;
-                  loadScriptOnce('https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js', function(okCdn){
-                    if(okCdn && renderLottie()) return;
-                    renderTextOnly();
-                  });
-                });
-              }catch(_){ renderTextOnly(); }
-            }
-            if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderTextOnly(); } }
+            renderIsolatedLottie();
           }catch(_){ }
         }
         function getInt(v){ var n=parseInt(String(v||'').replace(/[^0-9-]/g,''),10); return (isNaN(n)||!isFinite(n))?0:n; }
@@ -780,6 +676,8 @@
                 }
               })
               .catch(function(){
+                var wrapEl=document.getElementById('svc-stats-wrap');
+                if(wrapEl) wrapEl.style.display='none';
                 var emptyEl=document.getElementById('svc-empty');
                 if(emptyEl){ emptyEl.style.display=''; emptyEl.hidden=false;
                   try{ showNoDataImage(emptyEl,'서비스 데이터를 불러올 수 없습니다.'); }catch(_e){}
@@ -812,12 +710,13 @@
           return v.trim().toLowerCase().replace(/\s+/g,' ');
         }
 
-        var WORK_DEPTS_ENDPOINT = '/api/org-departments';
+        var WORK_DEPTS_ENDPOINT = '/api/work-groups/departments';
         var FIXED_WORK_STATUSES = [
-          { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
-          { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
-          { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+          { status_code: '운영', status_name: '운영', wc_color: 'ws-run' },
+          { status_code: '임시', status_name: '임시', wc_color: 'ws-wait' },
+          { status_code: '종료', status_name: '종료', wc_color: 'ws-idle' }
         ];
+        var WORK_GROUP_STATUS_CODE_SET = { 운영:1, 임시:1, 종료:1 };
 
         var LOOKUPS = {
           loadPromise: null,
@@ -891,10 +790,46 @@
           sys_dept:'담당 부서', work_status:'업무 상태', work_priority:'업무 우선순위', note:'비고'
         };
 
+        function attachWorkPriorityDigitsOnly(root){
+          var scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+          var nodes = scope.querySelectorAll('input[name="work_priority"]');
+          Array.prototype.forEach.call(nodes, function(input){
+            if(!input || input.dataset.priorityDigitsBound === '1') return;
+            input.dataset.priorityDigitsBound = '1';
+            input.setAttribute('inputmode', 'numeric');
+            input.setAttribute('autocomplete', 'off');
+            if(input.type === 'number') input.type = 'text';
+            function digitsOnly(s){ return String(s || '').replace(/\D/g, ''); }
+            input.addEventListener('keydown', function(e){
+              var allowedNav = ['Backspace','Tab','Escape','Enter','ArrowLeft','ArrowRight','Delete','Home','End'];
+              if(allowedNav.indexOf(e.key) >= 0 || e.ctrlKey || e.metaKey || e.altKey) return;
+              if(String(e.key).length === 1 && !(/\d/).test(e.key)) e.preventDefault();
+            });
+            input.addEventListener('input', function(){
+              var next = digitsOnly(input.value);
+              if(input.value !== next) input.value = next;
+            });
+            input.addEventListener('paste', function(e){
+              e.preventDefault();
+              var clip = digitsOnly((e.clipboardData && e.clipboardData.getData('text')) || '');
+              var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+              var end = input.selectionEnd != null ? input.selectionEnd : input.value.length;
+              input.value = digitsOnly(input.value.slice(0, start) + clip + input.value.slice(end));
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+          });
+        }
+
+        function isValidWorkPriorityString(raw){
+          var s = String(raw == null ? '' : raw).trim();
+          if(s === '') return true;
+          return (/^\d+$/).test(s);
+        }
+
         function generateFieldInput(col, value){
           var v = String(value==null? '' : value).trim();
           if(col==='wc_name'){
-            return '<input name="wc_name" class="form-input" value="'+escapeHTML(v)+'" required>';
+            return '<input name="wc_name" class="form-input" value="'+escapeHTML(v)+'" required maxlength="'+BUSINESS_WORK_LABEL_MAX_LEN+'">';
           }
           if(col==='group_code'){
             return '<input name="group_code" class="form-input" value="'+escapeHTML(v)+'" placeholder="업무 코드">';
@@ -917,6 +852,10 @@
           }
           if(col==='work_status'){
             var selected3 = v;
+            var legacyExtra = '';
+            if(selected3 && !WORK_GROUP_STATUS_CODE_SET[selected3]){
+              legacyExtra = '<option value="'+escapeHTML(selected3)+'" selected>'+escapeHTML(selected3)+' (기존)</option>';
+            }
             var opts3 = (LOOKUPS.statuses || []).map(function(r){
               var code3 = safeTrim(r && r.status_code);
               var name3 = safeTrim((r && r.status_name) || (r && r.wc_name) || (r && r.name));
@@ -924,12 +863,13 @@
               var sel3 = (code3 === selected3) ? ' selected' : '';
               return '<option value="'+escapeHTML(code3)+'"'+sel3+'>'+escapeHTML(name3)+'</option>';
             }).join('');
-            return '<select name="work_status" class="form-input search-select" data-placeholder="업무 상태 선택" required>'+
-              '<option value="">선택</option>'+opts3+
+            return '<select name="work_status" class="form-input" required>'+
+              '<option value="">선택</option>'+legacyExtra+opts3+
               '</select>';
           }
           if(col==='work_priority'){
-            return '<input name="work_priority" type="number" min="0" step="1" class="form-input" value="'+escapeHTML(v)+'" placeholder="업무 우선순위(숫자)">';
+            var pv = v.replace(/\D/g, '');
+            return '<input name="work_priority" type="text" inputmode="numeric" autocomplete="off" class="form-input" value="'+escapeHTML(pv)+'" placeholder="숫자">';
           }
           return '<input name="'+escapeHTML(col)+'" class="form-input" value="'+escapeHTML(v)+'">';
         }
@@ -983,11 +923,33 @@
           return payload2;
         }
 
-        function validateWorkGroupPayload(payload2){
+        function validateWorkGroupPayload(payload2, opts){
+          opts = opts || {};
+          var silent = !!opts.silent;
           var required = ['wc_name','work_status','sys_dept'];
           for(var i=0;i<required.length;i++){
             var k = required[i];
-            if(!safeTrim(payload2[k])) return false;
+            if(!safeTrim(payload2[k])){
+              if(!silent && typeof showMessage === 'function'){
+                showMessage('필수 항목을 모두 입력하세요.', '안내');
+              }
+              return false;
+            }
+          }
+          var st = safeTrim(payload2.work_status || payload2.status_code);
+          if(!WORK_GROUP_STATUS_CODE_SET[st]){
+            if(!silent && typeof showMessage === 'function'){
+              showMessage('업무 상태는 운영, 임시, 종료 중에서만 선택할 수 있습니다.', '안내');
+            }
+            return false;
+          }
+          var prRaw = payload2.work_priority;
+          var prSrc = (prRaw == null ? '' : String(prRaw)).trim();
+          if(prSrc !== '' && !(/^\d+$/).test(prSrc)){
+            if(!silent && typeof showMessage === 'function'){
+              showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내');
+            }
+            return false;
           }
           return true;
         }
@@ -1026,7 +988,9 @@
             grid.appendChild(wrap);
           });
           section.appendChild(grid);
+        ['model','vendor'].forEach(function(name){ var requiredInput = grid.querySelector('[name="'+name+'"]'); if(requiredInput) requiredInput.required = true; });
           form.appendChild(section);
+          attachWorkPriorityDigitsOnly(form);
         }
 
         var openBtn = document.getElementById(EDIT_OPEN_ID);
@@ -1047,6 +1011,10 @@
         if(saveBtn){ saveBtn.addEventListener('click', function(){
           var form = document.getElementById(EDIT_FORM_ID); if(!form) { closeModalLocal(EDIT_MODAL_ID); return; }
           var source = collectForm(form);
+          if(!isValidWorkPriorityString(source.work_priority)){
+            try{ if(typeof showMessage === 'function') showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내'); }catch(_){}
+            return;
+          }
           var updatePayload = buildWorkGroupPayload(source, { partial: true });
           if(!validateWorkGroupPayload(updatePayload)){
             // Focus the first missing required field (list modal behavior relies on required attr too)
@@ -1055,6 +1023,10 @@
               var k = order[i];
               if(!safeTrim(updatePayload[k])){ try{ form.querySelector('[name="'+k+'"]').focus(); }catch(_f){} break; }
             }
+            return;
+          }
+          if(safeTrim(updatePayload.wc_name).length > BUSINESS_WORK_LABEL_MAX_LEN){
+            try{ if(typeof showMessage === 'function') showMessage('업무 그룹은 ' + BUSINESS_WORK_LABEL_MAX_LEN + '글자 이내로 입력해 주세요.', '안내'); }catch(_){}
             return;
           }
           var id = getCurrentGroupId();
@@ -1145,7 +1117,7 @@
           }catch(_){ }
         }
         updateEmptyState();
-  
+
         // Select all (visible rows only)
         var selectAll = document.getElementById('au-select-all');
         if(selectAll){
@@ -1154,11 +1126,11 @@
             checks.forEach(function(c){ var tr=c.closest('tr'); var hidden=tr && (tr.hasAttribute('data-hidden') || tr.style.display==='none'); if(!hidden){ c.checked = !!selectAll.checked; } if(tr){ tr.classList.toggle('selected', !!c.checked && !hidden); } });
           });
         }
-  
+
         // Row click toggling and selection syncing
         table.addEventListener('click', function(ev){ (function(){ var tr=ev.target.closest('tr'); if(!tr || !tr.parentNode || tr.parentNode.tagName.toLowerCase()!=='tbody') return; var isControl=ev.target.closest('button, a, input, select, textarea, label'); var onCheckbox=ev.target.closest('input[type="checkbox"].au-row-check'); if(isControl && !onCheckbox) return; if(onCheckbox) return; var cb=tr.querySelector('.au-row-check'); if(!cb) return; var hidden=tr.hasAttribute('data-hidden') || tr.style.display==='none'; if(hidden) return; cb.checked = !cb.checked; tr.classList.toggle('selected', cb.checked); var sa=document.getElementById('au-select-all'); if(sa){ var visChecks=table.querySelectorAll('tbody tr:not([data-hidden]) .au-row-check'); if(visChecks.length){ sa.checked = Array.prototype.every.call(visChecks, function(c){ return c.checked; }); } else { sa.checked=false; } } })(); });
         table.addEventListener('change', function(ev){ var cb=ev.target.closest('.au-row-check'); if(!cb) return; var tr=cb.closest('tr'); if(tr){ var hidden=tr.hasAttribute('data-hidden') || tr.style.display==='none'; tr.classList.toggle('selected', !!cb.checked && !hidden); } var sa=document.getElementById('au-select-all'); if(sa){ var visChecks=table.querySelectorAll('tbody tr:not([data-hidden]) .au-row-check'); if(visChecks.length){ sa.checked = Array.prototype.every.call(visChecks, function(c){ return c.checked; }); } else { sa.checked=false; } } });
-  
+
         // CSV modal wiring
         (function(){
           var btn=document.getElementById('au-download-btn');
@@ -1173,7 +1145,7 @@
           if(modalEl){ modalEl.addEventListener('click', function(e){ if(e.target===modalEl) closeModalLocal(modalId); }); document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modalEl.classList.contains('show')) closeModalLocal(modalId); }); }
           if(confirmBtn){ confirmBtn.addEventListener('click', function(){ var onlySel = !!(document.getElementById('au-csv-range-selected') && document.getElementById('au-csv-range-selected').checked); auExportCSV(onlySel); closeModalLocal(modalId); }); }
         })();
-  
+
         // Add row
         var addBtn = document.getElementById('au-row-add');
         if(addBtn){
@@ -1212,12 +1184,12 @@
             wireCommandDependency(tr);
           });
         }
-  
+
         // Delegate actions
         table.addEventListener('click', function(ev){
           var target = ev.target.closest('.js-au-del, .js-au-edit, .js-au-commit, .js-au-toggle'); if(!target) return;
           var tr = ev.target.closest('tr'); if(!tr) return;
-  
+
           // delete
           if(target.classList.contains('js-au-del')){
             if(tr && tr.parentNode){ tr.parentNode.removeChild(tr); }
@@ -1225,7 +1197,7 @@
             updateEmptyState();
             return;
           }
-  
+
           // edit -> save
           if(
             target.classList.contains('js-au-edit') ||
@@ -1269,11 +1241,11 @@
           }
         });
       })(); */
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-      
+
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
       // ---------- Hardware/Allocation table interactions (system tab) ----------
@@ -2006,7 +1978,7 @@
     // Detect schema: inventory-style (qty column) vs bay-style (space/serial columns)
     var isInventorySchema = !!table.querySelector('[data-col="qty"]') && !table.querySelector('[data-col="space"]');
         var bayCount = isRearBay ? 8 : 16;
-  
+
         // Selection: select-all only affects visible rows
         var selectAll = document.getElementById('hw-select-all');
         if(selectAll){
@@ -2020,7 +1992,7 @@
             });
           });
         }
-  
+
         // 시스템 고정행: 첫 줄은 '시스템'으로 기본정보 탭의 하드웨어 정보를 반영
         function getPageSystemInfo(){
           // Schema-agnostic source for model/vendor/serial; mapping to columns handled in builders
@@ -2141,7 +2113,7 @@
             }).catch(function(_e){ /* ignore */ });
           }catch(_){ }
         })();
-  
+
         // Pagination state and helpers (match change log parity)
         var hwState = { page:1, pageSize:10 };
         (function initPageSize(){
@@ -2187,7 +2159,7 @@
         if(btnPrev) btnPrev.addEventListener('click', function(){ hwGoDelta(-1); });
         if(btnNext) btnNext.addEventListener('click', function(){ hwGoDelta(1); });
         if(btnLast) btnLast.addEventListener('click', hwGoLast);
-  
+
         function updateEmptyState(){
           try{ var hasRows = table.querySelector('tbody tr') != null; if(empty){ empty.hidden = !!hasRows; empty.style.display = hasRows ? 'none' : ''; } }
           catch(_){ if(empty){ empty.hidden=false; empty.style.display=''; } }
@@ -2195,7 +2167,7 @@
           hwRenderPage();
         }
         updateEmptyState();
-  
+
         // Add new row
         var addBtn = document.getElementById('hw-row-add');
         if(addBtn){
@@ -2241,7 +2213,7 @@
             updateEmptyState();
           });
         }
-  
+
         // delegate edit/delete/toggle save
         table.addEventListener('click', function(ev){
           var target = ev.target.closest('.js-hw-del, .js-hw-edit, .js-hw-commit, .js-hw-toggle'); if(!target) return;
@@ -2330,7 +2302,7 @@
             if(isSystemRow(tr)) spaceVal = '-';
             if(!spaceVal){ setError(spaceInput, true); if(!firstInvalid) firstInvalid = spaceInput; } else { setError(spaceInput, false); }
             if(firstInvalid){ try{ firstInvalid.focus(); }catch(_e){} return; }
-  
+
             // Commit values; default blanks to '-'
             function commit(name, val){
               var td = tr.querySelector('[data-col="'+name+'"]'); if(!td) return;
@@ -2374,7 +2346,7 @@
             return;
           }
         });
-  
+
         // Row click toggling and checkbox change syncing (visible rows only)
         table.addEventListener('click', function(ev){
           (function(){
@@ -2391,7 +2363,7 @@
           })();
         });
         table.addEventListener('change', function(ev){ var cb=ev.target.closest('.hw-row-check'); if(!cb) return; if(cb.disabled) return; var tr=cb.closest('tr'); if(tr){ var hidden=tr.hasAttribute('data-hidden') || tr.style.display==='none'; tr.classList.toggle('selected', !!cb.checked && !hidden); } var sa=document.getElementById('hw-select-all'); if(sa){ var visChecks=table.querySelectorAll('tbody tr:not([data-hidden]) .hw-row-check'); if(visChecks.length){ sa.checked = Array.prototype.every.call(visChecks, function(c){ return c.checked; }); } else { sa.checked=false; } } });
-  
+
         // CSV export helpers and modal wiring
         function hwEscapeCSV(val){ return '"' + String(val).replace(/"/g,'""') + '"'; }
         function hwRowSaved(tr){ var t=tr.querySelector('.js-hw-toggle'); var inEdit=t && t.getAttribute('data-action')==='save'; if(inEdit) return false; return !tr.querySelector('td[data-col] input, td[data-col] select, td[data-col] textarea'); }
@@ -2443,29 +2415,28 @@
           if(confirmBtn){ confirmBtn.addEventListener('click', function(){ var onlySel = !!(document.getElementById('hw-csv-range-selected') && document.getElementById('hw-csv-range-selected').checked); hwExportCSV(onlySel); closeModalLocal(modalId); }); }
         })();
       })();
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-      
-  
+
+
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-  
+
+
       // [Removed legacy Change Log implementation]
-  
+
 });
-  
+
     // No modal APIs to expose
   })();
-  

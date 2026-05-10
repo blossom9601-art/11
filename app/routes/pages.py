@@ -30,7 +30,11 @@ from app.services.work_category_service import list_work_categories
 from app.services.work_division_service import list_work_divisions
 from app.services.work_status_service import list_work_statuses
 from app.services.work_operation_service import list_work_operations
-from app.services.work_group_service import list_work_groups, get_work_group as _svc_get_work_group
+from app.services.work_group_service import (
+    list_work_groups,
+    get_work_group as _svc_get_work_group,
+    get_work_group_by_public_id as _svc_get_work_group_by_public_id,
+)
 from app.services.sw_db_type_service import get_sw_db_type
 from app.services.sw_os_type_service import get_sw_os_type
 from app.services.sw_middleware_type_service import get_sw_middleware_type
@@ -40,11 +44,19 @@ from app.services.sw_high_availability_type_service import get_sw_ha_type
 from app.services.vendor_manufacturer_service import get_vendor_by_code, get_vendor as svc_get_manufacturer_vendor
 from app.services.vendor_maintenance_service import get_maintenance_vendor as svc_get_maintenance_vendor
 from app.services.hardware_asset_service import get_hardware_asset as svc_get_hardware_asset
+from app.services.public_id_service import make_public_id, resolve_public_id
 from app.services.hw_server_type_service import get_hw_server_type as _svc_get_hw_server
 from app.services.hw_storage_type_service import get_hw_storage_type as _svc_get_hw_storage
 from app.services.hw_san_type_service import get_hw_san_type as _svc_get_hw_san
 from app.services.hw_network_type_service import get_hw_network_type as _svc_get_hw_network
 from app.services.hw_security_type_service import get_hw_security_type as _svc_get_hw_security
+from app.services.cmp_cpu_type_service import get_cmp_cpu_type as _svc_get_cmp_cpu
+from app.services.cmp_gpu_type_service import get_cmp_gpu_type as _svc_get_cmp_gpu
+from app.services.cmp_memory_type_service import get_cmp_memory_type as _svc_get_cmp_memory
+from app.services.cmp_disk_type_service import get_cmp_disk_type as _svc_get_cmp_disk
+from app.services.cmp_nic_type_service import get_cmp_nic_type as _svc_get_cmp_nic
+from app.services.cmp_hba_type_service import get_cmp_hba_type as _svc_get_cmp_hba
+from app.services.cmp_etc_type_service import get_cmp_etc_type as _svc_get_cmp_etc
 from app.services.customer_member_service import get_customer_member as _svc_get_customer_member
 from app.services.customer_associate_service import get_customer_associate as _svc_get_customer_associate
 from app.services.customer_client_service import get_customer_client as _svc_get_customer_client
@@ -63,6 +75,10 @@ _KEY_MENU_CODE = {
     'access_control_request': 'access_control.request',
     'access_control_audit': 'access_control.audit',
     'access_control_delegation': 'access_control.delegation',
+    'identity_account_status': 'identity_governance.status',
+    'identity_account_request': 'identity_governance.request',
+    'identity_account_audit': 'identity_governance.audit',
+    'identity_account_mapping': 'identity_governance.mapping',
     'gov_backup': 'governance.backup', 'gov_package': 'governance.package',
     'gov_vulnerability': 'governance.vulnerability', 'gov_ip': 'governance.ip',
     'gov_vpn': 'governance.vpn', 'gov_leased': 'governance.leased_line',
@@ -367,6 +383,10 @@ TEMPLATE_MAP = {
     'access_control_request': '3.access_control/3-1.access_control/3-1-2.request/1.request_list.html',
     'access_control_audit': '3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.html',
     'access_control_delegation': '3.access_control/3-1.access_control/3-1-4.delegation/1.delegation_list.html',
+    'identity_account_status': '3.access_control/3-2.identity_governance/3-2-1.status/1.identity_status.html',
+    'identity_account_request': '3.access_control/3-2.identity_governance/3-2-2.request/1.identity_request.html',
+    'identity_account_audit': '3.access_control/3-2.identity_governance/3-2-3.audit/1.identity_audit.html',
+    'identity_account_mapping': '3.access_control/3-2.identity_governance/3-2-4.mapping/1.identity_mapping.html',
     # High Availability Active-Active detail & tab pages (pattern identical to unix/security_etc)
     # High Availability Active-Passive detail & tab pages (unix pattern)
     # Governance
@@ -762,15 +782,442 @@ from ..utils.page_tokens import decode_manage_no, encode_manage_no
 from .spa_redirect import resolve_spa_redirect
 
 
+_WG_SECURE_TAB_TO_KEY = {
+    'basic': 'cat_business_group_detail',
+    'manager': 'cat_business_group_manager',
+    'system': 'cat_business_group_system',
+    'service': 'cat_business_group_service',
+    'log': 'cat_business_group_log',
+    'file': 'cat_business_group_file',
+}
+_WG_KEY_TO_SECURE_TAB = {v: k for k, v in _WG_SECURE_TAB_TO_KEY.items()}
+_WG_DETAIL_KEYS = set(_WG_KEY_TO_SECURE_TAB)
+_WG_LEGACY_SENSITIVE_PARAMS = {
+    'wc_name', 'group_name', 'dept', 'sys_dept', 'dept_code', 'dept_name',
+    'work_status', 'status_code', 'model', 'vendor', 'group_code',
+    'wc_desc', 'description', 'note', 'remark', 'work_priority',
+}
+
+
+@pages_bp.route('/business-groups')
+def business_groups_list():
+    return show('cat_business_group')
+
+
+@pages_bp.route('/business-groups/<public_id>')
+def business_group_detail(public_id: str):
+    tab = (request.args.get('tab') or 'basic').strip().lower()
+    key = _WG_SECURE_TAB_TO_KEY.get(tab)
+    if not key:
+        abort(404)
+    row = _svc_get_work_group_by_public_id(public_id)
+    if not row:
+        abort(404)
+    _ctx = session.get('cat_detail_ctx_v1')
+    if not isinstance(_ctx, dict):
+        _ctx = {}
+    _ctx['cat_business_group'] = {
+        'id': str(row.get('id') or ''),
+        'public_id': str(row.get('public_id') or public_id),
+    }
+    session['cat_detail_ctx_v1'] = _ctx
+    session.modified = True
+    target = url_for('pages.blossom_hub', segment=row.get('public_id') or public_id)
+    if tab != 'basic':
+        target = f'{target}?tab={tab}'
+    return redirect(target, code=302)
+
+
+_CATEGORY_TAB_TO_SUFFIX = {
+    'basic': '_detail',
+    'detail': '_detail',
+    'hardware': '_hardware',
+    'software': '_software',
+    'component': '_component',
+    'manager': '_manager',
+    'system': '_system',
+    'service': '_service',
+    'sla': '_sla',
+    'issue': '_issue',
+    'task': '_task',
+    'log': '_log',
+    'file': '_file',
+}
+_CATEGORY_KEY_TO_TAB = {
+    suffix: tab for tab, suffix in _CATEGORY_TAB_TO_SUFFIX.items() if tab != 'detail'
+}
+_CATEGORY_KEY_TO_TAB['_detail'] = 'basic'
+
+
+def _secure_category_route_map():
+    return {
+        ('hardware', 'servers'): {
+            'base': 'cat_hw_server', 'table': 'hw_server_type', 'prefix': 'srv',
+            'get': _svc_get_hw_server, 'code': 'server_code', 'type': 'form_factor',
+            'count': 'usage_count', 'title': 'model_name',
+        },
+        ('hardware', 'storage'): {
+            'base': 'cat_hw_storage', 'table': 'hw_storage_type', 'prefix': 'stor',
+            'get': _svc_get_hw_storage, 'code': 'storage_code', 'type': 'storage_type',
+            'count': 'storage_count', 'title': 'model_name',
+        },
+        ('hardware', 'san'): {
+            'base': 'cat_hw_san', 'table': 'hw_san_type', 'prefix': 'san',
+            'get': _svc_get_hw_san, 'code': 'san_code', 'type': 'san_type',
+            'count': 'san_count', 'title': 'model_name',
+        },
+        ('hardware', 'network'): {
+            'base': 'cat_hw_network', 'table': 'hw_network_type', 'prefix': 'net',
+            'get': _svc_get_hw_network, 'code': 'network_code', 'type': 'network_type',
+            'count': 'device_count', 'title': 'model_name',
+        },
+        ('hardware', 'security'): {
+            'base': 'cat_hw_security', 'table': 'hw_security_type', 'prefix': 'sec',
+            'get': _svc_get_hw_security, 'code': 'security_code', 'type': 'security_type',
+            'count': 'device_count', 'title': 'model_name',
+        },
+        ('software', 'os'): {'base': 'cat_sw_os', 'table': 'sw_os_type', 'prefix': 'os', 'get': get_sw_os_type, 'title': 'model_name'},
+        ('software', 'databases'): {'base': 'cat_sw_database', 'table': 'sw_db_type', 'prefix': 'db', 'get': get_sw_db_type, 'title': 'db_name'},
+        ('software', 'middleware'): {'base': 'cat_sw_middleware', 'table': 'sw_middleware_type', 'prefix': 'mw', 'get': get_sw_middleware_type, 'title': 'model_name'},
+        ('software', 'virtualization'): {'base': 'cat_sw_virtualization', 'table': 'sw_virtual_type', 'prefix': 'virt', 'get': get_sw_virtual_type, 'title': 'model_name'},
+        ('software', 'security'): {'base': 'cat_sw_security', 'table': 'sw_security_type', 'prefix': 'swsec', 'get': get_sw_security_type, 'title': 'model_name'},
+        ('software', 'high-availability'): {'base': 'cat_sw_high_availability', 'table': 'sw_high_availability_type', 'prefix': 'ha', 'get': get_sw_ha_type, 'title': 'model_name'},
+        ('components', 'cpu'): {'base': 'cat_component_cpu', 'table': 'cmp_cpu_type', 'prefix': 'cpu', 'get': _svc_get_cmp_cpu, 'code': 'cpu_code', 'title': 'model_name'},
+        ('components', 'gpu'): {'base': 'cat_component_gpu', 'table': 'cmp_gpu_type', 'prefix': 'gpu', 'get': _svc_get_cmp_gpu, 'code': 'gpu_code', 'title': 'model_name'},
+        ('components', 'memory'): {'base': 'cat_component_memory', 'table': 'cmp_memory_type', 'prefix': 'mem', 'get': _svc_get_cmp_memory, 'code': 'memory_code', 'title': 'model_name'},
+        ('components', 'disk'): {'base': 'cat_component_disk', 'table': 'cmp_disk_type', 'prefix': 'disk', 'get': _svc_get_cmp_disk, 'code': 'disk_code', 'title': 'model_name'},
+        ('components', 'nic'): {'base': 'cat_component_nic', 'table': 'cmp_nic_type', 'prefix': 'nic', 'get': _svc_get_cmp_nic, 'code': 'nic_code', 'title': 'model_name'},
+        ('components', 'hba'): {'base': 'cat_component_hba', 'table': 'cmp_hba_type', 'prefix': 'hba', 'get': _svc_get_cmp_hba, 'code': 'hba_code', 'title': 'model_name'},
+        ('components', 'etc'): {'base': 'cat_component_etc', 'table': 'cmp_etc_type', 'prefix': 'cmp', 'get': _svc_get_cmp_etc, 'code': 'etc_code', 'title': 'model_name'},
+        ('vendors', 'manufacturers'): {'base': 'cat_vendor_manufacturer', 'table': 'biz_vendor_manufacturer', 'prefix': 'ven', 'get': svc_get_manufacturer_vendor, 'vendor': True, 'title': 'manufacturer_name'},
+        ('vendors', 'maintenance'): {'base': 'cat_vendor_maintenance', 'table': 'biz_vendor_maintenance', 'prefix': 'mnt', 'get': svc_get_maintenance_vendor, 'vendor': True, 'title': 'maintenance_name'},
+        ('customers', 'clients'): {'base': 'cat_customer_client1', 'table': 'biz_customer_associate', 'prefix': 'cust', 'get': _svc_get_customer_associate, 'title': 'customer_name'},
+    }
+
+
+_SECURE_CATEGORY_ROUTES = _secure_category_route_map()
+_SECURE_CATEGORY_BY_BASE = {value['base']: ((section, resource), value) for (section, resource), value in _SECURE_CATEGORY_ROUTES.items()}
+_SECURE_CATEGORY_BY_PREFIX = {value['prefix']: ((section, resource), value) for (section, resource), value in _SECURE_CATEGORY_ROUTES.items()}
+# Signed opaque public_id branch prefixes (exclude cat_* UI keys — those are never opaque IDs here).
+_OPAQUE_PUBLIC_ID_PREFIXES = frozenset(_SECURE_CATEGORY_BY_PREFIX.keys()) | {'bg'}
+
+
+def _category_tab_key(base_key: str) -> str:
+    tab = (request.args.get('tab') or 'basic').strip().lower()
+    suffix = _CATEGORY_TAB_TO_SUFFIX.get(tab)
+    if not suffix:
+        abort(404)
+    key = base_key + suffix
+    if key not in TEMPLATE_MAP:
+        abort(404)
+    return key
+
+
+def _vendor_name_from_row(row: dict) -> str:
+    return str(row.get('manufacturer_name') or row.get('vendor') or row.get('manufacturer_code') or '').strip()
+
+
+def _store_category_resource_ctx(route_info: dict, record_id: int, row: dict, public_id: str) -> None:
+    base = route_info['base']
+    if route_info.get('vendor'):
+        ctx = session.get('vendor_detail_ctx_v1')
+        if not isinstance(ctx, dict):
+            ctx = {}
+        ctx[base] = record_id
+        session['vendor_detail_ctx_v1'] = ctx
+        session.modified = True
+        return
+
+    title_key = route_info.get('title') or 'model_name'
+    title_value = str(row.get(title_key) or row.get('model_name') or row.get('customer_name') or '').strip()
+    subtitle_value = str(row.get('address') or _vendor_name_from_row(row) or row.get('business_no') or '').strip()
+    ctx = session.get('cat_detail_ctx_v1')
+    if not isinstance(ctx, dict):
+        ctx = {}
+    detail_ctx = {
+        'id': str(record_id),
+        'public_id': public_id,
+        'title': title_value,
+        'subtitle': subtitle_value,
+    }
+    for source_key, target_key in (
+        (route_info.get('code'), 'server_code'),
+        (route_info.get('type'), 'hw_type'),
+        ('release_date', 'release_date'),
+        ('eosl_date', 'eosl'),
+        (route_info.get('count'), 'qty'),
+        ('remark', 'note'),
+    ):
+        if source_key and row.get(source_key) not in (None, ''):
+            detail_ctx[target_key] = str(row.get(source_key))
+    ctx[base] = detail_ctx
+    session['cat_detail_ctx_v1'] = ctx
+    session.modified = True
+
+
+def _page_url_for_key(key: str, token: str | None = None, **qs) -> str:
+    """Canonical Blossom UI URLs live under /b/<segment> (opaque IDs + template route keys)."""
+    k = (key or '').strip()
+    if token:
+        return url_for('pages.blossom_hub_token', segment=k, token=token, **qs)
+    return url_for('pages.blossom_hub', segment=k, **qs)
+
+
+def _is_category_nav_path(path: str) -> bool:
+    """Legacy ?id= flows are honored on /b/… (after /p → /b redirect)."""
+    p = path or ''
+    return p.startswith('/b/')
+
+
+def _secure_detail_url(base_key: str, public_id: str, tab_key: str | None = None) -> str:
+    entry = _SECURE_CATEGORY_BY_BASE.get(base_key)
+    if not entry:
+        return _page_url_for_key(tab_key or (base_key + '_detail'))
+    target = url_for('pages.blossom_hub', segment=public_id)
+    if tab_key:
+        suffix = tab_key[len(base_key):] if tab_key.startswith(base_key) else '_detail'
+        tab = _CATEGORY_KEY_TO_TAB.get(suffix, 'basic')
+        if tab != 'basic':
+            target = f'{target}?tab={tab}'
+    return target
+
+
+def _opaque_tab_target(base_key: str, url_token: str | None = None):
+    tab = (request.args.get('tab') or 'basic').strip().lower()
+    suffix = _CATEGORY_TAB_TO_SUFFIX.get(tab)
+    if not suffix:
+        abort(404)
+    key = base_key + suffix
+    if key not in TEMPLATE_MAP:
+        abort(404)
+    if tab == 'basic' and request.query_string:
+        return redirect(request.path, code=302)
+    forbidden_query = set(request.args) - {'tab'}
+    if forbidden_query:
+        return redirect(request.path + (f'?tab={tab}' if tab != 'basic' else ''), code=302)
+    return show(key, url_token)
+
+
+def _opaque_branch_response(value: str, url_token: str | None = None):
+    """Signed opaque public_id under /b/<segment> (category master rows)."""
+    if not value or '/' in value:
+        abort(404)
+    prefix = value.split('_', 1)[0] if '_' in value else ''
+    if prefix == 'bg':
+        row = _svc_get_work_group_by_public_id(value)
+        if not row:
+            abort(404)
+        ctx = session.get('cat_detail_ctx_v1')
+        if not isinstance(ctx, dict):
+            ctx = {}
+        ctx['cat_business_group'] = {
+            'id': str(row.get('id') or ''),
+            'public_id': str(row.get('public_id') or value),
+        }
+        session['cat_detail_ctx_v1'] = ctx
+        session.modified = True
+        return _opaque_tab_target('cat_business_group', url_token)
+
+    entry = _SECURE_CATEGORY_BY_PREFIX.get(prefix)
+    if not entry:
+        abort(404)
+    _route_key, route_info = entry
+    record_id = resolve_public_id(route_info['table'], route_info['prefix'], value)
+    if not record_id:
+        abort(404)
+    row = route_info['get'](record_id)
+    if not row:
+        abort(404)
+    _store_category_resource_ctx(route_info, record_id, row, value)
+    return _opaque_tab_target(route_info['base'], url_token)
+
+
+@pages_bp.route('/b/<segment>')
+def blossom_hub(segment: str):
+    """Single /b namespace: opaque signed IDs first, otherwise template route key."""
+    seg = (segment or '').strip()
+    if not seg or '/' in seg:
+        abort(404)
+    if seg.startswith('cat_'):
+        return show(seg)
+    pref = seg.split('_', 1)[0] if '_' in seg else ''
+    if pref in _OPAQUE_PUBLIC_ID_PREFIXES:
+        return _opaque_branch_response(seg)
+    return show(seg)
+
+
+@pages_bp.route('/b/<segment>/<token>')
+def blossom_hub_token(segment: str, token: str):
+    """Same routing as blossom_hub; second path segment is a signed/detail token (e.g. cost) when segment is a page key."""
+    seg = (segment or '').strip()
+    tok = (token or '').strip()
+    if not seg or '/' in seg or not tok:
+        abort(404)
+    if seg.startswith('cat_'):
+        return show(seg, tok)
+    pref = seg.split('_', 1)[0] if '_' in seg else ''
+    if pref in _OPAQUE_PUBLIC_ID_PREFIXES:
+        return _opaque_branch_response(seg, tok)
+    return show(seg, tok)
+
+
+@pages_bp.route('/b/page/<key>')
+@pages_bp.route('/b/page/<key>/<token>')
+def legacy_b_page_redirect(key: str, token: str | None = None):
+    """구형 /b/page/… 북마크 → /b/… 정규 경로."""
+    k = (key or '').strip()
+    target = (
+        url_for('pages.blossom_hub_token', segment=k, token=token)
+        if token
+        else url_for('pages.blossom_hub', segment=k)
+    )
+    qs = request.query_string.decode('utf-8', errors='ignore')
+    if qs:
+        target = f'{target}?{qs}'
+    return redirect(target, code=301)
+
+
+@pages_bp.route('/hardware/<resource>/<public_id>')
+@pages_bp.route('/software/<resource>/<public_id>')
+@pages_bp.route('/components/<resource>/<public_id>')
+@pages_bp.route('/vendors/<resource>/<public_id>')
+def category_resource_detail(resource: str, public_id: str):
+    section = (request.path.split('/', 2)[1] or '').strip()
+    route_info = _SECURE_CATEGORY_ROUTES.get((section, resource))
+    if not route_info:
+        abort(404)
+    record_id = resolve_public_id(route_info['table'], route_info['prefix'], public_id)
+    if not record_id:
+        abort(404)
+    row = route_info['get'](record_id)
+    if not row:
+        abort(404)
+    return redirect(_secure_detail_url(route_info['base'], public_id, _category_tab_key(route_info['base'])), code=302)
+
+
+@pages_bp.route('/customers/<public_id>')
+@pages_bp.route('/customers/clients/<public_id>')
+def customer_detail(public_id: str):
+    route_info = _SECURE_CATEGORY_ROUTES[('customers', 'clients')]
+    record_id = resolve_public_id(route_info['table'], route_info['prefix'], public_id)
+    if not record_id:
+        abort(404)
+    row = route_info['get'](record_id)
+    if not row:
+        abort(404)
+    return redirect(_secure_detail_url(route_info['base'], public_id, _category_tab_key(route_info['base'])), code=302)
+
+
 @pages_bp.route('/p/<key>')
 @pages_bp.route('/p/<key>/<token>')
+def legacy_p_route(key: str, token: str | None = None):
+    """Permanent redirect: /p/* → /b/* (same policy as blossom_hub)."""
+    k = (key or '').strip()
+    target = (
+        url_for('pages.blossom_hub_token', segment=k, token=token)
+        if token
+        else url_for('pages.blossom_hub', segment=k)
+    )
+    qs = request.query_string.decode('utf-8', errors='ignore')
+    if qs:
+        target = f'{target}?{qs}'
+    return redirect(target, code=301)
+
+
 def show(key: str, token: str | None = None):
+    _raw_key = key
+    key = (key or '').strip()
+    if key != _raw_key:
+        _target = _page_url_for_key(key, token)
+        _qs = request.query_string.decode('utf-8', errors='ignore')
+        if _qs:
+            _target = f"{_target}?{_qs}"
+        return redirect(_target, code=302)
+    _rp = request.path or ''
+    if key in _WG_DETAIL_KEYS and _is_category_nav_path(_rp):
+        legacy_id = (request.args.get('group_id') or request.args.get('id') or '').strip()
+        if not legacy_id:
+            abort(404)
+        try:
+            row = _svc_get_work_group(int(legacy_id))
+        except Exception:
+            row = None
+        if not row or not row.get('public_id'):
+            abort(404)
+        tab = _WG_KEY_TO_SECURE_TAB.get(key, 'basic')
+        target = url_for('pages.business_group_detail', public_id=row['public_id'])
+        if tab != 'basic':
+            target = f"{target}?tab={tab}"
+        return redirect(target, code=302)
+    if _is_category_nav_path(_rp):
+        _legacy_base = None
+        _legacy_route_info = None
+        for _base_key, (_route_key, _info) in _SECURE_CATEGORY_BY_BASE.items():
+            if key == _base_key or any(key == _base_key + _suf for _suf in _CATEGORY_KEY_TO_TAB):
+                _legacy_base = _base_key
+                _legacy_route_info = _info
+                break
+        if _legacy_base and _legacy_route_info:
+            _legacy_id = ''
+            for _id_name in ('id', 'type_id', 'os_id', 'db_id', 'middleware_id', 'virtual_id',
+                             'security_id', 'ha_id', 'vendor_id', 'customer_id', 'associate_id'):
+                _legacy_id = (request.args.get(_id_name) or '').strip()
+                if _legacy_id:
+                    break
+            _legacy_forbidden = {
+                'model', 'vendor', 'server_code', 'hw_type', 'release_date', 'eosl', 'qty', 'note',
+                'wc_name', 'wc_desc', 'dept', 'work_status', 'status', 'name', 'user_name',
+                'admin_name', 'org_name', 'service_name', 'permission', 'role', 'customer_name',
+                'manufacturer_name', 'maintenance_name', 'business_no', 'address',
+            }
+            if _legacy_id:
+                try:
+                    _legacy_row = _legacy_route_info['get'](int(_legacy_id))
+                except Exception:
+                    _legacy_row = None
+                if not _legacy_row:
+                    abort(404)
+                _legacy_public_id = str(_legacy_row.get('public_id') or '').strip()
+                if not _legacy_public_id:
+                    _legacy_public_id = make_public_id(
+                        _legacy_route_info['table'],
+                        _legacy_route_info['prefix'],
+                        _legacy_id,
+                    )
+                _suffix = key[len(_legacy_base):] if key.startswith(_legacy_base) else '_detail'
+                _tab = _CATEGORY_KEY_TO_TAB.get(_suffix, 'basic')
+                _target = _secure_detail_url(_legacy_base, _legacy_public_id, key)
+                return redirect(_target, code=302)
+            if any((request.args.get(_name) or '').strip() for _name in _legacy_forbidden):
+                abort(404)
     # ── SPA 모드: 직접 브라우저 방문 → SPA 셸 반환 ──
     # blossom.js SPA fetch 요청(X-Requested-With 헤더)이 아닌 경우
     # 최소 셸(header+sidebar+skeleton)을 반환하고, JS가 콘텐츠를 비동기 로드한다.
     _xhr = request.headers.get('X-Requested-With', '')
     _force_full_render_keys = {
         'cat_business_dashboard',
+        # 비즈니스 목록(분류·구분·상태·운영·그룹): SPA 셸 초기 진입만으로 정적 스크립트가 불안정하게 떨어지는 문제 방지 → 항상 풀 렌더
+        'cat_business_work',
+        'cat_business_division',
+        'cat_business_status',
+        'cat_business_operation',
+        'cat_business_group',
+        'cat_business_group_detail',
+        'cat_business_group_manager',
+        'cat_business_group_system',
+        'cat_business_group_service',
+        'cat_business_group_log',
+        'cat_business_group_file',
+        # 통합계정(신청 포함): SPA 셸 교체 시 스크립트/마법사 초기화 누락 방지 → 항상 풀 렌더
+        'identity_account_request',
+        'identity_account_status',
+        'identity_account_audit',
+        'identity_account_mapping',
+        # 서버 자산 목록: 센터-랙 캐스케이드·검색 셀렉트가 SPA 셸/캐시와 어긋나지 않도록 직접 방문 시 풀 렌더
+        'hw_server_onpremise',
+        'hw_server_workstation',
+        'hw_server_cloud',
+        'hw_server_frame',
         # HW/SW 카테고리 대시보드: 차트·빈 상태 스티커 등 최신 마크업/스크립트가 즉시 반영되도록 풀 렌더
         'cat_hw_dashboard',
         'cat_sw_dashboard',
@@ -786,7 +1233,23 @@ def show(key: str, token: str | None = None):
         'wf_designer_explore',
         'wf_designer_manage',
         'wf_designer_editor',
+        # 작업보고서는 팝업/새 창으로 직접 열리므로 SPA 셸이 아닌 보고서 템플릿을 바로 렌더링한다.
+        '2.task_detail.html',
     }
+    _category_full_render_prefixes = (
+        'cat_hw_',
+        'cat_sw_',
+        'cat_component_',
+        'cat_company_',
+        'cat_customer_',
+        'cat_vendor_',
+    )
+    # 카테고리 하위 목록/상세/탭은 공통 CSS·JS 캐시 키가 섞이면 SPA 셸에서
+    # 이전 스타일이 잔류하므로 비즈니스와 동일하게 항상 풀 렌더한다.
+    _force_full_render_keys.update(
+        k for k in TEMPLATE_MAP
+        if any(str(k).startswith(prefix) for prefix in _category_full_render_prefixes)
+    )
     if key not in _force_full_render_keys and _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
         return render_template(
             'layouts/spa_shell.html',
@@ -2715,6 +3178,8 @@ def show(key: str, token: str | None = None):
     # 페이지별 차이는 프리셋(data-preset) + 컨텍스트 변수로 주입.
     _is_tab95 = str(template).replace('\\', '/').endswith('/tab45-component.html')
     if _is_tab95:
+        import json as _json_tab95
+
         if key.endswith('_component'):
             base_key = key[:-len('_component')]
         elif key.endswith('_system'):
@@ -2754,6 +3219,20 @@ def show(key: str, token: str | None = None):
         _t95_session_key = ''
         _t95_storage_key = 'comp-model:pageSize'
         _t95_show_analytics = 'true'
+        _t95_data_context = 'comp-model-assets'
+        _t95_cols_class = 'cols-10'
+        _t95_analytics_group = 'work_group'
+        _t95_columns = [
+            {'key': 'category', 'label': '구분'},
+            {'key': 'type', 'label': '유형'},
+            {'key': 'work_operation', 'label': '업무운영'},
+            {'key': 'work_group', 'label': '업무그룹'},
+            {'key': 'work_name', 'label': '업무명', 'statusDot': True},
+            {'key': 'system_name', 'label': '시스템명'},
+            {'key': 'serial_number', 'label': '일련번호'},
+            {'key': 'firmware', 'label': '펌웨어'},
+            {'key': 'qty', 'label': '할당수량', 'numeric': True},
+        ]
 
         if str(base_key).startswith('cat_component_'):
             _comp_tab_order = ('_detail', '_system', '_task', '_log', '_file')
@@ -2772,6 +3251,20 @@ def show(key: str, token: str | None = None):
             _t95_api_endpoint = '/api/category/comp-model-assets?model={id}'
             _t95_storage_key = 'comp-model:pageSize'
             _t95_file_prefix = '컴포넌트_자산_'
+            _t95_data_context = 'comp-model-assets'
+            _t95_cols_class = 'cols-10'
+            _t95_analytics_group = 'work_group'
+            _t95_columns = [
+                {'key': 'category', 'label': '구분'},
+                {'key': 'type', 'label': '유형'},
+                {'key': 'work_operation', 'label': '업무운영'},
+                {'key': 'work_group', 'label': '업무그룹'},
+                {'key': 'work_name', 'label': '업무명', 'statusDot': True},
+                {'key': 'system_name', 'label': '시스템명'},
+                {'key': 'serial_number', 'label': '일련번호'},
+                {'key': 'firmware', 'label': '펌웨어'},
+                {'key': 'qty', 'label': '할당수량', 'numeric': True},
+            ]
         elif base_key == 'cat_vendor_manufacturer':
             _vendor_tab_order = ('_detail', '_manager', '_hardware', '_software', '_component', '_task', '_log', '_file')
             tabs = [t for t in tabs if t['key'].endswith(_vendor_tab_order)]
@@ -2787,6 +3280,16 @@ def show(key: str, token: str | None = None):
             _t95_session_key = 'manufacturer:context'
             _t95_storage_key = 'vendor:co-assets:pageSize'
             _t95_file_prefix = 'manufacturer_component_assets_'
+            _t95_data_context = 'vendor-comp-assets'
+            _t95_cols_class = 'cols-6'
+            _t95_analytics_group = 'model'
+            _t95_columns = [
+                {'key': 'category', 'label': '구분'},
+                {'key': 'model', 'label': '모델명'},
+                {'key': 'work_name', 'label': '업무명', 'statusDot': True},
+                {'key': 'system_name', 'label': '시스템명'},
+                {'key': 'qty', 'label': '할당수량', 'numeric': True},
+            ]
         elif base_key == 'cat_vendor_maintenance':
             _maint_tab_order = ('_detail', '_manager', '_hardware', '_software', '_component', '_sla', '_issue', '_task', '_log', '_file')
             tabs = [t for t in tabs if t['key'].endswith(_maint_tab_order)]
@@ -2802,6 +3305,20 @@ def show(key: str, token: str | None = None):
             _t95_session_key = 'maintenance:context'
             _t95_storage_key = 'maint:comp-assets:pageSize'
             _t95_file_prefix = 'maintenance_comp_'
+            _t95_data_context = 'maint-comp-assets'
+            _t95_cols_class = 'cols-9'
+            _t95_analytics_group = ''
+            _t95_show_analytics = 'false'
+            _t95_columns = [
+                {'key': 'category', 'label': '구분'},
+                {'key': 'type', 'label': '유형'},
+                {'key': 'model', 'label': '모델명'},
+                {'key': 'serial', 'label': '일련번호'},
+                {'key': 'work_name', 'label': '업무 이름', 'statusDot': True},
+                {'key': 'system_name', 'label': '시스템 이름'},
+                {'key': 'manage_no', 'label': '관리번호', 'contractDot': True},
+                {'key': 'qty', 'label': '할당수량', 'numeric': True},
+            ]
 
         _tab95_context = {
             'tab95_preset':             _t95_preset,
@@ -2815,6 +3332,23 @@ def show(key: str, token: str | None = None):
             'tab95_session_key':        _t95_session_key,
             'tab95_storage_key':        _t95_storage_key,
             'tab95_show_analytics':     _t95_show_analytics,
+            'tab95': {
+                'data_context':       _t95_data_context,
+                'section_title':      _t95_section_title,
+                'cols_class':         _t95_cols_class,
+                'columns':            _t95_columns,
+                'columns_json':       _json_tab95.dumps(_t95_columns, ensure_ascii=False),
+                'empty_title':        _t95_empty_title,
+                'empty_desc':         _t95_empty_desc,
+                'show_analytics':     _t95_show_analytics == 'true',
+                'analytics_title':    _t95_analytics_title,
+                'analytics_subtitle': _t95_analytics_subtitle,
+                'analytics_group':    _t95_analytics_group,
+                'csv_filename':       _t95_file_prefix.rstrip('_'),
+                'api_endpoint':       _t95_api_endpoint,
+                'session_key':        _t95_session_key,
+                'storage_key':        _t95_storage_key,
+            },
         }
 
         template = 'layouts/tab95-component-shared.html'
@@ -2828,6 +3362,8 @@ def show(key: str, token: str | None = None):
     _TAB91_SKIP_SHARED = set()  # 필요시 특정 키 제외
     _tab91_template_names = (
         '/tab41-system.html',
+        '/layouts/tab91-system-shared.html',
+        'layouts/tab91-system-shared.html',
     )
     _is_tab91 = (
         any(str(template).replace('\\', '/').endswith(s) for s in _tab91_template_names)
@@ -3294,7 +3830,7 @@ def show(key: str, token: str | None = None):
             }
             session['hw_detail_ctx'] = _hw_ctx
             session.modified = True
-            return redirect(url_for('pages.show', key=key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # ── No query params — read title/subtitle from session ──
         if title is None:
@@ -3395,7 +3931,7 @@ def show(key: str, token: str | None = None):
                     flat_qs[k] = v[0]
                 else:
                     flat_qs[k] = v
-            return redirect(url_for('pages.show', key=key, **flat_qs), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key, **flat_qs), code=302)
 
         # 2) Legacy query param: store in session, redirect to clean URL.
         _manage_no = (request.args.get('id') or '').strip()
@@ -3409,7 +3945,7 @@ def show(key: str, token: str | None = None):
                     flat_qs[k] = v[0]
                 else:
                     flat_qs[k] = v
-            return redirect(url_for('pages.show', key=key, **flat_qs), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key, **flat_qs), code=302)
 
         # 3) Canonical: resolve manage_no from session.
         try:
@@ -3421,7 +3957,7 @@ def show(key: str, token: str | None = None):
 
         if not detail_manage_no:
             # No context: go back to list page for this base.
-            return redirect(url_for('pages.show', key=base_key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=base_key), code=302)
 
         subtitle = detail_manage_no
         try:
@@ -3627,7 +4163,7 @@ def show(key: str, token: str | None = None):
             }
             session['gov_detail_ctx_v1'] = _ctx
             session.modified = True
-            return redirect(url_for('pages.show', key=key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # No query params — read from session
         _raw = (session.get('gov_detail_ctx_v1') or {}).get(_gb)
@@ -3635,7 +4171,7 @@ def show(key: str, token: str | None = None):
             _gov_sess = _raw
         if not _gov_sess.get('id'):
             # No context available → redirect to list page
-            return redirect(url_for('pages.show', key=_gov_list_key(_gb)), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=_gov_list_key(_gb)), code=302)
 
     # Governance > IP 정책(4-3-1): Title=정책명, Subtitle=IP범위
     if key in {
@@ -3878,7 +4414,7 @@ def show(key: str, token: str | None = None):
             }
             session['cat_detail_ctx_v1'] = _ctx
             session.modified = True
-            return redirect(url_for('pages.show', key=key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # No query params — read from session
         _cat_sess = {}
@@ -3891,7 +4427,7 @@ def show(key: str, token: str | None = None):
 
         if not _cat_sess.get('id') and not _cat_sess.get('title'):
             # No context — redirect to list
-            return redirect(url_for('pages.show', key=_cb), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=_cb), code=302)
 
     # Category > Hardware detail pages (Server / Storage / SAN / Network / Security)
     # Title: model name, Subtitle: vendor name — resolved from session
@@ -3973,13 +4509,14 @@ def show(key: str, token: str | None = None):
 
     # Category > Business > Work Group detail pages
     # Title: group name, Subtitle: group_code
-    _WG_DETAIL_KEYS = {
+    _wg_public_id = ''
+    _WG_DETAIL_PAGE_KEYS = {
         'cat_business_group_detail', 'cat_business_group_manager',
         'cat_business_group_system', 'cat_business_group_service',
         'cat_business_group_task', 'cat_business_group_log',
         'cat_business_group_file',
     }
-    if key in _WG_DETAIL_KEYS:
+    if key in _WG_DETAIL_PAGE_KEYS:
         _wg_id = _cat_sess.get('id', '')
         _wg_resolved = False
         if _wg_id:
@@ -3988,6 +4525,7 @@ def show(key: str, token: str | None = None):
                 if _wg_row:
                     title = str(_wg_row.get('group_name') or '').strip() or '업무 그룹'
                     subtitle = str(_wg_row.get('group_code') or '').strip() or 'Work Group'
+                    _wg_public_id = str(_wg_row.get('public_id') or _cat_sess.get('public_id') or '').strip()
                     _wg_resolved = True
                     # 세션 컨텍스트도 최신 값으로 갱신
                     _ctx_store = session.get('cat_detail_ctx_v1')
@@ -3996,12 +4534,15 @@ def show(key: str, token: str | None = None):
                         if isinstance(_existing, dict):
                             _existing['title'] = title
                             _existing['subtitle'] = subtitle
+                            if _wg_public_id:
+                                _existing['public_id'] = _wg_public_id
                             session.modified = True
             except Exception:
                 pass
         if not _wg_resolved:
             title = _cat_sess.get('title', '') or '업무 그룹'
             subtitle = _cat_sess.get('subtitle', '') or 'Work Group'
+            _wg_public_id = str(_cat_sess.get('public_id') or '').strip()
 
     # Category > Customer detail pages (Member / Client1 / Client2)
     # Title: customer_name, Subtitle: address
@@ -4386,7 +4927,7 @@ def show(key: str, token: str | None = None):
 
         if _vd_qp_id:
             _set_vendor_ctx(_vd_qp_id)
-            return redirect(url_for('pages.show', key=key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # Canonical: read vendor_id from session
         _vd_vid = None
@@ -4402,7 +4943,7 @@ def show(key: str, token: str | None = None):
         if not _vd_vid:
             # No context — redirect back to list
             _list_key = _vd_base  # e.g. 'cat_vendor_manufacturer' or 'cat_vendor_maintenance'
-            return redirect(url_for('pages.show', key=_list_key), code=302)
+            return redirect(url_for('pages.blossom_hub', segment=_list_key), code=302)
 
         # DB lookup for title / subtitle
         _vd_vendor_name = ''
@@ -4426,7 +4967,7 @@ def show(key: str, token: str | None = None):
     rack_code = (request.args.get('rack_code') or '').strip() or None
     if rack_code and key.startswith('dc_rack_detail_'):
         session['_rack_code'] = rack_code
-        return redirect(url_for('pages.show', key=key))
+        return redirect(url_for('pages.blossom_hub', segment=key))
     if not rack_code and key.startswith('dc_rack_detail_'):
         rack_code = session.get('_rack_code')
 
@@ -4446,6 +4987,8 @@ def show(key: str, token: str | None = None):
         'hw_id': _hw_id_for_ctx,
         'server_code': _server_code_for_ctx,
         'cat_detail_id': _cat_detail_id,
+        'work_group_public_id': _wg_public_id,
+        'work_group_secure_tab': _WG_KEY_TO_SECURE_TAB.get(key, ''),
         'gov_detail_id': _gov_detail_id,
         **_hw_extra_for_ctx,
     }
@@ -5485,6 +6028,19 @@ def show(key: str, token: str | None = None):
                 tabs.append({'key': _tk_d, 'label': _comp_tab_labels_d[_suf_d]})
         back_key = _comp_base if _comp_base in TEMPLATE_MAP else None
         back_label = '목록으로 돌아가기'
+
+    try:
+        if _wg_public_id and 'tabs' in locals() and isinstance(tabs, list):
+            for _tab in tabs:
+                _tab_key = _tab.get('key') if isinstance(_tab, dict) else ''
+                _secure_tab = _WG_KEY_TO_SECURE_TAB.get(_tab_key, 'basic')
+                _href = url_for('pages.business_group_detail', public_id=_wg_public_id)
+                if _secure_tab != 'basic':
+                    _href = f"{_href}?tab={_secure_tab}"
+                _tab['href'] = _href
+            context['secure_back_url'] = url_for('pages.business_groups_list')
+    except Exception:
+        pass
 
     return render_template(
         template,

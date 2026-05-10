@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
@@ -16,6 +17,7 @@ REQUEST_ITEM_TABLE = 'web_access_request_item'
 APPROVAL_TABLE = 'web_access_approval'
 GRANT_TABLE = 'web_access_grant'
 AUDIT_TABLE = 'web_access_audit_log'
+SSH_COMMAND_LOG_TABLE = 'web_access_ssh_command_log'
 PC_AGENT_TABLE = 'pc_agent_device'
 ATTACHMENT_TABLE = 'web_access_request_attachment'
 NOTIFICATION_TABLE = 'web_access_notification'
@@ -484,6 +486,31 @@ def _create_pc_agent_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def _create_ssh_command_log_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f'''
+        CREATE TABLE IF NOT EXISTS {SSH_COMMAND_LOG_TABLE} (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_log_id        INTEGER NOT NULL,
+            agent_id            TEXT NOT NULL DEFAULT '',
+            occurred_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            command_text        TEXT NOT NULL DEFAULT '',
+            raw_payload         TEXT NOT NULL DEFAULT '',
+            created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(audit_log_id) REFERENCES {AUDIT_TABLE}(id) ON DELETE CASCADE
+        )
+        '''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{SSH_COMMAND_LOG_TABLE}_audit_time
+            ON {SSH_COMMAND_LOG_TABLE}(audit_log_id, occurred_at, id)'''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{SSH_COMMAND_LOG_TABLE}_agent_time
+            ON {SSH_COMMAND_LOG_TABLE}(agent_id, occurred_at DESC)'''
+    )
+
+
 def _ensure_sqlite_org_user_for_pc_agent_join(conn: sqlite3.Connection) -> None:
     """접근제어 SQLite 의 PC 에이전트 조회에서 org_user 에 LEFT JOIN 한다.
 
@@ -586,15 +613,31 @@ def _pc_agent_sync_status(item: Dict[str, Any]) -> str:
     return '끊김'
 
 
-def _pc_agent_operation_status(sync_status: str) -> str:
+def _pc_agent_policy_inactive_days(app=None) -> int:
+    try:
+        policy = get_default_policy(app) or {}
+        return _policy_int(policy.get('pc_agent_inactive_days'), 7, 1, 365)
+    except Exception:
+        return 7
+
+
+def _pc_agent_operation_status(item: Dict[str, Any], inactive_days: Optional[int] = None) -> str:
     """UI용 에이전트 상태 — 활성/비활성/오류."""
 
-    s = str(sync_status or '').strip()
+    s = str(item.get('sync_status') or '').strip()
     if s == '오류':
         return '오류'
-    if s == '정상':
-        return '활성'
-    return '비활성'
+    last_seen = _parse_pc_agent_time(item.get('last_seen_at'))
+    if not last_seen:
+        return '비활성'
+    threshold_days = inactive_days if inactive_days is not None else 7
+    now = datetime.now(timezone.utc) if last_seen.tzinfo else datetime.now()
+    try:
+        if (now - last_seen).total_seconds() > max(1, int(threshold_days or 7)) * 86400:
+            return '비활성'
+    except Exception:
+        return '비활성'
+    return '활성'
 
 
 def _pc_agent_version_display_field(value: Any) -> str:
@@ -608,7 +651,19 @@ def _pc_agent_version_display_field(value: Any) -> str:
     return head if head else raw
 
 
-def _pc_agent_item(row: sqlite3.Row) -> Dict[str, Any]:
+def pc_agent_exists(agent_id: Any, app=None) -> bool:
+    aid = _pc_agent_text(agent_id, 128)
+    if not aid:
+        return False
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            f'SELECT 1 FROM {PC_AGENT_TABLE} WHERE agent_id = ? AND is_deleted = 0 LIMIT 1',
+            (aid,),
+        ).fetchone()
+    return bool(row)
+
+
+def _pc_agent_item(row: sqlite3.Row, inactive_days: Optional[int] = None) -> Dict[str, Any]:
     item = _dict(row) or {}
     user_id = _to_int_or_none(item.get('mapped_user_id'))
     item['mapped_user'] = None
@@ -621,7 +676,7 @@ def _pc_agent_item(row: sqlite3.Row) -> Dict[str, Any]:
             'profile_image': item.get('user_profile_image') or '',
         }
     item['sync_status'] = _pc_agent_sync_status(item)
-    item['operation_status'] = _pc_agent_operation_status(item['sync_status'])
+    item['operation_status'] = _pc_agent_operation_status(item, inactive_days)
     item['agent_version_display'] = _pc_agent_version_display_field(item.get('agent_version'))
     return item
 
@@ -647,7 +702,7 @@ def get_pc_agent(agent_pk: int, app=None) -> Optional[Dict[str, Any]]:
             _pc_agent_select_sql() + ' WHERE a.id = ? AND a.is_deleted = 0 LIMIT 1',
             (aid,),
         ).fetchone()
-    return _pc_agent_item(row) if row else None
+    return _pc_agent_item(row, inactive_days=_pc_agent_policy_inactive_days(app)) if row else None
 
 
 def _pc_agent_list_order_clause(filters: Dict[str, Any]) -> str:
@@ -744,7 +799,8 @@ def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page
                 {where}''',
             params,
         ).fetchall()
-    items = [_pc_agent_item(row) for row in rows]
+    inactive_days = _pc_agent_policy_inactive_days(app)
+    items = [_pc_agent_item(row, inactive_days=inactive_days) for row in rows]
     status_counts = {'정상': 0, '지연': 0, '끊김': 0, '미연동': 0, '오류': 0, '확인필요': 0}
     mapped_count = 0
     for row in summary_rows:
@@ -984,7 +1040,7 @@ def _validate_resource_payload(resource_type: str, host_address: str, port_numbe
 
 
 def _ensure_policy_extra_columns(conn: sqlite3.Connection) -> None:
-    """web_access_policy 테이블에 WEB 통제·인프라 메모 컬럼을 추가한다 (기존 DB 마이그레이션)."""
+    """web_access_policy 테이블에 접근제어 운영 설정 컬럼을 추가한다 (기존 DB 마이그레이션)."""
     try:
         rows = conn.execute(f'PRAGMA table_info({POLICY_TABLE})').fetchall()
     except sqlite3.Error:
@@ -995,6 +1051,19 @@ def _ensure_policy_extra_columns(conn: sqlite3.Connection) -> None:
         ('web_iframe_allow_patterns', "TEXT NOT NULL DEFAULT ''"),
         ('web_host_gate_patterns', "TEXT NOT NULL DEFAULT ''"),
         ('web_infra_runbook', "TEXT NOT NULL DEFAULT ''"),
+        ('lumina_gate_enabled', "INTEGER NOT NULL DEFAULT 1"),
+        ('lumina_gate_auto_push_enabled', "INTEGER NOT NULL DEFAULT 1"),
+        ('pc_agent_auto_register_enabled', "INTEGER NOT NULL DEFAULT 1"),
+        ('pc_agent_require_user_mapping', "INTEGER NOT NULL DEFAULT 1"),
+        ('pc_agent_inactive_days', "INTEGER NOT NULL DEFAULT 7"),
+        ('pc_agent_retention_days', "INTEGER NOT NULL DEFAULT 365"),
+        ('audit_log_retention_days', "INTEGER NOT NULL DEFAULT 365"),
+        ('audit_export_max_rows', "INTEGER NOT NULL DEFAULT 5000"),
+        ('ssh_launch_enabled', "INTEGER NOT NULL DEFAULT 1"),
+        ('ssh_connect_account_required', "INTEGER NOT NULL DEFAULT 0"),
+        ('access_click_cooldown_seconds', "INTEGER NOT NULL DEFAULT 3"),
+        ('access_rate_limit_window_seconds', "INTEGER NOT NULL DEFAULT 60"),
+        ('access_rate_limit_max_count', "INTEGER NOT NULL DEFAULT 5"),
     ]
     for col, ddl in migrations:
         if col not in existing:
@@ -1015,6 +1084,18 @@ def _sanitize_policy_text(raw: Any, max_len: int) -> str:
     return s
 
 
+def _policy_int(raw: Any, default: int, min_value: int, max_value: int) -> int:
+    try:
+        value = int(str(raw if raw is not None else default).strip() or default)
+    except (TypeError, ValueError):
+        value = default
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
+
 def _split_policy_patterns(text: Any) -> List[str]:
     out: List[str] = []
     for line in str(text or '').splitlines():
@@ -1025,12 +1106,17 @@ def _split_policy_patterns(text: Any) -> List[str]:
 
 
 def get_browse_policy_for_user(app=None) -> Dict[str, Any]:
-    """일반 사용자 WEB 접속 UI용 정책 스냅샷 (민감 필드 제외)."""
+    """일반 사용자 접속 UI용 정책 스냅샷 (민감 필드 제외)."""
     pol = get_default_policy(app) or {}
     return {
         'web_open_mode': _normalize_web_open_mode(pol.get('web_open_mode')),
         'web_host_gate_patterns': _split_policy_patterns(pol.get('web_host_gate_patterns')),
         'web_iframe_allow_patterns': _split_policy_patterns(pol.get('web_iframe_allow_patterns')),
+        'ssh_launch_enabled': _to_bool(pol.get('ssh_launch_enabled', 1)),
+        'ssh_connect_account_required': _to_bool(pol.get('ssh_connect_account_required', 0)),
+        'access_click_cooldown_seconds': _policy_int(pol.get('access_click_cooldown_seconds'), 3, 0, 60),
+        'access_rate_limit_window_seconds': _policy_int(pol.get('access_rate_limit_window_seconds'), 60, 1, 3600),
+        'access_rate_limit_max_count': _policy_int(pol.get('access_rate_limit_max_count'), 5, 1, 100),
     }
 
 
@@ -1265,6 +1351,7 @@ def init_web_access_control_tables(app=None) -> None:
         _create_endpoint_table(conn)
         _create_delegation_table(conn)
         _create_pc_agent_table(conn)
+        _create_ssh_command_log_table(conn)
         _ensure_sqlite_org_user_for_pc_agent_join(conn)
         _migrate_endpoints_from_resource(conn)
         _backfill_endpoint_access_columns(conn)
@@ -1731,11 +1818,11 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
     updates = {
         'team_lead_approval_required': _to_bool(payload.get('team_lead_approval_required', current.get('team_lead_approval_required', 1))),
         'admin_approval_required': _to_bool(payload.get('admin_approval_required', current.get('admin_approval_required', 0))),
-        'max_period_days': int(payload.get('max_period_days', current.get('max_period_days', 90)) or 90),
+        'max_period_days': _policy_int(payload.get('max_period_days', current.get('max_period_days', 90)), 90, 1, 365),
         'emergency_allowed': _to_bool(payload.get('emergency_allowed', current.get('emergency_allowed', 1))),
-        'notify_before_days': int(payload.get('notify_before_days', current.get('notify_before_days', 7)) or 7),
+        'notify_before_days': _policy_int(payload.get('notify_before_days', current.get('notify_before_days', 7)), 7, 0, 30),
         'duplicate_request_blocked': _to_bool(payload.get('duplicate_request_blocked', current.get('duplicate_request_blocked', 1))),
-        'default_period_days': int(payload.get('default_period_days', current.get('default_period_days', 30)) or 30),
+        'default_period_days': _policy_int(payload.get('default_period_days', current.get('default_period_days', 30)), 30, 1, 365),
         'web_open_mode': _normalize_web_open_mode(payload.get('web_open_mode', current.get('web_open_mode'))),
         'web_iframe_allow_patterns': _sanitize_policy_text(
             payload.get('web_iframe_allow_patterns', current.get('web_iframe_allow_patterns')), 4000
@@ -1746,9 +1833,24 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
         'web_infra_runbook': _sanitize_policy_text(
             payload.get('web_infra_runbook', current.get('web_infra_runbook')), 8000
         ),
+        'lumina_gate_enabled': _to_bool(payload.get('lumina_gate_enabled', current.get('lumina_gate_enabled', 1))),
+        'lumina_gate_auto_push_enabled': _to_bool(payload.get('lumina_gate_auto_push_enabled', current.get('lumina_gate_auto_push_enabled', 1))),
+        'pc_agent_auto_register_enabled': _to_bool(payload.get('pc_agent_auto_register_enabled', current.get('pc_agent_auto_register_enabled', 1))),
+        'pc_agent_require_user_mapping': _to_bool(payload.get('pc_agent_require_user_mapping', current.get('pc_agent_require_user_mapping', 1))),
+        'pc_agent_inactive_days': _policy_int(payload.get('pc_agent_inactive_days', current.get('pc_agent_inactive_days', 7)), 7, 1, 365),
+        'pc_agent_retention_days': _policy_int(payload.get('pc_agent_retention_days', current.get('pc_agent_retention_days', 365)), 365, 30, 3650),
+        'audit_log_retention_days': _policy_int(payload.get('audit_log_retention_days', current.get('audit_log_retention_days', 365)), 365, 30, 3650),
+        'audit_export_max_rows': _policy_int(payload.get('audit_export_max_rows', current.get('audit_export_max_rows', 5000)), 5000, 100, 50000),
+        'ssh_launch_enabled': _to_bool(payload.get('ssh_launch_enabled', current.get('ssh_launch_enabled', 1))),
+        'ssh_connect_account_required': _to_bool(payload.get('ssh_connect_account_required', current.get('ssh_connect_account_required', 0))),
+        'access_click_cooldown_seconds': _policy_int(payload.get('access_click_cooldown_seconds', current.get('access_click_cooldown_seconds', 3)), 3, 0, 60),
+        'access_rate_limit_window_seconds': _policy_int(payload.get('access_rate_limit_window_seconds', current.get('access_rate_limit_window_seconds', 60)), 60, 1, 3600),
+        'access_rate_limit_max_count': _policy_int(payload.get('access_rate_limit_max_count', current.get('access_rate_limit_max_count', 5)), 5, 1, 100),
         'updated_at': _now(),
         'updated_by': actor,
     }
+    if updates['default_period_days'] > updates['max_period_days']:
+        updates['default_period_days'] = updates['max_period_days']
     with _get_connection(app) as conn:
         _ensure_policy_extra_columns(conn)
         conn.execute(
@@ -1765,6 +1867,19 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
                    web_iframe_allow_patterns = ?,
                    web_host_gate_patterns = ?,
                    web_infra_runbook = ?,
+                 lumina_gate_enabled = ?,
+                 lumina_gate_auto_push_enabled = ?,
+                 pc_agent_auto_register_enabled = ?,
+                 pc_agent_require_user_mapping = ?,
+                 pc_agent_inactive_days = ?,
+                 pc_agent_retention_days = ?,
+                 audit_log_retention_days = ?,
+                 audit_export_max_rows = ?,
+                 ssh_launch_enabled = ?,
+                 ssh_connect_account_required = ?,
+                                 access_click_cooldown_seconds = ?,
+                                 access_rate_limit_window_seconds = ?,
+                                 access_rate_limit_max_count = ?,
                    updated_at = ?,
                    updated_by = ?
              WHERE id = ?
@@ -1781,12 +1896,31 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
                 updates['web_iframe_allow_patterns'],
                 updates['web_host_gate_patterns'],
                 updates['web_infra_runbook'],
+                updates['lumina_gate_enabled'],
+                updates['lumina_gate_auto_push_enabled'],
+                updates['pc_agent_auto_register_enabled'],
+                updates['pc_agent_require_user_mapping'],
+                updates['pc_agent_inactive_days'],
+                updates['pc_agent_retention_days'],
+                updates['audit_log_retention_days'],
+                updates['audit_export_max_rows'],
+                updates['ssh_launch_enabled'],
+                updates['ssh_connect_account_required'],
+                updates['access_click_cooldown_seconds'],
+                updates['access_rate_limit_window_seconds'],
+                updates['access_rate_limit_max_count'],
                 updates['updated_at'],
                 updates['updated_by'],
                 current['id'],
             )
         )
         conn.commit()
+    if (
+        ('lumina_gate_enabled' in payload or 'lumina_gate_auto_push_enabled' in payload)
+        and updates['lumina_gate_enabled']
+        and updates['lumina_gate_auto_push_enabled']
+    ):
+        _lumina_gate_schedule_full_mapped_resync(app)
     return get_default_policy(app)
 
 
@@ -3103,13 +3237,62 @@ def touch_access(
             )
             conn.commit()
             raise ValueError('접속 가능한 권한이 없습니다.')
+        audit_context = _audit_resource_context(conn, resource_id, endpoint_id)
+        access_kind = str(audit_context.get('access_type') or '').strip().upper()
+        _ensure_policy_extra_columns(conn)
+        policy = _dict(conn.execute(f'SELECT * FROM {POLICY_TABLE} WHERE id = 1').fetchone()) or {}
+        window_seconds = _policy_int(policy.get('access_rate_limit_window_seconds'), 60, 1, 3600)
+        max_count = _policy_int(policy.get('access_rate_limit_max_count'), 5, 1, 100)
+        cutoff = (datetime.now() - timedelta(seconds=window_seconds)).strftime('%Y-%m-%d %H:%M:%S')
+        recent_row = conn.execute(
+            f'''
+            SELECT COUNT(1) AS cnt
+              FROM {AUDIT_TABLE}
+             WHERE actor_user_id = ?
+               AND target_resource_id = ?
+               AND COALESCE(target_endpoint_id, 0) = COALESCE(?, 0)
+               AND action_type = '접속'
+               AND occurred_at >= ?
+            ''',
+            (user_id, resource_id, endpoint_id, cutoff),
+        ).fetchone()
+        recent_count = int(recent_row['cnt'] if recent_row else 0)
+        if recent_count >= max_count:
+            raise ValueError(f'접속 요청이 너무 잦습니다. {window_seconds}초 동안 최대 {max_count}회까지만 허용됩니다.')
+        if access_kind == ENDPOINT_KIND_SSH:
+            if not _to_bool(policy.get('ssh_launch_enabled', 1)):
+                reason = 'SSH 접속 실행이 관리자 정책으로 중지되어 있습니다.'
+                _insert_audit(
+                    conn,
+                    actor,
+                    resource_id,
+                    grant['source_request_id'],
+                    '접속',
+                    '실패',
+                    reason,
+                    {'ip_address': ip_address, 'endpoint_id': endpoint_id, 'connect_account': connect_account},
+                )
+                conn.commit()
+                raise ValueError(reason)
+            if _to_bool(policy.get('ssh_connect_account_required', 0)) and not connect_account:
+                reason = 'SSH 접속 계정 기록이 필수입니다.'
+                _insert_audit(
+                    conn,
+                    actor,
+                    resource_id,
+                    grant['source_request_id'],
+                    '접속',
+                    '실패',
+                    reason,
+                    {'ip_address': ip_address, 'endpoint_id': endpoint_id, 'connect_account': connect_account},
+                )
+                conn.commit()
+                raise ValueError(reason)
+        initial_outcome = AUDIT_ACCESS_OUTCOME_PENDING if access_kind == ENDPOINT_KIND_SSH else AUDIT_ACCESS_OUTCOME_SUCCESS
         conn.execute(
             f'UPDATE {GRANT_TABLE} SET last_accessed_at = ?, updated_at = ? WHERE id = ?',
             (_now(), _now(), grant['id'])
         )
-        audit_context = _audit_resource_context(conn, resource_id, endpoint_id)
-        access_kind = str(audit_context.get('access_type') or '').strip().upper()
-        initial_outcome = AUDIT_ACCESS_OUTCOME_PENDING if access_kind == ENDPOINT_KIND_SSH else AUDIT_ACCESS_OUTCOME_SUCCESS
         audit_log_id = _insert_audit(
             conn,
             actor,
@@ -3240,6 +3423,12 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
     filters = filters or {}
     export_all = bool(filters.get('export_all'))
     export_max = 5000
+    if export_all:
+        try:
+            policy = get_default_policy(app) or {}
+            export_max = _policy_int(policy.get('audit_export_max_rows'), 5000, 100, 50000)
+        except Exception:
+            export_max = 5000
     try:
         page = max(1, int(page or 1))
     except (TypeError, ValueError):
@@ -3379,7 +3568,12 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
                    r.resource_type,
                    {access_type_expr} AS access_type,
                    {access_type_expr} AS endpoint_kind,
-                   {access_info_expr} AS access_info
+                                     {access_info_expr} AS access_info,
+                                     (
+                                             SELECT COUNT(1)
+                                                 FROM {SSH_COMMAND_LOG_TABLE} cmd
+                                                WHERE cmd.audit_log_id = l.id
+                                     ) AS activity_count
             {where_sql}
              ORDER BY l.id DESC
              LIMIT ? OFFSET ?
@@ -3404,6 +3598,157 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
         out['export_truncated'] = True
         out['export_max'] = export_max
     return out
+
+
+def _normalize_ssh_command_time(value: Any) -> str:
+    parsed = _parse_pc_agent_time(value)
+    if parsed:
+        try:
+            if parsed.tzinfo:
+                parsed = parsed.astimezone()
+            return parsed.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            pass
+    text = str(value or '').strip()
+    if text and len(text) >= 19 and text[4] == '-' and text[7] == '-':
+        return text.replace('T', ' ')[:19]
+    return _now()
+
+
+def _ssh_command_text(event: Any) -> str:
+    if isinstance(event, str):
+        return event.strip()[:4000]
+    if not isinstance(event, dict):
+        return ''
+    value = (
+        event.get('command')
+        or event.get('command_text')
+        or event.get('commandText')
+        or event.get('cmd')
+        or event.get('line')
+        or ''
+    )
+    return str(value or '').strip()[:4000]
+
+
+def record_ssh_command_events(payload: Dict[str, Any], app=None) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError('명령어 이력 payload가 올바르지 않습니다.')
+    audit_log_id = _to_int_or_none(
+        payload.get('audit_log_id')
+        or payload.get('auditLogId')
+        or payload.get('session_audit_id')
+        or payload.get('sessionAuditId')
+    )
+    if not audit_log_id:
+        raise ValueError('audit_log_id가 필요합니다.')
+
+    agent_id = _pc_agent_text(payload.get('agent_id') or payload.get('agentId') or payload.get('pc_agent_id') or '', 128)
+    raw_events = payload.get('events')
+    if raw_events is None:
+        raw_events = payload.get('commands')
+    if raw_events is None:
+        raw_events = payload.get('rows')
+    if raw_events is None:
+        raw_events = [payload]
+    if not isinstance(raw_events, list):
+        raise ValueError('events는 배열이어야 합니다.')
+
+    events: List[Dict[str, str]] = []
+    for event in raw_events[:200]:
+        command = _ssh_command_text(event)
+        if not command:
+            continue
+        if isinstance(event, dict):
+            occurred_raw = (
+                event.get('occurred_at')
+                or event.get('occurredAt')
+                or event.get('executed_at')
+                or event.get('executedAt')
+                or event.get('timestamp')
+                or event.get('time')
+                or ''
+            )
+            event_agent_id = _pc_agent_text(event.get('agent_id') or event.get('agentId') or agent_id, 128)
+            raw_payload = json.dumps(event, ensure_ascii=False, default=str)[:8000]
+        else:
+            occurred_raw = ''
+            event_agent_id = agent_id
+            raw_payload = json.dumps({'command': command}, ensure_ascii=False)[:8000]
+        events.append({
+            'agent_id': event_agent_id,
+            'occurred_at': _normalize_ssh_command_time(occurred_raw),
+            'command_text': command,
+            'raw_payload': raw_payload,
+        })
+
+    if not events:
+        raise ValueError('기록할 명령어가 없습니다.')
+
+    with _get_connection(app) as conn:
+        _create_ssh_command_log_table(conn)
+        row = conn.execute(
+            f'''SELECT id, action_type, access_type, target_resource_id, target_endpoint_id
+                  FROM {AUDIT_TABLE}
+                 WHERE id = ?''',
+            (audit_log_id,),
+        ).fetchone()
+        if not row:
+            raise ValueError('감사 기록을 찾을 수 없습니다.')
+        kind = str(row['access_type'] or '').strip().upper()
+        if kind != ENDPOINT_KIND_SSH:
+            context = _audit_resource_context(conn, row['target_resource_id'], row['target_endpoint_id'])
+            kind = str(context.get('access_type') or '').strip().upper()
+        if (row['action_type'] or '') != '접속' or kind != ENDPOINT_KIND_SSH:
+            raise ValueError('SSH 접속 감사 기록에만 명령어 이력을 남길 수 있습니다.')
+        now_value = _now()
+        conn.executemany(
+            f'''
+            INSERT INTO {SSH_COMMAND_LOG_TABLE}
+                (audit_log_id, agent_id, occurred_at, command_text, raw_payload, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''',
+            [
+                (audit_log_id, event['agent_id'], event['occurred_at'], event['command_text'], event['raw_payload'], now_value)
+                for event in events
+            ],
+        )
+        conn.commit()
+    return {'audit_log_id': audit_log_id, 'inserted': len(events)}
+
+
+def list_ssh_command_history(audit_log_id: int, app=None) -> Optional[Dict[str, Any]]:
+    aid = _to_int_or_none(audit_log_id)
+    if not aid:
+        return None
+    with _get_connection(app) as conn:
+        _create_ssh_command_log_table(conn)
+        audit = conn.execute(
+            f'''
+            SELECT id, occurred_at, session_ended_at, actor_user_id, actor_emp_no, actor_name,
+                   target_resource_id, resource_name, access_type, access_info, connect_account,
+                   action_type, action_result
+              FROM {AUDIT_TABLE}
+             WHERE id = ?
+            ''',
+            (aid,),
+        ).fetchone()
+        if not audit:
+            return None
+        rows = conn.execute(
+            f'''
+            SELECT id, audit_log_id, agent_id, occurred_at, command_text, created_at
+              FROM {SSH_COMMAND_LOG_TABLE}
+             WHERE audit_log_id = ?
+             ORDER BY occurred_at ASC, id ASC
+            ''',
+            (aid,),
+        ).fetchall()
+    return {
+        'audit': _dict(audit),
+        'rows': [_dict(row) for row in rows],
+        'total': len(rows),
+    }
 
 
 def update_audit_log_connect_account(audit_log_id: int, user_id: int, connect_account: str, app=None) -> bool:

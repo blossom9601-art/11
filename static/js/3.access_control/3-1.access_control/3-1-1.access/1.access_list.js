@@ -17,8 +17,14 @@
 		webAuditOrphans: [],
 		browsePolicy: null,
 		browsePolicyLoaded: false,
+		connectLocks: {},
+		connectLockTimers: {},
+		connectAttemptHistory: {},
 	};
 	var initialized = false;
+	var CONNECT_COOLDOWN_MS = 3000;
+	var CONNECT_RATE_WINDOW_MS = 60000;
+	var CONNECT_RATE_MAX_COUNT = 5;
 
 	function qs(id) { return document.getElementById(id); }
 	function esc(value) {
@@ -95,6 +101,76 @@
 		});
 	}
 	function requestUrl() { return '/p/access_control_request'; }
+	function connectLockKey(id, epIdx) { return String(id || '') + ':' + String(epIdx || 0); }
+	function isConnectLocked(id, epIdx) { return !!state.connectLocks[connectLockKey(id, epIdx)]; }
+	function applyConnectPolicy(policy) {
+		var seconds = parseInt(policy && policy.access_click_cooldown_seconds, 10);
+		var windowSeconds = parseInt(policy && policy.access_rate_limit_window_seconds, 10);
+		var maxCount = parseInt(policy && policy.access_rate_limit_max_count, 10);
+		if (!isFinite(seconds)) seconds = 3;
+		if (!isFinite(windowSeconds)) windowSeconds = 60;
+		if (!isFinite(maxCount)) maxCount = 5;
+		seconds = Math.max(0, Math.min(seconds, 60));
+		windowSeconds = Math.max(1, Math.min(windowSeconds, 3600));
+		maxCount = Math.max(1, Math.min(maxCount, 100));
+		CONNECT_COOLDOWN_MS = seconds * 1000;
+		CONNECT_RATE_WINDOW_MS = windowSeconds * 1000;
+		CONNECT_RATE_MAX_COUNT = maxCount;
+	}
+	function lockConnectUntil(id, epIdx, waitMs) {
+		var key = connectLockKey(id, epIdx);
+		state.connectLocks[key] = true;
+		if (state.connectLockTimers[key]) window.clearTimeout(state.connectLockTimers[key]);
+		state.connectLockTimers[key] = window.setTimeout(function () {
+			delete state.connectLocks[key];
+			delete state.connectLockTimers[key];
+			refreshConnectButtons(id);
+		}, Math.max(500, waitMs || 500));
+		refreshConnectButtons(id);
+	}
+	function refreshConnectButtons(id) {
+		try { renderList(); } catch (_) {}
+		if (state.detail && String(state.detail.id) === String(id)) {
+			try { renderDetail(state.detail); } catch (_) {}
+		}
+	}
+	function beginConnectAttempt(id, epIdx) {
+		var key = connectLockKey(id, epIdx);
+		var now = Date.now();
+		var history = state.connectAttemptHistory[key] || [];
+		if (state.connectLocks[key]) return false;
+		history = history.filter(function (ts) { return now - ts < CONNECT_RATE_WINDOW_MS; });
+		if (history.length >= CONNECT_RATE_MAX_COUNT) {
+			state.connectAttemptHistory[key] = history;
+			lockConnectUntil(id, epIdx, (history[0] + CONNECT_RATE_WINDOW_MS) - now);
+			window.alert('설정된 접속 요청 제한에 도달했습니다. 잠시 후 다시 시도하세요.');
+			return false;
+		}
+		history.push(now);
+		state.connectAttemptHistory[key] = history;
+		state.connectLocks[key] = true;
+		if (state.connectLockTimers[key]) {
+			window.clearTimeout(state.connectLockTimers[key]);
+			delete state.connectLockTimers[key];
+		}
+		refreshConnectButtons(id);
+		return true;
+	}
+	function finishConnectAttempt(id, epIdx) {
+		var key = connectLockKey(id, epIdx);
+		if (state.connectLockTimers[key]) window.clearTimeout(state.connectLockTimers[key]);
+		if (CONNECT_COOLDOWN_MS <= 0) {
+			delete state.connectLocks[key];
+			delete state.connectLockTimers[key];
+			refreshConnectButtons(id);
+			return;
+		}
+		state.connectLockTimers[key] = window.setTimeout(function () {
+			delete state.connectLocks[key];
+			delete state.connectLockTimers[key];
+			refreshConnectButtons(id);
+		}, CONNECT_COOLDOWN_MS);
+	}
 	function firstEndpoint(row) {
 		var eps = row && row.endpoints ? row.endpoints : [];
 		var i;
@@ -254,7 +330,8 @@
 		qs('access-resource-list').innerHTML = currentRows().map(function (row) {
 			var ep = firstEndpoint(row);
 			var epIndex = Math.max(0, (row.endpoints || []).indexOf(ep));
-			var disabled = !row.can_access || statusLabel(row) === '만료됨' || statusLabel(row) === '시작 전' || !ep;
+			var busy = isConnectLocked(row.id, epIndex);
+			var disabled = !row.can_access || statusLabel(row) === '만료됨' || statusLabel(row) === '시작 전' || !ep || busy;
 			return '' +
 				'<article class="' + cardClass(row) + '" data-id="' + esc(row.id) + '" role="listitem" tabindex="0">' +
 					'<div class="access-card-main">' +
@@ -273,7 +350,7 @@
 					'<div class="access-card-side">' +
 						'<div class="access-card-actions">' +
 							'<button type="button" class="action-chip action-primary" data-action="connect" data-id="' + esc(row.id) + '" data-ep-idx="' + epIndex + '"' + (disabled ? ' disabled' : '') + '>' +
-								'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>접속</span>' +
+								'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>' + (busy ? '처리 중' : '접속') + '</span>' +
 							'</button>' +
 							'<button type="button" class="action-chip action-muted" data-action="detail" data-id="' + esc(row.id) + '">상세 보기</button>' +
 						'</div>' +
@@ -341,7 +418,7 @@
 		}).join('') + '</div>';
 	}
 	function renderAccessAction(item, ep, idx) {
-		var cred, credFields, sshHeadStatus, sshPrimaryBtn;
+		var cred, credFields, sshHeadStatus, sshPrimaryBtn, busy;
 		if (!ep) return '<div class="ac-action-box is-disabled"><strong>접속점이 없습니다.</strong><p>관리자에게 자원 접속점을 등록해 달라고 요청하세요.</p></div>';
 		if (statusLabel(item) === '시작 전') {
 			return '<div class="ac-action-box is-disabled"><strong>아직 접속 시작일 전입니다.</strong><p>권한의 <strong>사용 시작일</strong>(' + esc(formatDate(item.grant_start_date)) + ') 이후부터 접속할 수 있습니다. (기준: 한국 시간)</p><a class="action-chip action-muted" href="' + requestUrl() + '">신청 내역 보기</a></div>';
@@ -350,14 +427,18 @@
 			return '<div class="ac-action-box is-disabled"><strong>권한이 만료되었습니다.</strong><p>다시 접속하려면 접근 권한을 신청하세요.</p><a class="action-chip action-primary" href="' + requestUrl() + '?resource_id=' + esc(item.id) + '">접근 권한 신청하기</a></div>';
 		}
 		if (ep.kind === 'WEB') {
+			busy = isConnectLocked(item.id, idx);
 			return '<div class="ac-action-box ac-action-box--web">' +
 				'<div class="ac-web-action-main">' +
 					'<div><strong>WEB 접속</strong><span class="access-target-text">' + esc(ep.url || endpointTarget(ep)) + '</span></div>' +
 				'</div>' +
-				'<button type="button" class="action-chip action-primary action-chip-lg" data-action="connect" data-id="' + esc(item.id) + '" data-ep-idx="' + idx + '">' +
-					'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>접속</span>' +
+				'<button type="button" class="action-chip action-primary action-chip-lg" data-action="connect" data-id="' + esc(item.id) + '" data-ep-idx="' + idx + '"' + (busy ? ' disabled' : '') + '>' +
+					'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>' + (busy ? '처리 중' : '접속') + '</span>' +
 				'</button>' +
 			'</div>';
+		}
+		if (!policyFlag((state.browsePolicy || {}).ssh_launch_enabled, true)) {
+			return '<div class="ac-action-box is-disabled"><strong>SSH 접속 실행이 중지되어 있습니다.</strong><p>관리자 정책에 따라 SSH 클라이언트 실행을 사용할 수 없습니다.</p></div>';
 		}
 		cred = credentialInfo(item);
 		credFields = '';
@@ -369,11 +450,12 @@
 		sshHeadStatus = state.pendingSshAuditId
 			? '<span class="ac-ssh-status-done">로그 기록 완료</span>'
 			: '<span class="ac-ssh-status-pending">접속을 눌러 감사 로그를 남깁니다</span>';
+		busy = isConnectLocked(item.id, idx);
 		sshPrimaryBtn =
 			'<button type="button" class="action-chip action-primary action-chip-lg" data-action="' +
 			(state.pendingSshAuditId ? 'execute-ssh' : 'connect') +
-			'" data-id="' + esc(item.id) + '" data-ep-idx="' + idx + '">' +
-			'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>접속</span>' +
+			'" data-id="' + esc(item.id) + '" data-ep-idx="' + idx + '"' + (busy ? ' disabled' : '') + '>' +
+			'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>' + (busy ? '처리 중' : '접속') + '</span>' +
 			'</button>';
 		return '<div class="ac-ssh-panel">' +
 			'<div class="ac-ssh-panel-head"><strong>SSH 접속 정보</strong>' + sshHeadStatus + '</div>' +
@@ -469,7 +551,7 @@
 		}).catch(function () {});
 	}
 	/** Windows SSH: Blossom Chat preload가 있으면 IPC(openSsh) 우선 — 없으면 OS의 blossom-ssh:// 로 PuTTY (Lumina Gate PC 에이전트 또는 Blossom 설치 프로그램이 등록). */
-	function launchSshSession(item, ep, auditId) {
+	function launchSshSession(item, ep, auditId, formOverride) {
 		if (!item || !ep || String(ep.kind || '').toUpperCase() !== 'SSH') return;
 		var aid = auditId != null ? auditId : state.pendingSshAuditId;
 		if (!/Windows/i.test(navigator.userAgent || '')) {
@@ -480,7 +562,12 @@
 		var panelEl = qs('access-detail-panel');
 		var panel = panelEl && panelEl.querySelector('.ac-ssh-panel');
 		var detailMatches = state.detail && item.id != null && String(state.detail.id) === String(item.id);
-		if (state.sshCredentialsUnlocked && panel && detailMatches) {
+		if (formOverride) {
+			form = {
+				user: normalizeSshUser(formOverride.user || ''),
+				password: normalizeSshPassword(formOverride.password || '')
+			};
+		} else if (state.sshCredentialsUnlocked && panel && detailMatches) {
 			form = readSshFormFromPanel(panel);
 		} else {
 			var stored = credentialInfo(item);
@@ -569,13 +656,19 @@
 		if (state.browsePolicyLoaded && state.browsePolicy) return Promise.resolve(state.browsePolicy);
 		return fetchJson('/api/access-control/browse-policy').then(function (data) {
 			state.browsePolicy = data.item || {};
+			applyConnectPolicy(state.browsePolicy);
 			state.browsePolicyLoaded = true;
 			return state.browsePolicy;
 		}).catch(function () {
-			state.browsePolicy = { web_open_mode: 'new_tab', web_host_gate_patterns: [], web_iframe_allow_patterns: [] };
+			state.browsePolicy = { web_open_mode: 'new_tab', web_host_gate_patterns: [], web_iframe_allow_patterns: [], ssh_launch_enabled: 1, ssh_connect_account_required: 0, access_click_cooldown_seconds: 3, access_rate_limit_window_seconds: 60, access_rate_limit_max_count: 5 };
+			applyConnectPolicy(state.browsePolicy);
 			state.browsePolicyLoaded = true;
 			return state.browsePolicy;
 		});
+	}
+	function policyFlag(value, fallback) {
+		if (value === undefined || value === null || value === '') return !!fallback;
+		return ['0', 'false', 'n', 'no', 'off'].indexOf(String(value).trim().toLowerCase()) < 0;
 	}
 	function webUrlHostname(url) {
 		try {
@@ -657,17 +750,22 @@
 	}
 	function connectEndpoint(id, epIdx) {
 		var row = state.rows.filter(function (item) { return String(item.id) === String(id); })[0] || state.detail;
-		var eps, ep;
+		var eps, ep, epKind, sshFormSnapshot;
 		if (!row) return;
 		eps = row.endpoints || [];
 		ep = eps[epIdx] || firstEndpoint(row);
 		if (!ep) { window.alert('등록된 접속점이 없습니다.'); return; }
 		if (!row.can_access || statusLabel(row) === '만료됨' || statusLabel(row) === '시작 전') { selectResource(id, epIdx, false); return; }
-		var epKind = String(ep.kind || '').toUpperCase();
+		epKind = String(ep.kind || '').toUpperCase();
+		if (epKind === 'SSH' && state.sshCredentialsUnlocked && state.detail && String(state.detail.id) === String(id)) {
+			sshFormSnapshot = readSshFormFromPanel(qs('access-detail-panel'));
+		}
+		if (!beginConnectAttempt(id, epIdx)) return;
 		if (epKind === 'WEB') {
 			var webUrl = ep.url || endpointTarget(ep);
 			if (!webUrl || webUrl === '-') {
 				window.alert('표시할 WEB URL이 없습니다.');
+				finishConnectAttempt(id, epIdx);
 				return;
 			}
 			ensureBrowsePolicy().then(function (pol) {
@@ -679,35 +777,49 @@
 				return recordAccess(id, ep).then(function (data) {
 					handleWebAfterRecord(data, id, epIdx, row, ep, webUrl, pol);
 				});
-			}).catch(function (err) { window.alert(err.message); });
+			}).catch(function (err) { window.alert(err.message); }).then(function () { finishConnectAttempt(id, epIdx); });
 			return;
 		}
-		recordAccess(id, ep).then(function (data) {
-			var touchPayload = (data && data.item) || {};
-			var aid = touchPayload.audit_log_id;
-			var epKind = String(ep.kind || '').toUpperCase();
-			var touchResource = touchPayload.resource && typeof touchPayload.resource === 'object' ? touchPayload.resource : {};
-			clearAllWebAccessSessions(false);
-			if (epKind === 'SSH' && state.pendingSshAuditId && String(state.pendingSshAuditId) !== String(aid || '')) {
-				postSshSessionEnd(state.pendingSshAuditId, false);
+		ensureBrowsePolicy().then(function (pol) {
+			if (!policyFlag(pol.ssh_launch_enabled, true)) {
+				window.alert('SSH 접속 실행이 관리자 정책으로 중지되어 있습니다.');
+				selectResource(id, epIdx, false);
+				return null;
 			}
-			state.pendingSshAuditId = epKind === 'SSH' ? (aid || null) : null;
-			selectResource(id, epIdx, true);
-			loadRows(true);
-			if (epKind === 'SSH' && aid) {
-				// 왼쪽 카드 "접속": 목록 row만으로는 connection_options 등이 부족할 수 있음. 패널과 동일하게 상세 API로 맞춘 뒤 PuTTY 실행.
-				fetchJson('/api/access-control/resources/' + encodeURIComponent(id) + '?scope=accessible')
-					.then(function (detailRes) {
-						var detailItem = (detailRes && detailRes.item) || {};
-						var merged = Object.assign({}, row, touchResource, detailItem);
-						var epFresh = (detailItem.endpoints || []).filter(function (e) { return String(e.id) === String(ep.id); })[0] || ep;
-						launchSshSession(merged, epFresh, aid);
-					})
-					.catch(function () {
-						launchSshSession(Object.assign({}, row, touchResource), ep, aid);
+			return fetchJson('/api/access-control/resources/' + encodeURIComponent(id) + '?scope=accessible')
+				.catch(function () { return { item: row }; })
+				.then(function (detailRes) {
+					var detailItem = (detailRes && detailRes.item) || {};
+					var detailEndpoint = (detailItem.endpoints || []).filter(function (endpoint) { return String(endpoint.id) === String(ep.id); })[0] || ep;
+					var mergedForPolicy = Object.assign({}, row, detailItem);
+					var connectAccount = currentSshConnectAccount(mergedForPolicy, sshFormSnapshot);
+					if (policyFlag(pol.ssh_connect_account_required, false) && !connectAccount) {
+						state.detail = mergedForPolicy;
+						state.activeEndpointIndex = epIdx || 0;
+						state.sshPanelOpen = true;
+						state.sshCredentialsUnlocked = true;
+						renderList();
+						renderDetail(mergedForPolicy);
+						window.alert('SSH 접속 계정 기록이 필수입니다. 계정 정보를 입력한 뒤 다시 접속하세요.');
+						return null;
+					}
+					return recordAccess(id, detailEndpoint, connectAccount).then(function (data) {
+						var touchPayload = (data && data.item) || {};
+						var aid = touchPayload.audit_log_id;
+						var touchResource = touchPayload.resource && typeof touchPayload.resource === 'object' ? touchPayload.resource : {};
+						clearAllWebAccessSessions(false);
+						if (state.pendingSshAuditId && String(state.pendingSshAuditId) !== String(aid || '')) {
+							postSshSessionEnd(state.pendingSshAuditId, false);
+						}
+						state.pendingSshAuditId = aid || null;
+						selectResource(id, epIdx, true);
+						loadRows(true);
+						if (aid) {
+							launchSshSession(Object.assign({}, row, touchResource, detailItem), detailEndpoint, aid, sshFormSnapshot);
+						}
 					});
-			}
-		}).catch(function (err) { window.alert(err.message); });
+				});
+		}).catch(function (err) { window.alert(err.message); }).then(function () { finishConnectAttempt(id, epIdx); });
 	}
 	function loadRows(keepSelection) {
 		return fetchJson('/api/access-control/resources?scope=accessible')
@@ -736,6 +848,16 @@
 			user: normalizeSshUser(uIn ? String(uIn.value || '').trim() : ''),
 			password: normalizeSshPassword(pIn ? String(pIn.value || '').trim() : ''),
 		};
+	}
+	function currentSshConnectAccount(item, formOverride) {
+		var panel, form;
+		if (formOverride && formOverride.user) return formOverride.user;
+		if (state.sshCredentialsUnlocked && state.detail && item && String(state.detail.id) === String(item.id)) {
+			panel = qs('access-detail-panel');
+			form = readSshFormFromPanel(panel);
+			if (form.user) return form.user;
+		}
+		return credentialInfo(item || {}).username || '';
 	}
 	function blossomSshOpenUrl(item, ep, userOverride, passwordPlain) {
 		var cred = credentialInfo(item);
@@ -797,7 +919,13 @@
 		ep = (state.detail.endpoints || [])[state.activeEndpointIndex] || firstEndpoint(state.detail);
 		if (!ep) return;
 		if (action === 'execute-ssh') {
-			launchSshSession(state.detail, ep, state.pendingSshAuditId);
+			var formSnapshot = state.sshCredentialsUnlocked ? readSshFormFromPanel(qs('access-detail-panel')) : null;
+			if (!beginConnectAttempt(state.detail.id, state.activeEndpointIndex)) return;
+			try {
+				launchSshSession(state.detail, ep, state.pendingSshAuditId, formSnapshot);
+			} finally {
+				finishConnectAttempt(state.detail.id, state.activeEndpointIndex);
+			}
 		}
 	}
 	function syncFilterSelection() {
@@ -862,7 +990,10 @@
 		bindSshAuditLifecycle();
 		bindEvents();
 		syncCategoryTabs();
-		ensureBrowsePolicy().catch(function () {});
+		ensureBrowsePolicy().then(function () {
+			renderList();
+			if (state.detail) renderDetail(state.detail);
+		}).catch(function () {});
 		loadRows(false);
 	}
 	document.addEventListener('DOMContentLoaded', init);

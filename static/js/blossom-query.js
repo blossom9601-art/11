@@ -919,7 +919,7 @@
 
     var el = document.createElement('div');
     el.style.cssText = 'pointer-events:auto;padding:12px 20px;border-radius:10px;color:#fff;' +
-      'font-size:14px;backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,0.18);' +
+      'font-size:14px;backdrop-filter:blur(var(--modal-blur, 5px));box-shadow:0 4px 24px rgba(0,0,0,0.18);' +
       'display:flex;align-items:center;gap:8px;opacity:0;transform:translateX(40px);' +
       'transition:opacity .3s,transform .3s;max-width:380px;background:' + (colors[type] || colors.info);
     el.innerHTML = '<span>' + (icons[type] || '') + '</span><span>' +

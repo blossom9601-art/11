@@ -99,6 +99,7 @@ from app.services.quality_type_service import init_quality_type_table
 from app.services.page_tab_config_service import init_page_tab_config_table
 from app.services.brand_setting_service import init_brand_setting_table
 from app.services.web_access_control_service import init_web_access_control_tables
+from app.services.identity_governance_service import init_identity_governance_tables
 from flask_migrate import Migrate
 import os
 
@@ -1627,6 +1628,13 @@ def create_app(config_name='default'):
         except Exception as web_access_init_err:
             try:
                 print('[web-access-control] table init failed:', web_access_init_err, flush=True)
+            except Exception:
+                pass
+        try:
+            init_identity_governance_tables(app)
+        except Exception as identity_gov_init_err:
+            try:
+                print('[identity-governance] table init failed:', identity_gov_init_err, flush=True)
             except Exception:
                 pass
 

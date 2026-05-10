@@ -399,7 +399,7 @@
       method = 'POST';
     }
 
-    fetch(url, { method: method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    fetch(url, { method: method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.success) {
@@ -465,7 +465,7 @@
         return;
       }
       var id = remaining.shift();
-      fetch('/api/page-tabs/' + id, { method: 'DELETE', credentials: 'same-origin' })
+      fetch('/api/page-tabs/' + id, { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) { if (!d.success) { errorMsgs.push(id + ': ' + (d.message || '삭제 실패')); } else { deletedCount++; } next(); })
         .catch(function () { errorMsgs.push('서버 통신 오류'); next(); });
@@ -707,7 +707,7 @@
 
   function uploadImageForTab(tabId, callback) {
     if (_pendingImageRemove && !_pendingImageFile) {
-      fetch('/api/page-tabs/' + tabId + '/image', { method: 'DELETE', credentials: 'same-origin' })
+      fetch('/api/page-tabs/' + tabId + '/image', { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function () { callback(); })
         .catch(function () { callback(); });
       return;
@@ -715,7 +715,7 @@
     if (!_pendingImageFile) { callback(); return; }
     var fd = new FormData();
     fd.append('image', _pendingImageFile);
-    fetch('/api/page-tabs/' + tabId + '/image', { method: 'POST', credentials: 'same-origin', body: fd })
+    fetch('/api/page-tabs/' + tabId + '/image', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.success) showMessage(d.message || '이미지 업로드 실패', '오류');

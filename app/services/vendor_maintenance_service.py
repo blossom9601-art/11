@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from flask import current_app
+from app.services.public_id_service import make_public_id
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,14 @@ def _table_row_count(conn: sqlite3.Connection, table_name: str) -> int:
         return int(row['cnt'] or 0) if row else 0
     except sqlite3.DatabaseError:
         return 0
+
+
+def _table_has_column(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    try:
+        cols = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        return any(row[1] == column_name for row in cols)
+    except sqlite3.DatabaseError:
+        return False
 
 
 def _copy_table_rows(*, src_conn: sqlite3.Connection, dst_conn: sqlite3.Connection, table_name: str) -> int:
@@ -239,9 +248,12 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         return {}
     return {
         'id': row['id'],
+        'public_id': make_public_id(TABLE_NAME, 'mnt', row['id']),
         'maintenance_code': row['maintenance_code'],
         'maintenance_name': row['maintenance_name'],
         'vendor': row['maintenance_name'],
+        'logo_url': row['logo_url'] or '',
+        'logo': row['logo_url'] or '',
         'address': row['address'] or '',
         'business_number': row['business_no'] or '',
         'call_center': row['call_center'] or '',
@@ -269,6 +281,7 @@ def init_vendor_maintenance_table(app=None) -> None:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     maintenance_code TEXT NOT NULL UNIQUE,
                     maintenance_name TEXT NOT NULL,
+                    logo_url TEXT,
                     address TEXT,
                     business_no TEXT,
                     call_center TEXT,
@@ -291,6 +304,8 @@ def init_vendor_maintenance_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{TABLE_NAME}_deleted ON {TABLE_NAME}(is_deleted)"
             )
+            if not _table_has_column(conn, TABLE_NAME, 'logo_url'):
+                conn.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN logo_url TEXT")
             conn.commit()
             logger.info('%s table ready', TABLE_NAME)
 
@@ -492,6 +507,7 @@ def _prepare_payload(data: Dict[str, Any], *, require_all: bool = False) -> Dict
     payload: Dict[str, Any] = {}
     mapping = {
         'maintenance_name': ['maintenance_name', 'vendor', 'name'],
+        'logo_url': ['logo_url', 'logo'],
         'address': ['address'],
         'business_no': ['business_no', 'business_number'],
         'call_center': ['call_center'],
@@ -547,13 +563,14 @@ def list_maintenance_vendors(app=None, *, search: Optional[str] = None, include_
             clauses.append('(' + ' OR '.join([
                 'maintenance_name LIKE ?',
                 'maintenance_code LIKE ?',
+                'logo_url LIKE ?',
                 'address LIKE ?',
                 'business_no LIKE ?',
                 'call_center LIKE ?'
             ]) + ')')
-            params.extend([like] * 5)
+            params.extend([like] * 6)
         query = (
-            f"SELECT id, maintenance_code, maintenance_name, address, business_no, call_center, "
+            f"SELECT id, maintenance_code, maintenance_name, logo_url, address, business_no, call_center, "
             f"manager_count, hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE {' AND '.join(clauses)} ORDER BY id DESC"
         )
@@ -568,7 +585,7 @@ def get_maintenance_vendors_by_ids(ids: Iterable[Any], app=None) -> Dict[int, Di
         return {}
     placeholders = ','.join(['?'] * len(sanitized_ids))
     query = (
-        f"SELECT id, maintenance_code, maintenance_name, address, business_no, call_center, "
+        f"SELECT id, maintenance_code, maintenance_name, logo_url, address, business_no, call_center, "
         f"manager_count, hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
         f"FROM {TABLE_NAME} WHERE id IN ({placeholders})"
     )
@@ -595,14 +612,15 @@ def create_maintenance_vendor(data: Dict[str, Any], actor: str, app=None) -> Dic
         conn.execute(
             f"""
             INSERT INTO {TABLE_NAME}
-                (maintenance_code, maintenance_name, address, business_no, call_center,
+                (maintenance_code, maintenance_name, logo_url, address, business_no, call_center,
                  manager_count, hw_count, sw_count, component_count, remark,
                  created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             """,
             (
                 code[:60],
                 name,
+                payload.get('logo_url'),
                 payload.get('address'),
                 payload.get('business_no'),
                 payload.get('call_center'),
@@ -626,7 +644,7 @@ def get_maintenance_vendor(record_id: int, app=None) -> Optional[Dict[str, Any]]
     app = app or current_app
     with _get_connection(app) as conn:
         row = conn.execute(
-            f"SELECT id, maintenance_code, maintenance_name, address, business_no, call_center, manager_count, "
+            f"SELECT id, maintenance_code, maintenance_name, logo_url, address, business_no, call_center, manager_count, "
             f"hw_count, sw_count, component_count, remark, created_at, created_by, updated_at, updated_by, is_deleted "
             f"FROM {TABLE_NAME} WHERE id = ?",
             (record_id,),
@@ -652,6 +670,7 @@ def update_maintenance_vendor(record_id: int, data: Dict[str, Any], actor: str, 
         for column in (
             'maintenance_name',
             'maintenance_code',
+            'logo_url',
             'address',
             'business_no',
             'call_center',

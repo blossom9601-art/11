@@ -625,7 +625,7 @@
                     // Make model clickable to detail page while preserving highlight markup
                     if(col === 'model'){
                         // 동적 상세 페이지 딥링크 (Unix 패턴): 비어있지 않은 필드만 쿼리 전달
-                        var baseDetail = window.__SW_HIGH_AVAILABILITY_DETAIL_URL || '/p/cat_sw_high_availability_detail';
+                        var baseDetail = window.__SW_HIGH_AVAILABILITY_DETAIL_URL || '/b/cat_sw_high_availability_detail';
                         var href;
                         if(row.id != null && String(row.id).trim() !== ''){
                             href = baseDetail + '?ha_id=' + encodeURIComponent(String(row.id));
@@ -642,7 +642,7 @@
                         }
                         // payload JSON (세션스토리지 복원용) – 작은 따옴표로 감싸 안전 이스케이프
                         var payload = JSON.stringify(row).replace(/[<>&]/g, function(ch){ return {'<':'\u003C','>':'\u003E','&':'\u0026'}[ch]; });
-                        cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-row-payload='${payload}'>${cellValue}</a>`;
+                        cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row-payload='${payload}'>${cellValue}</a>`;
                     }
                     // EOSL status indicator (three colors)
                     if(col === 'eosl'){
@@ -891,7 +891,7 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'고가용성 유형', cols:['model','vendor','release_date','eosl'] };
+    const group = { title:'고가용성 유형', cols:['model','vendor','hw_type','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';

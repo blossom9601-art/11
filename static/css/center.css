@@ -521,10 +521,10 @@
 .page-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 4px rgba(99,102,241,.2); }
 
 /* Add / Edit modal minimal styles (already have classes in HTML) */
-.server-add-modal, .server-edit-modal { display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:150; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+.server-add-modal, .server-edit-modal { display:none; position:fixed; inset:0; width:100%; height:100%; background:var(--modal-overlay, rgba(15,23,42,.28)); z-index:150; backdrop-filter:blur(var(--modal-blur, 5px)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); }
 .server-add-modal.show, .server-edit-modal.show { display:block; }
 .modal-overlay-full { position:fixed !important; inset:0 !important; width:100% !important; height:100% !important; }
-.modal-overlay-full { background:rgba(17,24,39,0.55); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); z-index:1300; }
+.modal-overlay-full { background:var(--modal-overlay, rgba(15,23,42,.28)); backdrop-filter:blur(var(--modal-blur, 5px)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); z-index:1300; }
 .modal-overlay-full .server-add-content, .modal-overlay-full .server-edit-content { z-index:1310; }
 .modal-overlay-full.show { display:block; }
 .server-add-content, .server-edit-content { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:90%; max-width:800px; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; }

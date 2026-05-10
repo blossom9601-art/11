@@ -78,6 +78,12 @@ html.sidebar-hidden .main-content {
 
 .server-edit-modal .server-edit-body .form-section + .form-section::before { content:""; position:absolute; top:0; left:-32px; right:-32px; border-top:1px dotted #e5e7eb; }
 
+/* Category detail edit modals should mirror category list modal spacing. */
+.server-edit-modal.modal-overlay-full .server-edit-body .form-section + .form-section {
+  padding-top:24px;
+  margin-top:20px;
+}
+
 .form-input.input-metric {
   border-style: dashed;
   border-color: #cbd5e1;
@@ -147,7 +153,19 @@ html.sidebar-hidden .main-content {
 
 .server-edit-modal .form-grid .form-row.form-row-wide { grid-column:1 / -1; }
 
-.server-edit-modal .form-input.textarea-large { min-height:100px; line-height:1.5; resize:vertical; }
+.server-edit-modal .form-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px 20px;
+}
+
+.server-edit-modal .form-row {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.server-edit-modal .form-input.textarea-large { min-height:160px; line-height:1.5; resize:vertical; }
 
 .server-add-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input),
 .server-edit-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input) {
@@ -155,6 +173,29 @@ html.sidebar-hidden .main-content {
 }
 
 .server-edit-modal .form-row .form-input { width:100%; box-sizing:border-box; padding:8px 14px; }
+
+.modal-overlay-full .form-input {
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  min-height:46px;
+}
+
+.modal-overlay-full .fk-searchable-control .fk-searchable-display {
+  border-width:1px;
+  box-sizing:border-box;
+  min-height:46px;
+}
+
+.required { color:#ef4444; margin-left:4px; font-weight:700; }
+
+.modal-overlay-full .form-row:has(input[required], select[required], textarea[required]) > label:not(:has(.required, .req-star))::after {
+  content:"*";
+  color:#ef4444;
+  margin-left:4px;
+  font-weight:700;
+}
+
+.form-section .form-grid + .form-row { margin-top:12px; }
 
 .server-edit-modal .server-edit-body .form-section { margin-bottom:24px; padding:0 32px; }
 
@@ -613,6 +654,7 @@ table.hw-table td[data-col="status"].status-unregistered { color:#6b7280; }
   letter-spacing:0.2px;
   border:1px solid transparent;
   position:relative;
+  -webkit-user-select:none;
   user-select:none;
 }
 
@@ -1414,7 +1456,7 @@ table.hw-table td[data-col="status"].status-unregistered { color:#6b7280; }
 .hw-table select {
   width:100%; box-sizing:border-box; padding:8px 34px 8px 10px;
   border:1px solid #e5e7eb; border-radius:6px; font-size:13px; color:#374151; background:#fff;
-  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  -webkit-appearance:none; -moz-appearance:none; appearance:none;
   background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
   background-repeat:no-repeat; background-position:right 10px center; background-size:16px 16px;
   transition:border-color .2s ease, box-shadow .2s ease, background-color .2s ease, color .2s ease;
@@ -1659,3 +1701,197 @@ table.hw-table td[data-col="status"].status-unregistered { color:#6b7280; }
 
 .rotate--90 { transform: rotate(-90deg); }
 
+/* Category detail stat no-data cards use the same animated empty state. */
+#sys-empty.info-desc,
+#svc-empty.info-desc,
+#stat-empty.info-desc,
+#group-empty.info-desc,
+#oper-empty.info-desc,
+#cost-empty.info-desc,
+#ver-empty.info-desc {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  width:100%;
+  min-height:170px;
+  margin:0;
+  text-align:center;
+  color:#64748b;
+  line-height:1.45;
+  white-space:pre-line;
+}
+
+.bls-detail-no-data {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  width:100%;
+  min-height:170px;
+}
+
+.bls-detail-no-data-anim {
+  display:block;
+  width:240px;
+  max-width:100%;
+  height:180px;
+  pointer-events:none;
+}
+
+.bls-detail-no-data-text {
+  display:block;
+  font-size:13px;
+  color:#64748b;
+  text-align:center;
+  white-space:pre-line;
+}
+
+/* Category detail edit modal: keep field rows compact and prevent old detail rules from adding vertical gaps. */
+.server-edit-modal.modal-overlay-full .server-edit-body .form-grid {
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:8px 20px !important;
+  align-items:start !important;
+}
+
+.server-edit-modal.modal-overlay-full .server-edit-body .form-row {
+  display:flex !important;
+  flex-direction:column !important;
+  gap:4px !important;
+  row-gap:4px !important;
+  margin:0 !important;
+  min-width:0 !important;
+}
+
+.server-edit-modal.modal-overlay-full .server-edit-body .form-row > label {
+  display:block !important;
+  margin:0 !important;
+  padding:0 !important;
+  line-height:1.4 !important;
+}
+
+.server-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+.server-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
+  margin:0 !important;
+}
+
+.server-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
+  margin-top:8px !important;
+}
+
+/*
+ * Vendor logo row in add/edit modals — keep *detail* pages aligned with category *list*
+ * (category2.css loads this on list-only routes; detail routes use detail-common only).
+ */
+.form-grid .vendor-logo-row {
+  grid-column:1 / -1;
+}
+
+.vendor-logo-field {
+  box-sizing:border-box;
+  width:100%;
+  min-height:96px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 12px;
+  border:1px solid #d8e0eb;
+  border-radius:8px;
+  background:#fff;
+}
+
+.vendor-logo-preview {
+  width:128px;
+  height:64px;
+  flex:0 0 128px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e5eaf2;
+  border-radius:10px;
+  background:#f8fafc;
+  overflow:hidden;
+}
+
+.vendor-logo-preview[hidden] {
+  display:none !important;
+}
+
+.vendor-logo-preview img {
+  max-width:116px;
+  max-height:52px;
+  object-fit:contain;
+  display:block;
+}
+
+.vendor-logo-upload-btn {
+  height:36px;
+  width:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#f8fafc;
+  color:#334155;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.vendor-logo-upload-btn:hover {
+  background:#eef2f7;
+  border-color:#94a3b8;
+  color:#1e293b;
+}
+
+.vendor-logo-upload-btn:focus-within {
+  outline:none;
+  box-shadow:0 0 0 3px rgba(71,85,105,.16);
+}
+
+.vendor-logo-upload-icon {
+  width:18px;
+  height:18px;
+  display:block;
+  opacity:.82;
+}
+
+.vendor-logo-upload-btn:hover .vendor-logo-upload-icon {
+  opacity:1;
+}
+
+.vendor-logo-file-name {
+  min-width:0;
+  color:#64748b;
+  font-size:13px;
+  line-height:1.4;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.vendor-logo-field.has-file .vendor-logo-file-name {
+  display:none;
+}
+
+.vendor-logo-field.has-file {
+  min-height:108px;
+}
+
+.vendor-logo-field.has-file .vendor-logo-preview {
+  width:auto;
+  height:86px;
+  flex:1 1 auto;
+  justify-content:center;
+}
+
+.vendor-logo-field.has-file .vendor-logo-preview img {
+  max-width:100%;
+  max-height:74px;
+}

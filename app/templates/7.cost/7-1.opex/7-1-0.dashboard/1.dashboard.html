@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -32,7 +32,7 @@
                         ('cost_opex_etc','기타 사용료'),
                     ] %}
                     {% for key,label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
                 <div class="year-filter-wrap">
@@ -143,7 +143,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/vendor/chartjs/chart.umd.min.4.4.3.js"></script>
     <script src="/static/js/7.cost/7-1.opex/7-1-0.dashboard/opex_dashboard.js?v=20260215p"></script>
 </body>

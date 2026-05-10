@@ -278,10 +278,10 @@
 .fc .fc-daygrid-day-number::after { content: ''; }
 
 /* Modal */
-.modal-overlay { position: fixed; inset:0; background: rgba(17,24,39,.50); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: grid; place-items: center; padding: 20px; z-index: 2147483647; }
+.modal-overlay { position: fixed; inset:0; background: var(--modal-overlay, rgba(15,23,42,.28)); backdrop-filter: blur(var(--modal-blur, 5px)); -webkit-backdrop-filter: blur(var(--modal-blur, 5px)); display: grid; place-items: center; padding: 20px; z-index: 2147483647; }
 
 /* Project add modal (inspired by backup add modal) */
-.project-add-modal { position: fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(17,24,39,.50); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 20px; z-index: 2147483647; }
+.project-add-modal { position: fixed; inset:0; display:none; align-items:center; justify-content:center; background: var(--modal-overlay, rgba(15,23,42,.28)); backdrop-filter: blur(var(--modal-blur, 5px)); -webkit-backdrop-filter: blur(var(--modal-blur, 5px)); padding: 20px; z-index: 2147483647; }
 .project-add-modal.open { display:flex; }
 .project-add-content { width: 860px; max-width: 95vw; background:#fff; border-radius: 18px; border:1px solid #e5e7eb; box-shadow: 0 22px 40px -6px rgba(15,23,42,.18), 0 4px 12px rgba(0,0,0,.08); display:flex; flex-direction:column; overflow:hidden; }
 .project-add-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:20px 32px; border-bottom:1px solid #eaeef3; background: linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%); }
@@ -483,7 +483,7 @@ body.dark .task-timeline-page .table th, body.dark .task-timeline-page .table td
 .task-timeline-page .kpi .lbl { font-weight:700; color:#374151; }
 
 /* Modal */
-.task-timeline-page .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.45); backdrop-filter: blur(3px); display:none; z-index:100; }
+.task-timeline-page .modal-backdrop { position:fixed; inset:0; background:var(--modal-overlay, rgba(15,23,42,.28)); -webkit-backdrop-filter: blur(var(--modal-blur, 5px)); backdrop-filter: blur(var(--modal-blur, 5px)); display:none; z-index:100; }
 .task-timeline-page .modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:101; padding:20px; }
 .task-timeline-page .modal.show, .task-timeline-page .modal-backdrop.show { display:flex; }
 .task-timeline-page .modal-card { width:880px; max-width:96vw; max-height:90vh; background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 24px 44px rgba(15,23,42,.10); padding:0; color:#111827; display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; }
@@ -723,7 +723,7 @@ body.dark .task-timeline-page .table th, body.dark .task-timeline-page .table td
 /* Overview modal layout (shared) */
 .overview-modal.hidden { display:none; }
 .overview-modal { position:fixed; inset:0; z-index:2147483646; display:flex; align-items:center; justify-content:center; padding:32px; }
-.overview-modal-backdrop { position:absolute; inset:0; background:rgba(17,24,39,.55); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+.overview-modal-backdrop { position:absolute; inset:0; background:var(--modal-overlay, rgba(15,23,42,.28)); backdrop-filter:blur(var(--modal-blur, 5px)); -webkit-backdrop-filter:blur(var(--modal-blur, 5px)); }
 .overview-modal-dialog { position:relative; background:#fff; width: min(760px, 100%); max-height:80vh; border-radius:20px; box-shadow:0 25px 60px -10px rgba(15,23,42,.45), 0 10px 25px rgba(15,23,42,.18); display:flex; flex-direction:column; }
 .overview-modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 22px 14px; border-bottom:1px solid #f1f5f9; }
 .overview-modal-header h3 { margin:0; font-size:18px; font-weight:800; letter-spacing:0; color:#111827; }
@@ -929,9 +929,9 @@ body.modal-open { overflow: hidden; }
 	justify-content: center;
 	align-items: flex-start;
 	padding: 56px 32px 40px;
-	background: rgba(17,24,39,0.48);
-	backdrop-filter: blur(4px);
-	-webkit-backdrop-filter: blur(4px);
+	background: var(--modal-overlay, rgba(15,23,42,.28));
+	backdrop-filter: blur(var(--modal-blur, 5px));
+	-webkit-backdrop-filter: blur(var(--modal-blur, 5px));
 	z-index: 2147483000;
 	opacity: 1;
 }

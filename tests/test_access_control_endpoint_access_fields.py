@@ -1,3 +1,5 @@
+import pytest
+
 from app.services import web_access_control_service as service
 
 
@@ -173,6 +175,67 @@ def test_touch_web_access_audit_is_success_not_pending(app):
         assert row['action_result'] == service.AUDIT_ACCESS_OUTCOME_SUCCESS
 
 
+def test_touch_access_rate_limit_blocks_repeated_attempts_without_extra_audit(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        service.update_default_policy(
+            {
+                'access_click_cooldown_seconds': 1,
+                'access_rate_limit_window_seconds': 60,
+                'access_rate_limit_max_count': 1,
+            },
+            'pytest',
+            app,
+        )
+        item = service.create_resource(
+            {
+                'resource_name': 'ACCESS-RATE-LIMIT-TEST',
+                'category': '내부 서비스',
+                'endpoints': [
+                    {
+                        'label': 'W',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'limit.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        web_ep = item['endpoints'][0]
+        actor = {'user_id': 7005, 'emp_no': 'LIMIT001', 'name': 'Limit Test'}
+        with service._get_connection(app) as conn:
+            conn.execute(
+                f'''
+                INSERT INTO {service.GRANT_TABLE}
+                    (resource_id, user_id, grant_status, grant_start_date, grant_end_date, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (item['id'], actor['user_id'], service.GRANT_STATUS_ACTIVE, '2000-01-01', '9999-12-31', 'pytest', 'pytest'),
+            )
+            conn.commit()
+
+        service.touch_access(item['id'], actor['user_id'], actor, endpoint_id=web_ep['id'], app=app)
+        with pytest.raises(ValueError, match='접속 요청이 너무 잦습니다'):
+            service.touch_access(item['id'], actor['user_id'], actor, endpoint_id=web_ep['id'], app=app)
+
+        with service._get_connection(app) as conn:
+            count = conn.execute(
+                f'''
+                SELECT COUNT(1) AS cnt
+                  FROM {service.AUDIT_TABLE}
+                 WHERE target_resource_id = ?
+                   AND actor_user_id = ?
+                   AND action_type = '접속'
+                ''',
+                (item['id'], actor['user_id']),
+            ).fetchone()['cnt']
+        assert count == 1
+
+
 def test_complete_ssh_connection_outcome(app):
     with app.app_context():
         service.init_web_access_control_tables(app)
@@ -223,3 +286,61 @@ def test_complete_ssh_connection_outcome(app):
                 (aid,),
             ).fetchone()
         assert row2['action_result'] == service.AUDIT_ACCESS_OUTCOME_FAIL
+
+
+def test_ssh_command_history_is_recorded_and_counted(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        item = service.create_resource(
+            {
+                'resource_name': 'SSH-COMMAND-HISTORY-TEST',
+                'category': '내부 서비스',
+                'endpoints': [
+                    {
+                        'label': 'S',
+                        'kind': 'SSH',
+                        'protocol': 'SSH',
+                        'host': '10.0.0.30',
+                        'port': 22,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        ssh_ep = item['endpoints'][0]
+        actor = {'user_id': 7004, 'emp_no': 'SSHCMD01', 'name': 'SSH Command Test'}
+        with service._get_connection(app) as conn:
+            conn.execute(
+                f'''
+                INSERT INTO {service.GRANT_TABLE}
+                    (resource_id, user_id, grant_status, grant_start_date, grant_end_date, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (item['id'], actor['user_id'], service.GRANT_STATUS_ACTIVE, '2000-01-01', '9999-12-31', 'pytest', 'pytest'),
+            )
+            conn.commit()
+
+        out = service.touch_access(item['id'], actor['user_id'], actor, endpoint_id=ssh_ep['id'], app=app)
+        aid = out['audit_log_id']
+        recorded = service.record_ssh_command_events(
+            {
+                'audit_log_id': aid,
+                'agent_id': 'pc-agent-cmd-1',
+                'events': [
+                    {'occurred_at': '2026-05-04T10:11:12', 'command': 'whoami'},
+                    {'occurred_at': '2026-05-04 10:12:13', 'command': 'sudo systemctl status nginx'},
+                ],
+            },
+            app=app,
+        )
+        assert recorded['inserted'] == 2
+
+        history = service.list_ssh_command_history(aid, app=app)
+        assert history['total'] == 2
+        assert [row['command_text'] for row in history['rows']] == ['whoami', 'sudo systemctl status nginx']
+
+        listed = service.list_audit_logs({'audit_scope': 'access', 'keyword': 'SSH-COMMAND-HISTORY-TEST'}, app=app)
+        assert listed['total'] == 1
+        assert listed['rows'][0]['activity_count'] == 2

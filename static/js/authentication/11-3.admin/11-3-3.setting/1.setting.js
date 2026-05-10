@@ -160,7 +160,7 @@
 	function saveSecurityPolicy(payload) {
 		return fetch('/admin/auth/security-policy', {
 			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 			body: JSON.stringify(payload)
 		}).then(function(r) { return r.json(); });
 	}
@@ -469,7 +469,7 @@
 		var restoreBtn = document.querySelector('[data-action="restore-password-defaults"]');
 		if (restoreBtn) {
 			restoreBtn.addEventListener('click', function() {
-				fetch('/admin/auth/security-policy/defaults', { method: 'POST' }).then(function(r) { return r.json(); }).then(function(result) {
+				fetch('/admin/auth/security-policy/defaults', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(function(r) { return r.json(); }).then(function(result) {
 					if (result && result.success) {
 						state.settings.password = createDefaults().password;
 						state.bannedWords = ['password','admin','welcome','qwerty','letmein','123456','abc123','master','root','login'];
@@ -541,7 +541,7 @@
 			return fetch('/admin/auth/mfa/config').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; });
 		}
 		function saveToServer(payload) {
-			return fetch('/admin/auth/mfa/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) }).then(function(r) { return r.json(); }).catch(function() { return null; });
+			return fetch('/admin/auth/mfa/config', { method: 'PUT', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) }).then(function(r) { return r.json(); }).catch(function() { return null; });
 		}
 
 		var fill = function(mfa) {
@@ -650,7 +650,7 @@
 			if (!qrBox || !secret) return;
 			qrBox.innerHTML = '<p class="helper-text" style="text-align:center;color:#94a3b8">QR 생성 중…</p>';
 			fetch('/admin/auth/mfa/totp-qr', {
-				method: 'POST', headers: {'Content-Type':'application/json'},
+				method: 'POST', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'},
 				body: JSON.stringify({ secret: secret, label: 'Blossom', issuer: 'Blossom' })
 			}).then(function(res) {
 				if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -708,7 +708,7 @@
 		form.addEventListener('submit', function(e) {
 			e.preventDefault();
 			var payload = { api_key: form.api_key.value.trim(), api_secret: form.api_secret.value.trim(), sender_number: form.sender_number.value.trim(), enabled: true };
-			fetch('/admin/auth/sms/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+			fetch('/admin/auth/sms/config', { method: 'PUT', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) })
 				.then(function(r) { return r.json(); }).then(function(result) {
 					if (result.success) {
 						setBadge(true);
@@ -737,7 +737,7 @@
 				var phone = (phoneInput.value || '').trim();
 				if (!phone) return;
 				sendBtn.disabled = true; sendBtn.textContent = '발송 중…';
-				fetch('/admin/auth/sms/test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ phone: phone }) })
+				fetch('/admin/auth/sms/test', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify({ phone: phone }) })
 					.then(function(r) { return r.json(); }).then(function(result) {
 						closeModal();
 						if (result.success) { if (window.showToast) window.showToast(result.message, 'success', form); }
@@ -780,7 +780,7 @@
 				api_key: form.api_key.value.trim(), api_secret: form.api_secret.value.trim(),
 				timeout: Number(form.timeout.value) || 5, enabled: true
 			};
-			fetch('/admin/auth/company-otp/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+			fetch('/admin/auth/company-otp/config', { method: 'PUT', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) })
 				.then(function(r) { return r.json(); }).then(function(result) {
 					if (result.success) {
 						setBadge(true, payload.provider);
@@ -811,7 +811,7 @@
 				var code = (codeInput.value || '').trim();
 				if (!emp || !code) return;
 				sendBtn2.disabled = true; sendBtn2.textContent = '인증 중…';
-				fetch('/admin/auth/company-otp/test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ emp_no: emp, code: code }) })
+				fetch('/admin/auth/company-otp/test', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify({ emp_no: emp, code: code }) })
 					.then(function(r) { return r.json(); }).then(function(result) {
 						closeM();
 						if (result.success) { if (window.showToast) window.showToast(result.message, 'success', form); }
@@ -1060,7 +1060,7 @@
 				max_daily_attempts: Number(form.max_daily_attempts.value) || 10,
 				max_fail_count: Number(form.max_fail_count.value) || 5
 			};
-			fetch('/admin/auth/mfa/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+			fetch('/admin/auth/mfa/config', { method: 'PUT', headers: {'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest'}, body: JSON.stringify(payload) })
 				.then(function(r) { return r.json(); }).then(function(result) {
 					if (result.status === 'ok') {
 						if (statusEl) statusEl.textContent = '코드 ' + payload.code_length + '자리 · 유효 ' + payload.code_ttl_seconds + '초 · 재발송 대기 ' + payload.resend_wait_seconds + '초';

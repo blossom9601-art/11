@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -31,7 +31,7 @@
                         ('dc_data_deletion_system','데이터 삭제 시스템')
                     ] %}
                     {% for key,label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -132,7 +132,7 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/6.datacenter/6-2.erasure/6-2-2.data_deletion_system/1.data_deletion_system.js?v=1.0.8"></script>
 
         <!-- 시스템 추가 모달 -->

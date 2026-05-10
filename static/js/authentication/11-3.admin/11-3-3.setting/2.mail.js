@@ -104,7 +104,7 @@
 		try {
 			const res  = await fetch(API_BASE + '/config', {
 				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 				body: JSON.stringify(payload),
 			});
 			const data = await res.json();
@@ -132,7 +132,7 @@
 		try {
 			const res  = await fetch(API_BASE + '/test', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 				body: JSON.stringify({ mode: 'connect' }),
 			});
 			const data = await res.json();
@@ -158,7 +158,7 @@
 		try {
 			const res  = await fetch(API_BASE + '/test', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 				body: JSON.stringify({ mode: 'send' }),
 			});
 			const data = await res.json();

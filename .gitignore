@@ -31,6 +31,14 @@ _*.txt
 _*.log
 *.log
 
+# Runtime / deployment artifacts
+*.db-shm
+*.db-wal
+*_deploy.tar
+*_deploy.tar.gz
+*_cleanup.tar
+*_cleanup.tar.gz
+
 # Uploads
 uploads/
 

@@ -9,9 +9,11 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=20260510_modal_gap_fix2">
     <link rel="stylesheet" href="/static/css/detail3.css?v=1.4">
-    <script src="/static/js/9.category/9-3.software/9-3-5.security/2.security_detail.js?v=3.9"></script>
+    <script src="/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie"></script>
+
+    <script src="/static/js/9.category/9-3.software/9-3-5.security/2.security_detail.js?v=20260510_modal_exact2"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -22,7 +24,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 (동적 라우팅) -->
-            <a href="{{ url_for('pages.show', key='cat_sw_security') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='cat_sw_security') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -34,10 +36,10 @@
 
             <!-- 소프트웨어 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='cat_sw_security_detail') }}" class="server-detail-tab-btn active">기본정보</a>
-                <a href="{{ url_for('pages.show', key='cat_sw_security_system') }}" class="server-detail-tab-btn">소프트웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_sw_security_log') }}" class="server-detail-tab-btn">변경이력</a>
-                <a href="{{ url_for('pages.show', key='cat_sw_security_file') }}" class="server-detail-tab-btn">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_sw_security_detail') }}" class="server-detail-tab-btn active">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_sw_security_system') }}" class="server-detail-tab-btn">소프트웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_sw_security_log') }}" class="server-detail-tab-btn">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_sw_security_file') }}" class="server-detail-tab-btn">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -106,7 +108,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 보안S/W 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

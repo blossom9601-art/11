@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -10,11 +10,11 @@
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
 	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260504agentmapfont">
-	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260503agentmapuid" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260507ui1" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -88,6 +88,7 @@
 									<th class="audit-col-user-name" data-col="actor_name">사용자</th>
 									<th class="audit-col-resource" data-col="resource_name">자원 이름</th>
 									<th class="audit-col-connect-account" data-col="connect_account">접속 계정</th>
+									<th class="audit-col-activity-history" data-col="activity_history">행위 이력</th>
 									<th class="audit-col-access-info" data-col="access_info">접속 URL/IP</th>
 									<th class="audit-col-ip" data-col="ip_address">접속 IP</th>
 								</tr>
@@ -133,7 +134,7 @@
 								</div>
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector agent-filter-selector">
-								<select id="agent-mapping-filter" class="page-size-select" aria-label="연동 상태 필터">
+								<select id="agent-mapping-filter" class="page-size-select ac-dropdown-input search-select" aria-label="연동 상태 필터" data-searchable-scope="page" data-placeholder="연동 상태">
 									<option value="">전체</option>
 									<option value="mapped">연결</option>
 									<option value="unmapped">대기</option>
@@ -210,6 +211,31 @@
 	</main>
 	<div class="access-audit-modals">
 			{% include 'layouts/_message_modal.html' %}
+			<div class="modal-overlay-full audit-activity-modal" id="audit-activity-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="audit-activity-title">
+				<div class="audit-activity-dialog" role="document">
+					<div class="audit-activity-header">
+						<div>
+							<h2 id="audit-activity-title">행위 이력</h2>
+							<p id="audit-activity-subtitle">SSH 명령어 이력</p>
+						</div>
+						<button type="button" class="audit-activity-close" id="audit-activity-close" aria-label="닫기">×</button>
+					</div>
+					<div class="audit-activity-body">
+						<div id="audit-activity-empty" class="audit-activity-empty" hidden>기록된 명령어가 없습니다.</div>
+						<div class="audit-activity-table-wrap" id="audit-activity-table-wrap">
+							<table class="audit-activity-table">
+								<thead>
+									<tr>
+										<th scope="col">시간</th>
+										<th scope="col">명령어</th>
+									</tr>
+								</thead>
+								<tbody id="audit-activity-table-body"></tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
 			<div class="modal-overlay-full agent-map-modal" id="agent-map-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agent-map-title">
 				<div class="agent-map-dialog" role="document">
 					<div class="agent-map-header">

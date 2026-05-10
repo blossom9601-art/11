@@ -78,8 +78,16 @@
   --shadow-xl:  0 8px 24px rgba(0, 0, 0, 0.12);
 
   /* ── 모달 ── */
-  --modal-overlay:   rgba(17, 24, 39, 0.55);
+  --modal-overlay-rgb: 15, 23, 42;
+  --modal-overlay-opacity: 0.28;
+  --modal-overlay:   rgba(var(--modal-overlay-rgb), var(--modal-overlay-opacity));
+  --modal-overlay-danger-opacity: 0.32;
+  --modal-overlay-danger: rgba(var(--modal-overlay-rgb), var(--modal-overlay-danger-opacity));
+  --modal-overlay-fallback-opacity: 0.30;
+  --modal-overlay-fallback: rgba(var(--modal-overlay-rgb), var(--modal-overlay-fallback-opacity));
   --modal-blur:      5px;
+  --modal-context-blur: 1px;
+  --modal-context-opacity: 0.94;
   --modal-z-index:   1300;
   --modal-transition: 200ms;
 

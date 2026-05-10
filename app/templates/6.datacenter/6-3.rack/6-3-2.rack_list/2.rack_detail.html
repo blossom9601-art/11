@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='dc_rack_list') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_list') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -35,9 +35,9 @@
 
             <!-- RACK 상세 탭 네비게이션 -->
             <div class="server-detail-tabs" data-rack-code="{{ rack_code or '' }}">
-                <a href="{{ url_for('pages.show', key='dc_rack_detail_basic') }}" class="server-detail-tab-btn active">기본정보</a>
-                <a href="{{ url_for('pages.show', key='dc_rack_detail_log') }}" class="server-detail-tab-btn">변경이력</a>
-                <a href="{{ url_for('pages.show', key='dc_rack_detail_file') }}" class="server-detail-tab-btn">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_basic') }}" class="server-detail-tab-btn active">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_log') }}" class="server-detail-tab-btn">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_file') }}" class="server-detail-tab-btn">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -97,7 +97,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     <!-- RACK 장비 추가 모달 -->
     <div id="rack-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">

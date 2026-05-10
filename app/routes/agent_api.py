@@ -59,6 +59,15 @@ from app.services.agent_cli_service import (
     mask_sensitive_data,
     create_audit_log,
 )
+from app.services.account_job_service import (
+    approve_account_job,
+    claim_account_jobs_for_hostname,
+    complete_account_job,
+    create_account_job,
+    list_account_jobs,
+    reject_account_job,
+)
+from app.services.identity_governance_service import apply_account_job_result
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +110,49 @@ def agent_heartbeat():
             commands = get_pending_commands(hostname)
         except Exception:
             pass
-        return jsonify({"success": True, "found": found, "commands": commands})
+        account_jobs = []
+        try:
+            account_jobs = claim_account_jobs_for_hostname(hostname)
+        except Exception:
+            logger.exception("account job claim failed for %s", hostname)
+        return jsonify({
+            "success": True,
+            "found": found,
+            "commands": commands,
+            "account_jobs": account_jobs,
+        })
     except Exception:
         logger.exception("heartbeat 처리 오류")
         return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/account-jobs/result", methods=["POST"])
+def agent_account_job_result():
+    """Agent가 Root Worker 실행 후 결과를 보고한다."""
+    data = request.get_json(silent=True) or {}
+    hostname = (data.get("hostname") or "").strip()
+    request_id = (data.get("requestId") or "").strip()
+    if not hostname or not request_id:
+        return jsonify({"success": False, "error": "hostname and requestId required"}), 400
+    result = {k: v for k, v in data.items() if k != "hostname"}
+    try:
+        ok, err = complete_account_job(request_id, hostname, result)
+        if not ok:
+            return jsonify({"success": False, "error": err}), 400
+        try:
+            apply_account_job_result(
+                agent_job_request_id=request_id,
+                ok=bool(result.get("ok")),
+                error_code=str(result.get("errorCode") or ""),
+                exit_code=result.get("exitCode"),
+                actor=f'agent:{hostname}',
+            )
+        except Exception:
+            logger.exception("identity request reconcile failed for job %s", request_id)
+        return jsonify({"success": True})
+    except Exception:
+        logger.exception("account job result error")
+        return jsonify({"success": False, "error": "server_error"}), 500
 
 
 @agent_api_bp.route("/api/agent/upload", methods=["POST"])
@@ -650,3 +698,78 @@ def cli_agent_collect(agent_id):
     except Exception:
         logger.exception("CLI collect error")
         return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+# ── Account control jobs (central approval → agent → root worker) ─────────
+
+@agent_api_bp.route("/api/cli/account-jobs", methods=["GET"])
+@cli_auth_required(allowed_roles=["admin", "user", "auditor"])
+def cli_account_job_list():
+    agent_id = request.args.get("agent_id", type=int)
+    _audit("account_job list", detail=f"agent_id={agent_id or 'all'}")
+    try:
+        rows = list_account_jobs(agent_id=agent_id, limit=100)
+        return jsonify({"success": True, "rows": rows, "total": len(rows)})
+    except Exception:
+        logger.exception("CLI account job list error")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+@agent_api_bp.route("/api/cli/account-jobs", methods=["POST"])
+@cli_auth_required(allowed_roles=["admin", "user"])
+def cli_account_job_create():
+    data = request.get_json(silent=True) or {}
+    try:
+        agent_id = int(data.get("agent_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "agent_id required"}), 400
+    action = (data.get("action") or "").strip()
+    target_username = (data.get("target_username") or data.get("targetUsername") or "").strip()
+    payload = data.get("payload")
+    if payload is not None and not isinstance(payload, dict):
+        return jsonify({"success": False, "error": "payload must be object"}), 400
+    password = data.get("password")
+    if password is not None and not isinstance(password, str):
+        return jsonify({"success": False, "error": "password must be string"}), 400
+    ttl = data.get("ttl_minutes", 60)
+    try:
+        ttl = int(ttl)
+    except (TypeError, ValueError):
+        ttl = 60
+    user = getattr(request, "cli_user", {})
+    requested_by = user.get("emp_no", "")
+    _audit("account_job create", target_id=agent_id, detail=f"{action} {target_username}")
+    ok, err, item = create_account_job(
+        agent_id, action, target_username,
+        payload=payload or {},
+        password=password,
+        requested_by=requested_by,
+        ttl_minutes=ttl,
+    )
+    if not ok:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True, "item": item})
+
+
+@agent_api_bp.route("/api/cli/account-jobs/<request_id>/approve", methods=["POST"])
+@cli_auth_required(allowed_roles=["admin"])
+def cli_account_job_approve(request_id):
+    user = getattr(request, "cli_user", {})
+    approver = user.get("emp_no", "admin")
+    _audit("account_job approve", detail=request_id)
+    ok, err = approve_account_job(request_id, approver)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True})
+
+
+@agent_api_bp.route("/api/cli/account-jobs/<request_id>/reject", methods=["POST"])
+@cli_auth_required(allowed_roles=["admin"])
+def cli_account_job_reject(request_id):
+    user = getattr(request, "cli_user", {})
+    actor = user.get("emp_no", "admin")
+    _audit("account_job reject", detail=request_id)
+    ok, err = reject_account_job(request_id, actor)
+    if not ok:
+        return jsonify({"success": False, "error": err}), 400
+    return jsonify({"success": True})

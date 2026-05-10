@@ -1,3 +1,4 @@
+.page-tab92-employee-shared .detail-header-actions,
 .tab92-employee-root .detail-header-actions,
 .tab96-service-root .detail-header-actions,
 .tab97-partner-root .detail-header-actions,
@@ -9,6 +10,7 @@
     margin-bottom: 8px;
 }
 
+.page-tab92-employee-shared .detail-section > h3,
 .tab92-employee-root .detail-section > h3,
 .tab96-service-root .detail-section > h3,
 .tab97-partner-root .detail-section > h3,
@@ -20,6 +22,7 @@
     gap: 12px;
 }
 
+.page-tab92-employee-shared .detail-section > h3 .page-size-selector,
 .tab92-employee-root .detail-section > h3 .page-size-selector,
 .tab96-service-root .detail-section > h3 .page-size-selector,
 .tab97-partner-root .detail-section > h3 .page-size-selector,

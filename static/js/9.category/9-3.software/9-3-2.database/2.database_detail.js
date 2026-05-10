@@ -40,7 +40,7 @@
           }
           function loadLottieAndRender(){
             try{
-              var sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js'; sc.async=true; sc.onload=function(){ if(!renderLottie()) renderImageFallback(); }; sc.onerror=function(){ renderImageFallback(); }; document.head.appendChild(sc);
+              var sc=document.createElement('script'); sc.src='/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie'; sc.async=true; sc.onload=function(){ if(!renderLottie()) renderImageFallback(); }; sc.onerror=function(){ renderImageFallback(); }; document.head.appendChild(sc);
             }catch(_){ renderImageFallback(); }
           }
           function renderImageFallback(){
@@ -521,7 +521,7 @@
       function _loadScript(src){return new Promise(function(ok,fail){var s=document.createElement('script');s.src=src;s.async=true;s.onload=ok;s.onerror=function(){fail(new Error('load:'+src));};document.head.appendChild(s);});}
       function _ensureFlatpickr(){_ensureCss(FLATPICKR_CSS,'flatpickr-css');_ensureCss(FLATPICKR_THEME,'flatpickr-theme-css');if(window.flatpickr)return Promise.resolve();return _loadScript(FLATPICKR_JS).then(function(){return _loadScript(FLATPICKR_KO).catch(function(){});});}
       function initDatePickers(formId){var form=document.getElementById(formId);if(!form)return;_ensureFlatpickr().then(function(){var startEl=form.querySelector('[name="release_date"]');var endEl=form.querySelector('[name="eosl"]');function addToday(fp){var cal=fp&&fp.calendarContainer;if(!cal||cal.querySelector('.fp-today-btn'))return;var b=document.createElement('button');b.type='button';b.className='fp-today-btn';b.textContent='\uc624\ub298';b.addEventListener('click',function(){fp.setDate(new Date(),true);});cal.appendChild(b);}var opts={locale:(window.flatpickr&&window.flatpickr.l10ns&&window.flatpickr.l10ns.ko)?window.flatpickr.l10ns.ko:'ko',dateFormat:'Y-m-d',allowInput:true,disableMobile:true,onReady:function(_,__,inst){addToday(inst);},onOpen:function(_,__,inst){addToday(inst);}};if(startEl&&!startEl._flatpickr)window.flatpickr(startEl,opts);if(endEl&&!endEl._flatpickr)window.flatpickr(endEl,opts);}).catch(function(){});}
-  
+
       // Helpers to parse capacity strings like "100 TB" or "96000 GB" to GB
       function parseCapacityToGB(str){
         if(!str) return NaN;
@@ -531,7 +531,7 @@
         if(unit==='TB') return val*1024; return val; // treat GB as base
       }
       function formatGBToPretty(gb){ if(!isFinite(gb)) return ''; if(gb>=1024) return (Math.round(gb/102.4)/10)+' TB'; return Math.round(gb)+' GB'; }
-  
+
       // Fallback column labels if a global COLUMN_META is not present
       var COLUMN_META = window.COLUMN_META || {
         work_status: { label: '업무 상태' },
@@ -646,16 +646,21 @@
         var section=document.createElement('div'); section.className='form-section';
   section.innerHTML = '<div class="section-header"><h4>데이터베이스</h4></div>';
         var grid=document.createElement('div'); grid.className='form-grid';
-        ['model','vendor','release_date','eosl','note'].forEach(function(c){
+        ['model','vendor','hw_type','release_date','eosl'].forEach(function(c){
           var wrap=document.createElement('div');
-          wrap.className = (c==='note') ? 'form-row form-row-wide' : 'form-row';
+          wrap.className = 'form-row';
           wrap.innerHTML = '<label>'+LABELS[c]+'</label>'+generateOsField(c, current[c]||'');
           grid.appendChild(wrap);
         });
         section.appendChild(grid);
+        ['model','vendor'].forEach(function(name){ var requiredInput = grid.querySelector('[name="'+name+'"]'); if(requiredInput) requiredInput.required = true; });
+        var noteRow = document.createElement('div');
+        noteRow.className = 'form-row';
+        noteRow.innerHTML = '<label>'+LABELS.note+'</label>'+generateOsField('note', current.note||'');
+        section.appendChild(noteRow);
         form.appendChild(section);
       }
-  
+
       function attachSecurityScoreRecalc(formId){
         var form=document.getElementById(formId); if(!form) return;
         var scoreInput=form.querySelector('input[name="security_score"]'); if(!scoreInput) return;
@@ -669,7 +674,7 @@
         ['confidentiality','integrity','availability'].forEach(function(n){ var el=form.querySelector('[name="'+n+'"]'); if(el) el.addEventListener('change',recompute); });
         recompute();
       }
-  
+
       function enforceVirtualizationDash(form){
         if(!form) return; var virt=form.querySelector('[name="virtualization"]'); if(!virt) return;
         var v=String(virt.value||'').trim();
@@ -685,7 +690,7 @@
         }
       }
       function attachVirtualizationHandler(formId){ var form=document.getElementById(formId); if(!form) return; var sel=form.querySelector('[name="virtualization"]'); if(!sel) return; sel.addEventListener('change', function(){ enforceVirtualizationDash(form); }); enforceVirtualizationDash(form); }
-  
+
       function updatePageFromForm(){
         var form=document.getElementById(EDIT_FORM_ID); if(!form) return;
         // Tab31 basic-storage support
@@ -848,10 +853,10 @@
 
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-      
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
       // ---------- Hardware/Allocation table interactions (system tab) ----------
@@ -860,19 +865,19 @@
   			try{ window.BlossomTab41System.initAllocationTable(); }catch(_){ }
   		}
       })();
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       (function(){
         // Add row
         var addBtn = document.getElementById('mt-row-add');
@@ -909,19 +914,19 @@
             wireMtFormatters(tr);
           });
         }
-  
+
         // Delegate actions
         table.addEventListener('click', function(ev){
           var target = ev.target.closest('.js-mt-del, .js-mt-edit, .js-mt-commit, .js-mt-toggle'); if(!target) return;
           var tr = ev.target.closest('tr'); if(!tr) return;
-  
+
           // delete
           if(target.classList.contains('js-mt-del')){
             if(tr && tr.parentNode){ tr.parentNode.removeChild(tr); }
             updateEmptyState();
             return;
           }
-  
+
           // edit -> save
           if(
             target.classList.contains('js-mt-edit') ||
@@ -972,7 +977,7 @@
             }
             return;
           }
-  
+
           // save -> view
           if(
             target.classList.contains('js-mt-commit') ||
@@ -986,7 +991,7 @@
             var vendorInp = getInput('vendor'); var vendorVal = (vendorInp? vendorInp.value : (tr.querySelector('[data-col="vendor"]').textContent||'')).trim();
             if(!vendorVal){ setError(vendorInp,true); if(!firstInvalid) firstInvalid=vendorInp; } else { setError(vendorInp,false); }
             if(firstInvalid){ try{ firstInvalid.focus(); }catch(_){} return; }
-  
+
             function commit(name, val){ var td = tr.querySelector('[data-col="'+name+'"]'); if(!td) return; td.textContent = (val === '' || val == null)? '-' : String(val); }
             function read(name){ var inp = getInput(name); var v = (inp? inp.value : (tr.querySelector('[data-col="'+name+'"]').textContent||'')); return String(v).trim(); }
             commit('status', read('status'));
@@ -999,7 +1004,7 @@
             (function(){ var v = read('rate'); var d = String(v||'').replace(/\D/g,''); commit('rate', d ? (d+'%') : ''); })();
             // normalize amount (digits only + thousands + 원)
             (function(){ var v = read('amount'); var d = String(v||'').replace(/\D/g,''); commit('amount', d ? (formatNumberLocale(d)+'원') : ''); })();
-  
+
             var toggleBtn = tr.querySelector('.js-mt-toggle');
             if(toggleBtn){
               toggleBtn.setAttribute('data-action','edit');
@@ -1014,20 +1019,19 @@
           }
         });
       })();
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
+
       // [Tabs moved to /static/js/_detail/tab*.js]
 
-  
-  
+
+
       // [Removed legacy Change Log implementation]
-  
+
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',__detailInit);}else{__detailInit();}
 document.addEventListener('blossom:pageLoaded',function(){try{__detailInit();}catch(_){}});
-  
+
     // No modal APIs to expose
   })();
-  

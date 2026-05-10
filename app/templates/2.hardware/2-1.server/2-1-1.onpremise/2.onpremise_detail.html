@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -24,7 +24,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='hw_server_onpremise') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -36,21 +36,21 @@
 
             <!-- 서버 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_detail') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_detail' %}active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_hw') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_hw' %}active{% endif %}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_sw') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_sw' %}active{% endif %}">소프트웨어</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_backup') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_backup' %}active{% endif %}">백업정책</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_if') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_if' %}active{% endif %}">인터페이스</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_account') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_account' %}active{% endif %}">계정관리</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_authority') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_authority' %}active{% endif %}">권한관리</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_activate') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_activate' %}active{% endif %}">기동절차</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_firewalld') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_firewalld' %}active{% endif %}">방화벽</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_storage') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_storage' %}active{% endif %}">스토리지</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_task') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_task' %}active{% endif %}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_vulnerability') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_vulnerability' %}active{% endif %}">취약점</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_package') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_package' %}active{% endif %}">패키지</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_log') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_log' %}active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='hw_server_onpremise_file') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_file' %}active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_detail') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_hw') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_hw' %}active{% endif %}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_sw') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_sw' %}active{% endif %}">소프트웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_backup') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_backup' %}active{% endif %}">백업정책</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_if') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_if' %}active{% endif %}">인터페이스</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_account') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_account' %}active{% endif %}">계정관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_authority') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_authority' %}active{% endif %}">권한관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_activate') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_activate' %}active{% endif %}">기동절차</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_firewalld') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_firewalld' %}active{% endif %}">방화벽</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_storage') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_storage' %}active{% endif %}">스토리지</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_task') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_task' %}active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_vulnerability') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_vulnerability' %}active{% endif %}">취약점</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_package') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_package' %}active{% endif %}">패키지</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_log') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_file') }}" class="server-detail-tab-btn {% if current_key == 'hw_server_onpremise_file' %}active{% endif %}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -228,7 +228,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 시스템 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

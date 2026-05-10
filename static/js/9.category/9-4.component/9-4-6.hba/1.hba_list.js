@@ -439,13 +439,11 @@
       const cellsHtml = COLUMN_ORDER.map(col=>{
         if(!COLUMN_META[col]) return ''; const tdClass = state.visibleCols.has(col)?'':'col-hidden'; const label=COLUMN_META[col].label; let rawVal=row[col]; if(col==='note' && typeof rawVal==='string'){ rawVal = rawVal.replace(/\r?\n|\r/g,' ');} const displayVal=(rawVal==null || String(rawVal).trim()==='')?'-':(col==='spec'? rawVal+' Gbps' : rawVal); let html = escapeHTML(displayVal);
         if(col==='model'){
-          const base = window.__HBA_DETAIL_URL || '#';
-          const params = [];
-          ['id','model','spec','vendor','part_no','note'].forEach(k=>{ const v=row[k]; if(v!=null && String(v).trim()!==''){ params.push(encodeURIComponent(k)+'='+encodeURIComponent(String(v))); }});
-          const href = params.length ? (base + '?' + params.join('&')) : base;
+          const publicId = String(row.public_id || '').trim();
+          const href = publicId ? ('/b/' + encodeURIComponent(publicId)) : '#';
           let payload = JSON.stringify(row||{});
           payload = payload.replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
-          html = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-payload="${payload}">${html}</a>`;
+          html = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-payload="${payload}">${html}</a>`;
         }
         return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${html}</td>`; }).join('');
       tr.innerHTML = `<td><input type="checkbox" class="system-row-select" data-id="${row.id??''}" ${checked}></td>`+cellsHtml+`<td data-col="actions" data-label="관리" class="system-actions"><button type="button" class="action-btn" data-action="edit" data-id="${row.id}" title="수정" aria-label="수정"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정" class="action-icon"></button></td>`;

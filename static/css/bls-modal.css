@@ -17,9 +17,16 @@
    ========================================================================= */
 :root {
   /* 모달 컨테이너 */
-  --bls-modal-overlay: rgba(15, 23, 42, 0.48);
-  --bls-modal-blur: 6px;
+  --bls-modal-overlay: var(--modal-overlay, rgba(15, 23, 42, 0.28));
+  --bls-modal-blur: var(--modal-blur, 5px);
   --bls-modal-z: 1300;
+  --bls-modal-overlay-z: var(--modal-z-index, 1300);
+  --bls-modal-overlay-bg: var(--modal-overlay, rgba(15, 23, 42, 0.28));
+  --bls-modal-overlay-blur: var(--modal-blur, 5px);
+  --bls-modal-overlay-bg-danger: var(--modal-overlay-danger, rgba(15, 23, 42, 0.32));
+  --bls-modal-overlay-fallback: var(--modal-overlay-fallback, rgba(15, 23, 42, 0.30));
+  --bls-modal-overlay-fallback-danger: var(--modal-overlay-danger, rgba(15, 23, 42, 0.32));
+  --bls-modal-container-z: calc(var(--modal-z-index, 1300) + 10);
   --bls-modal-width: 860px;
   --bls-modal-max-width: 92vw;
   --bls-modal-max-height: 88vh;
@@ -207,8 +214,8 @@ body.modal-open {
 body.modal-open .main-header,
 body.modal-open .sidebar,
 body.modal-open .main-content {
-  filter: blur(3px);
-  opacity: 0.88;
+  filter: blur(var(--modal-context-blur, 1px));
+  opacity: var(--modal-context-opacity, 0.94);
   pointer-events: none;
   transition: filter 0.25s ease, opacity 0.25s ease;
 }
@@ -1469,6 +1476,75 @@ body.modal-open .server-edit-modal .server-edit-content {
   gap: var(--bls-field-gap);
 }
 
+/* Category detail edit modals must visually match category list add modals.
+   This file is loaded after detail-common.css through the shared header, so keep
+   the final override here instead of in detail-common.css. */
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-grid {
+  gap: 8px 20px !important;
+  align-items: start !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row {
+  gap: 4px !important;
+  row-gap: 4px !important;
+  margin: 0 !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > label,
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
+  margin: 0 !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-section {
+  padding: 0 32px !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  column-gap: 20px !important;
+  row-gap: 8px !important;
+  align-items: start !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > label {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 18px !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input),
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
+  height: 46px !important;
+  min-height: 46px !important;
+  line-height: 46px !important;
+}
+
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
+  margin-top: 8px !important;
+}
+
 /* 폼 라벨 */
 .server-add-modal .form-row label,
 .server-edit-modal .form-row label {
@@ -1534,9 +1610,9 @@ body.modal-open .server-edit-modal .server-edit-content {
   inset: 0;
   width: 100%;
   height: 100%;
-  background: rgba(15, 23, 42, 0.40);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: var(--modal-overlay, rgba(15, 23, 42, 0.28));
+  backdrop-filter: blur(var(--modal-blur, 5px));
+  -webkit-backdrop-filter: blur(var(--modal-blur, 5px));
   z-index: var(--bls-alert-z);
   /* 가운데 정렬용 flex */
   justify-content: center;

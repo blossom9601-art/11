@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,9 +9,11 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=20260510_modal_gap_fix2">
     <link rel="stylesheet" href="/static/css/detail7.css?v=1.2">
-    <script src="/static/js/9.category/9-7.vendor/9-7-2.maintenance/2.maintenance_detail.js?v=2.1"></script>
+    <script src="/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie"></script>
+
+    <script src="/static/js/9.category/9-7.vendor/9-7-2.maintenance/2.maintenance_detail.js?v=20260510_modal_exact2"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -22,7 +24,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='cat_vendor_maintenance') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -34,16 +36,16 @@
 
             <!-- 유지보수사 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_detail') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_detail' %}active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_manager') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_manager' %}active{% endif %}">담당자</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_hardware') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_hardware' %}active{% endif %}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_software') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_software' %}active{% endif %}">소프트웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_component') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_component' %}active{% endif %}">컴포넌트</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_sla') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_sla' %}active{% endif %}">SLA</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_issue') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_issue' %}active{% endif %}">이슈관리</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_task') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_task' %}active{% endif %}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_log') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_log' %}active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='cat_vendor_maintenance_file') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_file' %}active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_detail') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_manager') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_manager' %}active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_hardware') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_hardware' %}active{% endif %}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_software') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_software' %}active{% endif %}">소프트웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_component') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_component' %}active{% endif %}">컴포넌트</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_sla') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_sla' %}active{% endif %}">SLA</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_issue') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_issue' %}active{% endif %}">이슈관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_task') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_task' %}active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_log') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_maintenance_file') }}" class="server-detail-tab-btn {% if current_key == 'cat_vendor_maintenance_file' %}active{% endif %}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -109,7 +111,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 유지보수사 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

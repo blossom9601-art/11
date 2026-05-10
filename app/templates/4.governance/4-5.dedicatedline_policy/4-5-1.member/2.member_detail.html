@@ -23,7 +23,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 (동적) -->
-            <a href="{{ url_for('pages.show', key=dl_base) }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment=dl_base) }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -35,11 +35,11 @@
 
             <!-- 전용회선 상세 탭 네비게이션 (명시적, 순서 고정) -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key=dl_base + '_detail') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_detail' %} active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key=dl_base + '_manager') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_manager' %} active{% endif %}">담당자</a>
-                <a href="{{ url_for('pages.show', key=dl_base + '_task') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_task' %} active{% endif %}">작업이력</a>
-                <a href="{{ url_for('pages.show', key=dl_base + '_log') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_log' %} active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key=dl_base + '_file') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_file' %} active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=dl_base + '_detail') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_detail' %} active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=dl_base + '_manager') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_manager' %} active{% endif %}">담당자</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=dl_base + '_task') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_task' %} active{% endif %}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=dl_base + '_log') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_log' %} active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=dl_base + '_file') }}" class="server-detail-tab-btn{% if current_key == dl_base + '_file' %} active{% endif %}">구성/파일</a>
             </div>
 
             <!-- 전용회선 상세 탭 컨텐츠 -->
@@ -111,7 +111,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 기본정보 수정 모달 (전용회선 회원사 리스트와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

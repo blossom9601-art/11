@@ -24,6 +24,9 @@ function getQueryParamInt(keys){
 function getFromSession(key){
     try{ var raw=sessionStorage.getItem(key); if(!raw)return null; var o=JSON.parse(raw); return coerceInt(o&&o.id); }catch(_){ return null; }
 }
+function getBodyDataInt(name){
+    try{ return coerceInt(document.body && document.body.dataset ? document.body.dataset[name] : null); }catch(_){ return null; }
+}
 function escapeHtml(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(s){ return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]); }); }
 function toast(msg,type){ try{ if(window.showToast) window.showToast(msg,type||'info'); }catch(_){} }
 function escapeCSV(val){ return '"'+String(val==null?'':val).replace(/"/g,'""')+'"'; }
@@ -96,10 +99,16 @@ function cellVal(item,col){
 function inferConfig(){
     var body=document.body, cls=body&&body.classList;
     if(!cls||!cls.contains('page-workgroup-service')) return null;
+    var root=document.querySelector('.tab96-service-root');
     return {
         label:'서비스',
-        apiBase:'/api/work-groups',
-        id: getQueryParamInt(['id','group_id','groupId']) || getFromSession('work_group_selected_row') || parseInt(body.getAttribute('data-cat-detail-id'),10) || 0,
+        apiBase:(root&&root.dataset&&root.dataset.apiBase)||'/api/work-groups',
+        id: coerceInt(root&&root.dataset&&root.dataset.groupId)
+            || getBodyDataInt('catDetailId')
+            || getQueryParamInt(['id','group_id','groupId'])
+            || getFromSession('work_group_selected_row')
+            || parseInt(body.getAttribute('data-cat-detail-id'),10)
+            || 0,
         filePrefix:'workgroup_service_'
     };
 }
@@ -109,6 +118,8 @@ ready(function(){
     var cfg=inferConfig();
     var table=document.getElementById('hw-spec-table');
     if(!cfg||!table) return;
+    if(table.dataset.tab96Initialized==='1') return;
+    table.dataset.tab96Initialized='1';
 
     var tbody=table.querySelector('tbody')||table.appendChild(document.createElement('tbody'));
     var emptyEl=document.getElementById('hw-empty');
@@ -784,6 +795,8 @@ ready(function(){
 
     /* ── Init ── */
     updateEmpty();
-    Promise.all([loadSystemNames(), loadDepartments(), loadDomainFqdns(), loadVpnOrgNames()]).then(function(){ loadRows(); });
+    loadRows();
+    Promise.all([loadSystemNames(), loadDepartments(), loadDomainFqdns(), loadVpnOrgNames()])
+        .catch(function(err){ console.warn('[tab96] reference data load failed', err); });
 });
 })();

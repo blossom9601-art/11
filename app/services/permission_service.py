@@ -472,6 +472,7 @@ _URL_MENU_MAP = [
     ('/api/insight', 'insight'),
     # category
     ('/api/category', 'category'), ('/api/cat', 'category'),
+    ('/p/cat_', 'category'),
     # settings
     ('/admin/auth/access-control', 'settings.access_control'),
     ('/admin/auth/', 'settings'),
@@ -481,9 +482,13 @@ _EXEMPT_PREFIXES = ('/api/auth/', '/api/session/', '/api/menus', '/api/detail-pa
 
 
 def resolve_menu_code(path):
-    """URL path → menu_code (가장 구체적 매칭)"""
+    """URL path → menu_code (가장 구체적 매칭). /b/<segment>는 /p/<segment>와 동일 규칙으로 매핑."""
+    p = path or ''
+    if p.startswith('/b/'):
+        seg = p[len('/b/'):].strip('/').split('/')[0]
+        p = f'/p/{seg}' if seg else '/p/'
     for prefix, code in _URL_MENU_MAP:
-        if path.startswith(prefix):
+        if p.startswith(prefix):
             return code
     return None
 

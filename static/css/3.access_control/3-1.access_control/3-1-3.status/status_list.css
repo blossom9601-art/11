@@ -3,7 +3,7 @@
 /* ===== 모달 오버레이 (이 페이지가 로드하는 CSS에 누락되어 있어 명시) ===== */
 .modal-overlay-full {
 	position: fixed !important; inset: 0 !important; width: 100% !important; height: 100% !important;
-	background: rgba(17,24,39,0.55); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+	background: var(--modal-overlay, rgba(15,23,42,.28)); -webkit-backdrop-filter: blur(var(--modal-blur, 5px)); backdrop-filter: blur(var(--modal-blur, 5px));
 	z-index: 1300; display: none; align-items: center; justify-content: center;
 }
 .modal-overlay-full.show { display: flex !important; }
@@ -75,14 +75,14 @@ body.modal-open { overflow: hidden; }
 #status-count.is-updating { animation: countPulse .8s ease; }
 
 /* 헤더 필터 셀렉트 */
-.status-filter-select {
+.access-status-page .tab-header-right > .status-filter-select {
 	height: 36px; padding: 0 30px 0 12px; border: 1px solid #e5e7eb; border-radius: 6px;
 	background: #fff; color: #374151; font-size: 13px; cursor: pointer;
 	background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
 	background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
-	-webkit-appearance: none; appearance: none;
+	-webkit-appearance: none; appearance: none; font-family: inherit; font-weight: 400; line-height: 34px;
 }
-.status-filter-select:focus { outline: none; border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.access-status-page .tab-header-right > .status-filter-select:focus { outline: none; border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
 
 /* 컬럼 폭 / 정렬 (테이블 스타일은 .server-data-table 표준 사용) */
 #status-table th[data-col="select"],

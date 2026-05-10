@@ -10,6 +10,9 @@ def test_policy_extra_columns_and_browse_snapshot(app):
         assert 'web_host_gate_patterns' in cols
         assert 'web_iframe_allow_patterns' in cols
         assert 'web_infra_runbook' in cols
+        assert 'access_click_cooldown_seconds' in cols
+        assert 'access_rate_limit_window_seconds' in cols
+        assert 'access_rate_limit_max_count' in cols
 
         service.update_default_policy(
             {
@@ -17,6 +20,9 @@ def test_policy_extra_columns_and_browse_snapshot(app):
                 'web_host_gate_patterns': 'good.example.com\n',
                 'web_iframe_allow_patterns': 'good.example.com',
                 'web_infra_runbook': 'proxy: https://gate.test/',
+                'access_click_cooldown_seconds': 4,
+                'access_rate_limit_window_seconds': 30,
+                'access_rate_limit_max_count': 2,
             },
             'pytest',
             app,
@@ -25,3 +31,25 @@ def test_policy_extra_columns_and_browse_snapshot(app):
         assert snap['web_open_mode'] == 'iframe_embed'
         assert snap['web_host_gate_patterns'] == ['good.example.com']
         assert snap['web_iframe_allow_patterns'] == ['good.example.com']
+        assert snap['access_click_cooldown_seconds'] == 4
+        assert snap['access_rate_limit_window_seconds'] == 30
+        assert snap['access_rate_limit_max_count'] == 2
+
+        saved = service.update_default_policy(
+            {
+                'default_period_days': 9999,
+                'max_period_days': 9999,
+                'notify_before_days': 9999,
+                'access_click_cooldown_seconds': 9999,
+                'access_rate_limit_window_seconds': 999999,
+                'access_rate_limit_max_count': 9999,
+            },
+            'pytest',
+            app,
+        )
+        assert saved['default_period_days'] == 365
+        assert saved['max_period_days'] == 365
+        assert saved['notify_before_days'] == 30
+        assert saved['access_click_cooldown_seconds'] == 60
+        assert saved['access_rate_limit_window_seconds'] == 3600
+        assert saved['access_rate_limit_max_count'] == 100

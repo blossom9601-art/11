@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -11,19 +11,21 @@
 
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
-    <link rel="stylesheet" href="/static/css/tab96-service.css?v=1.0">
-    <script defer src="/static/js/_detail/tab96-service-shared.js?v=1.0"></script>
+    <link rel="stylesheet" href="/static/css/tab96-service.css?v=1.1">
+    <script defer src="/static/js/_detail/tab96-service-shared.js?v=1.1"></script>
 </head>
-<body class="page-tab96-service-shared {{ tab96.body_class|default('page-workgroup-service') }}" data-cat-detail-id="{{ cat_detail_id or '' }}">
+<body class="page-tab96-service-shared {{ tab96.body_class|default('page-workgroup-service') }}" data-cat-detail-id="{{ cat_detail_id or '' }}" data-work-group-public-id="{{ work_group_public_id or '' }}">
     {% include 'layouts/_header.html' %}
     {% include 'layouts/_sidebar.html' %}
 
     {% set _qs = request.query_string.decode('utf-8', 'replace') %}
 
-    <main class="main-content tab96-service-root">
+    <main class="main-content tab96-service-root"
+          data-api-base="/api/work-groups"
+          data-group-id="{{ cat_detail_id or '' }}">
         <div class="content-wrapper">
             {% if back_key %}
-            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+            <a href="{{ secure_back_url or (url_for('pages.blossom_hub', segment=back_key) ~ ('?' ~ _qs if _qs else '')) }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">{{ back_label or '목록으로 돌아가기' }}
             </a>
             {% endif %}
@@ -36,7 +38,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for t in tabs %}
-                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                <a href="{{ t.href or (url_for('pages.blossom_hub', segment=t.key) ~ ('?' ~ _qs if _qs else '')) }}"
                    class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
                 {% endfor %}
             </div>
@@ -101,6 +103,16 @@
                             </table>
                         </div>
 
+                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite">
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">{{ tab96.empty_title|default('서비스 항목이 없습니다.') }}</h3>
+                                <p class="empty-desc">{{ tab96.empty_desc|default('-') }}</p>
+                            </div>
+                        </div>
+
                         <div class="modern-pagination" id="hw-pagination">
                             <div class="pagination-info"><span id="hw-pagination-info">0개 항목</span></div>
                             <div class="pagination-controls">
@@ -119,23 +131,13 @@
                                 </button>
                             </div>
                         </div>
-
-                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite">
-                            <div class="empty-illustration">
-                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
-                            </div>
-                            <div class="empty-text">
-                                <h3 class="empty-title">{{ tab96.empty_title|default('서비스 항목이 없습니다.') }}</h3>
-                                <p class="empty-desc">{{ tab96.empty_desc|default('-') }}</p>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     <div id="svc-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
         <div class="server-add-content">

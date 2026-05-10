@@ -72,7 +72,7 @@
 		setStatus('정책 저장 중입니다.', true);
 		return fetch('/api/file-policy', {
 			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 			body: JSON.stringify(getPolicyPayload())
 		})
 			.then(function (r) { return r.json(); })
@@ -149,7 +149,7 @@
 	}
 
 	function cleanupOrphans() {
-		fetch('/api/files/orphans/cleanup', { method: 'POST' })
+		fetch('/api/files/orphans/cleanup', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
 			.then(function (r) { return r.json(); })
 			.then(function (res) {
 				if (!res || !res.success) throw new Error((res && res.error) || '고아 파일 정리 실패');

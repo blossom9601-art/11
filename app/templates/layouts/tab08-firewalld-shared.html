@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -51,7 +51,7 @@
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
             {% if back_key %}
-            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 {{ back_label or '목록으로 돌아가기' }}
             </a>
@@ -67,7 +67,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for t in tabs %}
-                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                <a href="{{ url_for('pages.blossom_hub', segment=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
                    class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
                 {% endfor %}
             </div>
@@ -171,7 +171,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>

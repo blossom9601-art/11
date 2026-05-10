@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -33,7 +33,7 @@
                 ] %}
                 <div class="system-tabs" role="tablist" aria-label="워크플로우 디자이너 탭">
                     {% for key, label in tabs %}
-                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -273,7 +273,7 @@
         </div>
         {% endif %}
 
-        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
         <script>
         // SPA 동적 CSS 로드 헬퍼
         function ensureCss(href){

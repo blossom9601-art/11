@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='hw_network_l7') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -35,15 +35,15 @@
 
             <!-- 서버 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='hw_network_l7_detail') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_detail' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_detail' else 'false' }}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_hw') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_hw' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_hw' else 'false' }}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_if') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_if' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_if' else 'false' }}">인터페이스</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_account') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_account' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_account' else 'false' }}">계정관리</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_task') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_task' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_task' else 'false' }}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_vulnerability') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_vulnerability' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_vulnerability' else 'false' }}">취약점</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_package') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_package' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_package' else 'false' }}">패키지</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_log') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_log' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_log' else 'false' }}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='hw_network_l7_file') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_file' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_file' else 'false' }}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_detail') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_detail' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_detail' else 'false' }}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_hw') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_hw' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_hw' else 'false' }}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_if') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_if' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_if' else 'false' }}">인터페이스</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_account') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_account' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_account' else 'false' }}">계정관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_task') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_task' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_task' else 'false' }}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_vulnerability') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_vulnerability' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_vulnerability' else 'false' }}">취약점</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_package') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_package' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_package' else 'false' }}">패키지</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_log') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_log' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_log' else 'false' }}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_l7_file') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_l7_file' else '' }}" aria-selected="{{ 'true' if current_key == 'hw_network_l7_file' else 'false' }}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -221,7 +221,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 시스템 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

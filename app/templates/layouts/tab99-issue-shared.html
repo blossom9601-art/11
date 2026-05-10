@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,7 @@
     <main class="main-content tab99-issue-root">
         <div class="content-wrapper">
             {% if back_key %}
-            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">{{ back_label or '목록으로 돌아가기' }}
             </a>
             {% endif %}
@@ -36,7 +36,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for t in tabs %}
-                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                <a href="{{ url_for('pages.blossom_hub', segment=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
                    class="server-detail-tab-btn {% if current_key == t.key %}active{% endif %}">{{ t.label }}</a>
                 {% endfor %}
             </div>
@@ -119,7 +119,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     <div id="iss-detail-modal" class="server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content iss-detail-content pv-detail-modal-content" role="dialog" aria-modal="true" aria-label="이슈 상세">

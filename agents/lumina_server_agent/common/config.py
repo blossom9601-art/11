@@ -81,6 +81,20 @@ run_as = {run_as}
 
 
 # ----------------------------------------------------------------------------
+#  [account_worker]  Root Worker (UDS) — 계정 변경 (non-root Agent 전용)
+# ----------------------------------------------------------------------------
+[account_worker]
+
+enabled = {account_worker_enabled}
+socket_path = {account_worker_socket_path}
+socket_group = {account_worker_socket_group}
+allowed_home_prefixes = {account_worker_allowed_home_prefixes}
+min_operable_uid = {account_worker_min_operable_uid}
+service_account_allowlist = {account_worker_service_account_allowlist}
+job_timeout_sec = {account_worker_job_timeout_sec}
+
+
+# ----------------------------------------------------------------------------
 #  [network]  Proxy and DNS settings
 # ----------------------------------------------------------------------------
 [network]
@@ -146,6 +160,15 @@ class AgentConfig:
         self.auth_token = ""
         self.mask_sensitive = True
         self.run_as = "lumina"
+
+        # [account_worker]
+        self.account_worker_enabled = False
+        self.account_worker_socket_path = "/run/lumina/account-worker.sock"
+        self.account_worker_socket_group = "lumina-agent"
+        self.account_worker_allowed_home_prefixes = "/home,/app"
+        self.account_worker_min_operable_uid = 1000
+        self.account_worker_service_account_allowlist = ""
+        self.account_worker_job_timeout_sec = 120
 
         # [network]
         self.proxy = ""
@@ -244,8 +267,30 @@ class AgentConfig:
                 self.mask_sensitive = s.getboolean("security", "mask_sensitive", fallback=True)
                 self.run_as = s.get("security", "run_as", fallback="lumina").strip()
 
+            # [account_worker]
+            if self._cp.has_section("account_worker"):
+                s = self._cp
+                self.account_worker_enabled = s.getboolean("account_worker", "enabled", fallback=False)
+                self.account_worker_socket_path = s.get(
+                    "account_worker", "socket_path", fallback=self.account_worker_socket_path,
+                ).strip() or self.account_worker_socket_path
+                self.account_worker_socket_group = s.get(
+                    "account_worker", "socket_group", fallback=self.account_worker_socket_group,
+                ).strip() or self.account_worker_socket_group
+                self.account_worker_allowed_home_prefixes = s.get(
+                    "account_worker", "allowed_home_prefixes", fallback=self.account_worker_allowed_home_prefixes,
+                ).strip()
+                self.account_worker_min_operable_uid = s.getint(
+                    "account_worker", "min_operable_uid", fallback=self.account_worker_min_operable_uid,
+                )
+                self.account_worker_service_account_allowlist = s.get(
+                    "account_worker", "service_account_allowlist", fallback="",
+                ).strip()
+                self.account_worker_job_timeout_sec = s.getint(
+                    "account_worker", "job_timeout_sec", fallback=self.account_worker_job_timeout_sec,
+                )
+
             # [network]
-            if self._cp.has_section("network"):
                 s = self._cp
                 self.proxy = s.get("network", "proxy", fallback="").strip()
                 self.no_proxy = s.get("network", "no_proxy", fallback="").strip()
@@ -285,6 +330,13 @@ class AgentConfig:
                 auth_token=self.auth_token,
                 mask_sensitive=str(self.mask_sensitive).lower(),
                 run_as=self.run_as,
+                account_worker_enabled=str(self.account_worker_enabled).lower(),
+                account_worker_socket_path=self.account_worker_socket_path,
+                account_worker_socket_group=self.account_worker_socket_group,
+                account_worker_allowed_home_prefixes=self.account_worker_allowed_home_prefixes,
+                account_worker_min_operable_uid=self.account_worker_min_operable_uid,
+                account_worker_service_account_allowlist=self.account_worker_service_account_allowlist,
+                account_worker_job_timeout_sec=self.account_worker_job_timeout_sec,
                 proxy=self.proxy,
                 no_proxy=self.no_proxy,
                 dns_timeout=self.dns_timeout,

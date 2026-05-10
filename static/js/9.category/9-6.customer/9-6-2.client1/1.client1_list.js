@@ -515,8 +515,9 @@
                     let cellValue = highlight(displayVal, col);
                     // linkify member_name to detail page
                     if(col==='member_name' && displayVal !== '-'){
-                        const detailUrl = (window.__CAT_CUSTOMER_CLIENT1_DETAIL_URL || '/p/cat_customer_client1_detail');
-                        cellValue = `<a href="${detailUrl}" class="work-name-link" data-id="${row.id??''}" title="준회원사 상세로 이동">${cellValue}</a>`;
+                        const publicId = String(row.public_id || '').trim();
+                        const detailUrl = publicId ? `/b/${encodeURIComponent(publicId)}` : (window.__CAT_CUSTOMER_CLIENT1_DETAIL_URL || '/b/cat_customer_client1_detail');
+                        cellValue = `<a href="${detailUrl}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" title="준회원사 상세로 이동">${cellValue}</a>`;
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
                 }).join('')

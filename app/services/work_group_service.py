@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import secrets
 import sqlite3
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
@@ -8,6 +9,7 @@ from urllib.parse import urlparse
 
 from flask import current_app
 
+from app.services.business_work_display_name import validate_business_work_display_name
 from app.services.work_asset_counts import counts_by_code, sw_counts_via_hardware
 
 logger = logging.getLogger(__name__)
@@ -18,9 +20,36 @@ MANAGER_TABLE_NAME = 'biz_work_group_manager'
 SYSTEM_TABLE_NAME = 'system'
 SERVICE_TABLE_NAME = 'biz_work_group_service'
 
+# 업무 그룹 전용 상태 — 카테고리 > 비즈니스 > 업무 상태(biz_work_status) 테이블과 무관하게 저장
+WORK_GROUP_STATUS_VALUES = frozenset({'운영', '임시', '종료'})
+PUBLIC_ID_PREFIX = 'bg_'
+
+# 기존 DB/업무상태코드 이름이 카테고리 마스터(biz_work_status) 기준이던 경우 표시 보정용
+LEGACY_WORK_GROUP_STATUS_SYNONYMS: Dict[str, str] = {
+    '운영': '운영',
+    '임시': '임시',
+    '종료': '종료',
+    '정상': '운영',
+    '가동': '운영',
+    '활성': '운영',
+    '활성화': '운영',
+    '보류': '임시',
+    '대기': '임시',
+    '점검': '임시',
+    '중지': '임시',
+    '폐기': '종료',
+    '유휴': '종료',
+    '비활성': '종료',
+    '미사용': '종료',
+}
+
 
 def _now() -> str:
     return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _new_public_id() -> str:
+    return PUBLIC_ID_PREFIX + secrets.token_urlsafe(9).replace('-', '').replace('_', '')[:12]
 
 
 def _project_root(app) -> str:
@@ -81,6 +110,7 @@ def _get_connection(app=None) -> sqlite3.Connection:
         conn.execute('PRAGMA foreign_keys = ON')
     except sqlite3.DatabaseError:
         logger.warning('Could not enable foreign key enforcement for %s', TABLE_NAME)
+    _attach_org_department_db(conn, app)
     return conn
 
 
@@ -91,6 +121,28 @@ def _sanitize_int(value: Any) -> Optional[int]:
         return max(0, int(value))
     except (TypeError, ValueError):
         return None
+
+
+def _coerce_work_group_priority(value: Any) -> int:
+    """업무 우선순위: 0 이상 정수만 허용. 공백/None은 0."""
+    if value in (None, ''):
+        return 0
+    if isinstance(value, bool):
+        raise ValueError('업무 우선순위는 숫자만 입력할 수 있습니다.')
+    if isinstance(value, int):
+        if value < 0:
+            raise ValueError('업무 우선순위는 0 이상의 정수만 입력할 수 있습니다.')
+        return value
+    if isinstance(value, float):
+        if value < 0 or not float(value).is_integer():
+            raise ValueError('업무 우선순위는 0 이상의 정수만 입력할 수 있습니다.')
+        return int(value)
+    s = str(value).strip()
+    if not s:
+        return 0
+    if not s.isdigit():
+        raise ValueError('업무 우선순위는 숫자만 입력할 수 있습니다.')
+    return int(s)
 
 
 def _generate_group_code(conn: sqlite3.Connection, name: str) -> str:
@@ -131,6 +183,8 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
 
     return {
         'id': row['id'],
+        'public_id': _get('public_id') or '',
+        'resource_id': _get('public_id') or '',
         'group_code': row['group_code'],
         'group_name': row['group_name'],
         'wc_name': row['group_name'],
@@ -159,6 +213,114 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
+def _sqlite_table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _attached_table_exists(conn: sqlite3.Connection, schema: str, table_name: str) -> bool:
+    try:
+        safe_schema = ''.join(ch for ch in schema if ch.isalnum() or ch == '_')
+        row = conn.execute(
+            f"SELECT 1 FROM {safe_schema}.sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _attach_org_department_db(conn: sqlite3.Connection, app=None) -> None:
+    """업무그룹 부서 표시/검색은 org_department.db의 dept_name도 반드시 참조한다."""
+    app = app or current_app
+    try:
+        db_path = os.path.join(app.instance_path, 'org_department.db')
+        if os.path.exists(db_path):
+            conn.execute("ATTACH DATABASE ? AS aux_od", (db_path,))
+    except sqlite3.DatabaseError:
+        # already attached or unavailable; same-db org_department remains usable.
+        pass
+
+
+def _work_group_has_status_fk_to_biz_work_status(conn: sqlite3.Connection) -> bool:
+    if not _sqlite_table_exists(conn, TABLE_NAME):
+        return False
+    try:
+        rows = conn.execute(f"PRAGMA foreign_key_list({TABLE_NAME})").fetchall()
+    except sqlite3.DatabaseError:
+        return False
+    for row in rows:
+        try:
+            ref_table = row['table']
+            from_col = row['from']
+        except (TypeError, IndexError, KeyError):
+            ref_table = row[2]
+            from_col = row[3]
+        if str(ref_table) == 'biz_work_status' and str(from_col) == 'status_code':
+            return True
+    return False
+
+
+def _migrate_strip_work_group_status_fk(conn: sqlite3.Connection) -> None:
+    """Remove FK from biz_work_group.status_code → biz_work_status (values are local enum)."""
+    if not _work_group_has_status_fk_to_biz_work_status(conn):
+        return
+    logger.info('Migrating %s: dropping FOREIGN KEY status_code → biz_work_status', TABLE_NAME)
+    try:
+        conn.execute('PRAGMA foreign_keys = OFF')
+    except sqlite3.DatabaseError:
+        pass
+
+    temp = f"{TABLE_NAME}__nostatusfk"
+    conn.execute(f"DROP TABLE IF EXISTS {temp}")
+    conn.execute(
+        f"""
+        CREATE TABLE {temp} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_code TEXT NOT NULL UNIQUE,
+            group_name TEXT NOT NULL,
+            description TEXT,
+            status_code TEXT NOT NULL,
+            dept_code TEXT NOT NULL,
+            member_count INTEGER DEFAULT 0,
+            hw_count INTEGER DEFAULT 0,
+            sw_count INTEGER DEFAULT 0,
+            priority INTEGER DEFAULT 0,
+            remark TEXT,
+            created_at TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            updated_at TEXT,
+            updated_by TEXT,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (dept_code) REFERENCES org_department(dept_code)
+        )
+        """
+    )
+    conn.execute(
+        f"""
+        INSERT INTO {temp}
+            (id, group_code, group_name, description, status_code, dept_code, member_count, hw_count, sw_count,
+             priority, remark, created_at, created_by, updated_at, updated_by, is_deleted)
+        SELECT
+            id, group_code, group_name, description, status_code, dept_code, member_count, hw_count, sw_count,
+            priority, remark, created_at, created_by, updated_at, updated_by, is_deleted
+        FROM {TABLE_NAME}
+        """
+    )
+    conn.execute(f"DROP TABLE {TABLE_NAME}")
+    conn.execute(f"ALTER TABLE {temp} RENAME TO {TABLE_NAME}")
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+    except sqlite3.DatabaseError:
+        pass
+
+
 def _table_has_column(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
     try:
         rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
@@ -166,6 +328,17 @@ def _table_has_column(conn: sqlite3.Connection, table_name: str, column_name: st
         return False
     cols = {r[1] if isinstance(r, (tuple, list)) else r['name'] for r in rows}
     return column_name in cols
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return bool(row)
+    except sqlite3.DatabaseError:
+        return False
 
 
 def _migrate_drop_division_code(conn: sqlite3.Connection) -> None:
@@ -203,7 +376,6 @@ def _migrate_drop_division_code(conn: sqlite3.Connection) -> None:
             updated_at TEXT,
             updated_by TEXT,
             is_deleted INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (status_code) REFERENCES biz_work_status(status_code),
             FOREIGN KEY (dept_code) REFERENCES org_department(dept_code)
         )
         """
@@ -231,6 +403,55 @@ def _migrate_drop_division_code(conn: sqlite3.Connection) -> None:
         pass
 
 
+def _normalize_existing_work_group_statuses(conn: sqlite3.Connection) -> None:
+    """Persist 업무그룹 상태 as 운영/임시/종료 only; never keep biz_work_status codes."""
+    if not _sqlite_table_exists(conn, TABLE_NAME):
+        return
+    try:
+        rows = conn.execute(f"SELECT id, status_code FROM {TABLE_NAME}").fetchall()
+        for row in rows:
+            current = _norm_text(row['status_code'])
+            canonical = _resolve_canonical_work_group_status(conn, current)
+            if canonical not in WORK_GROUP_STATUS_VALUES:
+                canonical = '운영'
+            if canonical != current:
+                conn.execute(
+                    f"UPDATE {TABLE_NAME} SET status_code = ? WHERE id = ?",
+                    (canonical, row['id']),
+                )
+    except sqlite3.DatabaseError:
+        logger.exception('Failed to normalize %s.status_code values', TABLE_NAME)
+
+
+def _ensure_work_group_public_ids(conn: sqlite3.Connection) -> None:
+    if not _sqlite_table_exists(conn, TABLE_NAME):
+        return
+    try:
+        if not _table_has_column(conn, TABLE_NAME, 'public_id'):
+            conn.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN public_id TEXT")
+        rows = conn.execute(
+            f"SELECT id FROM {TABLE_NAME} WHERE public_id IS NULL OR trim(public_id) = ''"
+        ).fetchall()
+        for row in rows:
+            while True:
+                candidate = _new_public_id()
+                exists = conn.execute(
+                    f"SELECT 1 FROM {TABLE_NAME} WHERE public_id = ? LIMIT 1",
+                    (candidate,),
+                ).fetchone()
+                if not exists:
+                    break
+            conn.execute(
+                f"UPDATE {TABLE_NAME} SET public_id = ? WHERE id = ?",
+                (candidate, row['id']),
+            )
+        conn.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{TABLE_NAME}_public_id ON {TABLE_NAME}(public_id)"
+        )
+    except sqlite3.DatabaseError:
+        logger.exception('Failed to ensure %s.public_id values', TABLE_NAME)
+
+
 def init_work_group_table(app=None) -> None:
     app = app or current_app
     try:
@@ -246,10 +467,14 @@ def init_work_group_table(app=None) -> None:
             # Drop legacy division_code column if present.
             _migrate_drop_division_code(conn)
 
+            # Drop status_code → biz_work_status FK when upgrading existing DBs.
+            _migrate_strip_work_group_status_fk(conn)
+
             conn.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    public_id TEXT UNIQUE,
                     group_code TEXT NOT NULL UNIQUE,
                     group_name TEXT NOT NULL,
                     description TEXT,
@@ -265,7 +490,6 @@ def init_work_group_table(app=None) -> None:
                     updated_at TEXT,
                     updated_by TEXT,
                     is_deleted INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (status_code) REFERENCES biz_work_status(status_code),
                     FOREIGN KEY (dept_code) REFERENCES org_department(dept_code)
                 )
                 """
@@ -335,6 +559,8 @@ def init_work_group_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{TABLE_NAME}_is_deleted ON {TABLE_NAME}(is_deleted)"
             )
+            _ensure_work_group_public_ids(conn)
+            _normalize_existing_work_group_statuses(conn)
 
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_TABLE_NAME}_group_id ON {MANAGER_TABLE_NAME}(group_id)"
@@ -549,40 +775,87 @@ def list_work_group_systems(
         group_code = grp['group_code']
 
         deleted_clause = "" if include_deleted else "AND (ha.is_deleted = 0 OR ha.is_deleted IS NULL)"
+        has_status_table = _table_exists(conn, 'biz_work_status')
+        has_status_level = has_status_table and _table_has_column(conn, 'biz_work_status', 'status_level')
+        has_operation_table = _table_exists(conn, 'biz_work_operation')
+        has_vendor_table = _table_exists(conn, 'biz_vendor_manufacturer')
+        has_server_type_table = _table_exists(conn, 'hw_server_type')
+        has_server_software = _table_exists(conn, 'server_software')
+        has_hw_component = _table_exists(conn, 'server_hw_component')
+        status_name_select = "COALESCE(bws.status_name, ha.work_status_code, '-') AS work_status_name" if has_status_table else "COALESCE(ha.work_status_code, '-') AS work_status_name"
+        status_level_select = "COALESCE(bws.status_level, '') AS work_status_level" if has_status_level else "'' AS work_status_level"
+        operation_select = "COALESCE(bwo.operation_name, ha.work_operation_code, '-') AS work_operation_name" if has_operation_table else "COALESCE(ha.work_operation_code, '-') AS work_operation_name"
+        manufacturer_select = "COALESCE(bvm.manufacturer_name, ha.manufacturer_code, '-') AS manufacturer_name" if has_vendor_table else "COALESCE(ha.manufacturer_code, '-') AS manufacturer_name"
+        server_model_select = "COALESCE(hst.model_name, ha.server_code, '-') AS server_model_name" if has_server_type_table else "COALESCE(ha.server_code, '-') AS server_model_name"
+        os_select = "COALESCE(ss_os.name, '-') AS os_type" if has_server_software else "'-' AS os_type"
+        cpu_select = "COALESCE(shc_cpu.active_capacity, '-') AS cpu_size" if has_hw_component else "'-' AS cpu_size"
+        mem_select = "COALESCE(shc_mem.active_capacity, '-') AS memory_size" if has_hw_component else "'-' AS memory_size"
+        joins = []
+        if has_status_table:
+            joins.append(
+                """
+            LEFT JOIN biz_work_status bws
+                ON bws.status_code = ha.work_status_code
+               AND (bws.is_deleted = 0 OR bws.is_deleted IS NULL)
+                """
+            )
+        if has_operation_table:
+            joins.append(
+                """
+            LEFT JOIN biz_work_operation bwo
+                ON bwo.operation_code = ha.work_operation_code
+                """
+            )
+        if has_vendor_table:
+            joins.append(
+                """
+            LEFT JOIN biz_vendor_manufacturer bvm
+                ON bvm.manufacturer_code = ha.manufacturer_code
+                """
+            )
+        if has_server_type_table:
+            joins.append(
+                """
+            LEFT JOIN hw_server_type hst
+                ON hst.server_code = ha.server_code
+                """
+            )
+        if has_server_software:
+            joins.append(
+                """
+            LEFT JOIN server_software ss_os
+                ON ss_os.hardware_id = ha.id AND ss_os.type = '운영체제'
+                """
+            )
+        if has_hw_component:
+            joins.append(
+                """
+            LEFT JOIN server_hw_component shc_cpu
+                ON shc_cpu.hardware_id = ha.id AND shc_cpu.type = 'CPU'
+            LEFT JOIN server_hw_component shc_mem
+                ON shc_mem.hardware_id = ha.id AND shc_mem.type = 'MEMORY'
+                """
+            )
         rows = conn.execute(
             f"""
             SELECT
                 ha.id,
                 COALESCE(ha.asset_category, '-')        AS asset_category,
                 COALESCE(ha.asset_type, '-')            AS asset_type,
-                COALESCE(bws.status_name, ha.work_status_code, '-') AS work_status_name,
-                COALESCE(bws.status_level, '') AS work_status_level,
-                COALESCE(bwo.operation_name, ha.work_operation_code, '-') AS work_operation_name,
+                {status_name_select},
+                {status_level_select},
+                {operation_select},
                 COALESCE(ha.work_name, '-')             AS work_name,
                 COALESCE(ha.system_name, '-')           AS system_name,
                 COALESCE(ha.system_ip, '-')             AS system_ip,
                 COALESCE(ha.virtualization_type, '-')   AS virtualization_type,
-                COALESCE(bvm.manufacturer_name, ha.manufacturer_code, '-') AS manufacturer_name,
-                COALESCE(hst.model_name, ha.server_code, '-') AS server_model_name,
-                COALESCE(ss_os.name, '-')               AS os_type,
-                COALESCE(shc_cpu.active_capacity, '-')  AS cpu_size,
-                COALESCE(shc_mem.active_capacity, '-')  AS memory_size
+                {manufacturer_select},
+                {server_model_select},
+                {os_select},
+                {cpu_select},
+                {mem_select}
             FROM hardware_asset ha
-            LEFT JOIN biz_work_status bws
-                ON bws.status_code = ha.work_status_code
-               AND (bws.is_deleted = 0 OR bws.is_deleted IS NULL)
-            LEFT JOIN biz_work_operation bwo
-                ON bwo.operation_code = ha.work_operation_code
-            LEFT JOIN biz_vendor_manufacturer bvm
-                ON bvm.manufacturer_code = ha.manufacturer_code
-            LEFT JOIN hw_server_type hst
-                ON hst.server_code = ha.server_code
-            LEFT JOIN server_software ss_os
-                ON ss_os.hardware_id = ha.id AND ss_os.type = '운영체제'
-            LEFT JOIN server_hw_component shc_cpu
-                ON shc_cpu.hardware_id = ha.id AND shc_cpu.type = 'CPU'
-            LEFT JOIN server_hw_component shc_mem
-                ON shc_mem.hardware_id = ha.id AND shc_mem.type = 'MEMORY'
+            {' '.join(joins)}
             WHERE ha.work_group_code = ?
               {deleted_clause}
             ORDER BY ha.id ASC
@@ -1119,16 +1392,19 @@ def list_work_group_change_logs(
 def _fetch_single(record_id: int, app=None) -> Optional[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
+        _ensure_work_group_public_ids(conn)
+        dept_name_expr, dept_joins, _ = _org_department_join_parts(conn)
         row = conn.execute(
             f"""
             SELECT
                 bwg.id,
+                bwg.public_id,
                 bwg.group_code,
                 bwg.group_name,
                 bwg.description,
                 bwg.status_code,
                 bwg.dept_code,
-                od.dept_name AS dept_name,
+                {dept_name_expr} AS dept_name,
                 bwg.member_count,
                 bwg.hw_count,
                 bwg.sw_count,
@@ -1140,7 +1416,7 @@ def _fetch_single(record_id: int, app=None) -> Optional[Dict[str, Any]]:
                 bwg.updated_by,
                 bwg.is_deleted
             FROM {TABLE_NAME} bwg
-            LEFT JOIN org_department od ON od.dept_code = bwg.dept_code
+            {dept_joins}
             WHERE bwg.id = ?
             """,
             (record_id,),
@@ -1152,11 +1428,13 @@ def _fetch_single(record_id: int, app=None) -> Optional[Dict[str, Any]]:
         if not code:
             item['hw_count'] = 0
             item['sw_count'] = 0
+            _apply_work_group_api_enrichment(conn, item)
             return item
         hw_counts = counts_by_code(conn, asset_table='hardware', code_column='work_group_code')
         sw_counts = sw_counts_via_hardware(conn, code_column='work_group_code')
         item['hw_count'] = hw_counts.get(code, 0)
         item['sw_count'] = sw_counts.get(code, 0)
+        _apply_work_group_api_enrichment(conn, item)
         return item
 
 
@@ -1169,35 +1447,55 @@ def get_work_group(group_id: int, app=None, *, include_deleted: bool = False) ->
     return item
 
 
+def get_work_group_by_public_id(public_id: str, app=None, *, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    pid = _norm_text(public_id)
+    if not pid:
+        return None
+    with _get_connection(app) as conn:
+        _ensure_work_group_public_ids(conn)
+        row = conn.execute(
+            f"SELECT id FROM {TABLE_NAME} WHERE public_id = ? LIMIT 1",
+            (pid,),
+        ).fetchone()
+    if not row:
+        return None
+    return get_work_group(int(row['id']), app=app, include_deleted=include_deleted)
+
+
 def list_work_groups(app=None, search: Optional[str] = None, include_deleted: bool = False) -> List[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
+        _ensure_work_group_public_ids(conn)
+        dept_name_expr, dept_joins, dept_name_cols = _org_department_join_parts(conn)
         clauses = ['1=1']
         params: List[Any] = []
         if not include_deleted:
             clauses.append('bwg.is_deleted = 0')
         if search:
             like = f"%{search}%"
-            clauses.append('(' + ' OR '.join([
+            search_terms = [
                 'bwg.group_name LIKE ?',
                 'bwg.group_code LIKE ?',
                 'bwg.description LIKE ?',
                 'bwg.remark LIKE ?',
                 'bwg.status_code LIKE ?',
                 'bwg.dept_code LIKE ?',
-                'od.dept_name LIKE ?'
-            ]) + ')')
-            params.extend([like] * 7)
+            ]
+            search_terms.extend(f'{col} LIKE ?' for col in dept_name_cols)
+            clauses.append('(' + ' OR '.join(search_terms) + ')')
+            params.extend([like] * len(search_terms))
         query = (
             f"""
             SELECT
                 bwg.id,
+                bwg.public_id,
                 bwg.group_code,
                 bwg.group_name,
                 bwg.description,
                 bwg.status_code,
                 bwg.dept_code,
-                od.dept_name AS dept_name,
+                {dept_name_expr} AS dept_name,
                 bwg.member_count,
                 bwg.hw_count,
                 bwg.sw_count,
@@ -1209,7 +1507,7 @@ def list_work_groups(app=None, search: Optional[str] = None, include_deleted: bo
                 bwg.updated_by,
                 bwg.is_deleted
             FROM {TABLE_NAME} bwg
-            LEFT JOIN org_department od ON od.dept_code = bwg.dept_code
+            {dept_joins}
             WHERE {' AND '.join(clauses)}
             ORDER BY bwg.id DESC
             """
@@ -1227,8 +1525,45 @@ def list_work_groups(app=None, search: Optional[str] = None, include_deleted: bo
             else:
                 item['hw_count'] = 0
                 item['sw_count'] = 0
+            _apply_work_group_api_enrichment(conn, item)
             out.append(item)
         return out
+
+
+def list_work_group_departments(app=None) -> List[Dict[str, Any]]:
+    """Departments for 업무그룹: read org_department.dept_name from main DB and org_department.db."""
+    app = app or current_app
+    with _get_connection(app) as conn:
+        by_code: Dict[str, Dict[str, Any]] = {}
+        for table_ref in ('org_department', 'aux_od.org_department'):
+            if table_ref.startswith('aux_od') and not _attached_table_exists(conn, 'aux_od', 'org_department'):
+                continue
+            if table_ref == 'org_department' and not _sqlite_table_exists(conn, 'org_department'):
+                continue
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT dept_code, dept_name, ifnull(is_deleted, 0) AS is_deleted
+                    FROM {table_ref}
+                    WHERE trim(ifnull(dept_code, '')) != ''
+                      AND trim(ifnull(dept_name, '')) != ''
+                    ORDER BY ifnull(is_deleted, 0), dept_name COLLATE NOCASE
+                    """
+                ).fetchall()
+            except sqlite3.DatabaseError:
+                continue
+            for row in rows:
+                code = _norm_text(row['dept_code'])
+                name = _norm_text(row['dept_name'])
+                if not code or not name:
+                    continue
+                if code.casefold() == 'default' or name.replace(' ', '') == '기본부서':
+                    continue
+                key = code.lower()
+                item = {'dept_code': code, 'dept_name': name}
+                if key not in by_code or int(row['is_deleted'] or 0) == 0:
+                    by_code[key] = item
+        return sorted(by_code.values(), key=lambda r: (r['dept_name'], r['dept_code']))
 
 
 def _prepare_payload(data: Dict[str, Any], *, require_all: bool = False) -> Dict[str, Any]:
@@ -1261,7 +1596,7 @@ def _prepare_payload(data: Dict[str, Any], *, require_all: bool = False) -> Dict
     if 'sw_count' in payload:
         payload['sw_count'] = _sanitize_int(payload['sw_count']) or 0
     if 'priority' in payload:
-        payload['priority'] = _sanitize_int(payload['priority']) or 0
+        payload['priority'] = _coerce_work_group_priority(payload['priority'])
     return payload
 
 
@@ -1274,32 +1609,118 @@ def _norm_text(value: Any) -> str:
         return ''
 
 
+def _dept_join_sql(alias_bwg: str = 'bwg', alias_od: str = 'od') -> str:
+    """부서 코드 대소문자·공백 불일치로 JOIN 이 깨져 부서 명·통합 검색이 실패하지 않도록."""
+    bc = f"lower(trim(ifnull({alias_bwg}.dept_code,'')))"
+    oc = f"lower(trim(ifnull({alias_od}.dept_code,'')))"
+    return f'{bc} = {oc}'
+
+
+def _org_department_join_parts(conn: sqlite3.Connection) -> tuple[str, str, list[str]]:
+    """Return dept_name expression, joins, and searchable name columns for main/aux org_department."""
+    joins: list[str] = []
+    name_cols: list[str] = []
+    if _sqlite_table_exists(conn, 'org_department'):
+        joins.append(f"LEFT JOIN org_department od ON {_dept_join_sql('bwg', 'od')}")
+        name_cols.append('od.dept_name')
+    if _attached_table_exists(conn, 'aux_od', 'org_department'):
+        joins.append(f"LEFT JOIN aux_od.org_department aod ON {_dept_join_sql('bwg', 'aod')}")
+        name_cols.append('aod.dept_name')
+    if not name_cols:
+        return "''", '', []
+    expr = "COALESCE(" + ", ".join(f"NULLIF({col}, '')" for col in name_cols) + ", '')"
+    return expr, "\n".join(joins), name_cols
+
+
+def _resolve_canonical_work_group_status(conn: sqlite3.Connection, raw: Optional[Any]) -> str:
+    """업무그룹 상태는 외부 FK 없이 운영/임시/종료 3개 값만 허용."""
+    s = _norm_text(raw)
+    if s in WORK_GROUP_STATUS_VALUES:
+        return s
+    if not s:
+        return '운영'
+    syn = LEGACY_WORK_GROUP_STATUS_SYNONYMS.get(s)
+    if syn:
+        return syn
+    # Unknown legacy FK/code values must not leak to the UI.
+    return '운영'
+
+
+def _apply_work_group_api_enrichment(conn: sqlite3.Connection, item: Dict[str, Any]) -> Dict[str, Any]:
+    """부서 명·업무 상태 보정(API 응답용 dict만 변경)."""
+    canon = _resolve_canonical_work_group_status(conn, item.get('status_code'))
+    item['status_code'] = canon
+    item['work_status'] = canon
+    dept = _norm_text(item.get('dept_code'))
+    if dept and not _norm_text(item.get('dept_name')):
+        for table_ref in ('org_department', 'aux_od.org_department'):
+            if table_ref.startswith('aux_od') and not _attached_table_exists(conn, 'aux_od', 'org_department'):
+                continue
+            if table_ref == 'org_department' and not _sqlite_table_exists(conn, 'org_department'):
+                continue
+            try:
+                r = conn.execute(
+                    f"""
+                    SELECT dept_name FROM {table_ref}
+                    WHERE lower(trim(dept_code)) = lower(trim(?))
+                    ORDER BY CASE WHEN ifnull(is_deleted,0)=0 THEN 0 ELSE 1 END, id DESC
+                    LIMIT 1
+                    """,
+                    (dept,),
+                ).fetchone()
+                if r and _norm_text(r['dept_name']):
+                    dn = _norm_text(r['dept_name'])
+                    item['dept_name'] = dn
+                    item['sys_dept_name'] = dn
+                    break
+            except sqlite3.DatabaseError:
+                pass
+    elif _norm_text(item.get('dept_name')):
+        dn = _norm_text(item.get('dept_name'))
+        item['sys_dept_name'] = dn
+    return item
+
+
 def _ensure_work_group_fk_seed(conn: sqlite3.Connection) -> None:
     """No-op: FK seed was removed. Tables must be populated by the user."""
     pass
 
 
 def _resolve_fk_codes(conn: sqlite3.Connection, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Resolve potentially name-like inputs into FK-safe codes."""
+    """Resolve dept name-like inputs into org_department codes; work group status stays local enum."""
     _ensure_work_group_fk_seed(conn)
 
     status_in = _norm_text(payload.get('status_code'))
     dept_in = _norm_text(payload.get('dept_code'))
 
     if status_in:
-        row = conn.execute(
-            "SELECT status_code FROM biz_work_status WHERE is_deleted=0 AND (status_code = ? OR status_name = ?) LIMIT 1",
-            (status_in, status_in),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"업무 상태 참조값이 존재하지 않습니다: {status_in}")
-        payload['status_code'] = row['status_code']
+        if status_in not in WORK_GROUP_STATUS_VALUES:
+            raise ValueError('업무 상태는 운영, 임시, 종료 중에서만 선택할 수 있습니다.')
+        payload['status_code'] = status_in
 
     if dept_in:
-        row = conn.execute(
-            "SELECT dept_code FROM org_department WHERE is_deleted=0 AND (dept_code = ? OR dept_name = ?) LIMIT 1",
-            (dept_in, dept_in),
-        ).fetchone()
+        row = None
+        for table_ref in ('org_department', 'aux_od.org_department'):
+            if table_ref.startswith('aux_od') and not _attached_table_exists(conn, 'aux_od', 'org_department'):
+                continue
+            if table_ref == 'org_department' and not _sqlite_table_exists(conn, 'org_department'):
+                continue
+            row = conn.execute(
+                f"""
+                SELECT dept_code FROM {table_ref}
+                WHERE (
+                    lower(trim(dept_code)) = lower(trim(?))
+                    OR dept_name = ?
+                  )
+                  AND lower(trim(dept_code)) != 'default'
+                  AND replace(trim(dept_name), ' ', '') != '기본부서'
+                ORDER BY CASE WHEN ifnull(is_deleted,0)=0 THEN 0 ELSE 1 END, id DESC
+                LIMIT 1
+                """,
+                (dept_in, dept_in),
+            ).fetchone()
+            if row:
+                break
         if not row:
             raise ValueError(f"부서 참조값이 존재하지 않습니다: {dept_in}")
         payload['dept_code'] = row['dept_code']
@@ -1314,17 +1735,24 @@ def create_work_group(data: Dict[str, Any], actor: str, app=None) -> Dict[str, A
     name = payload['group_name'].strip()
     if not name:
         raise ValueError('group_name is required')
+    validate_business_work_display_name(name, field_label='업무 그룹명')
     with _get_connection(app) as conn:
+        _ensure_work_group_public_ids(conn)
         payload = _resolve_fk_codes(conn, payload)
         group_code = (payload.get('group_code') or '').strip() or _generate_group_code(conn, name)
+        while True:
+            public_id = _new_public_id()
+            if not conn.execute(f"SELECT 1 FROM {TABLE_NAME} WHERE public_id = ? LIMIT 1", (public_id,)).fetchone():
+                break
         timestamp = _now()
         cur = conn.execute(
             f"""
             INSERT INTO {TABLE_NAME}
-                (group_code, group_name, description, status_code, dept_code, member_count, hw_count, sw_count, priority, remark, created_at, created_by, updated_at, updated_by, is_deleted)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                (public_id, group_code, group_name, description, status_code, dept_code, member_count, hw_count, sw_count, priority, remark, created_at, created_by, updated_at, updated_by, is_deleted)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             """,
             (
+                public_id,
                 group_code,
                 name,
                 payload.get('description'),
@@ -1381,8 +1809,11 @@ def update_work_group(group_id: int, data: Dict[str, Any], actor: str, app=None)
         ):
             if column in payload:
                 value = payload[column]
-                if column == 'group_name' and not value:
-                    raise ValueError('group_name is required')
+                if column == 'group_name':
+                    value = _norm_text(value)
+                    if not value:
+                        raise ValueError('group_name is required')
+                    validate_business_work_display_name(value, field_label='업무 그룹명')
                 updates.append(f"{column} = ?")
                 params.append(value)
         if not updates:

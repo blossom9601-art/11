@@ -8,6 +8,8 @@
  */
 
 (function(){
+    /** 카테고리>비즈니스 표시 이름 상한 (서버: business_work_display_name) */
+    const BUSINESS_WORK_LABEL_MAX_LEN = 16;
     // External dependencies
     const LOTTIE_CDN = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
     const XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
@@ -186,12 +188,23 @@
     const ALT_UPLOAD_HEADERS_KO = ['업무 분류','설명','하드웨어(수량)','소프트웨어(수량)','담당 부서','업무 상태','업무 우선순위','비고'];
     const ENUM_SETS = { };
     const API_ENDPOINT = '/api/work-groups';
-    const ORG_DEPARTMENTS_ENDPOINT = '/api/org-departments';
+    const ORG_DEPARTMENTS_ENDPOINT = '/api/work-groups/departments';
     const FIXED_WORK_STATUSES = [
-        { status_code: '정상', status_name: '정상', wc_color: 'ws-run' },
-        { status_code: '보류', status_name: '보류', wc_color: 'ws-wait' },
-        { status_code: '폐기', status_name: '폐기', wc_color: 'ws-idle' }
+        { status_code: '운영', status_name: '운영', wc_color: 'ws-run' },
+        { status_code: '임시', status_name: '임시', wc_color: 'ws-wait' },
+        { status_code: '종료', status_name: '종료', wc_color: 'ws-idle' }
     ];
+    const WORK_GROUP_STATUS_CODE_SET = new Set(FIXED_WORK_STATUSES.map((r) => String(r.status_code || '').trim()).filter(Boolean));
+    function canonicalWorkGroupStatus(raw){
+        const value = String(raw ?? '').trim();
+        if(WORK_GROUP_STATUS_CODE_SET.has(value)) return value;
+        const aliases = {
+            '정상':'운영', '가동':'운영', '활성':'운영', '활성화':'운영',
+            '보류':'임시', '대기':'임시', '점검':'임시', '중지':'임시',
+            '폐기':'종료', '유휴':'종료', '비활성':'종료', '미사용':'종료'
+        };
+        return aliases[value] || '운영';
+    }
     const JSON_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' };
     // Ensure the searchable-select helper is available before opening modals.
     // Some users can click very quickly before blossom.js finishes injecting the helper.
@@ -236,6 +249,17 @@
     function normalizeLookupKey(val){
         return String(val ?? '').trim().toLowerCase();
     }
+    /** 검색 문자열 통일(NFKC·공백)—담당 부서명 매칭 누락 완화 */
+    function normalizeSearchPlain(val){
+        let s = String(val ?? '').trim().toLowerCase();
+        try { s = s.normalize('NFKC'); } catch (_e) {}
+        return s.replace(/\s+/g, ' ');
+    }
+    function isDefaultDepartment(row){
+        const code = normalizeLookupKey(row && row.dept_code);
+        const name = String(row && row.dept_name || '').replace(/\s+/g, '').trim();
+        return code === 'default' || name === '기본부서';
+    }
     function hasDuplicateWorkGroupName(name, excludeId){
         const target = normalizeLookupKey(name);
         if(!target) return false;
@@ -253,8 +277,13 @@
         (LOOKUPS.departments || []).forEach(d=>{
             const code = String(d.dept_code ?? '').trim();
             const name = String(d.dept_name ?? '').trim();
-            if(code) deptNameByCode[code] = name || code;
-            if(code) deptCodeByName[normalizeLookupKey(code)] = code;
+            const nk = normalizeLookupKey(code);
+            if(code){
+                const label = name || code;
+                deptNameByCode[code] = label;
+                if(nk) deptNameByCode[nk] = label;
+            }
+            if(code && nk) deptCodeByName[nk] = code;
             if(name) deptCodeByName[normalizeLookupKey(name)] = code;
         });
 
@@ -292,7 +321,7 @@
         const mapped = items.map((r)=>({
             dept_code: String(r.dept_code ?? r.deptCode ?? '').trim(),
             dept_name: String(r.dept_name ?? r.deptName ?? r.name ?? '').trim()
-        })).filter(r=> r.dept_code && r.dept_name);
+        })).filter(r=> r.dept_code && r.dept_name && !isDefaultDepartment(r));
         mapped.sort((a,b)=> a.dept_name.localeCompare(b.dept_name,'ko-KR'));
         return mapped;
     }
@@ -400,9 +429,10 @@
         const key = String(raw).trim();
         if(key === '') return raw;
         if(col === 'sys_dept'){
-            if(LOOKUPS.deptNameByCode && LOOKUPS.deptNameByCode[key]){
-                return LOOKUPS.deptNameByCode[key];
-            }
+            const byExact = LOOKUPS.deptNameByCode && LOOKUPS.deptNameByCode[key];
+            const byNorm = LOOKUPS.deptNameByCode && LOOKUPS.deptNameByCode[normalizeLookupKey(key)];
+            if(byExact) return byExact;
+            if(byNorm) return byNorm;
             // Fallback: API may include dept name even when dept lookup endpoint is unavailable.
             // Keep stored value as code (`sys_dept`) but display a friendly label when possible.
             const apiName = (row.sys_dept_name ?? row.dept_name);
@@ -410,9 +440,69 @@
             return txt ? txt : raw;
         }
         if(col === 'work_status'){
-            return (LOOKUPS.statusNameByCode && LOOKUPS.statusNameByCode[key]) ? LOOKUPS.statusNameByCode[key] : raw;
+            return canonicalWorkGroupStatus((LOOKUPS.statusNameByCode && LOOKUPS.statusNameByCode[key]) ? LOOKUPS.statusNameByCode[key] : raw);
         }
         return raw;
+    }
+
+    /** 상단 검색: 담당 부서는 저장 코드·부서명·lookup 표시명을 모두 문자열로 합쳐 매칭 */
+    function getColumnSearchText(row, col){
+        if(!row) return '';
+        if(col === 'sys_dept'){
+            const parts = [];
+            const code = String(row.sys_dept ?? row.dept_code ?? '').trim();
+            const nameFromRow = String(row.sys_dept_name ?? row.dept_name ?? '').trim();
+            if(code) parts.push(code);
+            if(nameFromRow) parts.push(nameFromRow);
+            if(code){
+                const dn = LOOKUPS.deptNameByCode?.[code] || LOOKUPS.deptNameByCode?.[normalizeLookupKey(code)];
+                if(dn) parts.push(String(dn));
+            }
+            return normalizeSearchPlain([...new Set(parts)].join(' '));
+        }
+        const dv = getDisplayValue(row, col);
+        if(dv == null || dv === '') return '';
+        return normalizeSearchPlain(dv);
+    }
+
+    /** 업무 우선순위: 0~9만 입력 (빈 값 허용) */
+    function attachWorkPriorityDigitsOnly(root){
+        const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+        scope.querySelectorAll('input[name="work_priority"]').forEach((input)=>{
+            if(input.dataset.priorityDigitsBound === '1') return;
+            input.dataset.priorityDigitsBound = '1';
+            input.setAttribute('inputmode', 'numeric');
+            input.setAttribute('autocomplete', 'off');
+            if(input.type === 'number') input.type = 'text';
+            function digitsOnly(s){
+                return String(s || '').replace(/\D/g, '');
+            }
+            input.addEventListener('keydown', (e)=>{
+                const allowedNav = ['Backspace', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Delete', 'Home', 'End'];
+                if(allowedNav.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
+                if(e.key.length === 1 && !/\d/.test(e.key)) e.preventDefault();
+            });
+            input.addEventListener('input', ()=>{
+                const next = digitsOnly(input.value);
+                if(input.value !== next) input.value = next;
+            });
+            input.addEventListener('paste', (e)=>{
+                e.preventDefault();
+                const clip = digitsOnly((e.clipboardData && e.clipboardData.getData('text')) || '');
+                const start = input.selectionStart ?? input.value.length;
+                const end = input.selectionEnd ?? input.value.length;
+                const merged = digitsOnly(input.value.slice(0, start) + clip + input.value.slice(end));
+                input.value = merged;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        });
+    }
+
+    /** 빈 문자열 또는 양의 정수 문자열만 허용; 그 외 false */
+    function isValidWorkPriorityString(raw){
+        const s = String(raw ?? '').trim();
+        if(s === '') return true;
+        return /^\d+$/.test(s);
     }
 
     function normalizeWorkGroupRow(row){
@@ -435,10 +525,12 @@
         const note = row.remark ?? row.note;
         return {
             id: toId(row.id),
+            public_id: text(row.public_id || row.resource_id),
+            resource_id: text(row.resource_id || row.public_id),
             group_code: text(row.group_code),
             wc_name: text(wcName),
             wc_desc: text(desc),
-            work_status: text(status),
+            work_status: canonicalWorkGroupStatus(status),
             sys_dept: text(dept),
             sys_dept_name: text(deptName),
             hw_count: toInt(row.hw_count),
@@ -522,6 +614,7 @@
         // 렌더 순서도 헤더와 동일하게 맞춥니다 (체크박스 제외)
         'work_status','wc_name','group_code','hw_count','sw_count','sys_dept','work_priority'
     ];
+    const TABLE_COLSPAN = COLUMN_ORDER.length + 2; // checkbox + actions
 
     // 검색은 표시 여부와 무관하게 description까지 포함 (화면에서는 숨김)
     const SEARCH_COLUMNS = [
@@ -590,7 +683,7 @@
         // 그룹 분리: % 기준 AND, 그룹 내 , 기준 OR (같은 열 기준 다중검색)
         // 예) "HPE,IBM%홍길동" => [ ['hpe','ibm'], ['홍길동'] ]
         const groups = trimmed
-            ? trimmed.split('%').map(g=> g.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase())).filter(arr=>arr.length>0)
+            ? trimmed.split('%').map(g=> g.split(',').map(s=>normalizeSearchPlain(s)).filter(Boolean)).filter(arr=>arr.length>0)
             : [];
         // Always search across all defined columns
         // Search only across list columns (exclude note)
@@ -605,8 +698,8 @@
                 groups.every(alts => {
                     // 하나의 그룹 내에서는 같은 열에서 OR 매칭(하나라도 포함되면 통과)
                     return searchCols.some(col => {
-                        const v = getDisplayValue(row, col); if(v==null) return false;
-                        const cell = String(v).toLowerCase();
+                        const cell = getColumnSearchText(row, col);
+                        if(!cell && col !== 'sys_dept') return false;
                         return alts.some(tok => cell.includes(tok));
                     });
                 })
@@ -618,9 +711,20 @@
         });
         if(filterEntries.length){
             base = base.filter(row => filterEntries.every(([col,val])=>{
-                const cell = String(getDisplayValue(row, col) ?? '');
-                if(Array.isArray(val)) return val.includes(cell);
-                return cell === String(val);
+                const cellRaw = String(getDisplayValue(row, col) ?? '');
+                const cellDept = col === 'sys_dept' ? String(getColumnSearchText(row, col) || '') : '';
+                const cell = col === 'sys_dept' ? cellDept : cellRaw;
+                if(Array.isArray(val)){
+                    if(col === 'sys_dept'){
+                        return val.some(v => cell.includes(normalizeSearchPlain(v)) || cellRaw === String(v));
+                    }
+                    return val.includes(cellRaw);
+                }
+                if(col === 'sys_dept'){
+                    const want = normalizeSearchPlain(val);
+                    return cell.includes(want) || cellRaw === String(val);
+                }
+                return cellRaw === String(val);
             }));
         }
     state.filtered = base;
@@ -642,8 +746,22 @@
     function render(highlightContext){
         const tbody = document.getElementById(TBODY_ID);
         if(!tbody) return;
-        tbody.innerHTML='';
         const tableEl = document.getElementById(TABLE_ID);
+        if(state.isLoading){
+            tbody.innerHTML = `<tr class="loading-row"><td colspan="${TABLE_COLSPAN}">&nbsp;</td></tr>`;
+            const emptyEl = document.getElementById('system-empty');
+            if(emptyEl){ emptyEl.hidden = true; }
+            if(tableEl){ tableEl.hidden = false; }
+            const countEl = document.getElementById(COUNT_ID);
+            if(countEl){
+                countEl.textContent = '0';
+                countEl.setAttribute('data-count', '0');
+                countEl.classList.remove('large-number','very-large-number','is-updating');
+            }
+            updatePagination();
+            return;
+        }
+        tbody.innerHTML='';
         // 정렬 적용 (필터 결과에 대해)
         let working = state.filtered;
         if(state.sortKey){
@@ -670,10 +788,7 @@
                 // 검색어가 있을 때와 데이터 자체가 없을 때 메시지 구분
                 const titleEl = document.getElementById('system-empty-title');
                 const descEl = document.getElementById('system-empty-desc');
-                if(state.isLoading){
-                    if(titleEl) titleEl.textContent = '';
-                    if(descEl) descEl.textContent = '';
-                } else if(state.lastError){
+                if(state.lastError){
                     if(titleEl) titleEl.textContent = '데이터를 불러오지 못했습니다.';
                     if(descEl) descEl.textContent = state.lastError;
                 } else if(state.search.trim()){
@@ -704,6 +819,9 @@
         }
         function statusDotClass(name){
             const v = String(name||'').trim();
+            if(v==='운영') return 'ws-run';
+            if(v==='임시') return 'ws-wait';
+            if(v==='종료') return 'ws-idle';
             if(v==='정상') return 'ws-run';
             if(v==='보류') return 'ws-wait';
             if(v==='폐기') return 'ws-idle';
@@ -739,9 +857,10 @@
                     }
                     // 업무 그룹명: 상세 페이지 링크 처리 (동적 라우팅)
                     if(col === 'wc_name'){
-                        const detailHref = (window.__CAT_BUSINESS_GROUP_DETAIL_URL || '/p/cat_business_group_detail');
+                        const pid = String(row.public_id || row.resource_id || '').trim();
+                        const detailHref = pid ? `/business-groups/${encodeURIComponent(pid)}` : '#';
                         const nameHtml = highlight(displayVal, col);
-                        cellValue = `<a href="${detailHref}" class="work-name-link" data-id="${row.id??''}" title="상세 보기">${nameHtml}</a>`;
+                        cellValue = `<a href="${detailHref}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-public-id="${escapeHTML(pid)}" title="상세 보기">${nameHtml}</a>`;
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
                 }).join('')
@@ -1020,11 +1139,12 @@
         form.appendChild(sw);
 
         ensureNativeWorkStatusSelect(form);
+        attachWorkPriorityDigitsOnly(form);
     }
 
     function generateFieldInput(col,value=''){
         if(col==='wc_name'){
-            return `<input name="wc_name" class="form-input" value="${value??''}" required>`;
+            return `<input name="wc_name" class="form-input" value="${value??''}" required maxlength="${BUSINESS_WORK_LABEL_MAX_LEN}">`;
         }
         if(col==='note'){
             return `<textarea name="${col}" class="form-input textarea-large" rows="6">${value??''}</textarea>`;
@@ -1050,6 +1170,9 @@
         }
         if(col==='work_status'){
             const selected = String(value ?? '').trim();
+            const legacyOpt = (selected && !WORK_GROUP_STATUS_CODE_SET.has(selected))
+                ? `<option value="${escapeHTML(selected)}" selected>${escapeHTML(selected)} (기존)</option>`
+                : '';
             const options = FIXED_WORK_STATUSES.map(r=>{
                 const v = String(r.status_code ?? '').trim();
                 const t = String(r.status_name ?? '').trim();
@@ -1059,11 +1182,12 @@
             }).join('');
             return `<select name="work_status" class="form-input" required>`+
                 `<option value="">선택</option>`+
-                `${options}`+
+                `${legacyOpt}${options}`+
                 `</select>`;
         }
         if(col==='work_priority'){
-            return `<input name="work_priority" type="number" min="0" step="1" class="form-input" value="${value??''}" placeholder="업무 우선순위(숫자)">`;
+            const pv = value == null || value === '' ? '' : String(value).replace(/\D/g, '');
+            return `<input name="work_priority" type="text" inputmode="numeric" autocomplete="off" class="form-input" value="${escapeHTML(pv)}" placeholder="숫자">`;
         }
         return `<input name="${col}" class="form-input" value="${value??''}">`;
     }
@@ -1227,6 +1351,18 @@
             }
             return false;
         }
+        const st = String(payload.work_status || payload.status_code || '').trim();
+        if(!WORK_GROUP_STATUS_CODE_SET.has(st)){
+            if(!opts.silent){
+                showMessage('업무 상태는 운영, 임시, 종료 중에서만 선택할 수 있습니다.', '안내');
+            }
+            return false;
+        }
+        const prRaw = payload.work_priority ?? payload.priority;
+        if(prRaw != null && prRaw !== '' && !isValidWorkPriorityString(String(prRaw))){
+            if(!opts.silent){ showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내'); }
+            return false;
+        }
         return true;
     }
 
@@ -1388,34 +1524,25 @@
         // row edit delegation
         const tbodyEl = document.getElementById(TBODY_ID);
         tbodyEl?.addEventListener('click', async (e)=>{
-            // 업무 그룹 이름 링크 클릭 처리 (컨텍스트 저장 + 파라미터 부여 후 이동)
+            // 업무 그룹 이름 링크 클릭 처리 (공개 식별자 기반 상세 URL로 이동)
             const nameLink = e.target.closest('.work-name-link');
             if(nameLink){
                 e.preventDefault();
                 const rid = parseInt(nameLink.getAttribute('data-id'),10);
                 const row = state.data.find(r=> r.id === rid);
                 if(row){
-                    const payload = {
-                        id: row.id != null ? String(row.id) : '',
-                        group_id: row.id != null ? String(row.id) : '',
-                        work_status: row.work_status || '',
-                        wc_name: row.wc_name || '',
-                        wc_desc: row.wc_desc || '',
-                        group_code: row.group_code || '',
-                        hw_count: row.hw_count != null ? String(row.hw_count) : '',
-                        sw_count: row.sw_count != null ? String(row.sw_count) : '',
-                        sys_dept: row.sys_dept || '',
-                        work_priority: row.work_priority != null ? String(row.work_priority) : '',
-                        note: row.note || ''
-                    };
-                    try { sessionStorage.setItem('work_group_selected_row', JSON.stringify(payload)); } catch(_e){}
-                    const base = (window.__CAT_BUSINESS_GROUP_DETAIL_URL || '/p/cat_business_group_detail');
-                    const params = new URLSearchParams();
-                    Object.entries(payload).forEach(([k,v])=> params.set(k, v));
-                    // Send model/vendor for server-side session title/subtitle
-                    if(payload.wc_name) params.set('model', payload.wc_name);
-                    if(payload.group_code) params.set('vendor', payload.group_code);
-                    blsSpaNavigate(`${base}?${params.toString()}`);
+                    const publicId = String(row.public_id || row.resource_id || nameLink.getAttribute('data-public-id') || '').trim();
+                    if(!publicId){
+                        showMessage('상세 페이지 식별자를 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 시도하세요.', '오류');
+                        return;
+                    }
+                    try {
+                        sessionStorage.setItem('work_group_selected_row', JSON.stringify({
+                            public_id: publicId,
+                            id: row.id != null ? String(row.id) : ''
+                        }));
+                    } catch(_e){}
+                    blsSpaNavigate(`/business-groups/${encodeURIComponent(publicId)}`);
                 }
                 return; // 링크 클릭 시 다른 처리 중단
             }
@@ -1436,6 +1563,7 @@
                         return;
                     }
                     fillEditForm(row);
+                    attachWorkPriorityDigitsOnly(document.getElementById(EDIT_FORM_ID));
                     openModal(EDIT_MODAL_ID);
                     try { window.BlossomSearchableSelect?.enhance(document.getElementById(EDIT_MODAL_ID) || document); } catch(_e){}
                     ensureNativeWorkStatusSelect(document.getElementById(EDIT_MODAL_ID));
@@ -1558,6 +1686,7 @@
                 if(deptSel) deptSel.disabled = false;
                 resyncAddModalSearchSelects();
                 ensureNativeWorkStatusSelect(addModal);
+                attachWorkPriorityDigitsOnly(document.getElementById(ADD_FORM_ID));
             } catch(err){
                 if(statusSel) statusSel.disabled = false;
                 if(deptSel) deptSel.disabled = false;
@@ -1571,6 +1700,10 @@
             if(!form) return;
             if(!form.checkValidity()){ form.reportValidity(); return; }
             const data = collectForm(form);
+            if(!isValidWorkPriorityString(data.work_priority ?? '')){
+                showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내');
+                return;
+            }
             data.hw_count = toIntOrBlank(data.hw_count);
             data.sw_count = toIntOrBlank(data.sw_count);
             data.work_priority = toIntOrBlank(data.work_priority);
@@ -1578,6 +1711,10 @@
             data.member_count = toIntOrBlank(data.member_count);
             const payload = buildWorkGroupPayload(data);
             if(!validateWorkGroupPayload(payload)) return;
+            if(String(payload.wc_name || '').trim().length > BUSINESS_WORK_LABEL_MAX_LEN){
+                showMessage(`업무 그룹은 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력해 주세요.`, '안내');
+                return;
+            }
             if(hasDuplicateWorkGroupName(payload.wc_name)){
                 showMessage('이미 존재하는 업무 그룹입니다.\n\n중복 등록은 허용되지 않습니다.', '오류');
                 return;
@@ -1610,6 +1747,10 @@
                 return;
             }
             const data = collectForm(form);
+            if(!isValidWorkPriorityString(data.work_priority ?? '')){
+                showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내');
+                return;
+            }
             data.hw_count = toIntOrBlank(data.hw_count);
             data.sw_count = toIntOrBlank(data.sw_count);
             data.work_priority = toIntOrBlank(data.work_priority);
@@ -1617,6 +1758,10 @@
             data.member_count = toIntOrBlank(data.member_count);
             const payload = buildWorkGroupPayload(data);
             if(!validateWorkGroupPayload(payload)) return;
+            if(String(payload.wc_name || '').trim().length > BUSINESS_WORK_LABEL_MAX_LEN){
+                showMessage(`업무 그룹은 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력해 주세요.`, '안내');
+                return;
+            }
             if(hasDuplicateWorkGroupName(payload.wc_name, recordId)){
                 showMessage('이미 존재하는 업무 그룹입니다.\n\n중복 수정은 허용되지 않습니다.', '오류');
                 return;
@@ -1776,11 +1921,19 @@
                             const label = header[c]; const key = HEADER_KO_TO_KEY[label];
                             rec[key] = String(row[c]??'').trim();
                         }
+                        const wcTrim = String(rec.wc_name || '').trim();
+                        if(wcTrim.length > BUSINESS_WORK_LABEL_MAX_LEN){
+                            errors.push(`Row ${r+1}: 업무 그룹은 ${BUSINESS_WORK_LABEL_MAX_LEN}글자 이내로 입력하세요.`);
+                        }
                         // Validation rules (업무 그룹): counts must be integers if provided
-                        ['hw_count','sw_count','work_priority'].forEach(k=>{
+                        ['hw_count','sw_count'].forEach(k=>{
                             const rawVal = rec[k];
                             if(rawVal !== '' && !isIntegerLike(rawVal)) errors.push(`Row ${r+1}: ${COLUMN_META[k]?.label||k}는 숫자만 입력하세요.`);
                         });
+                        const rawPri = rec.work_priority;
+                        if(rawPri !== '' && !/^\d+$/.test(String(rawPri).trim())){
+                            errors.push(`Row ${r+1}: ${COLUMN_META.work_priority?.label || 'work_priority'}는 0 이상 정수(숫자만) 입력하세요.`);
+                        }
                         // Normalize numbers
                         rec.hw_count = toIntOrBlank(rec.hw_count);
                         rec.sw_count = toIntOrBlank(rec.sw_count);
@@ -1789,6 +1942,10 @@
                         rec.sys_dept = rec.sys_dept || '';
                         rec.work_status = rec.work_status || '';
                         rec.work_priority = rec.work_priority || '';
+                        const stRec = String(rec.work_status || '').trim();
+                        if(stRec && !WORK_GROUP_STATUS_CODE_SET.has(stRec)){
+                            errors.push(`Row ${r+1}: 업무 상태는 운영, 임시, 종료 중 하나만 입력하세요.`);
+                        }
                         imported.push(rec);
                     }
                     if(errors.length){
@@ -1911,6 +2068,7 @@
                 if(realIndex === -1){ showMessage('선택된 행을 찾을 수 없습니다.', '오류'); return; }
                 const row = state.data[realIndex];
                 fillEditForm(row);
+                attachWorkPriorityDigitsOnly(document.getElementById(EDIT_FORM_ID));
                 openModal(EDIT_MODAL_ID);
                 attachLicenseLiveSync(EDIT_FORM_ID);
                 initDatePickers(EDIT_FORM_ID);
@@ -1934,13 +2092,27 @@
             const ids = [...state.selected].map(id=> parseInt(id,10)).filter(id=> Number.isFinite(id) && id>0);
             if(!ids.length){ showMessage('선택된 항목을 찾을 수 없습니다.', '오류'); return; }
             const partialData = {};
+            let priorityBulkError = false;
             entries.forEach(({field, value})=>{
-                if(field === 'hw_count' || field === 'sw_count' || field === 'work_priority' || field === 'staff_count' || field === 'member_count'){
+                if(field === 'work_priority'){
+                    const s = String(value ?? '').trim();
+                    if(s !== '' && !/^\d+$/.test(s)){
+                        priorityBulkError = true;
+                        return;
+                    }
+                    partialData[field] = s === '' ? '' : parseInt(s, 10);
+                    return;
+                }
+                if(field === 'hw_count' || field === 'sw_count' || field === 'staff_count' || field === 'member_count'){
                     partialData[field] = toIntOrBlank(value);
                 } else {
                     partialData[field] = value;
                 }
             });
+            if(priorityBulkError){
+                showMessage('업무 우선순위는 숫자(0 이상 정수)만 입력할 수 있습니다.', '안내');
+                return;
+            }
             const payload = buildWorkGroupPayload(partialData, { partial: true });
             if(Object.keys(payload).length === 0){ showMessage('적용할 필드를 확인하세요.', '안내'); return; }
             const btn = document.getElementById(BULK_APPLY_ID);
@@ -1994,7 +2166,7 @@
                     `</select>`;
             }
             if(col === 'work_priority'){
-                return `<input type="number" min="0" step="1" class="form-input" data-bulk-field="${col}" placeholder="업무 우선순위(숫자)">`;
+                return `<input type="text" inputmode="numeric" autocomplete="off" class="form-input" data-bulk-field="${col}" placeholder="숫자">`;
             }
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
@@ -2018,7 +2190,7 @@
                     ${noteRow}
                 </div>`;
         }).join('');
-        // no extra widgets for this bulk form
+        attachWorkPriorityDigitsOnly(form);
     }
 
     // ----- Stats helpers -----
@@ -2100,6 +2272,7 @@
         // Load persisted sort (if any)
         loadSortPreference();
         bindEvents();
+        attachWorkPriorityDigitsOnly(document.getElementById(ADD_FORM_ID));
         state.isLoading = true;
         render();
         try { await ensureLookupsLoaded(); } catch(_e){}

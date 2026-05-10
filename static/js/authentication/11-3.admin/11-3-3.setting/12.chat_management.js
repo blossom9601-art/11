@@ -116,7 +116,7 @@
         fetch(API, {
             method: 'PUT',
             credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ policies: collectPolicies(), restoreDefaults: !!restoreDefaults })
         })
             .then(function(r){ return r.json(); })

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -11,10 +11,10 @@
 
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
-    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.1">
     <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.0"></script>
 </head>
-<body class="page-tab92-employee-shared {{ tab92.body_class|default('page-workgroup-manager') }}" data-cat-detail-id="{{ cat_detail_id or '' }}">
+<body class="page-tab92-employee-shared {{ tab92.body_class|default('page-workgroup-manager') }}" data-cat-detail-id="{{ cat_detail_id or '' }}" data-work-group-public-id="{{ work_group_public_id or '' }}">
     {% include 'layouts/_header.html' %}
     {% include 'layouts/_sidebar.html' %}
 
@@ -23,7 +23,7 @@
     <main class="main-content tab92-employee-root">
         <div class="content-wrapper">
             {% if back_key %}
-            <a href="{{ url_for('pages.show', key=back_key) }}{% if _qs %}?{{ _qs }}{% endif %}" class="back-btn">
+            <a href="{{ secure_back_url or (url_for('pages.blossom_hub', segment=back_key) ~ ('?' ~ _qs if _qs else '')) }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">{{ back_label or '목록으로 돌아가기' }}
             </a>
             {% endif %}
@@ -36,7 +36,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for t in tabs %}
-                <a href="{{ url_for('pages.show', key=t.key) }}{% if _qs %}?{{ _qs }}{% endif %}"
+                <a href="{{ t.href or (url_for('pages.blossom_hub', segment=t.key) ~ ('?' ~ _qs if _qs else '')) }}"
                    class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
                 {% endfor %}
             </div>
@@ -134,7 +134,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     <div id="mgr-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
         <div class="server-add-content">

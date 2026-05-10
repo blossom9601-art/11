@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -52,7 +52,7 @@
         <div class="content-wrapper tab94-sw">
             {# ── 뒤로가기 버튼 ── #}
             {% if back_key %}
-            <a href="{{ url_for('pages.show', key=back_key) }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment=back_key) }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 {{ back_label or '목록으로 돌아가기' }}
             </a>
@@ -68,7 +68,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for tab in tabs %}
-                <a href="{{ url_for('pages.show', key=tab.key) }}"
+                <a href="{{ url_for('pages.blossom_hub', segment=tab.key) }}"
                    class="server-detail-tab-btn {{ 'active' if current_key == tab.key else '' }}">{{ tab.label }}</a>
                 {% endfor %}
             </div>
@@ -161,7 +161,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     {# ══════════════════════════════════════════════════════════
        CSV 다운로드 확인 모달 (모든 컨텍스트 공통)

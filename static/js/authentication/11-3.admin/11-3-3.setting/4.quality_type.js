@@ -75,6 +75,7 @@
         var xhr = new XMLHttpRequest();
         xhr.open(method, url);
         xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== 4) return;
             var res;
@@ -511,6 +512,7 @@
         formData.append('file', _uploadFile);
         var xhr = new XMLHttpRequest();
         xhr.open('POST', API_BASE + '/upload');
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 
         // 업로드 진행률
         xhr.upload.addEventListener('progress', function (e) {

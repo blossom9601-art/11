@@ -238,9 +238,14 @@ def _enforce_active_session():
         if row is None:
             # DB에서 삭제됨 → 관리자가 종료한 세션
             session.clear()
+            session.modified = True
+            # abort(401)는 응답 경로에 따라 세션 쿠키가 갱신되지 않는 경우가 있어
+            # XHR에서도 명시적으로 401 Response를 반환한다.
             if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from flask import abort
-                abort(401)
+                return jsonify(
+                    {'success': False, 'error': 'session_revoked',
+                     'message': '세션이 종료되었습니다. 다시 로그인 해주세요.'}
+                ), 401
             return redirect(url_for('auth.login'))
         # last_active + 브라우저/OS 갱신 (매 요청마다)
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -438,35 +443,49 @@ def login():
         pass
     if request.method == 'GET':
         # 이미 로그인된 상태라면 로그인 페이지 대신 첫 화면으로 보냄
-        # (다른 계정으로 다시 로그인하려면 /login?force=1)
+        # force 요청은 기존 인증 세션을 먼저 폐기한 뒤 로그인 화면으로 보낸다.
         force = (request.args.get('force') or '').strip()
-        if force not in ('1', 'true', 'TRUE', 'yes', 'YES'):
-            pending_terms_uid = session.get('pending_terms_user_id')
-            if pending_terms_uid:
-                return redirect(url_for('auth.terms'))
+        if force in ('1', 'true', 'TRUE', 'yes', 'YES'):
+            # Force-login should mean "discard the current login session first".
+            # Keeping the old session while rendering the login page lets users
+            # continue into authenticated pages without entering credentials.
+            try:
+                _unregister_active_session()
+            except Exception:
+                pass
+            session.clear()
+            session.modified = True
+            return redirect(url_for('auth.login'), code=302)
 
-            uid = session.get('user_id')
-            emp = session.get('emp_no')
-            if uid or emp:
-                try:
-                    user = None
-                    if emp:
-                        user = AuthUser.query.filter_by(emp_no=emp).first()
-                    elif uid:
-                        user = AuthUser.query.filter_by(id=uid).first()
+        if request.args:
+            return redirect(url_for('auth.login'), code=302)
 
-                    if user and getattr(user, 'status', None) == 'active':
-                        return redirect(url_for('main.dashboard'))
-                except Exception:
-                    pass
+        pending_terms_uid = session.get('pending_terms_user_id')
+        if pending_terms_uid:
+            return redirect(url_for('auth.terms'))
 
-                # 세션이 깨졌거나 사용자가 없으면 로그인 페이지로 유도
-                try:
-                    session.pop('user_id', None)
-                    session.pop('emp_no', None)
-                    session.pop('role', None)
-                except Exception:
-                    pass
+        uid = session.get('user_id')
+        emp = session.get('emp_no')
+        if uid or emp:
+            try:
+                user = None
+                if emp:
+                    user = AuthUser.query.filter_by(emp_no=emp).first()
+                elif uid:
+                    user = AuthUser.query.filter_by(id=uid).first()
+
+                if user and getattr(user, 'status', None) == 'active':
+                    return redirect(url_for('main.dashboard'))
+            except Exception:
+                pass
+
+            # 세션이 깨졌거나 사용자가 없으면 로그인 페이지로 유도
+            try:
+                session.pop('user_id', None)
+                session.pop('emp_no', None)
+                session.pop('role', None)
+            except Exception:
+                pass
 
         return _render_sign_in()
 
@@ -1392,13 +1411,14 @@ def terms():
     view_only = bool(session.get('user_id')) and not session.get('pending_terms_user_id')
     return _render_terms(can_agree=bool(user), view_only=view_only)
 
-@auth_bp.route('/admin/auth/locked', methods=['GET', 'POST'])
+@auth_bp.route('/admin/auth/locked', methods=['GET', 'POST'], strict_slashes=False)
 def admin_locked_users():
     """관리 페이지: 모든 사용자 목록 + 잠금/실패 초기화 기능.
     기존에는 실패/잠금 사용자만 보여줬지만 UI 확장에 따라 전체를 보여주고
     잠금 관련 편의 정보(locked, remaining)를 추가한다.
     """
     unauthorized = ('role' not in session or session.get('role') not in ('admin', 'ADMIN'))
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     # 개발/퍼블릭 모드: format=json인 경우에는 항상 JSON 반환 (인증 무시)하여 로드 실패 방지
     if request.args.get('format') == 'json':
         # 병합 조회 (auth_users + user 프로필) - 비인가 시에도 수행, 실패 시 안전한 빈 배열
@@ -1488,6 +1508,8 @@ def admin_locked_users():
             print('[admin_locked_users] public json merge failed:', e)
         return jsonify({'users': rows})
     if unauthorized:
+        if is_ajax:
+            return jsonify({'status': 'error', 'error': 'unauthorized', 'message': '관리자만 접근 가능합니다.'}), 403
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
 
@@ -1496,10 +1518,18 @@ def admin_locked_users():
         emp_no = request.form.get('emp_no')
         user = AuthUser.query.filter_by(emp_no=emp_no).first()
         if not user:
+            if is_ajax:
+                return jsonify({'status': 'error', 'error': 'not_found', 'message': '해당 사번을 찾을 수 없습니다.'}), 404
             flash('해당 사번을 찾을 수 없습니다.', 'error')
             return redirect(url_for('auth.admin_locked_users'))
         user.reset_fail_count()
         db.session.commit()
+        if is_ajax:
+            return jsonify({
+                'status': 'ok',
+                'emp_no': emp_no,
+                'message': f'{emp_no} 실패/잠금 정보가 초기화되었습니다.'
+            })
         flash(f'{emp_no} 실패/잠금 정보가 초기화되었습니다.', 'success')
         return redirect(url_for('auth.admin_locked_users'))
 
@@ -1718,19 +1748,31 @@ def admin_create_user():
     code = 201 if profile_created else 200
     return jsonify(resp), code
 
-@auth_bp.route('/admin/auth/password_reset', methods=['POST'])
+@auth_bp.route('/admin/auth/password_reset', methods=['POST'], strict_slashes=False)
 def admin_password_reset():
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if 'role' not in session or session.get('role') not in ('admin','ADMIN'):
+        if is_ajax:
+            return jsonify({'status': 'error', 'error': 'unauthorized', 'message': '관리자만 접근 가능합니다.'}), 403
         flash('관리자만 접근 가능합니다.', 'error')
         return redirect(url_for('auth.login'))
     emp_no = request.form.get('emp_no')
     user = AuthUser.query.filter_by(emp_no=emp_no).first()
     if not user:
+        if is_ajax:
+            return jsonify({'status': 'error', 'error': 'not_found', 'message': '해당 사번을 찾을 수 없습니다.'}), 404
         flash('해당 사번을 찾을 수 없습니다.', 'error')
         return redirect(url_for('auth.admin_locked_users'))
     new_pw = 'Reset' + emp_no[-4:] + '!'
     user.set_password(new_pw)
     db.session.commit()
+    if is_ajax:
+        return jsonify({
+            'status': 'ok',
+            'emp_no': emp_no,
+            'temporary_password': new_pw,
+            'message': f'{emp_no} 비밀번호가 재설정되었습니다. 새PW: {new_pw}'
+        })
     flash(f'{emp_no} 비밀번호가 재설정되었습니다. 새PW: {new_pw}', 'success')
     return redirect(url_for('auth.admin_locked_users'))
 

@@ -6,7 +6,7 @@ ttt3 (192.168.56.108) 에 두 서비스를 함께 배포:
   - Port 443  → Blossom (IT 자산관리 대시보드)  Gunicorn :8001
   - Port 9601 → Lumina  (에이전트 승인 관리)    Gunicorn :8000
 
-실행: .\.venv\Scripts\python.exe _deploy_dual.py
+실행(Windows): python _deploy_dual.py  또는  .venv/Scripts/python.exe _deploy_dual.py
 """
 
 import os, sys, tarfile, io, time, textwrap
@@ -86,6 +86,12 @@ def create_tarball():
     include_files = ["config.py", "run.py", "requirements.txt", "index.html"]
 
     count = 0
+    def normalize_tarinfo(ti):
+        # Remote WEB VM clock can lag behind the local workstation.
+        # Normalizing mtimes prevents GNU tar from treating future timestamps as fatal.
+        ti.mtime = 0
+        return ti
+
     with tarfile.open(tar_path, "w:gz", compresslevel=6) as tar:
         # 디렉터리
         for d in include_dirs:
@@ -100,14 +106,14 @@ def create_tarball():
                     fpath = os.path.join(root, f)
                     arcname = os.path.relpath(fpath, PROJECT_ROOT).replace("\\", "/")
                     if should_include(arcname):
-                        tar.add(fpath, arcname=arcname)
+                        tar.add(fpath, arcname=arcname, filter=normalize_tarinfo)
                         count += 1
 
         # 개별 파일
         for f in include_files:
             fpath = os.path.join(PROJECT_ROOT, f)
             if os.path.isfile(fpath):
-                tar.add(fpath, arcname=f)
+                tar.add(fpath, arcname=f, filter=normalize_tarinfo)
                 count += 1
 
     size_mb = os.path.getsize(tar_path) / 1024 / 1024
@@ -219,8 +225,9 @@ def create_wsgi_and_gunicorn(ssh):
         keepalive = 5
         max_requests = 1000
         max_requests_jitter = 50
-        accesslog = '/var/log/blossom/web/access.log'
-        errorlog = '/var/log/blossom/web/error.log'
+        # systemd journal 로만 기록 (/var/log 권한·SELinux 이슈 회피, journalctl -u blossom-web 로 조회)
+        accesslog = '-'
+        errorlog = '-'
         loglevel = 'info'
         chdir = '{BLOSSOM_DIR}'
         preload_app = False
@@ -271,8 +278,15 @@ def create_systemd_service(ssh):
     """)
     run(ssh, f"cat > /usr/lib/systemd/system/blossom-web.service << 'SVCEOF'\n{service}SVCEOF")
 
-    # 퍼미션 설정
-    run(ssh, f"chown -R lumina-web:lumina-web {BLOSSOM_DIR}/instance {BLOSSOM_DIR}/uploads /var/log/blossom/web")
+    # 퍼미션 설정 (Gunicorn이 access/error 로그 파일에 반드시 쓸 수 있어야 재시작 후에도 기동된다)
+    run(ssh, "mkdir -p /var/log/blossom/web")
+    run(ssh, "touch /var/log/blossom/web/access.log /var/log/blossom/web/error.log", check=False)
+    run(
+        ssh,
+        f"chown -R lumina-web:lumina-web {BLOSSOM_DIR}/instance {BLOSSOM_DIR}/uploads "
+        "/var/log/blossom/web",
+    )
+    run(ssh, "chmod -R 775 /var/log/blossom/web", check=False)
     run(ssh, f"chmod -R 755 {BLOSSOM_DIR}")
     run(ssh, f"chmod -R 775 {BLOSSOM_DIR}/instance {BLOSSOM_DIR}/uploads")
 
@@ -365,8 +379,8 @@ def configure_nginx(ssh):
             # ── Static Files ─────────────────────────────────
             location /static/ {
                 alias /opt/blossom/web/static/;
-                expires 7d;
-                add_header Cache-Control "public, immutable";
+                expires -1;
+                add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0";
                 add_header X-Content-Type-Options "nosniff" always;
                 access_log off;
             }
@@ -380,6 +394,26 @@ def configure_nginx(ssh):
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            # ── Session 폴링/하트비트: API rate zone 제외 (고빈도 시 429/연결 불안정 완화) ──
+            location = /api/auth/session-check {
+                proxy_pass http://blossom_app;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 5s;
+                proxy_read_timeout 30s;
+            }
+            location = /api/session/heartbeat {
+                proxy_pass http://blossom_app;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 5s;
+                proxy_read_timeout 30s;
             }
 
             # ── API ──────────────────────────────────────────
@@ -478,15 +512,22 @@ def configure_nginx(ssh):
     # 파일 업로드
     sftp = ssh.open_sftp()
     conf_bytes = nginx_conf.encode("utf-8")
-    with sftp.file("/etc/nginx/conf.d/blossom-lumina.conf", "w") as f:
+    with sftp.file("/etc/nginx/conf.d/00-blossom-lumina.conf", "w") as f:
         f.write(nginx_conf)
     sftp.close()
 
+    # 이전 파일명 제거(conf.d 적재 순서가 아니면 server_name '_' 중복 경고 발생)
+    run(ssh, "rm -f /etc/nginx/conf.d/blossom-lumina.conf", check=False)
+    # 과거 분리 설정이 남아 있으면 같은 포트에서 server_name '_' 충돌 → 502/무시 발생 가능
+    run(ssh, "if [ -f /etc/nginx/conf.d/lumina-web.conf ]; then "
+             "mv -f /etc/nginx/conf.d/lumina-web.conf /etc/nginx/conf.d/_disabled_duplicate_lumina-web.conf.off 2>/dev/null; fi", check=False)
     # 기존 lumina.conf 제거 (충돌 방지)
     run(ssh, "rm -f /etc/nginx/conf.d/lumina.conf", check=False)
 
     # NGINX 설정 검증
     run(ssh, "nginx -t 2>&1")
+    print("  [nginx conf.d 활성 목록]")
+    run(ssh, "ls -1 /etc/nginx/conf.d/*.conf 2>/dev/null | head -25", check=False)
 
     # SELinux: port 443 기본 허용, 9601은 이미 추가됨
     run(ssh, "semanage port -l | grep -E '(443|9601)' | head -5", check=False)
@@ -525,9 +566,12 @@ def configure_firewall_selinux(ssh):
 def start_and_verify(ssh):
     print("\n[7/7] 서비스 시작 및 검증")
 
-    # blossom-web 서비스 시작
-    run(ssh, "systemctl enable blossom-web --now 2>&1 || true", check=False)
-    time.sleep(3)
+    # blossom-web 서비스 시작 (코드 반영을 위해 반드시 재시작 — enable --now 만으로는
+    # 이미 떠 있는 프로세스가 예전 Gunicorn 워커를 유지할 수 있음)
+    run(ssh, "mkdir -p /var/log/blossom/web && chown -R lumina-web:lumina-web /var/log/blossom/web && chmod -R 775 /var/log/blossom/web", check=False)
+    run(ssh, "systemctl enable blossom-web 2>&1 || true", check=False)
+    run(ssh, "systemctl restart blossom-web 2>&1 || true", check=False)
+    time.sleep(6)
 
     # lumina-web 서비스 확인/재시작
     run(ssh, "systemctl restart lumina-web 2>&1 || true", check=False)

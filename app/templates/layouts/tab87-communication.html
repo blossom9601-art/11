@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -38,7 +38,7 @@
                     </button>
                     <div class="basic-info-card-header">
                         <!-- 뒤로가기 버튼 -->
-                        <a href="{{ url_for('pages.show', key='proj_completed') }}" class="back-btn no-margin">
+                        <a href="{{ url_for('pages.blossom_hub', segment='proj_completed') }}" class="back-btn no-margin">
                             <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                             <span>목록으로 돌아가기</span>
                         </a>
@@ -56,17 +56,17 @@
                         </div>
                         <!-- 프로젝트 내용 탭 -->
                         <div class="server-detail-tabs" role="tablist" aria-label="프로젝트 내용 탭">
-                            <a href="{{ url_for('pages.show', key='proj_completed_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_detail' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_detail' else 'false' }}">통합 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_integrity') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_integrity' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_integrity' else 'false' }}">요구사항</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_scope') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_scope' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_scope' else 'false' }}">범위 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_schedule') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_schedule' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_schedule' else 'false' }}">일정 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_cost') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_cost' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_cost' else 'false' }}">비용 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_quality') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_quality' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_quality' else 'false' }}">품질 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_resource') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_resource' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_resource' else 'false' }}">자원 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_communication') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_communication' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_communication' else 'false' }}">의사소통 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_risk') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_risk' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_risk' else 'false' }}">위험 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_procurement') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_procurement' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_procurement' else 'false' }}">조달 관리</a>
-                            <a href="{{ url_for('pages.show', key='proj_completed_stakeholder') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_stakeholder' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_stakeholder' else 'false' }}">이해관계자 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_detail' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_detail' else 'false' }}">통합 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_integrity') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_integrity' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_integrity' else 'false' }}">요구사항</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_scope') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_scope' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_scope' else 'false' }}">범위 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_schedule') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_schedule' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_schedule' else 'false' }}">일정 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_cost') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_cost' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_cost' else 'false' }}">비용 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_quality') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_quality' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_quality' else 'false' }}">품질 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_resource') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_resource' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_resource' else 'false' }}">자원 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_communication') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_communication' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_communication' else 'false' }}">의사소통 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_risk') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_risk' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_risk' else 'false' }}">위험 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_procurement') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_procurement' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_procurement' else 'false' }}">조달 관리</a>
+                            <a href="{{ url_for('pages.blossom_hub', segment='proj_completed_stakeholder') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'proj_completed_stakeholder' else '' }}" role="tab" aria-selected="{{ 'true' if current_key == 'proj_completed_stakeholder' else 'false' }}">이해관계자 관리</a>
                         </div>
 
                         <!-- 프로젝트 개요 -->
@@ -404,7 +404,7 @@
         </div>
     </div>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
 
     <!-- 프로젝트 설정 모달 (리스트 페이지와 동일 마크업 -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -33,7 +33,7 @@
                         ('task_completed', '완료 작업')
                     ] %}
                     {% for key, label in tabs %}
-                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -59,7 +59,7 @@
             window.TASK_PAGE_MODE = 'other';
             window.CURRENT_USER = window.CURRENT_USER || '홍길동';
         </script>
-        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
         <script src="/static/js/8.project/8-2.task/8-2-1.my_task/1.my_task.js?v=2.16.0"></script>
         <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>

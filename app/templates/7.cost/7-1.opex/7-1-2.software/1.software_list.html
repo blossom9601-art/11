@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/contract.css?v=1.0.11">
-    <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.show', key='cost_opex_software_detail') }}";</script>
+    <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='cost_opex_software_detail') }}";</script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -18,7 +18,7 @@
     {% include 'layouts/_sidebar.html' %}
 
         <!-- Main Content -->
-        <main class="main-content" data-opex-type="SW" data-detail-url="{{ url_for('pages.show', key='cost_opex_software_detail') }}">
+        <main class="main-content" data-opex-type="SW" data-detail-url="{{ url_for('pages.blossom_hub', segment='cost_opex_software_detail') }}">
             <div class="content-wrapper">
                 <div class="page-header">
                     <div class="page-utility-right" data-info-key="cost.opex"></div>
@@ -34,7 +34,7 @@
                         ('cost_opex_etc','기타 사용료'),
                     ] %}
                     {% for key,label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key==key else '' }}" role="tab" aria-selected="{{ 'true' if current_key==key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -428,7 +428,7 @@
             </div>
         </div>
 
-        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
         <script src="/static/js/7.cost/7-1.opex/opex_contracts.js?v=20260413-spa"></script>
         <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>

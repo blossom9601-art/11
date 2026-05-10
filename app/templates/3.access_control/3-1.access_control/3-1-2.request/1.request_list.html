@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -9,11 +9,11 @@
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260502l">
-	<script src="/static/js/blossom.js?v=20260501_fouc1" defer></script>
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260502l" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260507ui1" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -64,11 +64,11 @@
 							<div class="resource-picker-toolbar">
 								<div>
 									<label for="request-resource-search">자원 검색</label>
-									<input id="request-resource-search" type="text" placeholder="자원명, URL, 호스트, IP 검색" autocomplete="off">
+									<input id="request-resource-search" class="ac-search-input" type="text" placeholder="자원명, URL, 호스트, IP 검색" autocomplete="off">
 								</div>
 								<div>
 									<label for="request-kind-filter">유형</label>
-									<select id="request-kind-filter">
+									<select id="request-kind-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="유형">
 										<option value="">전체</option>
 										<option value="WEB">WEB</option>
 										<option value="SSH">SSH</option>
@@ -76,7 +76,7 @@
 								</div>
 								<div>
 									<label for="request-category-filter">분류</label>
-									<select id="request-category-filter">
+									<select id="request-category-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="분류">
 										<option value="">전체</option>
 										<option value="내부 서비스">내부 서비스</option>
 										<option value="외부 서비스">외부 서비스</option>
@@ -86,7 +86,7 @@
 								</div>
 								<div>
 									<label for="request-status-filter">상태</label>
-									<select id="request-status-filter">
+									<select id="request-status-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="상태">
 										<option value="">전체</option>
 										<option value="selectable">신청 가능</option>
 										<option value="accessible">권한 보유</option>
@@ -186,7 +186,7 @@
 						<div class="request-grid-2">
 							<div>
 								<label for="request-emergency-flag">긴급 여부</label>
-								<select id="request-emergency-flag" name="emergencyFlag">
+								<select id="request-emergency-flag" class="ac-dropdown-input search-select" name="emergencyFlag" data-searchable-scope="page" data-placeholder="긴급 여부">
 									<option value="0">일반</option>
 									<option value="1">긴급</option>
 								</select>
@@ -208,7 +208,7 @@
 							<h2>신청 및 승인 현황</h2>
 							<p>신청 리스트와 상세 보기에서 승인 단계, 자원별 상태, 승인 타임라인을 확인합니다.</p>
 						</div>
-						<a class="action-chip action-muted" href="{{ url_for('pages.show', key='access_control_delegation') }}">승인 대무자 관리</a>
+						<a class="action-chip action-muted" href="{{ url_for('pages.blossom_hub', segment='access_control_delegation') }}">승인 대무자 관리</a>
 					</div>
 					<div class="segment-tabs">
 						<button type="button" class="segment-btn active" data-segment="mine">내 신청</button>

@@ -437,7 +437,7 @@
 			if (!Array.isArray(ids)) ids = [ids];
 			fetch('/api/change-events/bulk-delete', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 				body: JSON.stringify({ ids: ids })
 			})
 			.then(function (r) { return r.json(); })

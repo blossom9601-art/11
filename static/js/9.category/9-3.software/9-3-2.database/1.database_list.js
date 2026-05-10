@@ -435,6 +435,7 @@
         const existingRow = opts?.existingRow;
         if(existingRow && vendorInput === (existingRow.vendor || '') && existingRow.vendor_code){
             payload.manufacturer_code = existingRow.vendor_code;
+            payload.manufacturer_name = vendorInput;
         } else if(vendorInput){
             payload.manufacturer_name = vendorInput;
         }
@@ -627,18 +628,15 @@
                     // 모델명에 상세 링크 적용 (검색 하이라이트 유지)
                     if(col === 'model'){
                         try {
-                            var base = String(window.__SW_DATABASE_DETAIL_URL || '').trim();
-                            if(base){
-                                var u = new URL(base, window.location.origin);
-                                var params = u.searchParams;
-                                params.set('db_id', String(row.id ?? ''));
-                                var href = u.toString();
-                                cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-row='${JSON.stringify(row).replace(/'/g, "&#39;")}' >${cellValue}</a>`;
+                            var publicId = String(row.public_id || '').trim();
+                            if(publicId){
+                                var href = '/b/' + encodeURIComponent(publicId);
+                                cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row='${JSON.stringify(row).replace(/'/g, "&#39;")}' >${cellValue}</a>`;
                             } else {
-                                cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
+                                cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</a>`;
                             }
                         } catch(_e){
-                            cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
+                            cellValue = `<a href="#" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</a>`;
                         }
                     }
                     // EOSL status indicator (three colors)
@@ -888,7 +886,7 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'데이터베이스', cols:['model','vendor','release_date','eosl'] };
+    const group = { title:'데이터베이스', cols:['model','vendor','hw_type','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';

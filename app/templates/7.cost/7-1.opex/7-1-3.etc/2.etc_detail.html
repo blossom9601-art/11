@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -22,7 +22,7 @@
     <main class="main-content" {% if detail_manage_no %}data-manage-no="{{ detail_manage_no }}"{% endif %} {% if detail_contract and detail_contract.id %}data-contract-id="{{ detail_contract.id }}"{% endif %} {% if detail_contract and detail_contract.vendor_id %}data-vendor-id="{{ detail_contract.vendor_id }}"{% endif %} {% if detail_entity_key %}data-entity-key="{{ detail_entity_key }}"{% endif %}>
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='cost_opex_etc') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='cost_opex_etc') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -33,10 +33,10 @@
             </div>
 
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='cost_opex_etc_detail') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_detail' %}active{% endif %}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='cost_opex_etc_contract') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_contract' %}active{% endif %}">계약정보</a>
-                <a href="{{ url_for('pages.show', key='cost_opex_etc_log') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_log' %}active{% endif %}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='cost_opex_etc_file') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_file' %}active{% endif %}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cost_opex_etc_detail') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_detail' %}active{% endif %}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cost_opex_etc_contract') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_contract' %}active{% endif %}">계약정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cost_opex_etc_log') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_log' %}active{% endif %}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cost_opex_etc_file') }}" class="server-detail-tab-btn {% if current_key == 'cost_opex_etc_file' %}active{% endif %}">구성/파일</a>
             </div>
 
             <!-- 유지보수 상세 탭 컨텐츠 -->
@@ -85,7 +85,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 기본정보 수정 모달 (리스트의 '수정' 모달과 동일 구조) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

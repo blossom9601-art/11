@@ -72,7 +72,7 @@
             if(!renderLottie()){
                 if(!window.lottie){
                     var script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js';
+                    script.src = '/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie';
                     script.async = true;
                     script.onload = function(){ if(!renderLottie()) renderFallback(); };
                     script.onerror = renderFallback;

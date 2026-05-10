@@ -6,6 +6,14 @@
     overflow-x: auto;
 }
 
+.tab96-service-root #hw-empty.system-empty {
+    margin: 12px 0 0;
+}
+
+.tab96-service-root #hw-pagination {
+    margin-top: 20px;
+}
+
 .tab96-note {
     margin-top: 8px;
     font-size: 13px;

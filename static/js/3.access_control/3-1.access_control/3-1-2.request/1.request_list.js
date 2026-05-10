@@ -25,6 +25,11 @@
     };
 
     function qs(id) { return document.getElementById(id); }
+    function syncSearchSelect(el) {
+        if (window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function') {
+            window.BlossomSearchableSelect.syncAll(el || document);
+        }
+    }
     function esc(value) {
         return String(value == null ? '' : value)
             .replace(/&/g, '&amp;')
@@ -431,6 +436,7 @@
             return '<option value="' + esc(name) + '">' + esc(name || '전체') + '</option>';
         }).join('');
         if (fixed.indexOf(previous) >= 0) select.value = previous;
+        syncSearchSelect(select);
     }
     function syncCategoryTabs() {
         Array.prototype.slice.call(document.querySelectorAll('.request-category-tabs .system-tab-btn[data-category]')).forEach(function (button) {
@@ -438,7 +444,10 @@
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-        if (qs('request-category-filter') && qs('request-category-filter').value !== (state.category || '')) qs('request-category-filter').value = state.category || '';
+        if (qs('request-category-filter') && qs('request-category-filter').value !== (state.category || '')) {
+            qs('request-category-filter').value = state.category || '';
+            syncSearchSelect(qs('request-category-filter'));
+        }
     }
     function applyResourceFilters() {
         var keyword = (qs('request-resource-search').value || '').trim().toLowerCase();
@@ -986,6 +995,7 @@
             state.category = '';
             syncCategoryTabs();
             qs('request-status-filter').value = '';
+            syncSearchSelect(document);
             qs('request-hide-owned').checked = false;
             applyResourceFilters();
             renderResources();

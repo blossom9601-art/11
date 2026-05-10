@@ -383,24 +383,8 @@
     slice.forEach(row=>{ const tr=document.createElement('tr'); const checked=row.id && state.selected.has(row.id) ? 'checked' : ''; tr.setAttribute('data-id', row.id??''); tr.innerHTML = `<td><input type="checkbox" class="system-row-select" data-id="${row.id??''}" ${checked}></td>`
       + COLUMN_ORDER.map(col=>{ if(!COLUMN_META[col]) return ''; const tdClass=state.visibleCols.has(col)?'':'col-hidden'; const label=COLUMN_META[col].label; let rawVal=row[col]; if(col==='note' && typeof rawVal==='string'){ rawVal=rawVal.replace(/\r?\n|\r/g,' '); } const display=(rawVal==null||String(rawVal).trim()==='')?'-':rawVal; let cell=highlight(display,col);
         if(col==='model'){
-          const base = window.__SW_VIRTUALIZATION_DETAIL_URL || '#';
-          let urlObj;
-          try { urlObj = new URL(base, window.location.origin); } catch(_e){ urlObj = { searchParams: { set:()=>{} }, toString:()=> base }; }
-          if(row.id != null && String(row.id).trim() !== '' && urlObj && typeof urlObj === 'object' && 'searchParams' in urlObj){
-            try { urlObj.search = ''; } catch(_e){}
-            try { urlObj.searchParams.set('virtual_id', String(row.id)); } catch(_e){}
-          } else {
-            const params = {
-              model: row.model,
-              vendor: row.vendor,
-              hw_type: row.hw_type,
-              release_date: row.release_date,
-              eosl: row.eosl,
-              qty: row.qty,
-              note: row.note
-            };
-            Object.entries(params).forEach(([k,v])=>{ if(v!=null && String(v).trim()!=='') urlObj.searchParams.set(k, v); });
-          }
+          const publicId = String(row.public_id || '').trim();
+          const href = publicId ? ('/b/' + encodeURIComponent(publicId)) : '#';
           const payload = {
             id: row.id,
             model: row.model,
@@ -412,7 +396,7 @@
             note: row.note
           };
           const jsonAttr = escapeHTML(JSON.stringify(payload));
-          cell = `<a href="${urlObj.toString()}" class="work-name-link" data-id="${row.id??''}" data-row='${jsonAttr}' data-json='${jsonAttr}'>${cell}</a>`;
+          cell = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row='${jsonAttr}' data-json='${jsonAttr}'>${cell}</a>`;
         }
         if(col==='eosl'){ const accent=resolveAccentColor(); let dotColor=accent; let titleTxt='정보 없음'; if(display && display!=='-' && typeof display==='string'){ const m=display.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m){ const y=parseInt(m[1],10), mo=parseInt(m[2],10)-1, d=parseInt(m[3],10); const dateVal=new Date(y,mo,d); const today=new Date(); today.setHours(0,0,0,0); const daysLeft=Math.floor((dateVal-today)/(24*60*60*1000)); if(daysLeft<0){ dotColor='#e53935'; titleTxt='만료됨'; } else if(daysLeft<30){ dotColor='#29b6f6'; titleTxt=`임박 (${daysLeft}일 남음)`; } else { dotColor=accent; titleTxt=`여유 (${daysLeft}일 남음)`; } } else { titleTxt='형식 오류'; } } const dot=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background-color:${dotColor};margin-right:6px;vertical-align:middle;" title="${titleTxt}" aria-hidden="true"></span>`; cell = dot + cell; } return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cell}</td>`; }).join('')
       + `<td data-col="actions" data-label="관리" class="system-actions">`
@@ -443,7 +427,7 @@
   function resetColumnSelection(){ state.visibleCols=new Set(BASE_VISIBLE_COLUMNS); saveColumnSelection(); buildColumnModal(); applyColumnVisibility(); }
 
   function collectForm(form){ const data={}; form.querySelectorAll('input,select,textarea').forEach(el=>{ data[el.name]=el.value.trim(); }); return data; }
-  function fillEditForm(row){ const form=document.getElementById(EDIT_FORM_ID); if(!form) return; form.innerHTML=''; const group={ title:'가상화', cols:['model','vendor','release_date','eosl','note'] }; const section=document.createElement('div'); section.className='form-section'; section.innerHTML=`<div class="section-header"><h4>${group.title}</h4></div>`; const grid=document.createElement('div'); grid.className='form-grid'; group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div'); const wide=(c==='note'); wrap.className=wide?'form-row form-row-wide':'form-row'; const labelText=COLUMN_META[c]?.label||c; wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); }); section.appendChild(grid); form.appendChild(section); }
+  function fillEditForm(row){ const form=document.getElementById(EDIT_FORM_ID); if(!form) return; form.innerHTML=''; const group={ title:'가상화', cols:['model','vendor','hw_type','release_date','eosl','note'] }; const section=document.createElement('div'); section.className='form-section'; section.innerHTML=`<div class="section-header"><h4>${group.title}</h4></div>`; const grid=document.createElement('div'); grid.className='form-grid'; group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div'); const wide=(c==='note'); wrap.className=wide?'form-row form-row-wide':'form-row'; const labelText=COLUMN_META[c]?.label||c; wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); }); section.appendChild(grid); form.appendChild(section); }
   function generateFieldInput(col,value=''){ if(col==='eosl' || col==='release_date'){ return `<input name="${col}" type="text" class="form-input date-input" value="${value??''}" placeholder="YYYY-MM-DD">`; } if(col==='vendor'){ return renderVendorSelect(value); } if(col==='hw_type'){ const v=String(value??''); const opts=['','하이퍼바이저','컨테이너','쿠버네티스']; return `<select name="hw_type" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${opts.map(o=>`<option value="${o}" ${o===v?'selected':''}>${o===''?'선택':o}</option>`).join('')}</select>`; } if(col==='qty'){ return `<input name="qty" type="number" min="0" step="1" class="form-input qty-dashed-lock" value="${value??''}" placeholder="0">`; } if(col==='note'){ return `<textarea name="note" class="form-input textarea-large" rows="6">${value??''}</textarea>`; } if(col==='model'){ return `<input name="model" type="text" class="form-input" value="${value??''}" autocomplete="off" data-fk-ignore="1" required>`; } return `<input name="${col}" class="form-input" value="${value??''}">`; }
 
   function updateSortIndicators(){ const thead=document.querySelector(`#${TABLE_ID} thead`); if(!thead) return; thead.querySelectorAll('th[data-col]').forEach(th=>{ const col=th.getAttribute('data-col'); if(col && col===state.sortKey){ th.setAttribute('aria-sort', state.sortDir==='asc'?'ascending':'descending'); } else { th.setAttribute('aria-sort','none'); } const cf=state.columnFilters[col]; const active=Array.isArray(cf)? cf.length>0 : (cf!=null && cf!==''); th.classList.toggle('is-filtered', !!active); }); }

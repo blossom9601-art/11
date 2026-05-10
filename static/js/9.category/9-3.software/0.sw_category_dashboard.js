@@ -43,6 +43,20 @@
     requestAnimationFrame(step);
   }
 
+  function animatePercent(el, target) {
+    if (!el) return;
+    var duration = 500;
+    var startTime = null;
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      var progress = Math.min((ts - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(target * eased) + '%';
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
   /* ── 1. 상단 핵심 메시지 배너 ── */
   function renderAlertBanner(summary) {
     var el = document.getElementById('sw-alert-banner');
@@ -54,17 +68,17 @@
       barClass = 'critical';
       text = 'EOSL을 초과한 소프트웨어 자산이 <strong>' + fmt(eosl.expired) + '건</strong> 있습니다. 즉시 점검이 필요합니다.';
       btnLabel = '확인하기';
-      btnHref = '/p/cat_sw_os';
+      btnHref = '/b/cat_sw_os';
     } else if (eosl.imminent > 0) {
       barClass = 'warning';
       text = '30일 내 EOSL 도래 예정 소프트웨어가 <strong>' + fmt(eosl.imminent) + '건</strong> 있습니다.';
       btnLabel = '확인하기';
-      btnHref = '/p/cat_sw_os';
+      btnHref = '/b/cat_sw_os';
     } else if (eosl.unknown > 0) {
       barClass = 'info';
       text = 'EOSL 정보 미등록 소프트웨어가 <strong>' + fmt(eosl.unknown) + '건</strong>입니다. 정보를 보완하세요.';
       btnLabel = '보완하기';
-      btnHref = '/p/cat_sw_os';
+      btnHref = '/b/cat_sw_os';
     } else {
       barClass = 'success';
       text = '모든 소프트웨어 자산의 EOSL 상태가 양호합니다.';
@@ -130,7 +144,7 @@
 
     if (total === 0) {
       if (leg) leg.innerHTML = '';
-      if (totalEl) totalEl.textContent = fmt(0);
+      if (totalEl) totalEl.textContent = '0%';
       if (wrap) wrap.classList.add('cat-donut-wrap--empty');
       if (emptyPh) {
         emptyPh.hidden = false;
@@ -147,7 +161,7 @@
     }
 
     var colors = keys.map(function (k) { return COLORS[k]; });
-    if (totalEl) animateCount(totalEl, total);
+    if (totalEl) animatePercent(totalEl, 100);
 
     chartInstances['sw-eosl-donut'] = new Chart(canvas, {
       type: 'doughnut',
@@ -157,7 +171,7 @@
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        cutout: '85%',
+        cutout: '72%',
         animation: { duration: 600, easing: 'easeOutQuart' },
         plugins: {
           legend: { display: false },
@@ -285,31 +299,14 @@
       if (expired > 0) { statusClass = 'danger'; statusLabel = '주의 필요'; card.classList.add('status-danger'); }
       else if (imminent > 0) { statusClass = 'warn'; statusLabel = '점검 필요'; card.classList.add('status-warn'); }
 
-      /* 스택 바 비율 */
-      var bars = '';
-      if (total > 0) {
-        var pE = (expired / total * 100).toFixed(1);
-        var pI = (imminent / total * 100).toFixed(1);
-        var pH = (healthy / total * 100).toFixed(1);
-        var pU = (unknown / total * 100).toFixed(1);
-        bars =
-          '<div class="sec-bar">' +
-            (expired  ? '<div class="seg seg-expired" style="width:' + pE + '%"></div>' : '') +
-            (imminent ? '<div class="seg seg-imminent" style="width:' + pI + '%"></div>' : '') +
-            (healthy  ? '<div class="seg seg-healthy" style="width:' + pH + '%"></div>' : '') +
-            (unknown  ? '<div class="seg seg-unknown" style="width:' + pU + '%"></div>' : '') +
-          '</div>';
-      } else {
-        bars = '<div class="sec-bar"><div class="seg seg-empty" style="width:100%"></div></div>';
-      }
-
       var canvasId = 'sw-sec-donut-' + key;
+      var gaugeValue = expired > 0 ? expired : (imminent > 0 ? imminent : (healthy > 0 ? healthy : unknown));
+      var gaugeColor = expired > 0 ? COLORS.expired : (imminent > 0 ? COLORS.imminent : (healthy > 0 ? COLORS.healthy : COLORS.unknown));
 
       card.innerHTML =
         '<div class="sec-body">' +
           '<div class="sec-header">' +
             '<div class="cat-section-chart-title">' + (SECTION_LABELS[key] || key) + '</div>' +
-            '<span class="sec-status-badge ' + statusClass + '">' + statusLabel + '</span>' +
           '</div>' +
           '<div class="sec-center">' +
             '<div class="sec-mini-donut">' +
@@ -320,17 +317,16 @@
               '</div>' +
             '</div>' +
           '</div>' +
-        '</div>' +
-        '<div class="sec-progress-wrap">' + bars + '</div>';
+          '<div class="sec-gauge-caption">' + statusLabel + '</div>' +
+        '</div>';
 
       el.appendChild(card);
 
       /* 미니 도넛 생성 */
       var cvs = document.getElementById(canvasId);
       if (cvs && typeof Chart !== 'undefined') {
-        var dataArr = [expired, imminent, healthy, unknown];
-        var labelArr = ['초과', '임박', '정상', '미정'];
-        if (total === 0) { dataArr = [1]; labelArr = ['없음']; }
+        var dataArr = total === 0 ? [1] : [Math.max(gaugeValue, 0), Math.max(total - gaugeValue, 0)];
+        var labelArr = total === 0 ? ['데이터 없음'] : ['대표 상태', '기타'];
         new Chart(cvs.getContext('2d'), {
           type: 'doughnut',
           data: {
@@ -338,14 +334,16 @@
             datasets: [{
               data: dataArr,
               backgroundColor: total === 0
-                ? ['#E2E8F0']
-                : ['#E5484D', '#F59E0B', COLORS.healthy, '#3B82F6'],
+                ? ['#CBD5E1']
+                : [gaugeColor, '#D9DDE3'],
               borderWidth: 0,
               spacing: 1
             }]
           },
           options: {
-            cutout: '68%',
+            rotation: -135,
+            circumference: 270,
+            cutout: '70%',
             responsive: false,
             maintainAspectRatio: false,
             plugins: {
@@ -362,8 +360,16 @@
                 boxHeight: 8,
                 boxPadding: 4,
                 callbacks: {
+                  title: function () {
+                    return SECTION_LABELS[key] || key;
+                  },
                   label: function (ctx) {
-                    return ' ' + ctx.label + ': ' + ctx.raw + '건';
+                    return [
+                      '초과: ' + fmt(expired) + '건',
+                      '임박: ' + fmt(imminent) + '건',
+                      '정상: ' + fmt(healthy) + '건',
+                      '미정: ' + fmt(unknown) + '건'
+                    ];
                   }
                 }
               }
@@ -403,7 +409,7 @@
       var btn = document.getElementById(id);
       if (btn) btn.addEventListener('click', function (e) {
         e.preventDefault();
-        blsSpaNavigate('/p/cat_sw_os');
+        blsSpaNavigate('/b/cat_sw_os');
       });
     });
   }

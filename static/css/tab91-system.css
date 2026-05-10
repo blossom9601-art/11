@@ -24,14 +24,14 @@
     --t91-header-h: 40px;              /* 섹션 헤더 높이        */
 
     /* ── 테이블 ── */
-    --t91-table-border: rgba(255, 255, 255, 0.06);
+    --t91-table-border: #e5e7eb;
     --t91-table-radius: 8px;
-    --t91-th-bg: rgba(255, 255, 255, 0.03);
-    --t91-th-color: rgba(255, 255, 255, 0.65);
-    --t91-th-font-size: 12px;
+    --t91-th-bg: #f8fafc;
+    --t91-th-color: #374151;
+    --t91-th-font-size: 13px;
     --t91-td-font-size: 13px;
-    --t91-row-h: 40px;                 /* 행 높이               */
-    --t91-hover-bg: rgba(255, 255, 255, 0.025);
+    --t91-row-h: 44px;                 /* 행 높이               */
+    --t91-hover-bg: #f9fafb;
     --t91-selected-bg: rgba(99, 102, 241, 0.08);
     --t91-selected-border: rgba(99, 102, 241, 0.25);
 
@@ -39,7 +39,7 @@
     --t91-empty-icon-size: 64px;
     --t91-empty-title-size: 15px;
     --t91-empty-desc-size: 13px;
-    --t91-empty-color: rgba(255, 255, 255, 0.38);
+    --t91-empty-color: #374151;
     --t91-empty-pad-y: 48px;
 
     /* ── 페이지네이션 ── */
@@ -47,8 +47,8 @@
     --t91-pgn-btn-size: 32px;
     --t91-pgn-radius: 6px;
     --t91-pgn-font-size: 13px;
-    --t91-pgn-active-bg: rgba(99, 102, 241, 0.15);
-    --t91-pgn-active-color: #818cf8;
+    --t91-pgn-active-bg: var(--accent, #6366f1);
+    --t91-pgn-active-color: #ffffff;
 
     /* ── 버튼 ── */
     --t91-action-btn-size: 32px;
@@ -69,7 +69,12 @@
    ================================================================ */
 .tab91-system-root .t91-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
     table-layout: fixed;
 }
 
@@ -85,6 +90,9 @@
     border-bottom: 1px solid var(--t91-table-border);
     text-align: left;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-user-select: none;
     user-select: none;
 }
 
@@ -92,7 +100,7 @@
     cursor: pointer;
 }
 .tab91-system-root .t91-table thead th.sortable:hover {
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--accent, #6366f1);
 }
 .tab91-system-root .t91-table thead th.sort-asc::after {
     content: ' ▲';
@@ -113,8 +121,8 @@
 .tab91-system-root .t91-table tbody td {
     padding: 6px 10px;
     font-size: var(--t91-td-font-size);
-    color: rgba(255, 255, 255, 0.82);
-    border-bottom: 1px solid var(--t91-table-border);
+    color: #374151;
+    border-bottom: 1px solid #f3f4f6;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -174,55 +182,79 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 0;
+    margin-top: 20px;
+    padding: 16px 20px;
     gap: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
 .tab91-system-root .pagination-info {
     font-size: var(--t91-pgn-font-size);
-    color: rgba(255, 255, 255, 0.5);
+    color: #6b7280;
+    font-weight: 500;
 }
 .tab91-system-root .pagination-controls {
     display: flex;
     align-items: center;
-    gap: var(--t91-pgn-gap);
+    gap: 8px;
 }
 .tab91-system-root .pagination-btn {
-    width: var(--t91-pgn-btn-size);
-    height: var(--t91-pgn-btn-size);
-    border: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
     border-radius: var(--t91-pgn-radius);
-    background: transparent;
+    background: #fff;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
+    position: relative;
+    transition: all .2s ease;
 }
 .tab91-system-root .pagination-btn:hover:not(:disabled) {
-    background: var(--t91-action-hover-bg);
+    border-color: var(--accent, #6366f1);
+    background: #f9fafb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(99,102,241,.1);
 }
 .tab91-system-root .pagination-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
+    opacity: .4;
+    cursor: not-allowed;
+    background: #f9fafb;
 }
 .tab91-system-root .page-btn {
-    min-width: var(--t91-pgn-btn-size);
-    height: var(--t91-pgn-btn-size);
-    border: none;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid #e5e7eb;
     border-radius: var(--t91-pgn-radius);
-    background: transparent;
+    background: #fff;
     font-size: var(--t91-pgn-font-size);
-    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    color: #374151;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s ease;
 }
 .tab91-system-root .page-btn:hover {
-    background: var(--t91-action-hover-bg);
+    border-color: var(--accent, #6366f1);
+    background: #f9fafb;
+    color: var(--accent, #6366f1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(99,102,241,.1);
 }
 .tab91-system-root .page-btn.active {
     background: var(--t91-pgn-active-bg);
+    border-color: var(--accent, #6366f1);
     color: var(--t91-pgn-active-color);
     font-weight: 600;
+    box-shadow: 0 2px 4px rgba(99,102,241,.2);
 }
 
 /* ================================================================
@@ -301,4 +333,3 @@
 }
 
 /* 통계 분석 모달의 공통 프레임/도넛/스택바 스타일은 bls-stats-modal.css에서 관리한다. */
-    flex: 1;

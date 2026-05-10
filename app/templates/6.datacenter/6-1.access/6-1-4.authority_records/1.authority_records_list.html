@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -34,7 +34,7 @@
                         ('dc_access_system','출입 시스템')
                     ] %}
                     {% for key,label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -116,7 +116,7 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/6.datacenter/6-1.access/6-1-4.authority_records/1.authority_records_list.js"></script>
 
         <!-- 권한 기록 추가 모달 -->

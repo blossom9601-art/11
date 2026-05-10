@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -10,8 +10,9 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/governance.css?v=1.0.81">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
     <!-- 상세 페이지 글로벌 URL 주입 (unix 패턴) -->
-    <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.show', key='gov_ip_policy_detail') }}";</script>
+    <script>window.__MODULE_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='gov_ip_policy_detail') }}";</script>
 </head>
 <body class="page-gov-ip-policy">
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -131,7 +132,7 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>

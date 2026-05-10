@@ -180,6 +180,8 @@ class RateLimiter:
 # 전역 리미터: API 600 req/min, 로그인 10 req/min
 _api_limiter = RateLimiter(max_requests=600, window_seconds=60)
 _login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# 세션 유지용 경량 GET — 제한에 포함하면 429 시 클라이언트가 오탐 로그아웃할 수 있음
+_API_RATE_EXEMPT_PATHS = frozenset(('/api/session/heartbeat', '/api/auth/session-check'))
 
 
 def check_rate_limit() -> Optional[Tuple[str, int]]:
@@ -192,8 +194,8 @@ def check_rate_limit() -> Optional[Tuple[str, int]]:
             logger.warning('[RateLimit] 로그인 제한 초과 ip=%s', ip)
             return ('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
 
-    # 전체 API: 일반 제한 (heartbeat는 제외)
-    if request.path.startswith('/api/') and request.path != '/api/session/heartbeat':
+    # 전체 API: 일반 제한 (세션 유지 폴링만 제외)
+    if request.path.startswith('/api/') and request.path not in _API_RATE_EXEMPT_PATHS:
         if _api_limiter.is_rate_limited(f'api:{ip}'):
             logger.warning('[RateLimit] API 제한 초과 ip=%s', ip)
             return ('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)

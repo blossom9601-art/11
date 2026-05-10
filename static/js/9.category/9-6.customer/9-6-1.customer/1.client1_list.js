@@ -539,8 +539,9 @@
                     let cellValue = highlight(displayVal, col);
                     // linkify member_name to detail page
                     if(col==='member_name' && displayVal !== '-'){
-                        const detailUrl = (window.__CAT_CUSTOMER_CLIENT1_DETAIL_URL || '/p/cat_customer_client1_detail');
-                        cellValue = `<a href="${detailUrl}" class="work-name-link" data-id="${row.id??''}" title="준회원사 상세로 이동">${cellValue}</a>`;
+                        const publicId = String(row.public_id || '').trim();
+                        const detailUrl = publicId ? `/b/${encodeURIComponent(publicId)}` : (window.__CAT_CUSTOMER_CLIENT1_DETAIL_URL || '/b/cat_customer_client1_detail');
+                        cellValue = `<a href="${detailUrl}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" title="준회원사 상세로 이동">${cellValue}</a>`;
                     }
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
                 }).join('')
@@ -557,14 +558,7 @@
                 link.addEventListener('click', (ev)=>{
                     ev.preventDefault();
                     const href = link.getAttribute('href') || link.href;
-                    const fallbackHref = (()=>{
-                        const params = new URLSearchParams();
-                        if(row.id != null && row.id !== '') params.set('id', String(row.id));
-                        if(row.member_name || row.customer_name) params.set('model', String(row.member_name || row.customer_name));
-                        if(row.address) params.set('vendor', String(row.address));
-                        const query = params.toString();
-                        return query ? `${href}${href.indexOf('?')>-1 ? '&' : '?'}${query}` : href;
-                    })();
+                    const fallbackHref = href;
                     try{
                         const ctx = {
                             id: row.id,

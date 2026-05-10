@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -27,7 +27,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='hw_network_dedicateline') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -39,15 +39,15 @@
 
             <!-- 상세 탭 네비게이션 (Dedicated Line) -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_detail') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_detail' else '' }}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_hw') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_hw' else '' }}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_if') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_if' else '' }}">인터페이스</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_account') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_account' else '' }}">계정관리</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_task') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_task' else '' }}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_vulnerability') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_vulnerability' else '' }}">취약점</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_package') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_package' else '' }}">패키지</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_log') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_log' else '' }}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='hw_network_dedicateline_file') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_file' else '' }}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_detail') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_detail' else '' }}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_hw') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_hw' else '' }}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_if') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_if' else '' }}">인터페이스</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_account') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_account' else '' }}">계정관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_task') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_task' else '' }}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_vulnerability') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_vulnerability' else '' }}">취약점</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_package') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_package' else '' }}">패키지</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_log') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_log' else '' }}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_network_dedicateline_file') }}" class="server-detail-tab-btn{{ ' active' if current_key == 'hw_network_dedicateline_file' else '' }}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -225,7 +225,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 시스템 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

@@ -260,20 +260,20 @@
 	   API
 	══════════════════════════════════════════════ */
 	function terminateSession(id) {
-		return fetch('/admin/auth/active-sessions/' + id, { method: 'DELETE' })
+		return fetch('/admin/auth/active-sessions/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
 			.then(function(r) { return r.json(); });
 	}
 
 	function bulkTerminate(ids) {
 		return fetch('/admin/auth/active-sessions/bulk-terminate', {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 			body: JSON.stringify({ ids: ids })
 		}).then(function(r) { return r.json(); });
 	}
 
 	function terminateAll() {
-		return fetch('/admin/auth/active-sessions/terminate-all', { method: 'POST' })
+		return fetch('/admin/auth/active-sessions/terminate-all', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
 			.then(function(r) { return r.json(); });
 	}
 

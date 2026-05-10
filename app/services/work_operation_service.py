@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from flask import current_app
 
+from app.services.business_work_display_name import validate_business_work_display_name
 from app.services.work_asset_counts import counts_by_code, sw_counts_via_hardware
 
 logger = logging.getLogger(__name__)
@@ -270,6 +271,7 @@ def create_work_operation(data: Dict[str, Any], actor: str, app=None) -> Dict[st
     name = (data.get('operation_name') or data.get('wc_name') or '').strip()
     if not name:
         raise ValueError('operation_name is required')
+    validate_business_work_display_name(name, field_label='업무 운영명')
     description = (data.get('description') or data.get('wc_desc') or '').strip()
     remark = (data.get('remark') or data.get('note') or '').strip()
     hw_count = _sanitize_int(data.get('hw_count'))
@@ -309,6 +311,7 @@ def update_work_operation(operation_id: int, data: Dict[str, Any], actor: str, a
         name = (data.get('operation_name') or data.get('wc_name') or '').strip()
         if not name:
             raise ValueError('operation_name is required')
+        validate_business_work_display_name(name, field_label='업무 운영명')
         payload['operation_name'] = name
     if 'description' in data or 'wc_desc' in data:
         payload['description'] = (data.get('description') or data.get('wc_desc') or '').strip()

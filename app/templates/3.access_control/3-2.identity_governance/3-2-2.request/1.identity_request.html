@@ -1,0 +1,192 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507sshcmd2">
+	<link rel="stylesheet" href="/static/css/3.access_control/identity_governance.css?v=20260507wizard1">
+	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<script src="/static/js/3.access_control/3-2.identity_governance/3-2-2.request/1.identity_request.js?v=20260507wizard1" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+	<main class="main-content identity-page identity-request-page access-request-page">
+		<div class="content-wrapper">
+			<div class="page-header ac-page-header">
+				<div class="page-utility-right" data-info-key="identity_governance.request"></div>
+				<div>
+					<h1>통합계정 신청</h1>
+					<p>신청 유형, 계정 유형, 작업 정보를 단계에 맞춰 입력합니다.</p>
+				</div>
+			</div>
+
+			<div class="request-main-tabs" role="tablist" aria-label="통합계정 신청 화면">
+				<button type="button" class="request-main-tab active" id="identity-request-tab-form" data-identity-request-tab="form" role="tab" aria-selected="true" aria-controls="identity-request-panel-form">
+					<span>신청서 작성</span>
+				</button>
+				<button type="button" class="request-main-tab" id="identity-request-tab-status" data-identity-request-tab="status" role="tab" aria-selected="false" aria-controls="identity-request-panel-status">
+					<span>신청 및 승인현황</span>
+				</button>
+			</div>
+
+			<div class="request-tab-panels">
+				<section class="identity-panel request-card request-tab-panel active" id="identity-request-panel-form" role="tabpanel" aria-labelledby="identity-request-tab-form">
+					<div class="identity-panel-head request-head">
+						<div>
+							<h2>신청서 작성</h2>
+							<p>계정 유형과 대상자를 선택해 통합계정 신청서를 제출합니다.</p>
+						</div>
+					</div>
+				<form id="identity-request-form" class="request-form" autocomplete="off">
+					<div class="identity-wizard-shell">
+						<ul class="identity-wizard-steps" aria-label="신청 단계">
+							<li id="identity-step-dot-1" class="active">신청 유형</li>
+							<li id="identity-step-dot-2">계정·작업</li>
+							<li id="identity-step-dot-3">작업·대상 정보</li>
+						</ul>
+						<div id="identity-wizard-banner" class="identity-manual-banner" role="note">
+							<strong>수동 처리 대상</strong> — Agent 자동 반영이 없습니다. 승인 후 담당자 작업·증적 업로드·최종 완료 절차를 따릅니다.
+						</div>
+						<section class="identity-wizard-panel active" data-wizard-panel="1" aria-label="1단계">
+							<div class="identity-wizard-section" role="group" aria-labelledby="identity-step1-integration-label">
+								<span id="identity-step1-integration-label" class="identity-wizard-section-title">신청 유형</span>
+								<p class="identity-wizard-section-desc">통합 처리 방식을 선택합니다. 연동은 Agent 기반 자동 처리, 미연동·AD는 안내 절차가 다릅니다.</p>
+								<div id="integration-type-radios" class="identity-integration-options" data-integration-options></div>
+							</div>
+							<div class="identity-wizard-panel-foot">
+								<span class="identity-wizard-foot-hint">선택 후 <strong>다음</strong>으로 진행하세요.</span>
+								<div class="identity-wizard-nav-btns">
+									<button type="button" class="identity-primary-btn action-chip action-primary" data-wizard-next="1">다음</button>
+								</div>
+							</div>
+						</section>
+						<section class="identity-wizard-panel" data-wizard-panel="2" aria-label="2단계" aria-labelledby="identity-step2-label">
+							<div class="identity-wizard-section">
+								<span id="identity-step2-label" class="identity-wizard-section-title">계정·작업 유형</span>
+								<p class="identity-wizard-section-desc">통합 계정 종류와 Agent/API에 전달할 작업 코드를 지정합니다.</p>
+								<div class="identity-form-grid identity-form-grid--wizard-step">
+								<div><label for="request-account-type">계정 유형</label><select id="request-account-type" name="account_type"><option value="SERVICE">서비스 계정</option><option value="PERSONAL">개인 계정</option></select></div>
+								<div class="wide">
+									<label for="request-operation-type">작업 유형 코드</label>
+									<input id="request-operation-type" name="operation_type" maxlength="120" list="datalist-integration-ops" placeholder="예: INTEGRATED_ACCOUNT_BIND, CREATE_USER, LOCK_USER">
+									<datalist id="datalist-integration-ops"></datalist>
+								</div>
+								</div>
+							</div>
+							<div class="identity-wizard-panel-foot identity-wizard-panel-foot--end">
+								<div class="identity-wizard-nav-btns">
+									<button type="button" class="identity-secondary-btn action-chip action-muted" data-wizard-prev="2">이전</button>
+									<button type="button" class="identity-primary-btn action-chip action-primary" data-wizard-next="2">다음</button>
+								</div>
+							</div>
+						</section>
+						<section class="identity-wizard-panel" data-wizard-panel="3" aria-label="3단계" aria-labelledby="identity-step3-label">
+							<div class="identity-wizard-section">
+								<span id="identity-step3-label" class="identity-wizard-section-title">작업·대상 정보</span>
+								<p class="identity-wizard-section-desc">계정과 대상 사용자, 요청 내용을 입력합니다. 신청 유형에 따라 에이전트 또는 수동 증적 필드가 표시됩니다.</p>
+								<div class="identity-form-grid identity-form-grid--wizard-step">
+								<div><label for="request-account-name">계정명</label><input id="request-account-name" name="account_name" required maxlength="255"></div>
+								<div><label for="request-owner" id="request-owner-label">대상 관리자</label><select id="request-owner" name="target_owner_id" required></select></div>
+								<div><label for="request-system-type">시스템 유형</label><select id="request-system-type" name="system_type"></select></div>
+								<div><label for="request-account-id">계정ID</label><input id="request-account-id" name="account_id" required maxlength="255"></div>
+								<div><label for="request-privilege">권한 / Role</label><input id="request-privilege" name="privilege" maxlength="255" placeholder="root / admin / user / role명"></div>
+								<div><label for="request-valid-until">사용 기간(종료 예정일)</label><input id="request-valid-until" name="valid_until" maxlength="32" placeholder="YYYY-MM-DD 또는 설명"></div>
+								<div class="identity-form-grid-item-check"><label class="identity-check-inline"><input type="checkbox" id="request-emergency" name="is_emergency" value="1"> 긴급 처리 요청</label></div>
+								<div class="wide"><label for="request-reason">요청 사유</label><textarea id="request-reason" name="request_reason" required maxlength="2000"></textarea></div>
+								</div>
+							</div>
+							<div id="identity-integrated-agent-wrap" class="identity-form-grid identity-subform-block" hidden>
+								<div class="wide"><strong class="identity-subform-heading">연동 에이전트</strong> <span class="identity-muted identity-subform-hint">(CREATE_USER 등 자동 작업 시 필수)</span></div>
+								<div class="wide">
+									<label for="request-agent-pending-id">대상 Agent (agent_pending)</label>
+									<select id="request-agent-pending-id" name="agent_pending_id">
+										<option value="">(미선택 — 통합 매핑 전용 등)</option>
+									</select>
+									<p class="identity-muted" id="request-agent-guidance" style="margin:6px 0 0;font-size:12px;line-height:1.45;"></p>
+								</div>
+							</div>
+							<div id="identity-manual-fields" class="identity-form-grid identity-subform-block" hidden>
+								<div class="wide"><strong class="identity-subform-heading">미연동 / AD 추가 정보</strong></div>
+								<div><label for="request-manual-system-name">시스템명</label><input id="request-manual-system-name" name="manual_system_name" maxlength="255"></div>
+								<div><label for="request-access-method">접속 방식</label><select id="request-access-method" name="access_method"><option value="">선택</option><option value="CLI">CLI</option><option value="WEB">WEB</option><option value="GUI">GUI</option><option value="OTHER">기타</option></select></div>
+								<div class="wide"><label for="request-location-detail">작업 대상 위치(URL·IP·콘솔 등)</label><textarea id="request-location-detail" name="location_detail" maxlength="2000"></textarea></div>
+								<div><label for="request-operator-org-user">작업 담당자(org_user)</label><select id="request-operator-org-user" name="operator_org_user_id"><option value="">(선택)</option></select></div>
+								<div class="wide"><label for="request-manual-guide">작업 가이드 / 요청 상세</label><textarea id="request-manual-guide" name="manual_guide" maxlength="4000"></textarea></div>
+							</div>
+							<input type="file" id="identity-attachment-helper" class="identity-hidden-file" tabindex="-1" aria-hidden="true">
+							<div class="identity-wizard-panel-foot identity-wizard-panel-foot--end">
+								<div class="identity-wizard-nav-btns">
+									<button type="button" class="identity-secondary-btn action-chip action-muted" data-wizard-prev="3">이전</button>
+									<button type="reset" class="identity-secondary-btn action-chip action-muted">초기화</button>
+									<button type="submit" class="identity-primary-btn action-chip action-primary request-submit-button">신청 제출</button>
+								</div>
+							</div>
+						</section>
+					</div>
+					<div class="identity-modal-foot request-actions request-submit-bar">
+						<div id="identity-request-form-message">연동 신청은 운영 승인 후 Agent·통합계정에 반영됩니다. 미연동은 수동 증적·완료 절차가 필요합니다.</div>
+					</div>
+				</form>
+				</section>
+
+				<section class="identity-panel request-card request-tab-panel" id="identity-request-panel-status" role="tabpanel" aria-labelledby="identity-request-tab-status" hidden>
+				<div class="identity-panel-head request-head">
+					<div>
+						<h2>신청 및 승인현황 <span class="count-badge" id="identity-request-count">0</span></h2>
+						<p>신청 상태와 승인/반려 처리를 확인합니다.</p>
+					</div>
+					<div class="identity-toolbar">
+						<input type="text" id="identity-request-search" aria-label="신청 검색" placeholder="계정명·대상·사유 검색" autocomplete="off">
+						<select id="identity-request-status" aria-label="신청 상태 필터">
+							<option value="">상태 전체</option>
+							<option value="승인대기">승인대기</option>
+							<option value="운영팀 승인대기">운영팀 승인대기</option>
+							<option value="처리중">처리중 (수동)</option>
+							<option value="승인">승인</option>
+							<option value="반려">반려</option>
+						</select>
+						<button type="button" class="identity-secondary-btn" id="identity-request-refresh">새로고침</button>
+					</div>
+				</div>
+				<div class="identity-table-wrap">
+					<table class="identity-table request-table">
+						<thead>
+							<tr>
+								<th>계정명</th>
+								<th>신청 유형</th>
+								<th>계정 유형</th>
+								<th>워크플로</th>
+								<th>대상</th>
+								<th>시스템 유형</th>
+								<th>계정ID</th>
+								<th>권한</th>
+								<th>상태</th>
+								<th>Agent Job</th>
+								<th>신청일</th>
+								<th>액션</th>
+							</tr>
+						</thead>
+						<tbody id="identity-request-body"></tbody>
+					</table>
+				</div>
+				<div id="identity-request-empty" class="identity-empty" hidden>신청 내역이 없습니다.</div>
+				<div class="identity-pagination" id="identity-request-pagination">
+					<span id="identity-request-page-info">0개 항목</span>
+					<div class="resource-page-actions">
+						<button type="button" class="action-chip action-muted" id="identity-request-prev">이전</button>
+						<div class="resource-page-numbers" id="identity-request-page-numbers" aria-label="신청 페이지 번호"></div>
+						<button type="button" class="action-chip action-muted" id="identity-request-next">다음</button>
+					</div>
+				</div>
+				</section>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

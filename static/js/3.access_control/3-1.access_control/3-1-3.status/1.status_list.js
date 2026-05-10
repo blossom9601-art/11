@@ -12,6 +12,11 @@
 	};
 
 	function qs(id) { return document.getElementById(id); }
+	function syncSearchSelect(el) {
+		if (window.BlossomSearchableSelect && typeof window.BlossomSearchableSelect.syncAll === 'function') {
+			window.BlossomSearchableSelect.syncAll(el || document);
+		}
+	}
 	function esc(value) {
 		if (value === null || value === undefined) return '';
 		return String(value).replace(/[&<>"']/g, function (ch) {
@@ -255,6 +260,7 @@
 			selectEl.appendChild(o);
 		});
 		if (!current || opts.indexOf(current) === -1) selectEl.value = opts[0];
+		syncSearchSelect(selectEl);
 	}
 
 	function buildPreview(rowEl) {
@@ -310,11 +316,11 @@
 			+ '<div class="endpoint-row" data-endpoint>'
 			+   '<div class="endpoint-row-head">'
 			+     '<input type="text" class="form-input endpoint-label" data-role="label" maxlength="50" placeholder="라벨 (예: 관리 콘솔, 원격 SSH)">'
-			+     '<select class="form-input endpoint-kind" data-role="kind">'
+			+     '<select class="form-input endpoint-kind search-select" data-role="kind" data-placeholder="유형">'
 			+       '<option value="WEB">WEB</option>'
 			+       '<option value="SSH">SSH</option>'
 			+     '</select>'
-			+     '<select class="form-input endpoint-protocol" data-role="protocol"></select>'
+			+     '<select class="form-input endpoint-protocol search-select" data-role="protocol" data-placeholder="프로토콜"></select>'
 			+     '<button type="button" class="endpoint-remove-btn" data-role="remove" title="이 접속점 삭제">'
 			+       '<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="endpoint-remove-icon">'
 			+     '</button>'
@@ -365,6 +371,7 @@
 			updateEndpointEmptyMsg();
 		});
 		qs('endpoint-list').appendChild(rowEl);
+		syncSearchSelect(rowEl);
 		refreshEndpointPreview(rowEl);
 		updateEndpointEmptyMsg();
 	}
@@ -426,7 +433,9 @@
 		modal.style.alignItems = 'center';
 		modal.style.justifyContent = 'center';
 		modal.style.zIndex = '2000';
-		modal.style.background = 'rgba(17,24,39,0.55)';
+		modal.style.background = 'var(--modal-overlay, rgba(15,23,42,.28))';
+		modal.style.backdropFilter = 'blur(var(--modal-blur, 5px))';
+		modal.style.webkitBackdropFilter = 'blur(var(--modal-blur, 5px))';
 		document.body.classList.add('modal-open');
 		setTimeout(function () { qs('form-resource-name').focus(); }, 60);
 	}
@@ -501,7 +510,9 @@
 		m.style.alignItems = 'center';
 		m.style.justifyContent = 'center';
 		m.style.zIndex = '2000';
-		m.style.background = 'rgba(17,24,39,0.55)';
+		m.style.background = 'var(--modal-overlay, rgba(15,23,42,.28))';
+		m.style.backdropFilter = 'blur(var(--modal-blur, 5px))';
+		m.style.webkitBackdropFilter = 'blur(var(--modal-blur, 5px))';
 		document.body.classList.add('modal-open');
 	}
 	function closeBulkDeleteModal() {
@@ -583,7 +594,10 @@
 				b.classList.toggle('active', on);
 				b.setAttribute('aria-selected', on ? 'true' : 'false');
 			});
-			if (categorySelect && categorySelect.value !== cat) categorySelect.value = cat;
+			if (categorySelect && categorySelect.value !== cat) {
+				categorySelect.value = cat;
+				syncSearchSelect(categorySelect);
+			}
 		}
 		Array.prototype.forEach.call(tabs, function (btn) {
 			btn.addEventListener('click', function () {

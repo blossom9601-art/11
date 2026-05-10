@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -33,7 +33,7 @@
                         ('proj_cleared', '완료 프로젝트')
                     ] %}
                     {% for key, label in tabs %}
-                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.show', key=key) }}">{{ label }}</a>
+                    <a class="system-tab-btn {{ 'active' if current_key == key else '' }}" role="tab" aria-selected="{{ 'true' if current_key == key else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=key) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -117,9 +117,9 @@
         </div>
     </div>
 
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script>
-        window.__PROJ_COMPLETED_DETAIL_URL = "{{ url_for('pages.show', key='proj_completed_detail') }}";
+        window.__PROJ_COMPLETED_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='proj_completed_detail') }}";
     </script>
     <script src="/static/js/8.project/8-1.project/8-1-1.my_project/1.my_project.js?v=20260306"></script>
 

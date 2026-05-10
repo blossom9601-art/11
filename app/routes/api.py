@@ -148,6 +148,7 @@ from app.services.work_operation_service import (
 )
 from app.services.work_group_service import (
     list_work_groups as svc_list_work_groups,
+    list_work_group_departments as svc_list_work_group_departments,
     get_work_group as svc_get_work_group,
     create_work_group as svc_create_work_group,
     update_work_group as svc_update_work_group,
@@ -210,6 +211,7 @@ from app.services.web_access_control_service import (
     has_pending_request as svc_has_web_access_pending_request,
     close_audit_log_session as svc_close_web_access_audit_session,
     complete_audit_connection_outcome as svc_complete_web_access_audit_connection_outcome,
+    list_ssh_command_history as svc_list_web_access_ssh_command_history,
     list_pc_agents as svc_list_pc_agents,
     list_audit_logs as svc_list_web_access_audit_logs,
     list_approver_delegations as svc_list_web_access_delegations,
@@ -218,6 +220,8 @@ from app.services.web_access_control_service import (
     list_requests as svc_list_web_access_requests,
     list_resources as svc_list_web_access_resources,
     map_pc_agent_user as svc_map_pc_agent_user,
+    pc_agent_exists as svc_pc_agent_exists,
+    record_ssh_command_events as svc_record_web_access_ssh_command_events,
     soft_delete_pc_agents as svc_soft_delete_pc_agents,
     normalize_grant_date_key as svc_normalize_grant_date_key,
     reject_request as svc_reject_web_access_request,
@@ -541,6 +545,48 @@ from app.services.network_ad_fqdn_service import (
     update_network_ad_fqdn as svc_update_network_ad_fqdn,
     delete_network_ad_fqdn as svc_delete_network_ad_fqdn,
 )
+from app.services.identity_governance_service import (
+    add_user_to_admin as svc_identity_add_user_to_admin,
+    approve_request as svc_identity_approve_request,
+    assign_service_account as svc_identity_assign_service_account,
+    bootstrap_integrated_operations_requiring_agent as svc_identity_integrated_operations_need_agent,
+    create_access_review as svc_identity_create_access_review,
+    create_integrated_account as svc_identity_create_integrated_account,
+    create_request as svc_identity_create_request,
+    manual_finalize_request as svc_identity_manual_finalize_request,
+    manual_operator_start as svc_identity_manual_operator_start,
+    manual_submit_evidence as svc_identity_manual_submit_evidence,
+    create_source_account as svc_identity_create_source_account,
+    get_access_review as svc_identity_get_access_review,
+    get_integrated_account as svc_identity_get_integrated_account,
+    get_mapping_context as svc_identity_get_mapping_context,
+    get_request as svc_identity_get_request,
+    list_access_reviews as svc_identity_list_access_reviews,
+    list_ad_groups as svc_identity_list_ad_groups,
+    list_admins as svc_identity_list_admins,
+    list_audit_logs as svc_identity_list_audit_logs,
+    list_integrated_accounts as svc_identity_list_integrated_accounts,
+    list_requests as svc_identity_list_requests,
+    list_source_accounts as svc_identity_list_source_accounts,
+    list_users as svc_identity_list_users,
+    map_ad_group as svc_identity_map_ad_group,
+    map_source_account as svc_identity_map_source_account,
+    match_source_account as svc_identity_match_source_account,
+    reject_request as svc_identity_reject_request,
+    assign_request_manual_task as svc_identity_assign_request_manual_task,
+    list_request_attachments as svc_identity_list_request_attachments,
+    list_request_events as svc_identity_list_request_events,
+    list_request_manual_tasks as svc_identity_list_request_manual_tasks,
+    save_request_attachment as svc_identity_save_request_attachment,
+    remove_user_from_admin as svc_identity_remove_user_from_admin,
+    save_ad_group as svc_identity_save_ad_group,
+    sync_ad_groups as svc_identity_sync_ad_groups,
+    sync_source_accounts as svc_identity_sync_source_accounts,
+    unmap_source_account as svc_identity_unmap_source_account,
+    update_access_review_result as svc_identity_update_access_review_result,
+    update_integrated_account as svc_identity_update_integrated_account,
+)
+from app.services.agent_cli_service import list_all_agents as svc_agent_pending_list_all
 from app.services.network_ip_diagram_service import (
     list_network_ip_diagrams as svc_list_network_ip_diagrams,
     get_network_ip_diagram as svc_get_network_ip_diagram,
@@ -10038,18 +10084,25 @@ _TAB_SUFFIX_MAP = [
 ]
 
 
+def _referer_path_page_key(referer: str) -> str:
+    """Referer URL에서 페이지 라우트 키 추출 (/p/<key> · /b/<key> · /b/<key>/<token>)."""
+    try:
+        ref = (referer or '').strip()
+        if not ref:
+            return ''
+        path = (urlparse(ref).path or '').strip('/')
+        parts = path.split('/')
+        if len(parts) >= 2 and parts[0] in ('p', 'b'):
+            return (parts[1] or '').strip()
+    except Exception:
+        pass
+    return ''
+
+
 def _resolve_tab_name_from_referer() -> str:
     """Referer 헤더의 페이지 키에서 탭 한글 이름을 추출한다."""
     try:
-        referer = (request.headers.get('Referer') or '').strip()
-        if not referer:
-            return ''
-        # /p/hw_server_onpremise_detail?asset_id=27  →  hw_server_onpremise_detail
-        from urllib.parse import urlparse
-        path = urlparse(referer).path  # /p/hw_server_onpremise_detail
-        if '/p/' not in path:
-            return ''
-        page_key = path.split('/p/')[-1].split('/')[0].strip()
+        page_key = _referer_path_page_key(request.headers.get('Referer') or '')
         if not page_key:
             return ''
         # 접미사 매칭 — 긴 접미사 우선 (예: _vpn_policy > _policy)
@@ -12177,7 +12230,11 @@ def _vpn_policy_to_dict(row: NetVpnLinePolicy) -> dict:
 @api_bp.route('/api/session/heartbeat', methods=['GET'])
 def api_session_heartbeat():
     """세션 유효성 경량 확인. 프론트엔드 폴링용."""
-    if not session.get('emp_no'):
+    # emp_no만 있거나 user_id만 있는 세션 허용(테스트 픽스처·예외 레이스 포함).
+    # emp_no="" 인데 user_id는 있는 경우 not session.get('emp_no') 가 True가 되어
+    # 허위 401 알림이 뜨는 문제 방지.
+    emp = (session.get('emp_no') or '').strip()
+    if 'user_id' not in session and not emp:
         return jsonify({'alive': False}), 401
     return jsonify({'alive': True})
 
@@ -14725,6 +14782,9 @@ def _normalize_calendar_repeat_rule(
     frequency = _normalize_repeat_type(source.get('frequency') or source.get('freq') or source.get('unit') or repeat_type)
     if repeat_type != 'custom':
         frequency = repeat_type
+    else:
+        # 직접 입력(custom): UI·클라이언트는 주(week) 간격만 지원
+        frequency = 'weekly'
     if frequency == 'none' or frequency == 'custom':
         frequency = 'daily'
 
@@ -18544,10 +18604,30 @@ def delete_work_divisions():
         return jsonify({'success': False, 'message': '업무 구분 삭제 중 오류가 발생했습니다.'}), 500
 
 
+def _is_work_group_page_request() -> bool:
+    """Legacy/cached work-group UI code may still call shared FK endpoints."""
+    referer = (request.headers.get('Referer') or request.headers.get('Referrer') or '').strip()
+    return (
+        '/p/cat_business_group' in referer
+        or '/b/cat_business_group' in referer
+        or '/p/cat_business_group_detail' in referer
+        or '/b/cat_business_group_detail' in referer
+    )
+
+
 @api_bp.route('/api/work-statuses', methods=['GET'])
 def list_work_statuses():
     search = (request.args.get('q') or '').strip() or None
     try:
+        if _is_work_group_page_request():
+            rows = [
+                {'status_code': '운영', 'status_name': '운영', 'wc_name': '운영', 'wc_color': 'ws-run'},
+                {'status_code': '임시', 'status_name': '임시', 'wc_name': '임시', 'wc_color': 'ws-wait'},
+                {'status_code': '종료', 'status_name': '종료', 'wc_name': '종료', 'wc_color': 'ws-idle'},
+            ]
+            if search:
+                rows = [r for r in rows if search in r['status_code'] or search in r['status_name']]
+            return jsonify({'success': True, 'items': rows, 'total': len(rows)})
         rows = svc_list_work_statuses(search=search)
         return jsonify({'success': True, 'items': rows, 'total': len(rows)})
     except Exception:
@@ -18662,7 +18742,17 @@ def list_org_departments():
     ids_param = (request.args.get('ids') or '').strip() or None
     include_deleted = (request.args.get('include_deleted') or request.args.get('includeDeleted') or '').lower() in ('1', 'true', 'yes')
     try:
-        rows = svc_list_org_departments(search=search, include_deleted=include_deleted)
+        if _is_work_group_page_request() and not ids_param:
+            rows = svc_list_work_group_departments()
+            if search:
+                s = search.casefold()
+                rows = [
+                    r for r in rows
+                    if s in str(r.get('dept_name') or '').casefold()
+                    or s in str(r.get('dept_code') or '').casefold()
+                ]
+        else:
+            rows = svc_list_org_departments(search=search, include_deleted=include_deleted)
         if ids_param:
             wanted = set()
             for raw in [s.strip() for s in ids_param.split(',') if s.strip()]:
@@ -18962,8 +19052,14 @@ def list_org_racks():
     search = (request.args.get('q') or '').strip() or None
     include_deleted = (request.args.get('include_deleted') or request.args.get('includeDeleted') or '').lower() in ('1', 'true', 'yes')
     center_code = (request.args.get('center_code') or '').strip() or None
+    center_matches = request.args.getlist('center_match') or request.args.getlist('centerMatch')
     try:
-        rows = svc_list_org_racks(search=search, include_deleted=include_deleted, center_code=center_code)
+        rows = svc_list_org_racks(
+            search=search,
+            include_deleted=include_deleted,
+            center_code=center_code,
+            center_matches=center_matches if center_matches else None,
+        )
         return jsonify({'success': True, 'items': rows, 'total': len(rows)})
     except Exception:
         logger.exception('Failed to fetch org racks')
@@ -20258,6 +20354,9 @@ def list_vendor_manufacturers():
     try:
         rows = svc_list_vendors(search=search, include_deleted=include_deleted)
         return jsonify({'success': True, 'items': rows, 'total': len(rows)})
+    except sqlite3.Error:
+        logger.exception('Vendor manufacturers DB error (list)')
+        return jsonify({'success': False, 'message': '제조사 목록 저장소에 연결할 수 없습니다.'}), 503
     except Exception:
         logger.exception('Failed to fetch vendor manufacturers')
         return jsonify({'success': False, 'message': '제조사 목록 조회 중 오류가 발생했습니다.'}), 500
@@ -20270,6 +20369,9 @@ def get_vendor_manufacturer(vendor_id: int):
         if not record or record.get('is_deleted'):
             return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
         return jsonify({'success': True, 'item': record})
+    except sqlite3.Error:
+        logger.exception('Vendor manufacturer DB error (detail)')
+        return jsonify({'success': False, 'message': '제조사 저장소에 연결할 수 없습니다. 관리자에게 문의하세요.'}), 503
     except Exception:
         logger.exception('Failed to fetch vendor manufacturer detail')
         return jsonify({'success': False, 'message': '제조사 조회 중 오류가 발생했습니다.'}), 500
@@ -20865,6 +20967,7 @@ def list_vendor_manufacturer_hw_assets(vendor_id: int):
             return jsonify({'success': True, 'items': [], 'total': 0})
 
         conn = _vendor_asset_db_conn()
+        rows = []
         try:
             rows = conn.execute(
                 """
@@ -20892,6 +20995,8 @@ def list_vendor_manufacturer_hw_assets(vendor_id: int):
                 """,
                 (mfr_code,),
             ).fetchall()
+        except sqlite3.Error as exc:
+            logger.warning('vendor manufacturer hw-assets: sqlite error (empty fallback): %s', exc)
         finally:
             conn.close()
 
@@ -20931,6 +21036,7 @@ def list_vendor_manufacturer_sw_assets(vendor_id: int):
             return jsonify({'success': True, 'items': [], 'total': 0})
 
         conn = _vendor_asset_db_conn()
+        rows = []
         try:
             rows = conn.execute(
                 """
@@ -20961,6 +21067,8 @@ def list_vendor_manufacturer_sw_assets(vendor_id: int):
                 """,
                 (vendor_name,),
             ).fetchall()
+        except sqlite3.Error as exc:
+            logger.warning('vendor manufacturer sw-assets: sqlite error (empty fallback): %s', exc)
         finally:
             conn.close()
 
@@ -20998,6 +21106,7 @@ def list_vendor_manufacturer_comp_assets(vendor_id: int):
             return jsonify({'success': True, 'items': [], 'total': 0})
 
         conn = _vendor_asset_db_conn()
+        rows = []
         try:
             rows = conn.execute(
                 """
@@ -21027,6 +21136,8 @@ def list_vendor_manufacturer_comp_assets(vendor_id: int):
                 """,
                 (vendor_name,),
             ).fetchall()
+        except sqlite3.Error as exc:
+            logger.warning('vendor manufacturer comp-assets: sqlite error (empty fallback): %s', exc)
         finally:
             conn.close()
 
@@ -26219,6 +26330,16 @@ def list_work_groups():
     except Exception:
         logger.exception('Failed to fetch work groups')
         return jsonify({'success': False, 'message': '업무 그룹 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/work-groups/departments', methods=['GET'])
+def list_work_group_departments():
+    try:
+        rows = svc_list_work_group_departments()
+        return jsonify({'success': True, 'items': rows, 'total': len(rows)})
+    except Exception:
+        logger.exception('Failed to fetch work group departments')
+        return jsonify({'success': False, 'message': '담당 부서 목록 조회 중 오류가 발생했습니다.'}), 500
 
 
 @api_bp.route('/api/work-groups', methods=['POST'])
@@ -37343,12 +37464,51 @@ from app.services.brand_setting_service import (
 
 BRAND_ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'svg'}
 BRAND_MAX_SIZE = 2 * 1024 * 1024  # 2 MB
+VENDOR_LOGO_ALLOWED_EXT = {'png', 'jpg', 'jpeg', 'svg'}
+VENDOR_LOGO_MAX_SIZE = 2 * 1024 * 1024  # 2 MB
 
 
 def _brand_upload_folder():
     folder = os.path.join(current_app.root_path, '..', 'static', 'image', 'brand')
     os.makedirs(folder, exist_ok=True)
     return folder
+
+
+def _vendor_logo_upload_folder():
+    folder = os.path.join(current_app.instance_path, 'uploads', 'vendor_logo')
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+@api_bp.route('/api/vendor-logo/files/<path:filename>', methods=['GET'])
+def api_vendor_logo_file(filename: str):
+    safe_name = secure_filename(filename or '')
+    if not safe_name:
+        return jsonify({'success': False, 'message': '파일명이 올바르지 않습니다.'}), 400
+    return send_from_directory(_vendor_logo_upload_folder(), safe_name)
+
+
+@api_bp.route('/api/vendor-logo/upload', methods=['POST'])
+def api_vendor_logo_upload():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '파일을 선택하세요.'}), 400
+    uploaded = request.files['file']
+    if not uploaded.filename:
+        return jsonify({'success': False, 'message': '파일명이 비어 있습니다.'}), 400
+    ext = uploaded.filename.rsplit('.', 1)[-1].lower() if '.' in uploaded.filename else ''
+    if ext not in VENDOR_LOGO_ALLOWED_EXT:
+        return jsonify({'success': False, 'message': '허용 형식: png, jpg, jpeg, svg'}), 400
+    uploaded.seek(0, 2)
+    size = uploaded.tell()
+    uploaded.seek(0)
+    if size > VENDOR_LOGO_MAX_SIZE:
+        return jsonify({'success': False, 'message': '파일 크기는 2MB 이하여야 합니다.'}), 400
+    scope = secure_filename((request.form.get('scope') or 'vendor').strip()) or 'vendor'
+    filename = f"{scope}_{uuid.uuid4().hex[:16]}.{ext}"
+    path = os.path.join(_vendor_logo_upload_folder(), filename)
+    uploaded.save(path)
+    url = '/api/vendor-logo/files/' + filename
+    return jsonify({'success': True, 'url': url})
 
 
 @api_bp.route('/api/brand-settings', methods=['GET'])
@@ -38080,12 +38240,606 @@ def api_access_control_audit_logs():
     return jsonify({'success': True, **result})
 
 
-@api_bp.route('/api/internal/lumina-gate/pc-agent-sync', methods=['POST'])
-def api_internal_lumina_gate_pc_agent_sync():
-    """Lumina PC AP (lumina-gate) pushes agent snapshots into WEB SQLite (pc_agent_device).
+@api_bp.route('/api/identity-governance/bootstrap', methods=['GET'])
+def api_identity_governance_bootstrap():
+    try:
+        integrated_agents: List[Dict[str, Any]] = []
+        try:
+            rows = svc_agent_pending_list_all()
+            for a in rows or []:
+                integrated_agents.append({
+                    'id': a.get('id'),
+                    'hostname': a.get('hostname') or '',
+                    'fqdn': a.get('fqdn') or '',
+                    'ip_address': a.get('ip_address') or '',
+                    'status': a.get('status') or '',
+                    'linked': bool(a.get('linked')),
+                    'enabled': bool(a.get('is_enabled')),
+                })
+        except Exception:
+            logger.exception('identity bootstrap: lumina agents list failed')
+        return jsonify({
+            'success': True,
+            'admins': svc_identity_list_admins(),
+            'users': svc_identity_list_users(),
+            'system_types': [
+                'SERVER', 'STORAGE', 'SAN', 'NETWORK', 'SECURITY',
+                'WEB', 'VPN', 'SOLUTION', 'AD',
+            ],
+            'integrated_agents': integrated_agents,
+            'integrated_operations_need_agent': svc_identity_integrated_operations_need_agent(),
+            'integration_types': [
+                {'code': 'INTEGRATED', 'label': '연동 시스템 (Agent 자동)'},
+                {'code': 'NON_INTEGRATED', 'label': '미연동 (수동 처리)'},
+                {'code': 'AD', 'label': 'AD 계정'},
+            ],
+            'workflow_status_codes': [
+                'REQUESTED', 'OPS_PENDING', 'ASSIGNED', 'IN_PROGRESS', 'EVIDENCE_UPLOADED', 'COMPLETED', 'REJECTED', 'FAILED',
+            ],
+            'access_methods': ['CLI', 'WEB', 'GUI', 'OTHER'],
+            'sample_operations_personal_integrated': [
+                'INTEGRATED_ACCOUNT_BIND',
+                'ACCOUNT_UNLOCK',
+                'PASSWORD_RESET',
+            ],
+            'account_types': ['PERSONAL', 'SERVICE'],
+            'statuses': ['ACTIVE', 'INACTIVE'],
+        })
+    except Exception:
+        logger.exception('identity-governance bootstrap failed')
+        return jsonify({'success': False, 'message': '통합계정 기본 정보를 불러오지 못했습니다.'}), 500
 
-    동일한 값을 게이트 `web_sync_token` 과 WEB 환경 변수 `LUMINA_GATE_WEB_SYNC_SECRET` 에 설정해야 합니다.
-    """
+
+@api_bp.route('/api/identity-governance/integrated-accounts', methods=['GET'])
+def api_identity_integrated_accounts():
+    try:
+        result = svc_identity_list_integrated_accounts({
+            'keyword': request.args.get('keyword') or request.args.get('q') or '',
+            'account_type': request.args.get('account_type') or '',
+            'system_type': request.args.get('system_type') or '',
+            'status': request.args.get('status') or '',
+        })
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance integrated account list failed')
+        return jsonify({'success': False, 'message': '통합계정 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/integrated-accounts', methods=['POST'])
+def api_identity_create_integrated_account():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_create_integrated_account(payload, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance integrated account create failed')
+        return jsonify({'success': False, 'message': '통합계정 생성 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/integrated-accounts/<int:account_id>', methods=['GET'])
+def api_identity_get_integrated_account(account_id: int):
+    try:
+        item = svc_identity_get_integrated_account(account_id)
+        if not item:
+            return jsonify({'success': False, 'message': '통합계정을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('identity-governance integrated account get failed')
+        return jsonify({'success': False, 'message': '통합계정 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/integrated-accounts/<int:account_id>', methods=['PUT'])
+def api_identity_update_integrated_account(account_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_update_integrated_account(account_id, payload, actor=_resolve_actor())
+        if not item:
+            return jsonify({'success': False, 'message': '통합계정을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance integrated account update failed')
+        return jsonify({'success': False, 'message': '통합계정 수정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/source-accounts', methods=['GET'])
+def api_identity_source_accounts():
+    try:
+        result = svc_identity_list_source_accounts({
+            'keyword': request.args.get('keyword') or request.args.get('q') or '',
+            'system_type': request.args.get('system_type') or '',
+            'unmapped': request.args.get('unmapped') or '',
+        })
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance source account list failed')
+        return jsonify({'success': False, 'message': 'SourceAccount 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/source-accounts', methods=['POST'])
+def api_identity_create_source_account():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_create_source_account(payload, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance source account create failed')
+        return jsonify({'success': False, 'message': 'SourceAccount 등록 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/source-accounts/sync', methods=['POST'])
+def api_identity_sync_source_accounts():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_sync_source_accounts(actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('identity-governance source sync failed')
+        return jsonify({'success': False, 'message': '계정 동기화 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/source-accounts/<int:source_account_id>/match', methods=['GET'])
+def api_identity_match_source_account(source_account_id: int):
+    try:
+        item = svc_identity_match_source_account(source_account_id)
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 404
+    except Exception:
+        logger.exception('identity-governance source match failed')
+        return jsonify({'success': False, 'message': '자동 매칭 제안 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/mappings', methods=['POST'])
+def api_identity_map_source_account():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_map_source_account(
+            int(payload.get('integrated_account_id') or 0),
+            int(payload.get('source_account_id') or 0),
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, 'item': item})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance source map failed')
+        return jsonify({'success': False, 'message': '계정 연결 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/mappings/source/<int:source_account_id>', methods=['DELETE'])
+def api_identity_unmap_source_account(source_account_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        ok = svc_identity_unmap_source_account(source_account_id, actor=_resolve_actor())
+        if not ok:
+            return jsonify({'success': False, 'message': '연결 정보를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True})
+    except Exception:
+        logger.exception('identity-governance source unmap failed')
+        return jsonify({'success': False, 'message': '계정 연결 해제 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/mapping-context', methods=['GET'])
+def api_identity_mapping_context():
+    admin_id_raw = request.args.get('admin_id') or ''
+    try:
+        admin_id = int(admin_id_raw) if admin_id_raw else None
+    except ValueError:
+        admin_id = None
+    try:
+        item = svc_identity_get_mapping_context(admin_id=admin_id)
+        return jsonify({'success': True, **item})
+    except Exception:
+        logger.exception('identity-governance mapping context failed')
+        return jsonify({'success': False, 'message': '계정 매핑 정보를 불러오지 못했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/admin-users', methods=['POST'])
+def api_identity_add_admin_user():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_add_user_to_admin(
+            int(payload.get('admin_id') or 0),
+            int(payload.get('user_id') or 0),
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, **item})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance admin user add failed')
+        return jsonify({'success': False, 'message': '관리자 사용자 매핑 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/admin-users', methods=['DELETE'])
+def api_identity_remove_admin_user():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_remove_user_from_admin(
+            int(payload.get('admin_id') or 0),
+            int(payload.get('user_id') or 0),
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, **item})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance admin user remove failed')
+        return jsonify({'success': False, 'message': '관리자 사용자 매핑 해제 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/service-account-admin', methods=['POST'])
+def api_identity_assign_service_account():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_assign_service_account(
+            int(payload.get('admin_id') or 0),
+            int(payload.get('integrated_account_id') or 0),
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, **item})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance service account assign failed')
+        return jsonify({'success': False, 'message': '서비스 계정 할당 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests', methods=['GET'])
+def api_identity_requests():
+    try:
+        result = svc_identity_list_requests({
+            'status': request.args.get('status') or '',
+            'workflow_status': request.args.get('workflow_status') or '',
+            'keyword': request.args.get('keyword') or request.args.get('q') or '',
+        })
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance request list failed')
+        return jsonify({'success': False, 'message': '신청 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>', methods=['GET'])
+def api_identity_get_request(request_id: int):
+    try:
+        item = svc_identity_get_request(request_id)
+        if not item:
+            return jsonify({'success': False, 'message': '신청을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('identity-governance request get failed')
+        return jsonify({'success': False, 'message': '신청 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/events', methods=['GET'])
+def api_identity_request_events(request_id: int):
+    try:
+        result = svc_identity_list_request_events(request_id)
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance request events failed')
+        return jsonify({'success': False, 'message': '이벤트 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/tasks', methods=['GET'])
+def api_identity_request_tasks(request_id: int):
+    try:
+        result = svc_identity_list_request_manual_tasks(request_id)
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance request tasks failed')
+        return jsonify({'success': False, 'message': '작업 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/attachments', methods=['GET'])
+def api_identity_request_attachments(request_id: int):
+    try:
+        result = svc_identity_list_request_attachments(request_id)
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance request attachments list failed')
+        return jsonify({'success': False, 'message': '첨부 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/attachments', methods=['POST'])
+def api_identity_request_attachment_upload(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    fh = request.files.get('file')
+    if fh is None or not getattr(fh, 'filename', None):
+        return jsonify({'success': False, 'message': '파일이 필요합니다.'}), 400
+    kind_raw = request.form.get('kind') or 'EVIDENCE_OTHER'
+    data = fh.read()
+    actor = _resolve_actor()
+    try:
+        meta = svc_identity_save_request_attachment(
+            request_id,
+            kind=str(kind_raw),
+            filename=fh.filename,
+            mime_type=fh.mimetype or '',
+            data=data,
+            actor=actor,
+        )
+        return jsonify({'success': True, 'item': meta}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance attachment upload failed')
+        return jsonify({'success': False, 'message': '첨부 업로드 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/assignee', methods=['POST'])
+def api_identity_assign_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_assign_request_manual_task(
+            request_id,
+            assignee_org_user_id=int(payload.get('assignee_org_user_id') or payload.get('org_user_id') or 0),
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity assign request failed')
+        return jsonify({'success': False, 'message': '담당 지정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/manual/start', methods=['POST'])
+def api_identity_manual_operator_start(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_manual_operator_start(request_id, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity manual operator start failed')
+        return jsonify({'success': False, 'message': '작업 시작 처리 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/manual/evidence', methods=['POST'])
+def api_identity_manual_evidence_submit(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_manual_submit_evidence(request_id, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity manual evidence submit failed')
+        return jsonify({'success': False, 'message': '증적 제출 처리 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/manual/finalize', methods=['POST'])
+def api_identity_manual_finalize(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_manual_finalize_request(request_id, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity manual finalize failed')
+        return jsonify({'success': False, 'message': '최종 완료 처리 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests', methods=['POST'])
+def api_identity_create_request():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_create_request(payload, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance request create failed')
+        return jsonify({'success': False, 'message': '통합계정 신청 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/approve', methods=['POST'])
+def api_identity_approve_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_approve_request(request_id, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance request approve failed')
+        return jsonify({'success': False, 'message': '신청 승인 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/requests/<int:request_id>/reject', methods=['POST'])
+def api_identity_reject_request(request_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_reject_request(request_id, reason=payload.get('reason') or '', actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance request reject failed')
+        return jsonify({'success': False, 'message': '신청 반려 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/audit-logs', methods=['GET'])
+def api_identity_audit_logs():
+    try:
+        result = svc_identity_list_audit_logs({
+            'keyword': request.args.get('keyword') or request.args.get('q') or '',
+            'action_type': request.args.get('action_type') or '',
+        })
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance audit list failed')
+        return jsonify({'success': False, 'message': '감사 이력 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/ad-groups', methods=['GET'])
+def api_identity_ad_groups():
+    try:
+        result = svc_identity_list_ad_groups()
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance AD group list failed')
+        return jsonify({'success': False, 'message': 'AD 그룹 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/ad-groups', methods=['POST'])
+def api_identity_save_ad_group():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_save_ad_group(payload, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance AD group save failed')
+        return jsonify({'success': False, 'message': 'AD 그룹 저장 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/ad-groups/sync', methods=['POST'])
+def api_identity_sync_ad_groups():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    try:
+        item = svc_identity_sync_ad_groups(actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('identity-governance AD group sync failed')
+        return jsonify({'success': False, 'message': 'AD 그룹 동기화 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/ad-groups/map', methods=['POST'])
+def api_identity_map_ad_group():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_map_ad_group(
+            int(payload.get('group_id') or 0),
+            int(payload.get('integrated_account_id') or 0),
+            permission_level=payload.get('permission_level') or '',
+            actor=_resolve_actor(),
+        )
+        return jsonify({'success': True, **item})
+    except (TypeError, ValueError) as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance AD group map failed')
+        return jsonify({'success': False, 'message': 'AD 그룹 매핑 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/access-reviews', methods=['GET'])
+def api_identity_access_reviews():
+    try:
+        result = svc_identity_list_access_reviews()
+        return jsonify({'success': True, **result})
+    except Exception:
+        logger.exception('identity-governance access review list failed')
+        return jsonify({'success': False, 'message': '권한 검토 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/access-reviews', methods=['POST'])
+def api_identity_create_access_review():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_create_access_review(payload, actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance access review create failed')
+        return jsonify({'success': False, 'message': '권한 검토 요청 생성 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/access-reviews/<int:review_id>', methods=['GET'])
+def api_identity_get_access_review(review_id: int):
+    try:
+        item = svc_identity_get_access_review(review_id)
+        if not item:
+            return jsonify({'success': False, 'message': '권한 검토 정보를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('identity-governance access review get failed')
+        return jsonify({'success': False, 'message': '권한 검토 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/identity-governance/access-reviews/<int:review_id>/result', methods=['POST'])
+def api_identity_update_access_review_result(review_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_identity_update_access_review_result(review_id, payload.get('result') or '유지', actor=_resolve_actor())
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('identity-governance access review result failed')
+        return jsonify({'success': False, 'message': '권한 검토 결과 저장 중 오류가 발생했습니다.'}), 500
+
+
+def _require_lumina_gate_sync_token():
     secret = (os.environ.get('LUMINA_GATE_WEB_SYNC_SECRET') or '').strip()
     if not secret:
         return jsonify({'success': False, 'message': 'LUMINA_GATE_WEB_SYNC_SECRET 가 설정되지 않아 동기화가 비활성화 상태입니다.'}), 503
@@ -38104,8 +38858,28 @@ def api_internal_lumina_gate_pc_agent_sync():
 
     if not hmac.compare_digest(tok, secret):
         return jsonify({'success': False, 'message': '유효하지 않은 동기화 토큰입니다.'}), 401
+    return None
+
+
+@api_bp.route('/api/internal/lumina-gate/pc-agent-sync', methods=['POST'])
+def api_internal_lumina_gate_pc_agent_sync():
+    """Lumina PC AP (lumina-gate) pushes agent snapshots into WEB SQLite (pc_agent_device).
+
+    동일한 값을 게이트 `web_sync_token` 과 WEB 환경 변수 `LUMINA_GATE_WEB_SYNC_SECRET` 에 설정해야 합니다.
+    """
+    gate = _require_lumina_gate_sync_token()
+    if gate:
+        return gate
 
     payload = request.get_json(silent=True) or {}
+    agent_id = str(payload.get('agent_id') or payload.get('agentId') or '').strip()
+    policy = svc_get_web_access_policy() or {}
+    auto_register_enabled = str(policy.get('pc_agent_auto_register_enabled', 1)).strip().lower() in ('1', 'true', 'y', 'yes', 'on')
+    if not auto_register_enabled and not svc_pc_agent_exists(agent_id):
+        return jsonify({
+            'success': False,
+            'message': '신규 PC 에이전트 자동 등록이 차단되어 있습니다. 관리자 화면에서 먼저 등록하세요.',
+        }), 403
     try:
         item = svc_upsert_pc_agent(payload, actor=None)
     except ValueError as exc:
@@ -38124,6 +38898,22 @@ def api_internal_lumina_gate_pc_agent_sync():
         except Exception:
             logging.getLogger(__name__).exception('lumina-gate policy enqueue after gate pc-agent-sync failed')
     return jsonify({'success': True, 'item': {'id': agent_pk, 'agent_id': agent_id}})
+
+
+@api_bp.route('/api/internal/lumina-gate/ssh-command-events', methods=['POST'])
+def api_internal_lumina_gate_ssh_command_events():
+    gate = _require_lumina_gate_sync_token()
+    if gate:
+        return gate
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = svc_record_web_access_ssh_command_events(payload)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logging.getLogger(__name__).exception('lumina-gate ssh-command-events failed')
+        return jsonify({'success': False, 'message': 'SSH 행위 이력 처리 중 서버 오류가 발생했습니다.'}), 500
+    return jsonify({'success': True, **result})
 
 
 @api_bp.route('/api/access-control/pc-agents', methods=['GET'])
@@ -38295,6 +39085,20 @@ def api_access_control_audit_session_end(audit_id: int):
     if not ok:
         return jsonify({'success': False, 'message': '세션 종료 시각을 기록할 수 없습니다.'}), 404
     return jsonify({'success': True})
+
+
+@api_bp.route('/api/access-control/audit-logs/<int:audit_id>/activity-history', methods=['GET'])
+def api_access_control_audit_activity_history(audit_id: int):
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 행위 이력을 조회할 수 있습니다.'}), 403
+    result = svc_list_web_access_ssh_command_history(audit_id)
+    if result is None:
+        return jsonify({'success': False, 'message': '감사 기록을 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, **result})
 
 
 @api_bp.route('/api/access-control/notifications', methods=['GET'])

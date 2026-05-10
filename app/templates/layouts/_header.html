@@ -1,17 +1,17 @@
 <!-- Critical shell CSS: 외부 CSS가 늦어도 헤더/사이드바/스켈레톤 레이아웃을 먼저 고정 -->
 <style id="bls-critical-shell-css">
-html,body{margin:0;min-height:100%;background:#f9fafb;}
-.main-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #e5e7eb;box-sizing:border-box;}
+html,body{margin:0!important;padding:0!important;min-height:100%;background:#f9fafb;}
+.main-header{height:56px;min-height:56px;margin:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid #e5e7eb;box-sizing:border-box;}
 .header-left,.header-right,.header-center,.header-search-form{display:flex;align-items:center;}
 .header-left{gap:12px;}.header-right{gap:8px;}.header-center{flex:1;justify-content:center;padding:0 18px;}.header-search-form{width:min(100%,560px);gap:8px;}
-.header-logo{height:40px;}.system-title{margin:0;font-size:1.5rem;font-weight:700;color:#374151;}.system-subtitle{display:none;}
-.header-search-input{width:100%;height:40px;border:1px solid #d1d5db;border-radius:12px;padding:0 14px;box-sizing:border-box;background:#fff;color:#111827;}
+.header-logo{height:34px;}.system-title{margin:0;font-size:1.35rem;font-weight:700;color:#374151;}.system-subtitle{display:none;}
+.header-search-input{width:100%;height:36px;border:1px solid #d1d5db;border-radius:12px;padding:0 14px;box-sizing:border-box;background:#fff;color:#111827;}
 .header-btn{position:relative;border:0;background:transparent;border-radius:8px;padding:8px;color:#4b5563;cursor:pointer;}
 .header-icon{width:20px;height:20px;display:block;}.header-avatar-icon{width:28px;height:28px;border-radius:50%;object-fit:cover;display:block;}
 .sidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #f1f5f9;z-index:200;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;}
-.sidebar-menu{padding:80px 0 16px;box-sizing:border-box;}.menu-list{list-style:none;margin:0;padding:0;}.menu-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#64748b;text-decoration:none;font-size:.85rem;font-weight:500;box-sizing:border-box;}.submenu{list-style:none;margin:0;padding:0;max-height:0;overflow:hidden;background:#f8fafc;}.menu-item.open .submenu{max-height:1000px;}.submenu-link{display:block;padding:8px 20px 8px 52px;color:#64748b;text-decoration:none;font-size:.8rem;}
+.sidebar-menu{padding:72px 0 16px;box-sizing:border-box;}.menu-list{list-style:none;margin:0;padding:0;}.menu-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#64748b;text-decoration:none;font-size:.85rem;font-weight:500;box-sizing:border-box;}.submenu{list-style:none;margin:0;padding:0;max-height:0;overflow:hidden;background:#f8fafc;}.menu-item.open .submenu{max-height:1000px;}.submenu-link{display:block;padding:8px 20px 8px 52px;color:#64748b;text-decoration:none;font-size:.8rem;}
 .menu-icon{width:18px;height:18px;flex-shrink:0;}.submenu-arrow{width:14px;height:14px;margin-left:auto;flex-shrink:0;}.bls-inline-icon{display:inline-block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:currentColor;filter:none!important;}
-.main-content{margin-left:260px;height:calc(100vh - 64px);padding:0 24px;background:#f9fafb;box-sizing:border-box;overflow:auto;position:relative;min-height:360px;}
+.main-content{margin-left:260px;height:calc(100vh - 56px);padding:0 24px;background:#f9fafb;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;position:relative;min-height:360px;}
 .spa-skeleton{padding:32px 24px;display:flex;flex-direction:column;gap:18px;min-height:300px;box-sizing:border-box;}.spa-skeleton-bar{height:18px;border-radius:6px;background:#eef2f7;}.spa-skeleton-bar.short{height:14px;}
 body:not(.bls-ready) main.main-content:not([data-spa-boot])>:not(.spa-skeleton):not(.bls-mount-skeleton),[data-bls-mounting="true"]>:not(.bls-mount-skeleton){visibility:hidden!important;}
 </style>
@@ -20,7 +20,7 @@ body:not(.bls-ready) main.main-content:not([data-spa-boot])>:not(.spa-skeleton):
 <!-- 공통 디자인 토큰 & 컴포넌트 -->
 <link rel="stylesheet" href="/static/css/design-tokens.css?v=20260315">
 <link rel="stylesheet" href="/static/css/components.css?v=20260315">
-<link rel="stylesheet" href="/static/css/bls-modal.css?v=20260321d">
+<link rel="stylesheet" href="/static/css/bls-modal.css?v=20260510_category_detail_modal_exact2">
 <link rel="stylesheet" href="/static/css/bls-stats-modal.css?v=20260321b">
 
 <!-- Global Footer assets -->
@@ -201,4 +201,3 @@ body:not(.bls-ready) main.main-content:not([data-spa-boot])>:not(.spa-skeleton):
 })();
 </script>
 {% endif %}
-

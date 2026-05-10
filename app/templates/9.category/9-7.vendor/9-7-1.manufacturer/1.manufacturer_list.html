@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/category2.css?v=20260414j">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260509_vendor_logo_persist">
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -31,7 +31,7 @@
                         ('cat_vendor_maintenance', '유지보수사')
                     ] %}
                     {% for k, label in tabs %}
-                        <a class="system-tab-btn {{ 'active' if current_key == k else '' }}" role="tab" aria-selected="{{ 'true' if current_key == k else 'false' }}" href="{{ url_for('pages.show', key=k) }}">{{ label }}</a>
+                        <a class="system-tab-btn {{ 'active' if current_key == k else '' }}" role="tab" aria-selected="{{ 'true' if current_key == k else 'false' }}" href="{{ url_for('pages.blossom_hub', segment=k) }}">{{ label }}</a>
                     {% endfor %}
                 </div>
 
@@ -79,7 +79,8 @@
                             <table class="system-data-table server-data-table" id="system-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" id="system-select-all"></th>
+                                        <th><input type="checkbox" id="system-select-all" title="전체 선택" aria-label="전체 선택"></th>
+                                        <th data-col="logo">로고</th>
                                         <th data-col="vendor">제조사</th>
                                         <th data-col="address" class="col-hidden">주소</th>
                                         <th data-col="business_number">사업자번호</th>
@@ -119,15 +120,15 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
         <!-- 제조사 상세 페이지 전역 URL 변수 (3-1-1.unix 패턴 동일) -->
         <script>
-            window.__CAT_VENDOR_MANUFACTURER_DETAIL_URL = "{{ url_for('pages.show', key='cat_vendor_manufacturer_detail') }}";
+            window.__CAT_VENDOR_MANUFACTURER_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer_detail') }}";
         </script>
-        <script src="/static/js/9.category/9-7.vendor/9-7-1.manufacturer/1.manufacturer_list.js?v=20260419b"></script>
+        <script src="/static/js/9.category/9-7.vendor/9-7-1.manufacturer/1.manufacturer_list.js?v=20260510_b_public"></script>
 
         <!-- 제조사 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -148,6 +149,7 @@
                             <input name="software_qty" type="hidden" value="0">
                             <input name="component_qty" type="hidden" value="0">
                             <div class="form-grid">
+                                <div class="form-row vendor-logo-row"><label>로고</label><div class="vendor-logo-field"><div class="vendor-logo-preview" hidden><img alt="로고 미리보기"></div><label class="vendor-logo-upload-btn" title="로고 첨부" aria-label="로고 첨부"><input name="logo_file" type="file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="vendor-logo-file-input" hidden><img src="/static/image/svg/free-icon-font-folder-open.svg" alt="" class="vendor-logo-upload-icon" aria-hidden="true"></label><span class="vendor-logo-file-name">선택된 파일 없음</span></div></div>
                                 <div class="form-row"><label>제조사<span class="required">*</span></label><input name="vendor" class="form-input" placeholder="예: 삼성전자" required data-fk-ignore="1"></div>
                                 <div class="form-row"><label>주소</label><input name="address" class="form-input" placeholder="예: 서울특별시 ..."></div>
                                 <div class="form-row"><label>사업자번호</label><input name="business_number" class="form-input" placeholder="예: 123-45-67890"></div>

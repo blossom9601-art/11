@@ -168,3 +168,19 @@ no_proxy =
 # DNS lookup timeout in seconds (used by the proxy resolver).
 # Default: 5
 dns_timeout = 5
+
+
+# ----------------------------------------------------------------------------
+#  [account_worker]  Root Worker (UDS) — centralized account changes
+# ----------------------------------------------------------------------------
+[account_worker]
+
+# Enable lumina-agent --account-request and future server-driven jobs.
+enabled = false
+
+socket_path = /run/lumina/account-worker.sock
+socket_group = lumina-agent
+allowed_home_prefixes = /home,/app
+min_operable_uid = 1000
+service_account_allowlist =
+job_timeout_sec = 120

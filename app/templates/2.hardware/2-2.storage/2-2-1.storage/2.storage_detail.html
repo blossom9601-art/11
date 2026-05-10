@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -24,7 +24,7 @@
         <div class="content-wrapper">
             {% set qs = '' %}
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='hw_storage_san') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -36,17 +36,17 @@
 
             <!-- 서버 상세 탭 네비게이션 -->
             <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='hw_storage_san_detail') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_detail' else '' }}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_basic') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_basic' else '' }}">구성정보</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_assign') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_assign' else '' }}">할당정보</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_hw') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_hw' else '' }}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_if') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_if' else '' }}">인터페이스</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_account') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_account' else '' }}">계정관리</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_task') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_task' else '' }}">작업이력</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_vulnerability') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_vulnerability' else '' }}">취약점</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_package') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_package' else '' }}">패키지</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_log') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_log' else '' }}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='hw_storage_san_file') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_file' else '' }}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_detail') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_detail' else '' }}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_basic') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_basic' else '' }}">구성정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_assign') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_assign' else '' }}">할당정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_hw') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_hw' else '' }}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_if') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_if' else '' }}">인터페이스</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_account') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_account' else '' }}">계정관리</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_task') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_task' else '' }}">작업이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_vulnerability') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_vulnerability' else '' }}">취약점</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_package') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_package' else '' }}">패키지</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_log') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_log' else '' }}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san_file') }}{{ qs }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_storage_san_file' else '' }}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -224,7 +224,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 시스템 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

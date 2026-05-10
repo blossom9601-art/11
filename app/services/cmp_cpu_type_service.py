@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 from flask import current_app
+from app.services.public_id_service import make_public_id
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,7 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         per_core_tpmc = round(ref_tpmc / ref_core, 4)
     return {
         'id': row['id'],
+        'public_id': make_public_id(TABLE_NAME, 'cpu', row['id']),
         'cpu_code': row['cpu_code'],
         'model_name': row['model_name'],
         'model': row['model_name'],

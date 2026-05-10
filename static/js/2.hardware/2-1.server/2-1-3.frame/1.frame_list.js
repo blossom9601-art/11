@@ -329,19 +329,23 @@
         return allowed.size ? allowed : null;
     }
 
-    async function loadFkSource(sourceKey){
-        if(fkSourceCache.has(sourceKey)){
+    async function loadFkSource(sourceKey, options){
+        const forceRefresh = !!options?.forceRefresh;
+        const bypassSharedCache = sourceKey === 'ORG_RACK' || forceRefresh;
+        if(!forceRefresh && fkSourceCache.has(sourceKey)){
             return fkSourceCache.get(sourceKey);
         }
         const config = FK_SOURCE_CONFIG[sourceKey];
         if(!config){
-            fkSourceCache.set(sourceKey, []);
-            return [];
+            if(!forceRefresh || !fkSourceCache.has(sourceKey)){
+                fkSourceCache.set(sourceKey, []);
+            }
+            return fkSourceCache.get(sourceKey) || [];
         }
         try{
-            var __c = window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
+            var __c = !bypassSharedCache && window.__blsFkCache && window.__blsFkCache.get(config.endpoint);
             const data = __c || await fetchJSON(config.endpoint, { method:'GET', headers:{'Accept':'application/json'} });
-            if(!__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
+            if(!bypassSharedCache && !__c && window.__blsFkCache){ window.__blsFkCache.set(config.endpoint, data); }
             let items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             if(sourceKey === 'SERVER_MODEL' && SERVER_MODEL_FORM_FACTOR_FILTER){
                 const target = String(SERVER_MODEL_FORM_FACTOR_FILTER).trim();
@@ -370,8 +374,10 @@
             return items;
         }catch(err){
             console.warn('[frame] FK source load failed:', sourceKey, err);
-            fkSourceCache.set(sourceKey, []);
-            return [];
+            if(!forceRefresh || !fkSourceCache.has(sourceKey)){
+                fkSourceCache.set(sourceKey, []);
+            }
+            return fkSourceCache.get(sourceKey) || [];
         }
     }
 
@@ -1207,14 +1213,122 @@
         return [{ parentField: 'location_place', childField: 'location_pos' }];
     }
 
-    function extractCenterCodeFromRackRecord(item){
-        return String(item?.center_code || item?.centerCode || item?.center || '').trim();
+    function collectCenterMatchTokens(){
+        const tokens = new Set();
+        Array.from(arguments).forEach(value => {
+            const token = String(value == null ? '' : value).trim();
+            if(token) tokens.add(token);
+        });
+        return tokens;
     }
 
-    function buildRackOptionsMarkupForCenter(centerCode, selectedValue, placeholderLabel){
+    function mergeOrgCenterAliasTokens(tokens){
+        if(!tokens || !tokens.size) return;
+        const centers = fkSourceCache.get('ORG_CENTER') || [];
+        (Array.isArray(centers) ? centers : []).forEach(item => {
+            const rowTokens = collectCenterMatchTokens(
+                item?.center_code,
+                item?.centerCode,
+                item?.center_name,
+                item?.centerName,
+                item?.name
+            );
+            let overlap = false;
+            tokens.forEach(t => {
+                if(rowTokens.has(t)) overlap = true;
+            });
+            if(overlap){
+                rowTokens.forEach(t => { if(t) tokens.add(t); });
+            }
+        });
+    }
+
+    const PLACEHOLDER_CENTER_LABELS = new Set(['센터 선택','랙 선택','선택','위치 선택']);
+
+    function augmentCenterTokensFromPlaceSelect(tokens, locationPlaceSelect){
+        if(!tokens || !locationPlaceSelect) return;
+        const opt = locationPlaceSelect.selectedOptions && locationPlaceSelect.selectedOptions[0];
+        const raw = opt ? String(opt.textContent || '').trim() : '';
+        if(!raw) return;
+        raw.split('·').forEach(seg => {
+            const t = seg.trim();
+            if(t && !PLACEHOLDER_CENTER_LABELS.has(t)) tokens.add(t);
+        });
+        mergeOrgCenterAliasTokens(tokens);
+    }
+
+    function getCenterMatchTokensFromCenterValue(centerValue){
+        const normalized = String(centerValue || '').trim();
+        const tokens = collectCenterMatchTokens(normalized);
+        const centers = fkSourceCache.get('ORG_CENTER') || [];
+        (Array.isArray(centers) ? centers : []).forEach(item => {
+            const itemTokens = collectCenterMatchTokens(
+                item?.center_code,
+                item?.centerCode,
+                item?.center_name,
+                item?.centerName,
+                item?.name
+            );
+            if(normalized && itemTokens.has(normalized)){
+                itemTokens.forEach(token => tokens.add(token));
+            }
+        });
+        mergeOrgCenterAliasTokens(tokens);
+        return tokens;
+    }
+
+    function getCenterMatchTokensFromRackRecord(item){
+        const tokens = collectCenterMatchTokens(
+            item?.center_code,
+            item?.centerCode,
+            item?.center,
+            item?.center_name,
+            item?.centerName,
+            item?.location_place,
+            item?.locationPlace
+        );
+        mergeOrgCenterAliasTokens(tokens);
+        return tokens;
+    }
+
+    async function loadOrgRacksScopedToPlace(normalizedCenter, locationPlaceSelect){
+        const trimmed = String(normalizedCenter || '').trim();
+        if(!trimmed){
+            fkSourceCache.set('ORG_RACK', []);
+            return [];
+        }
+        const config = FK_SOURCE_CONFIG.ORG_RACK || {};
+        const endpoint = config.endpoint || '/api/org-racks';
+        await loadFkSource('ORG_CENTER');
+        const tokens = getCenterMatchTokensFromCenterValue(trimmed);
+        augmentCenterTokensFromPlaceSelect(tokens, locationPlaceSelect);
+        const params = new URLSearchParams();
+        let n = 0;
+        tokens.forEach(t => {
+            params.append('center_match', t);
+            n++;
+        });
+        if(!n){
+            params.append('center_match', trimmed);
+        }
+        const url = `${endpoint}?${params.toString()}`;
+        try{
+            const data = await fetchJSON(url, { method:'GET', headers:{'Accept':'application/json'} });
+            const items = Array.isArray(data?.items) ? data.items : [];
+            fkSourceCache.set('ORG_RACK', items);
+            return items;
+        }catch(err){
+            console.warn('[frame] ORG_RACK(center_match) load failed:', err);
+            fkSourceCache.set('ORG_RACK', []);
+            return [];
+        }
+    }
+
+    function buildRackOptionsMarkupForCenter(centerCode, selectedValue, placeholderLabel, locationPlaceSelect, rackFilterOpts){
         const normalizedCenter = String(centerCode || '').trim();
         const placeholder = placeholderLabel || '랙 선택';
         const current = selectedValue == null ? '' : String(selectedValue).trim();
+        const skipClientCenterFilter = !!(rackFilterOpts && rackFilterOpts.skipClientCenterFilter);
 
         if(!normalizedCenter){
             let html = `<option value="">${escapeHTML('센터를 먼저 선택')}</option>`;
@@ -1231,10 +1345,17 @@
         const labelKey = spec.labelKey || sourceConfig.labelKey || 'name';
         const formatter = spec.optionFormatter || ((item, value, label) => defaultFkFormatter(value, label));
 
-        const filtered = (Array.isArray(records) ? records : []).filter(item => {
-            const rackCenter = extractCenterCodeFromRackRecord(item);
-            return rackCenter && rackCenter === normalizedCenter;
-        });
+        let filtered;
+        if(skipClientCenterFilter){
+            filtered = Array.isArray(records) ? records.slice() : [];
+        } else {
+            const centerTokens = getCenterMatchTokensFromCenterValue(normalizedCenter);
+            augmentCenterTokensFromPlaceSelect(centerTokens, locationPlaceSelect);
+            filtered = (Array.isArray(records) ? records : []).filter(item => {
+                const rackCenters = getCenterMatchTokensFromRackRecord(item);
+                return Array.from(rackCenters).some(token => centerTokens.has(token));
+            });
+        }
 
         const options = [];
         const seen = new Set();
@@ -1264,7 +1385,7 @@
         return html;
     }
 
-    function refreshRackSelectForCenter(rackSelect, centerCode, options){
+    async function refreshRackSelectForCenter(rackSelect, centerCode, options){
         if(!rackSelect) return;
         const normalizedCenter = String(centerCode || '').trim();
         const keepValue = !!options?.keepValue;
@@ -1272,7 +1393,21 @@
         const initialValue = rackSelect.getAttribute('data-initial-value') || '';
         const currentValue = keepValue ? (rackSelect.value || initialValue) : '';
 
-        rackSelect.innerHTML = buildRackOptionsMarkupForCenter(normalizedCenter, currentValue, placeholder);
+        const locationPlaceSel = rackSelect.form && rackSelect.form.querySelector('[name="location_place"]');
+
+        if(normalizedCenter){
+            await loadOrgRacksScopedToPlace(normalizedCenter, locationPlaceSel);
+        } else {
+            fkSourceCache.set('ORG_RACK', []);
+        }
+
+        rackSelect.innerHTML = buildRackOptionsMarkupForCenter(
+            normalizedCenter,
+            currentValue,
+            placeholder,
+            locationPlaceSel,
+            { skipClientCenterFilter: !!normalizedCenter }
+        );
 
         const shouldDisable = !normalizedCenter;
         rackSelect.disabled = shouldDisable;

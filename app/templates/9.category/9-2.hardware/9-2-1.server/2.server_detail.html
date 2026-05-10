@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,9 +9,11 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=20260510_modal_gap_fix2">
     <link rel="stylesheet" href="/static/css/detail3.css?v=1.6">
-    <script src="/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=4.11"></script>
+    <script src="/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie"></script>
+
+    <script src="/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=20260510_modal_exact8"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -22,7 +24,7 @@
     <main class="main-content">
         <div class="content-wrapper">
             <!-- 뒤로가기 버튼 -->
-            <a href="{{ url_for('pages.show', key='cat_hw_server') }}" class="back-btn">
+            <a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server') }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 목록으로 돌아가기
             </a>
@@ -33,10 +35,10 @@
             </div>
 
             <!-- 하드웨어 상세 탭 네비게이션 -->            <div class="server-detail-tabs">
-                <a href="{{ url_for('pages.show', key='cat_hw_server_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_detail' else '' }}">기본정보</a>
-                <a href="{{ url_for('pages.show', key='cat_hw_server_hardware') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_hardware' else '' }}">하드웨어</a>
-                <a href="{{ url_for('pages.show', key='cat_hw_server_log') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_log' else '' }}">변경이력</a>
-                <a href="{{ url_for('pages.show', key='cat_hw_server_file') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_file' else '' }}">구성/파일</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server_detail') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_detail' else '' }}">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server_hardware') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_hardware' else '' }}">하드웨어</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server_log') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_log' else '' }}">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server_file') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'cat_hw_server_file' else '' }}">구성/파일</a>
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -100,7 +102,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260501_fouc1"></script>
+    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
     <!-- 서버 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true" data-modal>
         <div class="server-edit-content">
@@ -119,113 +121,116 @@
     <!-- 메시지 모달 (alert 대체) -->
     {% include 'layouts/_message_modal.html' %}
 
-
+<style id="cat-hw-server-detail-modal-fix">
+#system-edit-modal .server-edit-body .form-section {
+  padding:0 36px !important;
+}
+#system-edit-modal .server-edit-body .form-grid {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:18px !important;
+  align-items:start !important;
+}
+#system-edit-modal .server-edit-body .form-row {
+  display:flex !important;
+  flex-direction:column !important;
+  gap:6px !important;
+  margin:0 !important;
+  min-width:0 !important;
+  width:100% !important;
+}
+#system-edit-modal .server-edit-body .form-row > label {
+  display:flex !important;
+  align-items:center !important;
+  height:18px !important;
+  min-height:18px !important;
+  margin:0 !important;
+  padding:0 !important;
+  line-height:18px !important;
+}
+#system-edit-modal .server-edit-body :is(input.form-input, select.form-input, .fk-searchable-display) {
+  width:100% !important;
+  max-width:100% !important;
+  height:46px !important;
+  min-height:46px !important;
+  line-height:20px !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+}
+#system-edit-modal .server-edit-body .fk-searchable-display {
+  line-height:46px !important;
+}
+#system-edit-modal .server-edit-body .fk-searchable-control {
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  margin:0 !important;
+}
+#system-edit-modal .server-edit-body textarea.form-input {
+  width:100% !important;
+  max-width:100% !important;
+  min-height:160px !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+}
+#system-edit-modal .server-edit-body .form-section .form-grid + .form-row {
+  margin-top:18px !important;
+}
+</style>
 <script>
-/* ========== HW MODAL DIAGNOSTIC ========== */
 (function(){
-  var D = '[hw-diag] ';
-  console.log(D + 'diagnostic script loaded');
-
-  // Wait for DOM
-  function runDiag(){
-    console.log(D + 'running diagnostic...');
-
+  function applyModalFix(){
     var modal = document.getElementById('system-edit-modal');
-    var closeBtn = document.getElementById('system-edit-close');
-    var saveBtn = document.getElementById('system-edit-save');
-    var openBtn = document.getElementById('detail-edit-open');
-    var form = document.getElementById('system-edit-form');
-
-    console.log(D + 'modal: ' + (modal ? 'FOUND' : 'MISSING'));
-    console.log(D + 'openBtn: ' + (openBtn ? 'FOUND' : 'MISSING'));
-    console.log(D + 'closeBtn: ' + (closeBtn ? 'FOUND' : 'MISSING'));
-    console.log(D + 'saveBtn: ' + (saveBtn ? 'FOUND' : 'MISSING'));
-    console.log(D + 'form: ' + (form ? 'FOUND' : 'MISSING'));
-
-    if(openBtn) console.log(D + 'openBtn.onclick=' + typeof openBtn.onclick);
-    if(closeBtn) console.log(D + 'closeBtn.onclick=' + typeof closeBtn.onclick);
-    if(saveBtn) console.log(D + 'saveBtn.onclick=' + typeof saveBtn.onclick);
-
-    // Monitor ALL events on the save button
-    ['pointerdown','pointerup','mousedown','mouseup','click'].forEach(function(evType){
-      if(saveBtn) saveBtn.addEventListener(evType, function(e){
-        console.log(D + 'saveBtn got ' + evType + ' (bubbles=' + e.bubbles + ', defaultPrevented=' + e.defaultPrevented + ')');
-      }, false);
-      if(closeBtn) closeBtn.addEventListener(evType, function(e){
-        console.log(D + 'closeBtn got ' + evType + ' (bubbles=' + e.bubbles + ', defaultPrevented=' + e.defaultPrevented + ')');
-      }, false);
+    if(!modal) return;
+    modal.classList.add('category-detail-edit-modal');
+    modal.querySelectorAll('.server-edit-body .form-grid').forEach(function(grid){
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'minmax(0,1fr) minmax(0,1fr)';
+      grid.style.gap = '18px';
+      grid.style.columnGap = '18px';
+      grid.style.rowGap = '18px';
+      grid.style.alignItems = 'start';
     });
-
-    // Monitor capture phase on document
-    document.addEventListener('click', function(e){
-      var btn = e.target ? (e.target.closest ? e.target.closest('button') : null) : null;
-      if(btn && (btn.id === 'system-edit-save' || btn.id === 'system-edit-close')){
-        console.log(D + 'CAPTURE click on ' + btn.id + ' at document level');
-      }
-    }, true);
-
-    // Check computed styles of buttons
-    if(saveBtn){
-      var cs = window.getComputedStyle(saveBtn);
-      console.log(D + 'saveBtn computedStyle: pointerEvents=' + cs.pointerEvents + ', visibility=' + cs.visibility + ', display=' + cs.display + ', opacity=' + cs.opacity + ', zIndex=' + cs.zIndex);
-    }
-
-    // Check if any element covers the save button
-    if(modal && modal.classList.contains('show') && saveBtn){
-      var rect = saveBtn.getBoundingClientRect();
-      var cx = rect.left + rect.width/2;
-      var cy = rect.top + rect.height/2;
-      var topEl = document.elementFromPoint(cx, cy);
-      console.log(D + 'elementFromPoint at saveBtn center: ' + (topEl ? (topEl.tagName + '#' + topEl.id + '.' + topEl.className) : 'null'));
-    }
-
-    // Monitor modal open to re-check after opening
-    if(modal){
-      new MutationObserver(function(mutations){
-        mutations.forEach(function(m){
-          if(m.attributeName === 'class' && modal.classList.contains('show')){
-            console.log(D + 'MODAL OPENED — re-checking...');
-            setTimeout(function(){
-              console.log(D + 'saveBtn.onclick=' + typeof (saveBtn||{}).onclick);
-              console.log(D + 'closeBtn.onclick=' + typeof (closeBtn||{}).onclick);
-              // Check element coverage
-              if(saveBtn){
-                var r = saveBtn.getBoundingClientRect();
-                var cx = r.left + r.width/2;
-                var cy = r.top + r.height/2;
-                var topEl = document.elementFromPoint(cx, cy);
-                console.log(D + 'elementFromPoint at saveBtn center: ' + (topEl ? (topEl.tagName + '#' + topEl.id + '.' + topEl.className) : 'null'));
-                // Check if the hit element is the save button itself or its descendant
-                if(topEl !== saveBtn && !saveBtn.contains(topEl)){
-                  console.error(D + 'BLOCKED! Save button is COVERED by: ' + topEl.tagName + '#' + topEl.id + '.' + topEl.className);
-                  console.error(D + 'Blocker zIndex=' + window.getComputedStyle(topEl).zIndex + ', position=' + window.getComputedStyle(topEl).position);
-                } else {
-                  console.log(D + 'OK: Save button is clickable (top element is self or child)');
-                }
-              }
-              if(closeBtn){
-                var r2 = closeBtn.getBoundingClientRect();
-                var cx2 = r2.left + r2.width/2;
-                var cy2 = r2.top + r2.height/2;
-                var topEl2 = document.elementFromPoint(cx2, cy2);
-                if(topEl2 !== closeBtn && !closeBtn.contains(topEl2)){
-                  console.error(D + 'BLOCKED! Close button is COVERED by: ' + topEl2.tagName + '#' + topEl2.id + '.' + topEl2.className);
-                } else {
-                  console.log(D + 'OK: Close button is clickable');
-                }
-              }
-            }, 300);
-          }
-        });
-      }).observe(modal, {attributes: true, attributeFilter:['class']});
-    }
+    modal.querySelectorAll('.server-edit-body .form-row').forEach(function(row){
+      row.style.display = 'flex';
+      row.style.flexDirection = 'column';
+      row.style.gap = '6px';
+      row.style.margin = '0';
+      row.style.width = '100%';
+      row.style.minWidth = '0';
+    });
+    modal.querySelectorAll('.server-edit-body .form-row > label').forEach(function(label){
+      label.style.height = '18px';
+      label.style.minHeight = '18px';
+      label.style.lineHeight = '18px';
+      label.style.margin = '0';
+      label.style.padding = '0';
+    });
+    modal.querySelectorAll('.server-edit-body input.form-input, .server-edit-body select.form-input, .server-edit-body .fk-searchable-display').forEach(function(field){
+      field.style.width = '100%';
+      field.style.maxWidth = '100%';
+      field.style.height = '46px';
+      field.style.minHeight = '46px';
+      field.style.margin = '0';
+      field.style.boxSizing = 'border-box';
+    });
   }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', runDiag);
-  } else {
-    runDiag();
+  function run(){
+    applyModalFix();
   }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  document.addEventListener('click', function(e){
+    if(e.target && e.target.closest && e.target.closest('#detail-edit-open')){
+      setTimeout(applyModalFix, 0);
+      setTimeout(applyModalFix, 150);
+      setTimeout(applyModalFix, 500);
+    }
+  }, true);
+  setInterval(function(){
+    var modal = document.getElementById('system-edit-modal');
+    if(modal && modal.classList.contains('show')) applyModalFix();
+  }, 500);
 })();
 </script>
 </body>

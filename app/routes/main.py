@@ -164,9 +164,7 @@ def addon_chat():
 
 @main_bp.route('/addon/calendar')
 def addon_calendar():
-    """캘린더 (임시 스텁)"""
-    if not _is_spa_fetch():
-        return render_template('layouts/spa_shell.html', current_key='addon_calendar', menu_code=None)
+    """캘린더 — 첫 로드부터 전체 HTML(FullCalendar·페이지 CSS 포함). SPA 전환 시에만 main 교체."""
     # 기존 프로젝트 작업 캘린더 라우트와 중복될 수 있으나 구분 (addon prefix)
     try:
         calendar_api_base = url_for('api.list_calendar_schedules')

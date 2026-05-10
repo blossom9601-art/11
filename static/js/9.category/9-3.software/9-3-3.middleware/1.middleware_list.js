@@ -561,24 +561,8 @@
                     let cellValue = highlight(displayVal, col);
                     // 모델명에 상세 링크 적용 (검색 하이라이트 유지)
                     if(col === 'model'){
-                        // Dynamic detail URL construction replicating database pattern
-                        const base = window.__SW_MIDDLEWARE_DETAIL_URL || '#';
-                        const urlObj = new URL(base, window.location.origin);
-                        if(row.id != null && String(row.id).trim() !== ''){
-                            urlObj.search = '';
-                            urlObj.searchParams.set('middleware_id', String(row.id));
-                        } else {
-                            const params = {
-                                model: row.model,
-                                vendor: row.vendor,
-                                hw_type: row.hw_type,
-                                release_date: row.release_date,
-                                eosl: row.eosl,
-                                qty: row.qty,
-                                note: row.note
-                            };
-                            Object.entries(params).forEach(([k,v])=>{ if(v!=null && String(v).trim()!=='') urlObj.searchParams.set(k, v); });
-                        }
+                        const publicId = String(row.public_id || '').trim();
+                        const href = publicId ? ('/b/' + encodeURIComponent(publicId)) : '#';
                         const payload = {
                             id: row.id,
                             model: row.model,
@@ -590,7 +574,7 @@
                             note: row.note
                         };
                         const jsonAttr = escapeHTML(JSON.stringify(payload));
-                        cellValue = `<a href="${urlObj.toString()}" class="work-name-link" data-id="${row.id??''}" data-row='${jsonAttr}' data-json='${jsonAttr}'>${cellValue}</a>`;
+                        cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" data-row='${jsonAttr}' data-json='${jsonAttr}'>${cellValue}</a>`;
                     }
                     // EOSL status indicator (three colors)
                     if(col === 'eosl'){
@@ -839,7 +823,7 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'미들웨어', cols:['model','vendor','release_date','eosl'] };
+    const group = { title:'미들웨어', cols:['model','vendor','hw_type','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';

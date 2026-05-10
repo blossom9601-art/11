@@ -645,22 +645,12 @@
                     // 링크: 모델명 클릭 시 서버 상세 페이지로 이동 (CPU 리스트와 동일한 스타일/클래스 적용)
                     if(col === 'model'){
                         // Dynamic detail routing (Unix pattern replication)
-                        var base = (window.__HW_SERVER_DETAIL_URL || '');
                         try{
-                            var params = new URLSearchParams();
-                            params.set('id', (row.id==null?'' : String(row.id)));
-                            params.set('model', row.model || '');
-                            params.set('vendor', row.vendor || '');
-                            params.set('server_code', row.server_code || '');
-                            params.set('hw_type', row.hw_type || '');
-                            params.set('release_date', row.release_date || '');
-                            params.set('eosl', row.eosl || '');
-                            params.set('qty', (row.qty==null?'' : String(row.qty)));
-                            params.set('note', row.note || '');
-                            var href = base ? (base + '?' + params.toString()) : '#';
-                            cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
+                            var publicId = String(row.public_id || '').trim();
+                            var href = publicId ? ('/b/' + encodeURIComponent(publicId)) : '#';
+                            cellValue = `<a href="${href}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</a>`;
                         }catch(_e){
-                            cellValue = `<span class="work-name-link" data-id="${row.id??''}">${cellValue}</span>`;
+                            cellValue = `<span class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}">${cellValue}</span>`;
                         }
                     }
                     // EOSL status indicator (three colors)
@@ -916,7 +906,7 @@
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.setAttribute('data-fk-ignore', '1');
         form.innerHTML='';
-    const group = { title:'하드웨어', cols:['model','vendor','release_date','eosl'] };
+    const group = { title:'하드웨어', cols:['model','vendor','hw_type','release_date','eosl'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
@@ -942,6 +932,12 @@
         if(col==='vendor'){
             const v = String(value ?? '').trim();
             return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${buildVendorOptionsHtml(v, { allowLegacyUnknownSelected: true })}</select>`;
+        }
+        if(col==='hw_type'){
+            const v = String(value??'');
+            const opts = ['', '서버', '클라우드', '프레임', '워크스테이션'];
+            const labels = { '': '선택', '서버': '물리서버', '클라우드': '클라우드', '프레임': '프레임', '워크스테이션': '가상서버' };
+            return `<select name="hw_type" class="form-input search-select" data-searchable="true" data-placeholder="선택" required>${opts.map(o=>`<option value="${o}" ${o===v?'selected':''}>${labels[o]||o}</option>`).join('')}</select>`;
         }
         if(col==='qty'){
             return `<input name="qty" type="number" min="0" step="1" class="form-input" value="${value??''}" placeholder="숫자만">`;

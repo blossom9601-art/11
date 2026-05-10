@@ -302,7 +302,7 @@
 		var overlay = document.createElement('div');
 		overlay.id = id;
 		overlay.style.cssText = 'position:fixed;inset:0;z-index:10100;display:flex;align-items:center;justify-content:center;' +
-			'background:rgba(15,23,42,.45);backdrop-filter:blur(4px);animation:fadeIn .15s ease;';
+			'background:var(--modal-overlay, rgba(15,23,42,.28));backdrop-filter:blur(var(--modal-blur, 5px));animation:fadeIn .15s ease;';
 		overlay.innerHTML =
 			'<div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.18);' +
 				'width:420px;max-width:90vw;overflow:hidden;">' +
@@ -768,7 +768,7 @@
 		overlay.id = _COLLECTED_MODAL_ID;
 		overlay.className = 'modal-overlay-full';
 		overlay.setAttribute('aria-hidden', 'true');
-		overlay.style.cssText = 'position:fixed;inset:0;z-index:10120;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.42);backdrop-filter:blur(6px);padding:24px;';
+		overlay.style.cssText = 'position:fixed;inset:0;z-index:10120;display:none;align-items:center;justify-content:center;background:var(--modal-overlay, rgba(15,23,42,.28));backdrop-filter:blur(var(--modal-blur, 5px));padding:24px;';
 		overlay.innerHTML = '' +
 			'<div style="width:min(1120px,96vw);max-height:88vh;display:flex;flex-direction:column;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 28px 80px rgba(15,23,42,.24);">' +
 				'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px 28px 18px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);">' +

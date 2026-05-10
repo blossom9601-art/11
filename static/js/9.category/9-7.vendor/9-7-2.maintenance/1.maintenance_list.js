@@ -188,9 +188,10 @@
     const UPLOAD_CONFIRM_ID = 'system-upload-confirm';
     // Upload template (Maintenance schema)
     const UPLOAD_HEADERS_KO = [
-        '유지보수사','주소','사업자번호','고객센터','담당자수','하드웨어(수량)','소프트웨어(수량)','컴포넌트(수량)','비고'
+        '로고','유지보수사','주소','사업자번호','고객센터','담당자수','하드웨어(수량)','소프트웨어(수량)','컴포넌트(수량)','비고'
     ];
     const HEADER_KO_TO_KEY = {
+        '로고':'logo_url',
         '유지보수사':'vendor',
         '주소':'address',
         '사업자번호':'business_number',
@@ -210,19 +211,20 @@
     // "주소", "비고"는 모달에는 유지하지만 목록 화면(테이블)에서는 숨김
     const ALWAYS_HIDDEN_TABLE_COLS = new Set(['address']);
     const BASE_VISIBLE_COLUMNS = [
-        'vendor','business_number','call_center','hardware_qty','software_qty','component_qty'
+        'logo','vendor','business_number','call_center','hardware_qty','software_qty','component_qty'
     ];
     const COLUMN_ORDER = [
-        'vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'
+        'logo','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty','note'
     ];
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
     const COLUMN_MODAL_GROUPS = [
-        { group: '유지보수사', columns: ['vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] }
+        { group: '유지보수사', columns: ['logo','vendor','address','business_number','call_center','hardware_qty','software_qty','component_qty'] }
     ];
 
     /** 컬럼 메타 (라벨 + 그룹) */
     const COLUMN_META = {
+        logo:{label:'로고',group:'유지보수사'},
         vendor:{label:'유지보수사',group:'유지보수사'},
         address:{label:'주소',group:'유지보수사'},
         business_number:{label:'사업자번호',group:'유지보수사'},
@@ -286,6 +288,8 @@
         const payload = {
             maintenance_name: vendorName || undefined,
             vendor: vendorName || undefined,
+            logo_url: sanitizeString(data.logo_url || data.logo),
+            logo: sanitizeString(data.logo || data.logo_url),
             address: sanitizeString(data.address),
             business_number: sanitizeString(data.business_number),
             business_no: sanitizeString(data.business_no),
@@ -322,9 +326,12 @@
         if(!item) return null;
         return {
             id: item.id,
+            public_id: String(item.public_id || '').trim(),
             vendor: item.vendor || item.maintenance_name || '',
             maintenance_name: item.maintenance_name || item.vendor || '',
             maintenance_code: item.maintenance_code || item.code || '',
+            logo: item.logo || item.logo_url || '',
+            logo_url: item.logo_url || item.logo || '',
             address: item.address || '',
             business_number: item.business_number || item.business_no || '',
             call_center: item.call_center || '',
@@ -365,6 +372,25 @@
             throw error;
         }
         return data;
+    }
+
+    async function uploadVendorLogo(file){
+        if(!file) return '';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('scope', 'maintenance');
+        const response = await fetch('/api/vendor-logo/upload', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        });
+        let data = null;
+        try { data = await response.json(); } catch(_e) { data = null; }
+        if(!response.ok || data?.success === false){
+            throw new Error(data?.message || data?.error || '로고 업로드 중 오류가 발생했습니다.');
+        }
+        return data?.url || '';
     }
 
     async function loadMaintenanceVendors(options){
@@ -553,10 +579,14 @@
                     }
                     const displayVal = (rawVal==null || String(rawVal).trim()==='') ? '-' : rawVal;
                     let cellValue = highlight(displayVal, col);
+                    if(col === 'logo'){
+                        cellValue = renderVendorLogo(rawVal, row.vendor);
+                    }
                     // Link vendor name to maintenance detail page (clean URL — no id in query string)
                     if(col === 'vendor' && displayVal !== '-'){
-                        const injected = (window.__CAT_VENDOR_MAINTENANCE_DETAIL_URL || '/p/cat_vendor_maintenance_detail');
-                        cellValue = `<a href="${injected}" class="work-name-link" data-id="${row.id??''}" title="유지보수사 상세로 이동">${cellValue}</a>`;
+                        const publicId = String(row.public_id || '').trim();
+                        const injected = publicId ? `/b/${encodeURIComponent(publicId)}` : (window.__CAT_VENDOR_MAINTENANCE_DETAIL_URL || '/b/cat_vendor_maintenance_detail');
+                        cellValue = `<a href="${injected}" class="work-name-link" data-id="${row.id??''}" data-public-id="${row.public_id??''}" title="유지보수사 상세로 이동">${cellValue}</a>`;
                     }
                     // no special cell rendering for maintenance schema
                     return `<td data-col="${col}" data-label="${label}" class="${tdClass}">${cellValue}</td>`;
@@ -578,6 +608,8 @@
                             id: row.id,
                             vendor_id: row.id,
                             vendor: row.vendor,
+                            logo: row.logo,
+                            logo_url: row.logo_url,
                             address: row.address,
                             business_number: row.business_number,
                             call_center: row.call_center,
@@ -597,9 +629,9 @@
                         credentials: 'same-origin'
                     }).then(function(res){
                         if(res.ok){ blsSpaNavigate(href); }
-                        else { blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id)); }
+                        else { blsSpaNavigate(href); }
                     }).catch(function(){
-                        blsSpaNavigate(href + (href.indexOf('?')>-1?'&':'?') + 'vendor_id=' + encodeURIComponent(row.id));
+                        blsSpaNavigate(href);
                     });
                 });
             }
@@ -640,6 +672,71 @@
 
     function escapeHTML(str){
         return String(str).replace(/[&<>'"]/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[s]));
+    }
+
+    function renderVendorLogo(url, altText){
+        const src = sanitizeString(url);
+        if(!src) return '-';
+        const alt = sanitizeString(altText) || '유지보수사 로고';
+        return `<img src="${escapeHTML(src)}" alt="${escapeHTML(alt)}" title="${escapeHTML(alt)}" class="vendor-logo-img" loading="lazy" onerror="this.style.display='none';">`;
+    }
+
+    function renderLogoFileInput(value){
+        const src = sanitizeString(value);
+        const preview = src
+            ? `<div class="vendor-logo-preview"><img src="${escapeHTML(src)}" alt="로고 미리보기"></div>`
+            : `<div class="vendor-logo-preview" hidden><img alt="로고 미리보기"></div>`;
+        return `<input name="logo_url" type="hidden" value="${escapeHTML(src)}">`
+            + `<div class="vendor-logo-field${src ? ' has-file' : ''}">`
+            + preview
+            + `<label class="vendor-logo-upload-btn" title="로고 첨부" aria-label="로고 첨부"><input name="logo_file" type="file" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" class="vendor-logo-file-input" hidden><img src="/static/image/svg/free-icon-font-folder-open.svg" alt="" class="vendor-logo-upload-icon" aria-hidden="true"></label>`
+            + `<span class="vendor-logo-file-name">${src ? '' : '선택된 파일 없음'}</span>`
+            + `</div>`;
+    }
+
+    function bindLogoPreviewHandlers(){
+        document.addEventListener('change', (event)=>{
+            const input = event.target;
+            if(!input || !input.classList || !input.classList.contains('vendor-logo-file-input')) return;
+            const file = input.files && input.files[0] ? input.files[0] : null;
+            const field = input.closest('.vendor-logo-field');
+            if(!field) return;
+            const preview = field.querySelector('.vendor-logo-preview');
+            const img = preview ? preview.querySelector('img') : null;
+            const fileName = field.querySelector('.vendor-logo-file-name');
+            if(file){
+                if(img) img.src = URL.createObjectURL(file);
+                if(preview) preview.hidden = false;
+                if(fileName) fileName.textContent = '';
+                field.classList.add('has-file');
+            } else {
+                if(preview) preview.hidden = true;
+                if(fileName) fileName.textContent = '선택된 파일 없음';
+                field.classList.remove('has-file');
+            }
+        });
+    }
+
+    function resetLogoFieldVisuals(form){
+        if(!form) return;
+        form.querySelectorAll('.vendor-logo-field').forEach(field=>{
+            const preview = field.querySelector('.vendor-logo-preview');
+            const img = preview ? preview.querySelector('img') : null;
+            const fileName = field.querySelector('.vendor-logo-file-name');
+            const hidden = field.parentElement ? field.parentElement.querySelector('input[name="logo_url"]') : null;
+            const existing = sanitizeString(hidden?.value);
+            if(existing){
+                if(img) img.src = existing;
+                if(preview) preview.hidden = false;
+                if(fileName) fileName.textContent = '';
+                field.classList.add('has-file');
+            } else {
+                if(img) img.removeAttribute('src');
+                if(preview) preview.hidden = true;
+                if(fileName) fileName.textContent = '선택된 파일 없음';
+                field.classList.remove('has-file');
+            }
+        });
     }
 
     // Pagination UI
@@ -825,9 +922,20 @@
     }
 
     // Add / Edit
-    function collectForm(form){
+    async function collectForm(form){
         const data={};
-        form.querySelectorAll('input,select,textarea').forEach(el=>{ data[el.name]=el.value.trim(); });
+        for(const el of form.querySelectorAll('input,select,textarea')){
+            if(!el.name) continue;
+            if(el.type === 'file'){
+                const file = el.files && el.files[0] ? el.files[0] : null;
+                if(file){
+                    data.logo_url = await uploadVendorLogo(file);
+                    data.logo = data.logo_url;
+                }
+                continue;
+            }
+            data[el.name]=el.value.trim();
+        }
         return data;
     }
 
@@ -843,12 +951,12 @@
             form.appendChild(hid);
         });
 
-    const group = { title:'유지보수사', cols:['vendor','address','business_number','call_center','manager_count'] };
+    const group = { title:'유지보수사', cols:['logo','vendor','address','business_number','call_center','manager_count'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';
         group.cols.forEach(c=>{ if(!COLUMN_META[c]) return; const wrap=document.createElement('div');
-            wrap.className = 'form-row';
+            wrap.className = c === 'logo' ? 'form-row vendor-logo-row' : 'form-row';
             const labelText = COLUMN_META[c]?.label||c;
             wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
         section.appendChild(grid);
@@ -864,6 +972,9 @@
         }
         if(col==='note'){
             return `<textarea name="note" class="form-input textarea-large" rows="6">${value??''}</textarea>`;
+        }
+        if(col==='logo'){
+            return renderLogoFileInput(value);
         }
         if(col==='vendor'){
             return `<input name="vendor" class="form-input" value="${value??''}" data-fk-ignore="1">`;
@@ -1200,6 +1311,8 @@
         });
     // add modal
     document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> {
+            const form = document.getElementById(ADD_FORM_ID);
+            if(form) resetLogoFieldVisuals(form);
             openModal(ADD_MODAL_ID);
             // Apply dashed-with-lock styling to numeric inputs in Add modal
             ['manager_count','hardware_qty','software_qty','component_qty'].forEach(name=>{
@@ -1217,13 +1330,14 @@
             const form = document.getElementById(ADD_FORM_ID);
             if(!form){ return; }
             if(!form.checkValidity()){ form.reportValidity(); return; }
-            const data = collectForm(form);
             const btn = document.getElementById(ADD_SAVE_ID);
             if(btn) btn.disabled = true;
             try{
+                const data = await collectForm(form);
                 await createMaintenanceRecord(data);
                 await loadMaintenanceVendors({ silent: true });
                 form.reset();
+                resetLogoFieldVisuals(form);
                 closeModal(ADD_MODAL_ID);
                 showMessage('유지보수사가 등록되었습니다.', '완료');
             }catch(err){
@@ -1242,9 +1356,9 @@
             const btn = document.getElementById(EDIT_SAVE_ID);
             const id = parseInt(btn?.getAttribute('data-id')||'-1',10);
             if(!Number.isFinite(id) || id < 0){ showMessage('수정할 유지보수사를 찾을 수 없습니다.', '안내'); return; }
-            const data = collectForm(form);
             if(btn) btn.disabled = true;
             try{
+                const data = await collectForm(form);
                 await updateMaintenanceRecord(id, data);
                 await loadMaintenanceVendors({ silent: true });
                 closeModal(EDIT_MODAL_ID);
@@ -1506,7 +1620,7 @@
     document.getElementById(DISPOSE_CLOSE_ID)?.addEventListener('click', ()=> closeModal(DISPOSE_MODAL_ID));
         document.getElementById(DISPOSE_CONFIRM_ID)?.addEventListener('click', ()=>{
             // 선택 행 스냅샷: 유지보수사 관련 주요 필드 수집
-            const fields = ['vendor','address','business_number','call_center','manager_count','hardware_qty','software_qty','component_qty'];
+            const fields = ['logo','logo_url','vendor','address','business_number','call_center','manager_count','hardware_qty','software_qty','component_qty'];
             const selected = state.data.filter(r=> state.selected.has(r.id)).map(r=>{
                 const obj = { id: r.id };
                 fields.forEach(f=> obj[f] = r[f] ?? '');
@@ -1611,9 +1725,11 @@
         function inputFor(col){
             if(col === 'manager_count' || col === 'hardware_qty' || col === 'software_qty' || col === 'component_qty') return `<input type="number" min="0" step="1" class="form-input qty-dashed-lock" data-bulk-field="${col}" placeholder="0">`;
             if(col === 'note') return `<textarea class="form-input textarea-large" rows="6" data-bulk-field="note" placeholder="설명"></textarea>`;
+            if(col === 'logo') return `<input class="form-input" data-bulk-field="logo_url" placeholder="로고 첨부">`;
+            if(col === 'vendor') return `<input class="form-input" data-bulk-field="vendor" placeholder="값 입력" data-fk-ignore="1">`;
             return `<input class="form-input" data-bulk-field="${col}" placeholder="값 입력">`;
         }
-    const GROUP = { title:'유지보수사', cols:['vendor','address','business_number','call_center','manager_count','hardware_qty','software_qty','component_qty'] };
+    const GROUP = { title:'유지보수사', cols:['logo','vendor','address','business_number','call_center','manager_count','hardware_qty','software_qty','component_qty'] };
         const grid = GROUP.cols.map(col=>{
             const meta = COLUMN_META[col]; if(!meta) return '';
             const wide = (col === 'note');
@@ -1686,6 +1802,7 @@
         } catch(err){}
         // Load persisted sort (if any)
         loadSortPreference();
+        bindLogoPreviewHandlers();
         bindEvents();
         render();
         await loadMaintenanceVendors();

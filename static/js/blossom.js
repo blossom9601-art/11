@@ -22,8 +22,9 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
                 .then(function (response) {
-                    // 401 응답 또는 response.ok가 false면 세션 무효 처리
-                    if (!response.ok || response.status === 401) {
+                    // 서버·프록시 오류(5xx), 레이트리밋(429) 등은 세션 무효가 아님.
+                    // 서버가 세션을 확실히 끊은 경우만(401) 로그아웃 동기화.
+                    if (response.status === 401) {
                         // 로그아웃 신호를 localStorage에 저장 (다른 탭에 알림)
                         try {
                             localStorage.setItem(LS_LOGOUT_KEY, String(Date.now()));
@@ -31,7 +32,7 @@
                             // localStorage 접근 불가능한 경우
                         }
                         // 현재 탭을 로그인 페이지로 리다이렉트
-                        window.location.href = '/login?reason=session-expired';
+                        window.location.href = '/login';
                     }
                 })
                 .catch(function (error) {
@@ -51,7 +52,7 @@
             window.addEventListener('storage', function (event) {
                 if (event.key === LS_LOGOUT_KEY && event.newValue) {
                     // 다른 탭에서 로그아웃했음을 감지 → 즉시 리다이렉트
-                    window.location.href = '/login?reason=multi-tab-logout';
+                    window.location.href = '/login';
                 }
             });
         }
@@ -4314,11 +4315,80 @@ document.addEventListener('DOMContentLoaded', () => {
     // 페이지 로드 시 서브메뉴 상태 복원
     restoreSubmenuState();
     
+    /** /b/ven_* … 같은 서명 public_id 경로 → cat_* 라우트 키 (사이드바 data-match-keys 와 일치) */
+    function resolveOpaqueSegmentNavKey(segment, search) {
+        if (!segment || String(segment).startsWith('cat_')) return '';
+        const us = String(segment).indexOf('_');
+        if (us < 1) return '';
+        const prefix = String(segment).slice(0, us);
+        const OPAQUE_PREFIX_TO_BASE = {
+            bg: 'cat_business_group',
+            srv: 'cat_hw_server',
+            stor: 'cat_hw_storage',
+            san: 'cat_hw_san',
+            net: 'cat_hw_network',
+            sec: 'cat_hw_security',
+            os: 'cat_sw_os',
+            db: 'cat_sw_database',
+            mw: 'cat_sw_middleware',
+            virt: 'cat_sw_virtualization',
+            swsec: 'cat_sw_security',
+            ha: 'cat_sw_high_availability',
+            cpu: 'cat_component_cpu',
+            gpu: 'cat_component_gpu',
+            mem: 'cat_component_memory',
+            disk: 'cat_component_disk',
+            nic: 'cat_component_nic',
+            hba: 'cat_component_hba',
+            cmp: 'cat_component_etc',
+            ven: 'cat_vendor_manufacturer',
+            mnt: 'cat_vendor_maintenance',
+            cust: 'cat_customer_client1',
+        };
+        const base = OPAQUE_PREFIX_TO_BASE[prefix];
+        if (!base) return '';
+        let tab = 'basic';
+        try {
+            const p = new URLSearchParams(search || '');
+            const t = (p.get('tab') || 'basic').trim().toLowerCase();
+            if (t) tab = t;
+        } catch (_e) {}
+        const TAB_TO_SUFFIX = {
+            basic: '_detail',
+            detail: '_detail',
+            hardware: '_hardware',
+            software: '_software',
+            component: '_component',
+            manager: '_manager',
+            system: '_system',
+            service: '_service',
+            sla: '_sla',
+            issue: '_issue',
+            task: '_task',
+            log: '_log',
+            file: '_file',
+        };
+        const suf = TAB_TO_SUFFIX[tab] || '_detail';
+        return base + suf;
+    }
+
     // 현재 페이지 활성화 표시 (중복 누적 방지)
     function applyActiveMenuHighlight(){
         const currentPath = window.location.pathname;
-        const currentKeyMatch = currentPath.match(/\/p\/([^\/?#]+)/);
-        const currentKey = currentKeyMatch ? currentKeyMatch[1] : '';
+        let currentKey = '';
+        const currentKeyMatchP = currentPath.match(/^\/p\/([^/?#]+)/);
+        const currentKeyMatchB = currentPath.match(/^\/b\/([^/?#]+)/);
+        if (currentKeyMatchP) currentKey = currentKeyMatchP[1];
+        else if (currentKeyMatchB) currentKey = currentKeyMatchB[1];
+        try {
+            const opaqueK = resolveOpaqueSegmentNavKey(currentKey, window.location.search);
+            if (opaqueK) currentKey = opaqueK;
+        } catch (_e) {}
+        try {
+            const mk = document.querySelector('main.main-content[data-current-key]');
+            const dk = mk ? String(mk.getAttribute('data-current-key') || '').trim() : '';
+            if (dk) currentKey = dk;
+        } catch (_e) {}
         const links = document.querySelectorAll('.menu-link, .submenu-link');
         // 모든 활성화 초기화
         links.forEach(l => l.classList.remove('active'));
@@ -4420,9 +4490,14 @@ document.addEventListener('DOMContentLoaded', () => {
     var __spaNavInflight = null;      // 현재 진행 중인 AbortController
     var __spaNavPrefetch = {};        // href -> Promise  (hover prefetch)
     var SPA_CACHE_TTL = 5 * 60 * 1000; // 5분
+    /** 값을 올리면 SPA HTML 스냅샷 캐시 전부 무효화(오래된 <script>?v= 잔류 방지). */
+    var SPA_HTML_CACHE_REVISION = '20260510l';
+    function __spaNavCacheKey(href) {
+        return String(href || '') + '\u0001' + SPA_HTML_CACHE_REVISION;
+    }
 
     // SPA 인터셉트 가능한 경로 목록
-    var __spaRoutePrefixes = ['/p/', '/addon/', '/dashboard', '/settings/', '/account/', '/admin/auth/', '/hardware/', '/project/', '/construction'];
+    var __spaRoutePrefixes = ['/p/', '/b/', '/addon/', '/dashboard', '/settings/', '/account/', '/admin/auth/', '/hardware/', '/project/', '/construction'];
 
     function __spaCanIntercept(href) {
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
@@ -4436,9 +4511,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // 안정성을 위해 항상 풀 페이지 이동으로 처리한다.
             if (/^\/p\/cat_business_group_(detail|manager|system|service|task|log|file)$/.test(url.pathname)) return false;
             // 비즈니스 대시보드는 첫 진입 레이아웃 안정성을 위해 항상 풀 리로드로 진입한다.
-            if (url.pathname === '/p/cat_business_dashboard') return false;
+            if (url.pathname === '/b/cat_business_dashboard') return false;
             // 채팅은 독립 페이지 스크립트가 매 진입마다 새로 평가되어야 한다.
             if (url.pathname === '/addon/chat') return false;
+            // 통합계정(신청·현황 등): 단계형 폼 스크립트가 SPA 삽입 시 누락되는 경우 방지 → 풀 로드
+            if (/^\/p\/identity_account_/.test(url.pathname)) return false;
             var ok = false;
             for (var pi = 0; pi < __spaRoutePrefixes.length; pi++) {
                 if (url.pathname.startsWith(__spaRoutePrefixes[pi]) || url.pathname === __spaRoutePrefixes[pi].replace(/\/$/, '')) {
@@ -4452,7 +4529,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function __spaFetchPage(href) {
         // 캐시 히트 확인
-        var cached = __spaNavCache[href];
+        var cached = __spaNavCache[__spaNavCacheKey(href)];
         if (cached && (Date.now() - cached.ts < SPA_CACHE_TTL)) {
             return Promise.resolve(cached.html);
         }
@@ -4471,7 +4548,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
         }).then(function (html) {
-            __spaNavCache[href] = { html: html, ts: Date.now() };
+            __spaNavCache[__spaNavCacheKey(href)] = { html: html, ts: Date.now() };
             return html;
         });
     }
@@ -4700,7 +4777,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 즉시 active 반영 + progress bar
         try { __spaSetActiveLink(href); } catch (_e) {}
         // 캐시 히트 시 스켈레톤 표시 생략 → 즉시 교체 (체감 속도 대폭 개선)
-        var hasCached = __spaNavCache[href] && (Date.now() - __spaNavCache[href].ts < SPA_CACHE_TTL);
+        var hasCached = __spaNavCache[__spaNavCacheKey(href)] && (Date.now() - __spaNavCache[__spaNavCacheKey(href)].ts < SPA_CACHE_TTL);
         if (!hasCached) __spaShowSkeleton();
         document.documentElement.classList.add('spa-loading');
 
@@ -4768,7 +4845,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function __spaPrefetch(href) {
         if (!__spaCanIntercept(href)) return;
         if (__spaNavPrefetch[href]) return; // 이미 요청 중
-        var cached = __spaNavCache[href];
+        var cached = __spaNavCache[__spaNavCacheKey(href)];
         if (cached && (Date.now() - cached.ts < SPA_CACHE_TTL)) return; // 캐시 유효
         __spaNavPrefetch[href] = fetch(href, {
             method: 'GET',
@@ -4779,7 +4856,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
         }).then(function (html) {
-            __spaNavCache[href] = { html: html, ts: Date.now() };
+            __spaNavCache[__spaNavCacheKey(href)] = { html: html, ts: Date.now() };
         }).catch(function () {}).finally(function () {
             delete __spaNavPrefetch[href];
         });
@@ -5589,7 +5666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         async function fetchAndSwap(href){
             // 캐시 히트 시 스피너 생략
-            const hasCached = __spaNavCache[href] && (Date.now() - __spaNavCache[href].ts < SPA_CACHE_TTL);
+            const hasCached = __spaNavCache[__spaNavCacheKey(href)] && (Date.now() - __spaNavCache[__spaNavCacheKey(href)].ts < SPA_CACHE_TTL);
             let spinner = null;
             if(!hasCached){
                 spinner = document.getElementById('spa-loading-spinner');
@@ -5606,7 +5683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 공유 SPA 캐시 활용 (hover prefetch 결과 포함)
                 let text;
                 let finalHref = href;
-                const cached = __spaNavCache[href];
+                const cached = __spaNavCache[__spaNavCacheKey(href)];
                 if(cached && (Date.now() - cached.ts < SPA_CACHE_TTL)){
                     text = cached.html;
                 } else {
@@ -5614,7 +5691,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(!resp.ok) throw new Error('HTTP '+resp.status);
                     finalHref = (resp && resp.url) ? resp.url : href;
                     text = await resp.text();
-                    __spaNavCache[href] = { html: text, ts: Date.now() };
+                    __spaNavCache[__spaNavCacheKey(href)] = { html: text, ts: Date.now() };
                 }
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(text, 'text/html');
@@ -6308,7 +6385,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Category detail tabs (data-driven)
         // ------------------------------------------------------------------
         var CAT_DETAIL_JS = {
-            'cat_business_group': '/static/js/9.category/9-1.business/9-1-5.work_group/2.work_group_detail.js?v=3.10',
+            // cat_business_group LIST는 목록 스크립트(1.work_group_list.js); 상위 키는 사용하지 않는다(cost-tabs 전용).
+            // cat_business_group_detail 등은 브라우저 풀 네비로 로드된다.
             'cat_customer_client1': '/static/js/9.category/9-6.customer/9-6-1.customer/2.client1_detail.js?v=1.0',
             'cat_hw_server': '/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=3.5',
             'cat_hw_storage': '/static/js/9.category/9-2.hardware/9-2-2.storage/2.storage_detail.js?v=3.5',
@@ -6328,7 +6406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'cat_component_nic': '/static/js/9.category/9-4.component/9-4-5.nic/2.nic_detail.js?v=1.0',
             'cat_component_hba': '/static/js/9.category/9-4.component/9-4-6.hba/2.hba_detail.js?v=1.0',
             'cat_component_etc': '/static/js/9.category/9-4.component/9-4-7.etc/2.etc_detail.js?v=1.0',
-            'cat_vendor_manufacturer': '/static/js/9.category/9-7.vendor/9-7-1.manufacturer/2.manufacturer_detail.js?v=1.3',
+            'cat_vendor_manufacturer': '/static/js/9.category/9-7.vendor/9-7-1.manufacturer/2.manufacturer_detail.js?v=20260510_deleg_27a',
             'cat_vendor_maintenance': '/static/js/9.category/9-7.vendor/9-7-2.maintenance/2.maintenance_detail.js?v=2.1'
         };
         var CAT_TAB_SUFFIXES = ['_detail','_system','_manager','_service','_task','_log','_file',
@@ -6751,7 +6829,9 @@ function openHeaderAvatarPicker() {
     const overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.inset = '0';
-    overlay.style.background = 'rgba(17,24,39,.5)';
+    overlay.style.background = 'var(--modal-overlay, rgba(15,23,42,.28))';
+    overlay.style.backdropFilter = 'blur(var(--modal-blur, 5px))';
+    overlay.style.webkitBackdropFilter = 'blur(var(--modal-blur, 5px))';
     overlay.style.zIndex = '1100';
     overlay.style.display = 'flex';
     overlay.style.alignItems = 'center';
@@ -7643,7 +7723,9 @@ function updateColumnCheckboxStates() {
         }).then(function(res) {
             if (res.status === 401 || (res.redirected && /\/login\b/.test(res.url))) {
                 clearInterval(_timer);
-                alert('세션이 종료되었습니다. 다시 로그인 해주세요.');
+                try {
+                    localStorage.setItem('blossom.session.invalidated', String(Date.now()));
+                } catch (_e) { }
                 window.location.href = '/login';
             }
         }).catch(function() {
@@ -8279,7 +8361,7 @@ document.addEventListener('DOMContentLoaded', function(){
         btn.addEventListener('click', function(e){
             const href = btn.getAttribute('href');
             // External page route: SPA navigation
-            if (href && href.startsWith('/p/')) {
+            if (href && (href.startsWith('/p/') || href.startsWith('/b/'))) {
                 e.preventDefault();
                 // List tabs should navigate without carrying selected-row context.
                 if (typeof window.blsSpaNavigate === 'function') {
@@ -8425,6 +8507,272 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 })();
 
+/* §27a ── Detail “통계” empty states → Lottie (free-animated-no-data.json) ─ */
+(function(){
+    'use strict';
+
+    /* 고정 ID + DOM에서 발견하는 *-analytics-empty (목록의 analytics-empty 제외) */
+    var EMPTY_IDS = [
+        'sys-empty',
+        'svc-empty',
+        'stat-empty',
+        'group-empty',
+        'oper-empty',
+        'cost-empty',
+        'ver-empty',
+        'ip-status-empty',
+        'dns-record-status-empty',
+        'ad-domain-empty',
+        'ad-account-empty',
+        'hw-analytics-empty',
+        'sw-analytics-empty',
+        't91-analytics-empty',
+        't95-analytics-empty',
+        'sys-analytics-empty',
+        'comp-analytics-empty'
+    ];
+    var ANALYTICS_EMPTY_SUFFIX = '-analytics-empty';
+    var LIST_PAGE_ANALYTICS_EMPTY_ID = 'analytics-empty';
+    var NO_DATA_JSON = '/static/image/svg/free-animated-no-data.json';
+    var LOTTIE_SRC = '/static/vendor/lottie/lottie.min.5.12.2.js?v=5.12.2';
+    var LOTTIE_CDN_FALLBACK = 'https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js';
+    var lottiePromise = null;
+
+    function isDetailStatEmptyLottiePage(){
+        try{
+            if(document.querySelector('.server-detail-content')) return true;
+            var b = document.body;
+            if(b && b.hasAttribute('data-gov-detail-id')) return true;
+            if(b && b.hasAttribute('data-cat-detail-id')) return true;
+            if(document.querySelector('main.tab91-system-root')) return true;
+        }catch(_e){}
+        return false;
+    }
+
+    function collectEmptyTargetIds(){
+        var seen = Object.create(null);
+        var ids = [];
+        function add(id){
+            if(!id || seen[id]) return;
+            if(id === LIST_PAGE_ANALYTICS_EMPTY_ID) return;
+            seen[id] = true;
+            ids.push(id);
+        }
+        EMPTY_IDS.forEach(add);
+        try{
+            document.querySelectorAll('[id$="' + ANALYTICS_EMPTY_SUFFIX + '"]').forEach(function(node){
+                if(node && node.id) add(node.id);
+            });
+        }catch(_e){}
+        return ids;
+    }
+
+    function isVisible(el){
+        if(!el || el.hidden) return false;
+        if(el.style && el.style.display === 'none') return false;
+        try{
+            var cs = window.getComputedStyle(el);
+            if(!cs || cs.display === 'none' || cs.visibility === 'hidden') return false;
+        }catch(_e){}
+        return true;
+    }
+
+    function getMessage(el){
+        try{
+            var stored = el.getAttribute('data-bls-empty-message');
+            if(stored) return stored;
+            var text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            if(!text || text === '-') text = '데이터가 없습니다.';
+            el.setAttribute('data-bls-empty-message', text);
+            return text;
+        }catch(_e){
+            return '데이터가 없습니다.';
+        }
+    }
+
+    function ensureLottie(){
+        if(window.lottie) return Promise.resolve(window.lottie);
+        if(lottiePromise) return lottiePromise;
+        lottiePromise = new Promise(function(resolve, reject){
+            function inject(src, onScriptError){
+                try{
+                    var script = document.createElement('script');
+                    script.src = src;
+                    script.async = true;
+                    script.onload = function(){
+                        if(window.lottie) resolve(window.lottie);
+                        else if(onScriptError) onScriptError();
+                        else reject(new Error('lottie missing after load'));
+                    };
+                    script.onerror = function(){ if(onScriptError) onScriptError(); else reject(new Error('lottie load failed')); };
+                    document.head.appendChild(script);
+                }catch(e){
+                    if(onScriptError) try{ onScriptError(); }catch(_e2){ reject(e); }
+                    else reject(e);
+                }
+            }
+            inject(LOTTIE_SRC, function(){
+                if(window.lottie){ resolve(window.lottie); return; }
+                inject(LOTTIE_CDN_FALLBACK, function(){ reject(new Error('lottie load failed (local+cdn)')); });
+            });
+        }).catch(function(err){
+            lottiePromise = null;
+            throw err;
+        });
+        return lottiePromise;
+    }
+
+    function renderFallback(el, message){
+        el.innerHTML = '<span class="bls-detail-no-data" role="status" aria-live="polite">'
+            + '<span class="bls-detail-no-data-text"></span>'
+            + '</span>';
+        var textEl = el.querySelector('.bls-detail-no-data-text');
+        if(textEl) textEl.textContent = message;
+    }
+
+    /** 다른 *_detail 스크립트가 전용 플래그로 슬롯을 소유 중일 때만 true.
+     *  data-bls-no-data-loading 은 §27a renderEmpty 가 자신도 쓰므로 여기 넣으면
+     *  ensureLottie 이후 .then 안에서 항상 true → fetch/Lottie 가 절대 실행되지 않는다. */
+    function isForeignDetailNoDataAnim(el){
+        try{
+            if(!el) return false;
+            if(el.getAttribute('data-bls-no-data-owner') === 'detail-page') return true;
+            if(el.getAttribute('data-bls-no-data-anim') === '1') return true;
+            var anim = el.querySelector('.bls-detail-no-data-anim');
+            if(anim && !el.querySelector('.bls-detail-no-data')) return true;
+            if(anim && !anim.closest('.bls-detail-no-data')) return true;
+        }catch(_e){}
+        return false;
+    }
+
+    function hasBlossomNoDataLottie(el){
+        try{
+            var shell = el && el.querySelector('.bls-detail-no-data');
+            if(!shell) return false;
+            var box = shell.querySelector('.bls-detail-no-data-anim');
+            return !!(box && box.querySelector('svg'));
+        }catch(_e){}
+        return false;
+    }
+
+    function renderEmpty(el){
+        if(!el || !isVisible(el)) return;
+        if(isForeignDetailNoDataAnim(el)) return;
+        if(hasBlossomNoDataLottie(el)) return;
+
+        if(el.getAttribute('data-bls-no-data-loading') === '1'){
+            if(el.querySelector('.bls-detail-no-data')) return;
+            try{ el.removeAttribute('data-bls-no-data-loading'); }catch(_e){}
+        }
+
+        var message = getMessage(el);
+        el.removeAttribute('data-bls-no-data-rendered');
+        el.setAttribute('data-bls-no-data-loading', '1');
+
+        el.innerHTML = '<span class="bls-detail-no-data" role="status" aria-live="polite">'
+            + '<span class="bls-detail-no-data-anim" aria-hidden="true"></span>'
+            + '<span class="bls-detail-no-data-text"></span>'
+            + '</span>';
+
+        var textEl = el.querySelector('.bls-detail-no-data-text');
+        if(textEl) textEl.textContent = message;
+
+        var animEl = el.querySelector('.bls-detail-no-data-anim');
+        function clearLoading(){
+            try{ el.removeAttribute('data-bls-no-data-loading'); }catch(_e){}
+        }
+        ensureLottie()
+            .then(function(lottie){
+                if(isForeignDetailNoDataAnim(el)){
+                    clearLoading();
+                    return null;
+                }
+                if(!lottie || !animEl || !document.documentElement.contains(animEl)){
+                    clearLoading();
+                    return null;
+                }
+                /* path 로딩 실패 조용히 넘어가는 브라우저/설정 회피: JSON fetch → animationData */
+                return fetch(NO_DATA_JSON + '?v=bls_nd_2', { credentials: 'same-origin', cache: 'force-cache' })
+                    .then(function(r){
+                        if(!r.ok) throw new Error('no-data json ' + r.status);
+                        return r.json();
+                    })
+                    .then(function(json){
+                        if(isForeignDetailNoDataAnim(el) || !animEl || !document.documentElement.contains(animEl)){
+                            clearLoading();
+                            return;
+                        }
+                        lottie.loadAnimation({
+                            container: animEl,
+                            renderer: 'svg',
+                            loop: true,
+                            autoplay: true,
+                            animationData: json,
+                            rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
+                        });
+                        el.setAttribute('data-bls-no-data-rendered', '1');
+                        clearLoading();
+                    });
+            })
+            .catch(function(){
+                try{
+                    if(!isForeignDetailNoDataAnim(el) && document.documentElement.contains(el)){
+                        renderFallback(el, message);
+                        el.setAttribute('data-bls-no-data-rendered', '1');
+                    }
+                }catch(_e){}
+                clearLoading();
+            });
+    }
+
+    function scan(){
+        if(!isDetailStatEmptyLottiePage()) return;
+        collectEmptyTargetIds().forEach(function(id){
+            try{
+                var el = document.getElementById(id);
+                if(el && isVisible(el)) renderEmpty(el);
+            }catch(_e){}
+        });
+    }
+
+    function observe(){
+        if(!isDetailStatEmptyLottiePage() || !document.body) return;
+        collectEmptyTargetIds().forEach(function(id){
+            var el = document.getElementById(id);
+            if(!el || el._blsNoDataObserver) return;
+            el._blsNoDataObserver = new MutationObserver(function(){
+                if(isVisible(el)) renderEmpty(el);
+            });
+            el._blsNoDataObserver.observe(el, {
+                attributes: true,
+                childList: true,
+                subtree: true,
+                attributeFilter: ['style', 'class', 'hidden', 'data-bls-empty-message']
+            });
+        });
+    }
+
+    function init(){
+        scan();
+        observe();
+        setTimeout(scan, 100);
+        setTimeout(scan, 600);
+        setTimeout(scan, 1200);
+        setTimeout(scan, 2500);
+    }
+
+    if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', init);
+    }else{
+        init();
+    }
+    document.addEventListener('blossom:pageLoaded', init);
+    try{
+        window.__blsRescanDetailStatEmpty = init;
+        document.addEventListener('bls-detail-stat-empty', init);
+    }catch(_e){}
+})();
+
 /* §27 ── Tab11 Task Loader ─────────────────────────────────── */
 // tab11-task: unified behaviors live in /static/js/_detail/tab11-task.js
 // Lazy-load and initialize when tk-spec-table exists.
@@ -8490,6 +8838,212 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(restoreId, 0);
     } catch (_eTop) { }
 });
+
+/* §27b ── Secure Category Detail Links ─────────────────────── */
+(function initSecureCategoryDetailLinks() {
+    const ROUTES = {
+        cat_hw_server_detail: '/hardware/servers/',
+        cat_hw_server_hardware: '/hardware/servers/',
+        cat_hw_server_log: '/hardware/servers/',
+        cat_hw_server_file: '/hardware/servers/',
+        cat_hw_storage_detail: '/hardware/storage/',
+        cat_hw_storage_hardware: '/hardware/storage/',
+        cat_hw_storage_log: '/hardware/storage/',
+        cat_hw_storage_file: '/hardware/storage/',
+        cat_hw_san_detail: '/hardware/san/',
+        cat_hw_san_hardware: '/hardware/san/',
+        cat_hw_san_log: '/hardware/san/',
+        cat_hw_san_file: '/hardware/san/',
+        cat_hw_network_detail: '/hardware/network/',
+        cat_hw_network_hardware: '/hardware/network/',
+        cat_hw_network_log: '/hardware/network/',
+        cat_hw_network_file: '/hardware/network/',
+        cat_hw_security_detail: '/hardware/security/',
+        cat_hw_security_hardware: '/hardware/security/',
+        cat_hw_security_log: '/hardware/security/',
+        cat_hw_security_file: '/hardware/security/',
+        cat_sw_os_detail: '/software/os/',
+        cat_sw_os_system: '/software/os/',
+        cat_sw_os_task: '/software/os/',
+        cat_sw_os_log: '/software/os/',
+        cat_sw_os_file: '/software/os/',
+        cat_sw_database_detail: '/software/databases/',
+        cat_sw_database_system: '/software/databases/',
+        cat_sw_database_task: '/software/databases/',
+        cat_sw_database_log: '/software/databases/',
+        cat_sw_database_file: '/software/databases/',
+        cat_sw_middleware_detail: '/software/middleware/',
+        cat_sw_middleware_system: '/software/middleware/',
+        cat_sw_middleware_task: '/software/middleware/',
+        cat_sw_middleware_log: '/software/middleware/',
+        cat_sw_middleware_file: '/software/middleware/',
+        cat_sw_virtualization_detail: '/software/virtualization/',
+        cat_sw_virtualization_system: '/software/virtualization/',
+        cat_sw_virtualization_task: '/software/virtualization/',
+        cat_sw_virtualization_log: '/software/virtualization/',
+        cat_sw_virtualization_file: '/software/virtualization/',
+        cat_sw_security_detail: '/software/security/',
+        cat_sw_security_system: '/software/security/',
+        cat_sw_security_task: '/software/security/',
+        cat_sw_security_log: '/software/security/',
+        cat_sw_security_file: '/software/security/',
+        cat_sw_high_availability_detail: '/software/high-availability/',
+        cat_sw_high_availability_system: '/software/high-availability/',
+        cat_sw_high_availability_task: '/software/high-availability/',
+        cat_sw_high_availability_log: '/software/high-availability/',
+        cat_sw_high_availability_file: '/software/high-availability/',
+        cat_component_cpu_detail: '/components/cpu/',
+        cat_component_cpu_system: '/components/cpu/',
+        cat_component_cpu_task: '/components/cpu/',
+        cat_component_cpu_log: '/components/cpu/',
+        cat_component_cpu_file: '/components/cpu/',
+        cat_component_gpu_detail: '/components/gpu/',
+        cat_component_gpu_system: '/components/gpu/',
+        cat_component_gpu_task: '/components/gpu/',
+        cat_component_gpu_log: '/components/gpu/',
+        cat_component_gpu_file: '/components/gpu/',
+        cat_component_memory_detail: '/components/memory/',
+        cat_component_memory_system: '/components/memory/',
+        cat_component_memory_task: '/components/memory/',
+        cat_component_memory_log: '/components/memory/',
+        cat_component_memory_file: '/components/memory/',
+        cat_component_disk_detail: '/components/disk/',
+        cat_component_disk_system: '/components/disk/',
+        cat_component_disk_task: '/components/disk/',
+        cat_component_disk_log: '/components/disk/',
+        cat_component_disk_file: '/components/disk/',
+        cat_component_nic_detail: '/components/nic/',
+        cat_component_nic_system: '/components/nic/',
+        cat_component_nic_task: '/components/nic/',
+        cat_component_nic_log: '/components/nic/',
+        cat_component_nic_file: '/components/nic/',
+        cat_component_hba_detail: '/components/hba/',
+        cat_component_hba_system: '/components/hba/',
+        cat_component_hba_task: '/components/hba/',
+        cat_component_hba_log: '/components/hba/',
+        cat_component_hba_file: '/components/hba/',
+        cat_component_etc_detail: '/components/etc/',
+        cat_component_etc_system: '/components/etc/',
+        cat_component_etc_task: '/components/etc/',
+        cat_component_etc_log: '/components/etc/',
+        cat_component_etc_file: '/components/etc/',
+        cat_vendor_manufacturer_detail: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_manager: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_hardware: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_software: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_component: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_task: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_log: '/vendors/manufacturers/',
+        cat_vendor_manufacturer_file: '/vendors/manufacturers/',
+        cat_vendor_maintenance_detail: '/vendors/maintenance/',
+        cat_vendor_maintenance_manager: '/vendors/maintenance/',
+        cat_vendor_maintenance_hardware: '/vendors/maintenance/',
+        cat_vendor_maintenance_software: '/vendors/maintenance/',
+        cat_vendor_maintenance_component: '/vendors/maintenance/',
+        cat_vendor_maintenance_sla: '/vendors/maintenance/',
+        cat_vendor_maintenance_issue: '/vendors/maintenance/',
+        cat_vendor_maintenance_task: '/vendors/maintenance/',
+        cat_vendor_maintenance_log: '/vendors/maintenance/',
+        cat_vendor_maintenance_file: '/vendors/maintenance/',
+        cat_customer_client1_detail: '/customers/',
+        cat_customer_client1_manager: '/customers/',
+        cat_customer_client1_task: '/customers/',
+        cat_customer_client1_log: '/customers/',
+        cat_customer_client1_file: '/customers/'
+    };
+    const TAB_BY_SUFFIX = {
+        _detail: 'basic', _hardware: 'hardware', _software: 'software', _component: 'component',
+        _manager: 'manager', _system: 'system', _service: 'service', _sla: 'sla',
+        _issue: 'issue', _task: 'task', _log: 'log', _file: 'file'
+    };
+
+    function keyFromHref(href) {
+        try {
+            const url = new URL(href, window.location.origin);
+            const parts = url.pathname.split('/').filter(Boolean);
+            if (parts[0] === 'b' && parts[1]) return parts[1];
+            if (parts[0] === 'p') return parts[1] || url.searchParams.get('key') || '';
+            return '';
+        } catch (_e) {
+            const mb = String(href || '').match(/\/b\/([^?#]+)/);
+            if (mb) return decodeURIComponent(mb[1]);
+            const mp = String(href || '').match(/\/p\/([^?#]+)/);
+            return mp ? decodeURIComponent(mp[1]) : '';
+        }
+    }
+
+    function publicIdFromAnchor(a) {
+        const direct = a.dataset.publicId || a.dataset.resourceId || a.dataset.pid;
+        if (direct) return direct.trim();
+        try {
+            const current = new URL(window.location.href);
+            const m = current.pathname.match(/^\/b\/([^/]+)$/);
+            if (m && m[1]) {
+                const seg = decodeURIComponent(m[1]).trim();
+                if (seg.startsWith('cat_')) return '';
+                const pref = seg.split('_', 1)[0];
+                const OPAQUE_PREF = { os: 1, srv: 1, stor: 1, san: 1, net: 1, sec: 1, bg: 1, db: 1, mw: 1, virt: 1, swsec: 1, ha: 1, cpu: 1, gpu: 1, mem: 1, disk: 1, nic: 1, hba: 1, cmp: 1, ven: 1, mnt: 1, cust: 1 };
+                if (OPAQUE_PREF[pref]) return seg;
+            }
+        } catch (_e) { }
+        for (const name of ['row', 'item', 'payload', 'rowPayload', 'json']) {
+            const raw = a.dataset[name];
+            if (!raw) continue;
+            try {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.public_id) return String(parsed.public_id).trim();
+            } catch (_e) { }
+        }
+        return '';
+    }
+
+    function tabForKey(key) {
+        for (const suffix of Object.keys(TAB_BY_SUFFIX)) {
+            if (key.endsWith(suffix)) return TAB_BY_SUFFIX[suffix];
+        }
+        return 'basic';
+    }
+
+    function secureHref(a) {
+        const href = a.getAttribute('href') || '';
+        const key = keyFromHref(href);
+        const base = ROUTES[key];
+        const publicId = publicIdFromAnchor(a);
+        if (!base || !publicId) return '';
+        const tab = tabForKey(key);
+        return '/b/' + encodeURIComponent(publicId) + (tab && tab !== 'basic' ? `?tab=${encodeURIComponent(tab)}` : '');
+    }
+
+    function rewrite(root) {
+        const scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll('a[href^="/p/cat_"], a[href*="/p/cat_"], a[href^="/b/cat_"], a[href*="/b/cat_"]').forEach((a) => {
+            const next = secureHref(a);
+            if (next) a.setAttribute('href', next);
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+        const a = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+        if (!a) return;
+        const next = secureHref(a);
+        if (!next) return;
+        event.preventDefault();
+        window.location.assign(next);
+    }, true);
+
+    document.addEventListener('DOMContentLoaded', function () { rewrite(document); });
+    document.addEventListener('blossom:pageLoaded', function (event) { rewrite(event.detail && event.detail.root); });
+    try {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                (m.addedNodes || []).forEach(function (node) {
+                    if (node && node.nodeType === 1) rewrite(node);
+                });
+            });
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+    } catch (_e) { }
+})();
 
 /* §28 ── Date Picker ───────────────────────────────────────── */
 // ── Global date-picker initializer ──────────────────────────────────

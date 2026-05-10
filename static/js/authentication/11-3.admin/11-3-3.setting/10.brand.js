@@ -86,6 +86,7 @@
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', API_BASE);
 		xhr.setRequestHeader('Content-Type', 'application/json');
+		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xhr.onload = function () {
 			try {
 				var res = JSON.parse(xhr.responseText);
@@ -131,6 +132,7 @@
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST', API_BASE + '/reset');
 		xhr.setRequestHeader('Content-Type', 'application/json');
+		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xhr.onload = function () {
 			try {
 				var res = JSON.parse(xhr.responseText);
@@ -151,6 +153,7 @@
 		var xhr = new XMLHttpRequest();
 		xhr.open('DELETE', API_BASE + '/' + encodeURIComponent(key));
 		xhr.setRequestHeader('Accept', 'application/json');
+		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xhr.onload = function () {
 			try {
 				var res = JSON.parse(xhr.responseText);
