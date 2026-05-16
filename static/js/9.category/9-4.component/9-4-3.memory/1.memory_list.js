@@ -173,6 +173,7 @@
         const note = item.note ?? item.remark ?? '';
         return {
             id: Number.isFinite(normalizedId) ? normalizedId : item.id,
+            public_id: item.public_id ?? item.publicId ?? '',
             memory_code: item.memory_code ?? item.code ?? '',
             model: modelName,
             model_name: modelName,

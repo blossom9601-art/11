@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 
 from flask import current_app
 
+from app.services.public_id_service import make_public_id
+
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = 'org_rack'
@@ -164,6 +166,7 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     rack_display_name = rack_position or business_name or row['rack_code']
     return {
         'id': row['id'],
+        'public_id': make_public_id(TABLE_NAME, 'rack', row['id']),
         'rack_code': row['rack_code'],
         'business_status_code': row['business_status_code'] or '',
         'business_name': business_name,
@@ -298,6 +301,43 @@ def fetch_by_rack_code(rack_code: str, app=None) -> Optional[Dict[str, Any]]:
             (rack_code,),
         ).fetchone()
         return _row_to_dict(row) if row else None
+
+
+def _candidate_rack_identifiers(raw: str) -> List[str]:
+    value = (raw or '').strip()
+    if not value:
+        return []
+    candidates = [value]
+    if '-' in value:
+        candidates.append(value.replace('-', '_'))
+    if '_' in value:
+        candidates.append(value.replace('_', '-'))
+    seen = set()
+    output: List[str] = []
+    for candidate in candidates:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            output.append(candidate)
+    return output
+
+
+def fetch_by_rack_identifier(identifier: str, app=None) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    with _get_connection(app) as conn:
+        for candidate in _candidate_rack_identifiers(identifier):
+            rows = conn.execute(
+                f"SELECT id, rack_code, business_status_code, business_name, manufacturer_code, system_model_code, serial_number, center_code, rack_position, system_height_u, system_dept_code, system_manager_id, service_dept_code, service_manager_id, remark, created_at, created_by, updated_at, updated_by, is_deleted FROM {TABLE_NAME} WHERE (rack_code = ? OR rack_position = ?) AND is_deleted = 0 LIMIT 2",
+                (candidate, candidate),
+            ).fetchall()
+            if not rows:
+                continue
+            chosen = None
+            for row in rows:
+                if (row['rack_code'] or '') == candidate:
+                    chosen = row
+                    break
+            return _row_to_dict(chosen or rows[0])
+    return None
 
 
 def create_org_rack(data: Dict[str, Any], actor: str, app=None) -> Dict[str, Any]:

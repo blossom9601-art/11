@@ -31,8 +31,74 @@
         else fn();
     }
     function dash(v) { var s = String(v == null ? '' : v).trim(); return s || '-'; }
+    function text(v) { return String(v == null ? '' : v).trim(); }
+    function norm(v) { return text(v).toLowerCase(); }
     function toInt(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
     function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+    function pick(row, keys) {
+        var value;
+        for (var i = 0; i < keys.length; i++) {
+            value = row ? row[keys[i]] : '';
+            if (value !== undefined && value !== null && text(value) !== '') return text(value);
+        }
+        return '';
+    }
+    function withQuery(url, key, value) {
+        if (!value) return url;
+        return url + (url.indexOf('?') >= 0 ? '&' : '?') + encodeURIComponent(key) + '=' + encodeURIComponent(value);
+    }
+    function extractItems(data) {
+        if (Object.prototype.toString.call(data) === '[object Array]') return data;
+        if (!data) return [];
+        return data.items || data.rows || data.data || [];
+    }
+    function facilityStatusColor(status) {
+        var s = norm(status);
+        if (!s) return '#6b7280';
+        if (s.indexOf('정상') >= 0 || s.indexOf('운영') >= 0 || s.indexOf('active') >= 0 || s.indexOf('run') >= 0) return '#22c55e';
+        if (s.indexOf('중지') >= 0 || s.indexOf('장애') >= 0 || s.indexOf('error') >= 0 || s.indexOf('down') >= 0) return '#ef4444';
+        if (s.indexOf('점검') >= 0 || s.indexOf('대기') >= 0 || s.indexOf('warn') >= 0) return '#f59e0b';
+        return '#6b7280';
+    }
+    function facilityEndpoint(resource) {
+        var endpoints = {
+            access: '/api/datacenter/access/systems',
+            data_delete: '/api/datacenter/data-deletion-systems?page_size=500',
+            rack: '/api/org-racks',
+            thermometer: '/api/org-thermometers',
+            cctv: '/api/org-cctvs'
+        };
+        return endpoints[resource] || ('/api/datacenter-facility-systems/' + encodeURIComponent(resource || ''));
+    }
+    function normalizeFacilityRows(items, table) {
+        var resource = text(table.getAttribute('data-resource') || '');
+        var label = text(table.getAttribute('data-resource-label') || '시설·보안');
+        var targetModel = text(table.getAttribute('data-model') || '');
+        var target = norm(targetModel);
+        var out = [];
+        (items || []).forEach(function (raw) {
+            raw = raw || {};
+            var model = pick(raw, ['model_name', 'system_model_name', 'model', 'rack_model', 'system_model_code']);
+            if (target && target !== '-' && target !== '모델명' && norm(model) !== target) return;
+            var status = pick(raw, ['business_status', 'business_status_code', 'work_status', 'biz_work_status', 'status']);
+            var businessName = pick(raw, ['business_name', 'work_name', 'system_name', 'rack_name', 'name']);
+            var ownerDept = pick(raw, ['system_owner_dept', 'system_dept_code', 'system_owner_dept_code', 'system_dept', 'service_owner_dept', 'service_dept_code', 'svc_dept']);
+            out.push({
+                category: '시설·보안',
+                type: label || resource,
+                work_operation: status,
+                work_group: ownerDept,
+                work_name: businessName,
+                system_name: pick(raw, ['system_name', 'rack_name', 'name', 'device_name', 'business_name', 'work_name']) || model,
+                serial_number: pick(raw, ['serial_number', 'serial']),
+                firmware: pick(raw, ['firmware', 'firmware_version', 'version']),
+                work_status: status,
+                work_status_color: facilityStatusColor(status),
+                qty: 1
+            });
+        });
+        return out;
+    }
     function statusDotHTML(color) {
         var bg = color || '#6b7280';
         return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:6px;background:' + bg + '" aria-hidden="true"></span>';
@@ -118,6 +184,22 @@
                 return '';
             },
             pageSizeKey: 'maint:hw-assets:pageSize'
+        },
+
+        /* ── 카테고리 > 시설·보안 ── */
+        'facility-security-assets': {
+            getApiUrl: function (table) {
+                var resource = text(table.getAttribute('data-resource') || '');
+                var model = text(table.getAttribute('data-model') || '');
+                if (!model) {
+                    var titleEl = document.getElementById('page-header-title');
+                    model = titleEl ? text(titleEl.textContent || '') : '';
+                }
+                if (model && ['모델명', '시설·보안', '하드웨어'].indexOf(model) >= 0) model = '';
+                return withQuery(facilityEndpoint(resource), 'q', model);
+            },
+            pageSizeKey: 'facility-security:pageSize',
+            mapItems: normalizeFacilityRows
         }
     };
 
@@ -319,7 +401,12 @@
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    if (data && data.success) { lastLoadedItems = data.items || []; renderRows(lastLoadedItems); }
+                    if (data && data.success) {
+                        var items = extractItems(data);
+                        if (strategy.mapItems) items = strategy.mapItems(items, table);
+                        lastLoadedItems = items || [];
+                        renderRows(lastLoadedItems);
+                    }
                     else { lastLoadedItems = []; updateEmpty(); }
                 })
                 .catch(function () { lastLoadedItems = []; updateEmpty(); });
@@ -378,7 +465,7 @@
             var analyticsBtn = document.getElementById('hw-analytics-btn');
             var analyticsModal = document.getElementById('hw-analytics-modal');
             var analyticsClose = document.getElementById('hw-analytics-close');
-            var analyticsEmpty = document.getElementById('hw-analytics-empty');
+            var analyticsEmpty = document.getElementById('hw-stats-empty') || document.getElementById('hw-analytics-empty');
             var tabStrip = document.getElementById('hw-tab-strip');
             var tabContent = document.getElementById('hw-tab-content');
 
@@ -501,12 +588,12 @@
             function renderAnalytics() {
                 var items = lastLoadedItems;
                 if (!items.length) {
-                    if (analyticsEmpty) analyticsEmpty.style.display = '';
+                    if (analyticsEmpty) { analyticsEmpty.hidden = false; analyticsEmpty.style.display = ''; }
                     if (tabStrip) tabStrip.innerHTML = '';
                     if (tabContent) tabContent.innerHTML = '';
                     return;
                 }
-                if (analyticsEmpty) analyticsEmpty.style.display = 'none';
+                if (analyticsEmpty) { analyticsEmpty.hidden = true; analyticsEmpty.style.display = 'none'; }
                 var catMap = buildCatMap(items);
                 var cats = renderTabStrip(catMap);
                 if (cats.length > 0) renderCatContent(catMap[cats[0]], cats[0]);

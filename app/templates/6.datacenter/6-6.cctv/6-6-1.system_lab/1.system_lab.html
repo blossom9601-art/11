@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
 </head>
 <body class="{{ page_class }}">
     <!-- JS CONFIG (data-* 속성으로 전달) -->
@@ -29,14 +29,14 @@
             <div class="content-wrapper">
                 <div class="page-header">
                     <div class="page-utility-right" data-info-key="datacenter.cctv"></div>
-                    <h1>CCTV 관리</h1>
-                    <p>CCTV 자산을 관리 합니다.</p>
+                    <h1>영상감시 관리</h1>
+                    <p>영상감시 자산을 관리합니다.</p>
                 </div>
                 <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
                 <div id="dynamic-system-tabs"
                      data-page-code="DC_CCTV"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="CCTV 관리 탭"
+                     data-aria-label="영상감시 관리 탭"
                      data-layout-title-selector="#cctv-layout-title"
                      data-layout-title-suffix=" 배치도"></div>
 
@@ -94,16 +94,16 @@
             </div>
         </main>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
-    <script src="/static/js/6.datacenter/6-6.cctv/cctv_status.js"></script>
-    <script src="/static/js/6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.js?v=20260413a"></script>
+    <script src="/static/js/6.datacenter/6-6.cctv/cctv_status.js?v=20260514_facility_groups1"></script>
+    <script src="/static/js/6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.js?v=20260514_facility_groups1"></script>
 
-        <!-- CCTV 추가 모달 -->
+        <!-- 영상감시 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
             <div class="server-add-content">
                 <div class="server-add-header">
-                    <div class="server-add-title"><h3 id="system-add-title">CCTV 등록</h3><p class="server-add-subtitle" id="system-add-subtitle">CCTV 정보를 입력하세요.</p></div>
+                    <div class="server-add-title"><h3 id="system-add-title">영상감시 등록</h3><p class="server-add-subtitle" id="system-add-subtitle">영상감시 정보를 입력하세요.</p></div>
                     <button class="close-btn" type="button" id="system-add-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -111,17 +111,17 @@
                 <div class="server-add-body">
                     <form id="system-add-form" data-cctv-form="true" data-cctv-center="{{ center_name }}">
                         <div class="form-section">
-                            <div class="section-header"><h4>CCTV 정보</h4></div>
+                            <div class="section-header"><h4>영상감시 정보</h4></div>
                             <div class="form-grid">
                                 <div class="form-row slab-name-row">
-                                    <label>CCTV 이름 <span class="required">*</span></label>
+                                    <label>영상감시 이름 <span class="required">*</span></label>
                                     <div class="status-input-wrap cctv-search-wrap">
                                         <div class="fk-searchable-control cctv-search-control">
                                             <button type="button" class="fk-searchable-display cctv-display-btn" data-cctv-display="true" aria-haspopup="dialog" aria-expanded="false">
                                                 <span class="cctv-display-text" data-cctv-placeholder="true">선택</span>
                                             </button>
                                             <button type="button" class="fk-searchable-clear cctv-clear-btn" data-cctv-clear="true" aria-label="선택 초기화" hidden>지우기</button>
-                                            <input name="slab_name" class="visually-hidden" data-cctv-input="true" placeholder="CCTV 이름" autocomplete="off" required>
+                                            <input name="slab_name" class="visually-hidden" data-cctv-input="true" placeholder="영상감시 이름" autocomplete="off" required>
                                         </div>
                                         <input type="hidden" name="cctv_code" id="cctv-code-hidden" value="">
                                         <input type="hidden" name="cctv_status" id="cctv-status-hidden" value="">
@@ -130,14 +130,14 @@
                                     </div>
                                 </div>
                                 <div class="form-row">
-                                    <label>CCTV 유형</label>
+                                    <label>영상감시 유형</label>
                                     <select name="cctv_type" class="form-input">
                                         <option value="원통형 CCTV">원통형 CCTV</option>
                                         <option value="고정형 CCTV">고정형 CCTV</option>
                                     </select>
                                 </div>
                                 <div class="form-row">
-                                    <label>CCTV 상태</label>
+                                    <label>영상감시 상태</label>
                                     <div id="cctv-status-display" class="form-readonly cctv-status-display fk-searchable-display" aria-live="polite">상태 표시</div>
                                 </div>
                                 <input type="hidden" name="selected_rack" id="selected-rack-hidden" value="">

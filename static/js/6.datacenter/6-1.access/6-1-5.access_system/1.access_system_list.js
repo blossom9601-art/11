@@ -190,6 +190,7 @@
 
     // ---- API wiring (dc_access_system) ----
     const ACCESS_SYSTEM_API_BASE = '/api/datacenter/access/systems';
+    const FACILITY_SECURITY_RESOURCE = 'access';
 
     const directory = {
         loaded: false,
@@ -810,6 +811,15 @@
         return data;
     }
 
+    function wireFacilityCategoryFk(form){
+        if(!form || !window.DcFacilityFk || typeof window.DcFacilityFk.wireForm !== 'function') return;
+        window.DcFacilityFk.wireForm(form, {
+            resource: FACILITY_SECURITY_RESOURCE,
+            manufacturerName: 'vendor',
+            modelName: 'model'
+        });
+    }
+
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
@@ -831,6 +841,7 @@
         });
         // Ensure searchable-select UI is synced after dynamic insertion
         try { window.BlossomSearchableSelect?.syncAll?.(form); } catch(_e){}
+        wireFacilityCategoryFk(form);
     }
 
     function generateFieldInput(col,value=''){
@@ -920,6 +931,7 @@
             select.value = current;
         });
         try { window.BlossomSearchableSelect?.syncAll?.(form); } catch(_e){}
+        wireFacilityCategoryFk(form);
     }
 
     // Live-sync helpers for license fields in Add/Edit forms

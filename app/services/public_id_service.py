@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import os
 import re
+import secrets
 from typing import Optional
 
 from flask import current_app
@@ -13,8 +15,38 @@ _TOKEN_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 
 def _secret() -> bytes:
-    value = current_app.config.get('SECRET_KEY') or current_app.config.get('PUBLIC_ID_SECRET') or 'blossom-public-id-v1'
+    value = current_app.config.get('PUBLIC_ID_SECRET') or os.environ.get('PUBLIC_ID_SECRET')
+    if not value:
+        value = _instance_secret()
+    if not value:
+        value = current_app.config.get('SECRET_KEY') or 'blossom-public-id-v1'
     return str(value).encode('utf-8')
+
+
+def _instance_secret() -> str:
+    path = current_app.config.get('PUBLIC_ID_SECRET_FILE') or os.path.join(current_app.instance_path, 'public_id_secret')
+    try:
+        with open(path, encoding='utf-8') as secret_file:
+            value = secret_file.read().strip()
+            if value:
+                return value
+    except OSError:
+        pass
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        token = secrets.token_urlsafe(48)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as secret_file:
+            secret_file.write(token)
+        return token
+    except FileExistsError:
+        try:
+            with open(path, encoding='utf-8') as secret_file:
+                return secret_file.read().strip()
+        except OSError:
+            return ''
+    except OSError:
+        return ''
 
 
 def _b64(data: bytes) -> str:

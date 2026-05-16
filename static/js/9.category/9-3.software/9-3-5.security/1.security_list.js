@@ -297,6 +297,7 @@
         const note = item.note ?? item.remark ?? '';
         return {
             id: Number.isFinite(normalizedId) ? normalizedId : item.id,
+            public_id: String(item.public_id || '').trim(),
             secsw_code: item.secsw_code ?? item.secswCode ?? '',
             model,
             secsw_name: item.secsw_name ?? model,

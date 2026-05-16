@@ -99,6 +99,7 @@
     }
     const ORG_RACK_API = '/api/org-racks';
     const ORG_RACK_BULK_DELETE_API = '/api/org-racks/bulk-delete';
+    const FACILITY_SECURITY_RESOURCE = 'rack';
 
     async function requestJSON(url, options){
         const opts = options ? { ...options } : {};
@@ -365,6 +366,7 @@
         const manufacturerText = safeText(item.manufacturer_code);
         const row = {
             id,
+            public_id: safeText(item.public_id),
             rack_code: safeText(item.rack_code),
             business_status: safeText(item.business_status),
             business_status_code: safeText(item.business_status_code),
@@ -1405,8 +1407,11 @@
                     // 시스템 위치는 상세페이지로 링크 (업무 이름은 중복 가능)
                     if(col === 'location'){
                         const rackCode = (row && row.rack_code) ? String(row.rack_code).trim() : '';
-                        if(rackCode){
-                            const href = `/p/dc_rack_detail_basic?rack_code=${encodeURIComponent(rackCode)}`;
+                        const publicId = (row && row.public_id) ? String(row.public_id).trim() : '';
+                        if(publicId || rackCode){
+                            const href = publicId
+                                ? `/b/${encodeURIComponent(publicId)}`
+                                : `/b/dc_rack_detail_basic?rack_code=${encodeURIComponent(rackCode)}`;
                             // Match hw_server_onpremise link styling
                             cellValue = `<a href="${href}" class="work-name-link">${highlight(displayVal, col)}</a>`;
                         }
@@ -1688,6 +1693,15 @@
         return data;
     }
 
+    function wireFacilityCategoryFk(form){
+        if(!form || !window.DcFacilityFk || typeof window.DcFacilityFk.wireForm !== 'function') return;
+        window.DcFacilityFk.wireForm(form, {
+            resource: FACILITY_SECURITY_RESOURCE,
+            manufacturerName: 'vendor',
+            modelName: 'model'
+        });
+    }
+
     /** 일괄변경: search-select는 저장값이 dataset.value에 있음 */
     function readBulkControlValue(el){
         if(!el || !el.getAttribute) return '';
@@ -1893,6 +1907,7 @@
             section.appendChild(grid); form.appendChild(section);
         });
         augmentRackBusinessStatusForEditRow(row);
+        wireFacilityCategoryFk(form);
         syncSearchSelectDisplays(form);
         wireSystemHeightInput(form);
     }
@@ -1930,13 +1945,21 @@
             return `<input type="text" name="${col}" class="form-input search-select" placeholder="${safePlaceholder}" data-placeholder="${safePlaceholder}" data-search-source="${searchMeta.source}" data-value="${escapeHTML(resolvedCode)}" value="${escapeHTML(value ?? '')}"${dependsAttr}${requiredAttr}${searchableAttr}>`;
         }
         if(col==='vendor'){
-            return `<input type="text" name="vendor" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력" value="${escapeHTML(value??'')}">`;
+            const safeValue = escapeHTML(value ?? '');
+            return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">제조사 검색</option>
+                ${safeValue ? `<option value="${safeValue}" selected>${safeValue}</option>` : ''}
+            </select>`;
         }
         if(col==='business_name'){
             return `<input name="business_name" class="form-input" placeholder="필수" value="${escapeHTML(value??'')}" required>`;
         }
         if(col==='model'){
-            return `<input type="text" name="model" class="form-input rack-free-text" autocomplete="off" spellcheck="false" placeholder="직접 입력" value="${escapeHTML(value??'')}">`;
+            const safeValue = escapeHTML(value ?? '');
+            return `<select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">모델명 검색</option>
+                ${safeValue ? `<option value="${safeValue}" selected>${safeValue}</option>` : ''}
+            </select>`;
         }
         if(col==='serial'){
             return `<input name="serial" class="form-input" value="${escapeHTML(value??'')}">`;
@@ -2342,6 +2365,7 @@
             const form = document.getElementById(ADD_FORM_ID);
             form?.classList.remove('show-required-errors');
             openModal(ADD_MODAL_ID);
+            wireFacilityCategoryFk(form);
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=>{
             const form = document.getElementById(ADD_FORM_ID);

@@ -139,11 +139,12 @@
       function showNoDataImage(container, altText){
         try{
           if(!container) return;
+          if(container.querySelector && container.querySelector('.bls-detail-no-data')) return;
           if(container.getAttribute('data-bls-no-data-loading') === '1'){
             return;
           }
           if(container.getAttribute('data-bls-no-data-anim') === '1'){
-            if(container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback) svg')){
+            if(hasPaintedNoDataGraphic(container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback)'))){
               return;
             }
             container.removeAttribute('data-bls-no-data-anim');
@@ -168,29 +169,41 @@
           wrap.style.boxSizing = 'border-box';
           wrap.style.flexDirection = 'column';
           var jsonPath = '/static/image/svg/free-animated-no-data.json';
-          function appendInlineFallback(){
-            var existing = wrap.querySelector('.bls-detail-no-data-fallback');
+          function hasPaintedNoDataGraphic(node){
+            try{
+              if(!node) return false;
+              if(node.querySelector('.bls-detail-no-data-fallback svg')) return true;
+              var svg = node.querySelector('svg');
+              if(svg && svg.querySelector('g > path, g > rect, g > circle, g > ellipse, g > line, g > polyline, g > polygon, g > text, g > image')) return true;
+              var canvas = node.querySelector('canvas');
+              if(canvas && canvas.width && canvas.height){
+                var ctx = canvas.getContext && canvas.getContext('2d');
+                if(ctx){
+                  var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                  for(var i = 3; i < data.length; i += 64){ if(data[i] !== 0) return true; }
+                }
+              }
+            }catch(_p){}
+            return false;
+          }
+          function appendCaption(altMsg){
+            var existing = wrap.querySelector('.bls-detail-no-data-caption');
             if(existing) return existing;
-            var fallbackBox = document.createElement('span');
-            fallbackBox.className = 'bls-detail-no-data-anim bls-detail-no-data-fallback';
-            fallbackBox.setAttribute('aria-hidden', 'true');
-            fallbackBox.style.display = 'inline-flex';
-            fallbackBox.style.alignItems = 'center';
-            fallbackBox.style.justifyContent = 'center';
-            fallbackBox.style.width = '150px';
-            fallbackBox.style.height = '110px';
-            fallbackBox.innerHTML = '<svg viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="데이터 없음"><rect x="20" y="28" width="80" height="58" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3"/><path d="M38 48h44M38 62h28" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/><circle cx="86" cy="82" r="16" fill="#fff" stroke="#94a3b8" stroke-width="3"/><path d="M78 82h16" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/></svg>';
-            wrap.appendChild(fallbackBox);
-            return fallbackBox;
+            var capWrap = document.createElement('span'); capWrap.className='bls-detail-no-data-caption'; capWrap.style.display='block'; capWrap.style.marginTop='4px'; capWrap.style.textAlign='center';
+            (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
+            wrap.appendChild(capWrap);
+            return capWrap;
+          }
+          function ensureWrapMounted(){
+            if(wrap.parentNode !== container) container.appendChild(wrap);
           }
           function renderLottie(){
             try{
               if(!window.lottie){ return false; }
               if(container.getAttribute('data-bls-no-data-anim') === '1'){
-                return !!container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback) svg');
+                return hasPaintedNoDataGraphic(container.querySelector('.bls-detail-no-data-anim:not(.bls-detail-no-data-fallback)'));
               }
               if(container.getAttribute('data-bls-no-data-loading') === '1') return true;
-              var fallback = appendInlineFallback();
               var animBox = document.createElement('span');
               animBox.className = 'bls-detail-no-data-anim';
               animBox.style.display = 'inline-block';
@@ -200,45 +213,45 @@
               animBox.style.pointerEvents = 'none';
               var altMsg = altText || '데이터 없음';
               animBox.setAttribute('aria-label', (altMsg+'').split('\n')[0]);
-              wrap.insertBefore(animBox, fallback || null);
+              wrap.appendChild(animBox);
               try{
-                var capWrap = document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='4px'; capWrap.style.textAlign='center';
-                (altMsg+'').split('\n').forEach(function(line, idx){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = idx===0 ? '14px' : '13px'; cap.style.color = '#64748b'; capWrap.appendChild(cap); });
-                wrap.appendChild(capWrap); container.appendChild(wrap);
+                appendCaption(altMsg); ensureWrapMounted();
                 container.setAttribute('data-bls-no-data-loading', '1');
                 fetch(jsonPath + '?v=20260510_detail_lottie', { cache: 'no-store' })
                   .then(function(res){ if(!res.ok) throw new Error('no-data json load failed'); return res.json(); })
                   .then(function(animationData){
                     var anim = window.lottie.loadAnimation({ container: animBox, renderer: 'svg', loop: true, autoplay: true, animationData: animationData });
                     animBox.setAttribute('data-lottie-json', jsonPath);
-                    function removeFallback(){
+                    function markRendered(){
                       try{
-                        if(animBox.querySelector('svg')){
+                        if(hasPaintedNoDataGraphic(animBox)){
                           container.setAttribute('data-bls-no-data-anim', '1');
                           container.removeAttribute('data-bls-no-data-loading');
-                          if(fallback && fallback.parentNode) fallback.parentNode.removeChild(fallback);
                         }
                       }catch(_r){}
                     }
                     try{
                       anim.addEventListener('DOMLoaded', function(){
-                        removeFallback();
+                        markRendered();
                       });
                     }catch(_evt){
-                      removeFallback();
+                      markRendered();
                     }
-                    setTimeout(removeFallback, 250);
-                    setTimeout(removeFallback, 800);
+                    setTimeout(markRendered, 250);
+                    setTimeout(markRendered, 800);
                     setTimeout(function(){
-                      if(!animBox.querySelector('svg')){
+                      if(!hasPaintedNoDataGraphic(animBox)){
                         container.removeAttribute('data-bls-no-data-loading');
+                        if(anim && anim.destroy) try{ anim.destroy(); }catch(_destroy){}
+                        if(animBox && animBox.parentNode) animBox.parentNode.removeChild(animBox);
+                        container.removeAttribute('data-bls-no-data-anim');
                         renderImageFallback();
                       }
                     }, 1600);
                   })
                   .catch(function(){
                     container.removeAttribute('data-bls-no-data-loading');
-                    if(!animBox.querySelector('svg') && animBox.parentNode) animBox.parentNode.removeChild(animBox);
+                    if(!hasPaintedNoDataGraphic(animBox) && animBox.parentNode) animBox.parentNode.removeChild(animBox);
                     renderImageFallback();
                   });
                 return true;
@@ -254,28 +267,41 @@
           function renderImageFallback(){
             try{
               var altMsg = altText || '데이터 없음';
-              appendInlineFallback();
-              var capWrap=document.createElement('span'); capWrap.style.display='block'; capWrap.style.marginTop='4px'; capWrap.style.textAlign='center';
-              (altMsg+'').split('\n').forEach(function(line, i){ var cap=document.createElement('span'); cap.textContent=line; cap.style.display='block'; cap.style.fontSize = i===0 ? '14px' : '13px'; cap.style.color='#64748b'; capWrap.appendChild(cap); });
-              wrap.appendChild(capWrap); container.appendChild(wrap);
+              appendCaption(altMsg); ensureWrapMounted();
             }catch(_f){ }
           }
           if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderImageFallback(); } }
         }catch(_){ }
       }
 
+      function renderSharedNoData(container, message){
+        try{
+          if(!container) return;
+          var text = message || '데이터가 없습니다.';
+          container.style.display = '';
+          container.setAttribute('data-bls-empty-message', text);
+          container.removeAttribute('data-bls-no-data-rendered');
+          container.removeAttribute('data-bls-no-data-owner');
+          container.removeAttribute('data-bls-no-data-anim');
+          container.removeAttribute('data-bls-no-data-loading');
+          container.textContent = text;
+          if(window.__blsRescanDetailStatEmpty) window.__blsRescanDetailStatEmpty();
+          else if(window.CustomEvent) document.dispatchEvent(new CustomEvent('bls-detail-stat-empty'));
+        }catch(_){ }
+      }
+
       function forceVisibleNoDataImages(){
         try{
           [
-            { id:'stat-empty', msg:'할당 하드웨어 자산이 없습니다.' },
-            { id:'group-empty', msg:'할당 하드웨어 자산이 없습니다.' },
-            { id:'ver-empty', msg:'할당 하드웨어 자산의\n소프트웨어 버전 정보가 없습니다.' }
+            { id:'stat-empty', msg:'할당 시스템 내역이 없습니다.' },
+            { id:'group-empty', msg:'할당 시스템 내역이 없습니다.' },
+            { id:'ver-empty', msg:'할당 시스템 내역이 없습니다.' }
           ].forEach(function(item){
             var el = document.getElementById(item.id);
             if(!el) return;
             var hidden = el.hidden || el.style.display === 'none';
             if(hidden) return;
-            if(el.getAttribute('data-bls-no-data-anim') !== '1') showNoDataImage(el, item.msg);
+            renderSharedNoData(el, item.msg);
           });
         }catch(_){}
       }
@@ -387,25 +413,25 @@
           }
           function showPieEmpty(msg){
             hidePieWrap(emptyPie);
-            if(emptyPie){ emptyPie.style.display=''; try{ showNoDataImage(emptyPie, msg); }catch(_){} }
+            renderSharedNoData(emptyPie, msg);
             if(pie){ pie.style.visibility='hidden'; pie.style.display='none'; }
             if(legendPie) legendPie.style.display='none';
           }
           function showGroupEmpty(msg){
             hidePieWrap(emptyGroup);
-            if(emptyGroup){ emptyGroup.style.display=''; try{ if(typeof showNoDataImage==='function') showNoDataImage(emptyGroup, msg); }catch(_){} }
+            renderSharedNoData(emptyGroup, msg);
             if(groupPie) groupPie.style.display='none';
             if(groupLegend) groupLegend.style.display='none';
           }
           function showVerEmpty(){
-            if(emptyVer){ emptyVer.style.display=''; try{ showNoDataImage(emptyVer, '할당 하드웨어 자산의\n소프트웨어 버전 정보가 없습니다.'); }catch(_){} }
+            renderSharedNoData(emptyVer, '할당 시스템 내역이 없습니다.');
             if(verDonut) verDonut.style.display='none';
             if(verLegend) verLegend.style.display='none';
           }
           showVerEmpty();
           if(!serverCode){
-            showPieEmpty('할당 하드웨어 자산이 없습니다.');
-            showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+            showPieEmpty('할당 시스템 내역이 없습니다.');
+            showGroupEmpty('할당 시스템 내역이 없습니다.');
             forceVisibleNoDataImages();
             return;
           }
@@ -413,8 +439,8 @@
             .then(function(res){ return res.json(); })
             .then(function(data){
               if(!data.success || !data.items || !data.items.length){
-                showPieEmpty('할당 하드웨어 자산이 없습니다.');
-                showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+                showPieEmpty('할당 시스템 내역이 없습니다.');
+                showGroupEmpty('할당 시스템 내역이 없습니다.');
                 forceVisibleNoDataImages();
                 return;
               }
@@ -435,7 +461,7 @@
               Object.keys(statusMap).forEach(function(k){ if(stOrder.indexOf(k)===-1) stEntries.push({label:k, count:statusMap[k]}); });
               var stTotal = stEntries.reduce(function(s,e){ return s+e.count; }, 0);
               if(!stTotal){
-                showPieEmpty('할당 하드웨어 자산이 없습니다.');
+                showPieEmpty('할당 시스템 내역이 없습니다.');
               } else {
                 if(emptyPie) emptyPie.style.display='none';
                 if(pie){ pie.style.visibility=''; pie.style.display='block'; pie.style.width='220px'; pie.style.height='220px'; pie.style.borderRadius='50%'; }
@@ -476,7 +502,7 @@
               opOrder.forEach(function(name){ if(opMap[name]) opEntries.push({label:name, count:opMap[name]}); });
               Object.keys(opMap).forEach(function(k){ if(opOrder.indexOf(k)===-1) opEntries.push({label:k, count:opMap[k]}); });
               var gTotal = opEntries.reduce(function(s,e){ return s+e.count; }, 0);
-              if(!gTotal){ showGroupEmpty('할당 하드웨어 자산이 없습니다.'); forceVisibleNoDataImages(); return; }
+              if(!gTotal){ showGroupEmpty('할당 시스템 내역이 없습니다.'); forceVisibleNoDataImages(); return; }
               if(emptyGroup) emptyGroup.style.display='none';
               var fallbackColors = ['#ef4444','#94a3b8','#8b5cf6','#ec4899'];
               var gradParts = [], segData = [], degCur = 0, fcIdx = 0;

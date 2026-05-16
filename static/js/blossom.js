@@ -4321,6 +4321,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const us = String(segment).indexOf('_');
         if (us < 1) return '';
         const prefix = String(segment).slice(0, us);
+        if (prefix === 'rack') {
+            let tab = 'basic';
+            try {
+                const p = new URLSearchParams(search || '');
+                const t = (p.get('tab') || 'basic').trim().toLowerCase();
+                if (t) tab = t;
+            } catch (_e) {}
+            const RACK_TAB_TO_KEY = {
+                basic: 'dc_rack_detail_basic',
+                detail: 'dc_rack_detail_basic',
+                task: 'dc_rack_detail_task',
+                log: 'dc_rack_detail_log',
+                file: 'dc_rack_detail_file',
+            };
+            return RACK_TAB_TO_KEY[tab] || 'dc_rack_detail_basic';
+        }
         const OPAQUE_PREFIX_TO_BASE = {
             bg: 'cat_business_group',
             srv: 'cat_hw_server',
@@ -4341,6 +4357,20 @@ document.addEventListener('DOMContentLoaded', () => {
             nic: 'cat_component_nic',
             hba: 'cat_component_hba',
             cmp: 'cat_component_etc',
+            fsacc: 'cat_facility_security_access',
+            fsdel: 'cat_facility_security_data_delete',
+            fsrack: 'cat_facility_security_rack',
+            fsth: 'cat_facility_security_thermometer',
+            fscctv: 'cat_facility_security_cctv',
+            fstrans: 'cat_facility_security_transformer',
+            fsgen: 'cat_facility_security_generator',
+            fsups: 'cat_facility_security_ups',
+            fsbat: 'cat_facility_security_battery',
+            fshvac: 'cat_facility_security_hvac',
+            fsleak: 'cat_facility_security_leak_detector',
+            fsdet: 'cat_facility_security_detection',
+            fsfire: 'cat_facility_security_fire_extinguishing',
+            fsevac: 'cat_facility_security_evacuation',
             ven: 'cat_vendor_manufacturer',
             mnt: 'cat_vendor_maintenance',
             cust: 'cat_customer_client1',
@@ -4491,7 +4521,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var __spaNavPrefetch = {};        // href -> Promise  (hover prefetch)
     var SPA_CACHE_TTL = 5 * 60 * 1000; // 5분
     /** 값을 올리면 SPA HTML 스냅샷 캐시 전부 무효화(오래된 <script>?v= 잔류 방지). */
-    var SPA_HTML_CACHE_REVISION = '20260510l';
+    var SPA_HTML_CACHE_REVISION = '20260512_no_data_component_fix';
     function __spaNavCacheKey(href) {
         return String(href || '') + '\u0001' + SPA_HTML_CACHE_REVISION;
     }
@@ -4512,6 +4542,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (/^\/p\/cat_business_group_(detail|manager|system|service|task|log|file)$/.test(url.pathname)) return false;
             // 비즈니스 대시보드는 첫 진입 레이아웃 안정성을 위해 항상 풀 리로드로 진입한다.
             if (url.pathname === '/b/cat_business_dashboard') return false;
+            // 메인 대시보드는 인증 세션/레이아웃 셸을 서버 렌더링 기준으로 다시 맞춘다.
+            if (url.pathname === '/dashboard') return false;
             // 채팅은 독립 페이지 스크립트가 매 진입마다 새로 평가되어야 한다.
             if (url.pathname === '/addon/chat') return false;
             // 통합계정(신청·현황 등): 단계형 폼 스크립트가 SPA 삽입 시 누락되는 경우 방지 → 풀 로드
@@ -4545,6 +4577,17 @@ document.addEventListener('DOMContentLoaded', () => {
             signal: __spaNavInflight.signal,
             headers: { 'X-Requested-With': 'blossom-spa' }
         }).then(function (r) {
+            try {
+                var responseUrl = new URL(r.url || href, location.origin);
+                if (r.redirected && responseUrl.pathname === '/login') {
+                    var authErr = new Error('AUTH_REDIRECT');
+                    authErr.name = 'AuthRedirectError';
+                    authErr.redirectUrl = responseUrl.pathname + responseUrl.search;
+                    throw authErr;
+                }
+            } catch (urlErr) {
+                if (urlErr && urlErr.name === 'AuthRedirectError') throw urlErr;
+            }
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
         }).then(function (html) {
@@ -4811,6 +4854,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.classList.remove('spa-loading');
             // SPA 실패 시 기존 방식 fallback
             if (err && err.name === 'AbortError') return;
+            if (err && err.name === 'AuthRedirectError') {
+                window.location.href = err.redirectUrl || '/login';
+                return;
+            }
             console.warn('[spa-nav] fallback to full reload', err);
             window.location.href = href;
         });
@@ -7714,14 +7761,16 @@ function updateColumnCheckboxStates() {
     var _timer = null;
     var _isLoginPage = /\/login\b/.test(window.location.pathname);
     if (_isLoginPage) return;  // 로그인 페이지에서는 동작하지 않음
+    if (window.__sessionPollInterval) return;  // §18 session-check가 이미 같은 역할을 수행한다.
 
     function checkSession() {
-        fetch('/api/session/heartbeat', {
+        fetch('/api/auth/session-check', {
             method: 'GET',
             credentials: 'same-origin',
+            cache: 'no-store',
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         }).then(function(res) {
-            if (res.status === 401 || (res.redirected && /\/login\b/.test(res.url))) {
+            if (res.status === 401) {
                 clearInterval(_timer);
                 try {
                     localStorage.setItem('blossom.session.invalidated', String(Date.now()));
@@ -8582,11 +8631,11 @@ document.addEventListener('DOMContentLoaded', function(){
             var stored = el.getAttribute('data-bls-empty-message');
             if(stored) return stored;
             var text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-            if(!text || text === '-') text = '데이터가 없습니다.';
+            if(!text || text === '-') text = '할당 시스템 내역이 없습니다.';
             el.setAttribute('data-bls-empty-message', text);
             return text;
         }catch(_e){
-            return '데이터가 없습니다.';
+            return '할당 시스템 내역이 없습니다.';
         }
     }
 
@@ -8622,25 +8671,76 @@ document.addEventListener('DOMContentLoaded', function(){
         return lottiePromise;
     }
 
+    function renderInlineNoDataImage(animEl){
+        if(!animEl) return;
+        animEl.innerHTML = ''
+            + '<svg class="bls-detail-no-data-svg-fallback" viewBox="0 0 500 500" role="img" aria-label="No data" xmlns="http://www.w3.org/2000/svg">'
+            + '<rect x="78" y="126" width="344" height="258" rx="22" fill="#fff" stroke="#111827" stroke-width="16"/>'
+            + '<path d="M78 178H422" stroke="#111827" stroke-width="16" stroke-linecap="round"/>'
+            + '<circle cx="340" cy="152" r="7" fill="#22d3ee"><animate attributeName="opacity" values=".35;1;.35" dur="1.4s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="370" cy="152" r="7" fill="#22d3ee"><animate attributeName="opacity" values="1;.35;1" dur="1.4s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="398" cy="152" r="7" fill="#22d3ee"><animate attributeName="opacity" values=".55;1;.55" dur="1.4s" repeatCount="indefinite"/></circle>'
+            + '<circle cx="134" cy="238" r="22" fill="none" stroke="#111827" stroke-width="14"/>'
+            + '<path d="M152 254L178 280" stroke="#111827" stroke-width="14" stroke-linecap="round"/>'
+            + '<rect x="210" y="218" width="152" height="38" rx="19" fill="#fff" stroke="#111827" stroke-width="14"/>'
+            + '<rect x="224" y="232" width="70" height="10" rx="5" fill="#22d3ee"><animate attributeName="width" values="42;106;42" dur="1.8s" repeatCount="indefinite"/></rect>'
+            + '<text x="250" y="330" text-anchor="middle" font-size="58" font-weight="800" fill="#22d3ee">NO DATA</text>'
+            + '</svg>';
+    }
+
     function renderFallback(el, message){
         el.innerHTML = '<span class="bls-detail-no-data" role="status" aria-live="polite">'
+            + '<span class="bls-detail-no-data-anim" aria-hidden="true"></span>'
             + '<span class="bls-detail-no-data-text"></span>'
             + '</span>';
+        renderInlineNoDataImage(el.querySelector('.bls-detail-no-data-anim'));
         var textEl = el.querySelector('.bls-detail-no-data-text');
         if(textEl) textEl.textContent = message;
     }
 
-    /** 다른 *_detail 스크립트가 전용 플래그로 슬롯을 소유 중일 때만 true.
+    function hasRenderedSvg(el){
+        try{
+            return !!(el && el.querySelector && el.querySelector('svg'));
+        }catch(_e){
+            return false;
+        }
+    }
+
+    /** 다른 *_detail 스크립트가 실제 애니메이션을 렌더링했을 때만 true.
+     *  SPA 전환 후 일부 상세 스크립트의 path 기반 Lottie가 빈 박스만 남길 수 있어서,
+     *  플래그만 보고 스킵하지 않고 SVG가 확인되는 경우에만 전용 렌더를 존중한다.
      *  data-bls-no-data-loading 은 §27a renderEmpty 가 자신도 쓰므로 여기 넣으면
      *  ensureLottie 이후 .then 안에서 항상 true → fetch/Lottie 가 절대 실행되지 않는다. */
     function isForeignDetailNoDataAnim(el){
         try{
             if(!el) return false;
-            if(el.getAttribute('data-bls-no-data-owner') === 'detail-page') return true;
-            if(el.getAttribute('data-bls-no-data-anim') === '1') return true;
+            if(el.querySelector('.bls-detail-no-data')) return false;
+            if(el.querySelector('.bls-detail-no-data-fallback')) return false;
+            if(el.getAttribute('data-bls-no-data-owner') === 'detail-page' && hasPaintedNoDataGraphic(el)) return true;
+            if(el.getAttribute('data-bls-no-data-anim') === '1' && hasPaintedNoDataGraphic(el)) return true;
             var anim = el.querySelector('.bls-detail-no-data-anim');
-            if(anim && !el.querySelector('.bls-detail-no-data')) return true;
-            if(anim && !anim.closest('.bls-detail-no-data')) return true;
+            if(anim && anim.classList && anim.classList.contains('bls-detail-no-data-fallback')) return false;
+            if(anim && !anim.closest('.bls-detail-no-data') && hasPaintedNoDataGraphic(anim)) return true;
+        }catch(_e){}
+        return false;
+    }
+
+    function hasPaintedNoDataGraphic(el){
+        try{
+            if(!el) return false;
+            if(el.querySelector('.bls-detail-no-data-svg-fallback')) return true;
+            var svg = el.querySelector('svg');
+            if(svg && svg.querySelector('g > path, g > rect, g > circle, g > ellipse, g > line, g > polyline, g > polygon, g > text, g > image')) return true;
+            var canvas = el.querySelector('canvas');
+            if(canvas && canvas.width && canvas.height){
+                var ctx = canvas.getContext && canvas.getContext('2d');
+                if(ctx){
+                    var data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                    for(var i = 3; i < data.length; i += 64){
+                        if(data[i] !== 0) return true;
+                    }
+                }
+            }
         }catch(_e){}
         return false;
     }
@@ -8650,7 +8750,7 @@ document.addEventListener('DOMContentLoaded', function(){
             var shell = el && el.querySelector('.bls-detail-no-data');
             if(!shell) return false;
             var box = shell.querySelector('.bls-detail-no-data-anim');
-            return !!(box && box.querySelector('svg'));
+            return !!(box && hasPaintedNoDataGraphic(box));
         }catch(_e){}
         return false;
     }
@@ -8667,7 +8767,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
         var message = getMessage(el);
         el.removeAttribute('data-bls-no-data-rendered');
+        el.removeAttribute('data-bls-no-data-owner');
+        el.removeAttribute('data-bls-no-data-anim');
         el.setAttribute('data-bls-no-data-loading', '1');
+        try{ el.style.minHeight = '220px'; }catch(_styleErr){}
 
         el.innerHTML = '<span class="bls-detail-no-data" role="status" aria-live="polite">'
             + '<span class="bls-detail-no-data-anim" aria-hidden="true"></span>'
@@ -8681,9 +8784,25 @@ document.addEventListener('DOMContentLoaded', function(){
         function clearLoading(){
             try{ el.removeAttribute('data-bls-no-data-loading'); }catch(_e){}
         }
+        function ensureFallbackVisible(){
+            try{
+                if(animEl && document.documentElement.contains(animEl) && !hasPaintedNoDataGraphic(animEl)){
+                    renderInlineNoDataImage(animEl);
+                    el.setAttribute('data-bls-no-data-rendered', '1');
+                    clearLoading();
+                }
+            }catch(_fallbackErr){}
+        }
+        ensureFallbackVisible();
+        setTimeout(ensureFallbackVisible, 900);
+        setTimeout(ensureFallbackVisible, 2200);
         ensureLottie()
             .then(function(lottie){
                 if(isForeignDetailNoDataAnim(el)){
+                    clearLoading();
+                    return null;
+                }
+                if(hasPaintedNoDataGraphic(animEl)){
                     clearLoading();
                     return null;
                 }
@@ -8702,7 +8821,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             clearLoading();
                             return;
                         }
-                        lottie.loadAnimation({
+                        var anim = lottie.loadAnimation({
                             container: animEl,
                             renderer: 'svg',
                             loop: true,
@@ -8711,6 +8830,23 @@ document.addEventListener('DOMContentLoaded', function(){
                             rendererSettings: { preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true }
                         });
                         el.setAttribute('data-bls-no-data-rendered', '1');
+                        function ensureVisibleGraphic(){
+                            try{
+                                if(animEl && document.documentElement.contains(animEl) && !hasPaintedNoDataGraphic(animEl)){
+                                    if(anim && anim.destroy) try{ anim.destroy(); }catch(_destroyErr){}
+                                    renderInlineNoDataImage(animEl);
+                                }
+                            }catch(_visibleErr){}
+                        }
+                        try{
+                            if(anim && anim.addEventListener){
+                                anim.addEventListener('DOMLoaded', function(){ setTimeout(ensureVisibleGraphic, 80); });
+                                anim.addEventListener('data_ready', function(){ setTimeout(ensureVisibleGraphic, 80); });
+                                anim.addEventListener('data_failed', ensureVisibleGraphic);
+                            }
+                        }catch(_eventErr){}
+                        setTimeout(ensureVisibleGraphic, 700);
+                        setTimeout(ensureVisibleGraphic, 1600);
                         clearLoading();
                     });
             })

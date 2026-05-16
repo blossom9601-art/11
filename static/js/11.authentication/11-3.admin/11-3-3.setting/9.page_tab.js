@@ -14,13 +14,31 @@
     CATEGORY_CUSTOMER: '카테고리 > 고객',
     DC_RACK: '데이터센터 > RACK 관리',
     DC_THERMOMETER: '데이터센터 > 온/습도 관리',
-    DC_CCTV: '데이터센터 > CCTV 관리'
+    DC_TRANSFORMER: '데이터센터 > 전력설비 > 변압기',
+    DC_GENERATOR: '데이터센터 > 전력설비 > 발전기',
+    DC_UPS: '데이터센터 > 전력설비 > 무정전전원장치',
+    DC_BATTERY: '데이터센터 > 전력설비 > 배터리',
+    DC_HVAC: '데이터센터 > 환경설비 > 항온항습기',
+    DC_LEAK_DETECTOR: '데이터센터 > 환경설비 > 누수감지',
+    DC_DETECTION: '데이터센터 > 안전설비 > 감지설비',
+    DC_FIRE_EXTINGUISHING: '데이터센터 > 안전설비 > 소화설비',
+    DC_EVACUATION: '데이터센터 > 안전설비 > 대피설비',
+    DC_CCTV: '데이터센터 > 영상감시 관리'
   };
 
   /* ── 삭제 불가 탭 (page_code → tab_code Set) ── */
   var LOCKED_TABS = {
     DC_RACK: { LIST: 1 },
     DC_THERMOMETER: { LIST: 1, LOG: 1 },
+    DC_TRANSFORMER: { LIST: 1 },
+    DC_GENERATOR: { LIST: 1 },
+    DC_UPS: { LIST: 1 },
+    DC_BATTERY: { LIST: 1 },
+    DC_HVAC: { LIST: 1 },
+    DC_LEAK_DETECTOR: { LIST: 1 },
+    DC_DETECTION: { LIST: 1 },
+    DC_FIRE_EXTINGUISHING: { LIST: 1 },
+    DC_EVACUATION: { LIST: 1 },
     DC_CCTV: { LIST: 1 }
   };
   function isLocked(t) {
@@ -350,15 +368,21 @@
   function saveTab() {
     var editId    = $('pt-edit-id').value;
     var pageCode  = $('edit-pt-page-code').value;
-    var tabCode   = $('edit-pt-tab-code').value.trim();
+    var tabCode   = $('edit-pt-tab-code').value.trim().toUpperCase();
     var tabName   = $('edit-pt-tab-name').value.trim();
     var routeKey  = $('edit-pt-route-key').value.trim();
     var tabOrder  = parseInt($('edit-pt-tab-order').value, 10) || 0;
     var isActive  = parseInt($('edit-pt-is-active').value, 10);
     var desc      = $('edit-pt-description').value.trim();
 
+    if ($('edit-pt-tab-code')) $('edit-pt-tab-code').value = tabCode;
     if (!pageCode) { showMessage('페이지를 선택하세요.', '안내'); return; }
     if (!tabCode || !tabName) { showMessage('탭 코드와 탭 이름은 필수입니다.', '안내'); return; }
+
+    if (isDcPage(pageCode) && !routeKey) {
+      routeKey = dcRouteKeyFor(pageCode, tabCode);
+      if ($('edit-pt-route-key')) $('edit-pt-route-key').value = routeKey;
+    }
 
     /* 같은 페이지 내 탭 코드 중복 검사 */
     var dupTab = _allTabs.some(function (t) {
@@ -389,6 +413,8 @@
       page_code: pageCode, tab_code: tabCode, tab_name: tabName,
       route_key: routeKey, tab_order: tabOrder, is_active: isActive, description: desc
     };
+    var dcExtraOptions = buildDcExtraOptions(pageCode, tabCode, routeKey, tabName);
+    if (dcExtraOptions) payload.extra_options = JSON.stringify(dcExtraOptions);
 
     var url, method;
     if (editId) {
@@ -653,6 +679,40 @@
   function isLockedTab(pageCode, tabCode) {
     var m = LOCKED_TABS[pageCode];
     return m && m[tabCode];
+  }
+
+  var DC_ROUTE_SLUGS = {
+    DC_RACK: 'rack',
+    DC_THERMOMETER: 'thermo',
+    DC_TRANSFORMER: 'transformer',
+    DC_GENERATOR: 'generator',
+    DC_UPS: 'ups',
+    DC_BATTERY: 'battery',
+    DC_HVAC: 'hvac',
+    DC_LEAK_DETECTOR: 'leak_detector',
+    DC_DETECTION: 'detection',
+    DC_FIRE_EXTINGUISHING: 'fire_extinguishing',
+    DC_EVACUATION: 'evacuation',
+    DC_CCTV: 'cctv'
+  };
+
+  function dcRouteKeyFor(pageCode, tabCode) {
+    var slug = DC_ROUTE_SLUGS[pageCode] || String(pageCode || '').toLowerCase().replace(/^dc_/, '');
+    var code = String(tabCode || '').trim().toLowerCase();
+    if (!slug || !code) return '';
+    if (code === 'list') return 'dc_' + slug + '_list';
+    if (code === 'log') return 'dc_' + slug + '_log';
+    return 'dc_' + slug + '_' + code;
+  }
+
+  function buildDcExtraOptions(pageCode, tabCode, routeKey, tabName) {
+    if (!isDcPage(pageCode) || isLockedTab(pageCode, tabCode) || !/^LAB\d+$/i.test(tabCode || '')) return null;
+    return {
+      template_type: 'system_lab',
+      center_name: tabName || '',
+      layout_key: routeKey || dcRouteKeyFor(pageCode, tabCode),
+      overlay_store_key: (routeKey || dcRouteKeyFor(pageCode, tabCode)) + '_overlay_boxes'
+    };
   }
 
   function toggleImageSection(pageCode, tabCode) {

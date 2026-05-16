@@ -162,13 +162,12 @@
             var c=document.getElementById('mf-component-qty'); if(c) c.textContent=String(coVal);
           }catch(_){ } })();
           var isEmpty = (total<=0);
-          // Toggle visibility with desired two-line guidance
-          var emptyHTML = '할당 시스템 내역이 없습니다.<br>시스템 탭에서 시스템을 할당하세요.';
+          var emptyHTML = '할당 시스템 내역이 없습니다.';
           if(emptyEl){
             if(isEmpty){
               emptyEl.style.display = '';
               emptyEl.hidden = false;
-              try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.'); }catch(_s){}
+              try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.'); }catch(_s){}
             } else {
               emptyEl.innerHTML = emptyHTML; // keep text content accessible if toggled later
               emptyEl.style.display = 'none';
@@ -574,7 +573,7 @@
               if(isEmpty){
                 emptyEl.style.display = '';
                 emptyEl.hidden = false;
-                try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.'); }catch(_s){}
+                try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.'); }catch(_s){}
               } else {
                 emptyEl.style.display = 'none';
                 emptyEl.hidden = true;
@@ -622,7 +621,7 @@
                 if(total<=0){
                   if(wrapEl) wrapEl.style.display='none';
                   if(emptyEl){ emptyEl.style.display=''; emptyEl.hidden=false;
-                    try{ showNoDataImage(emptyEl,'서비스 데이터가 없습니다.\n서비스 탭에서 정보를 추가하세요.'); }catch(_s){}
+                    try{ showNoDataImage(emptyEl,'할당 시스템 내역이 없습니다.'); }catch(_s){}
                   }
                   return;
                 }

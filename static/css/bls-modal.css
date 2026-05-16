@@ -1476,56 +1476,45 @@ body.modal-open .server-edit-modal .server-edit-content {
   gap: var(--bls-field-gap);
 }
 
-/* Category detail edit modals must visually match category list add modals.
+/* Category detail edit modals must keep a uniform field rhythm across category groups.
    This file is loaded after detail-common.css through the shared header, so keep
    the final override here instead of in detail-common.css. */
-body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-grid {
-  gap: 8px 20px !important;
-  align-items: start !important;
-}
-
-body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row {
-  gap: 4px !important;
-  row-gap: 4px !important;
-  margin: 0 !important;
-}
-
-body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > label,
-body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
-body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
-  margin: 0 !important;
-}
-
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-section,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-section {
-  padding: 0 32px !important;
+  padding: 0 36px !important;
 }
 
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-grid,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-grid {
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  column-gap: 20px !important;
-  row-gap: 8px !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 18px !important;
   align-items: start !important;
 }
 
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row {
   display: flex !important;
   flex-direction: column !important;
-  gap: 4px !important;
+  gap: 6px !important;
   margin: 0 !important;
   min-width: 0 !important;
   width: 100% !important;
 }
 
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > label,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > label {
   display: flex !important;
   align-items: center !important;
+  height: 18px !important;
   min-height: 18px !important;
   margin: 0 !important;
   padding: 0 !important;
   line-height: 18px !important;
 }
 
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
   width: 100% !important;
@@ -1534,15 +1523,52 @@ body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-e
   box-sizing: border-box !important;
 }
 
-.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > :is(input.form-input, select.form-input),
-.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-row > .fk-searchable-control .fk-searchable-display {
-  height: 46px !important;
-  min-height: 46px !important;
-  line-height: 46px !important;
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .fk-searchable-control,
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .fk-searchable-control {
+  min-width: 0 !important;
 }
 
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body :is(input.form-input, select.form-input, .fk-searchable-display),
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body :is(input.form-input, select.form-input, .fk-searchable-display) {
+  height: 46px !important;
+  min-height: 46px !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body :is(input.form-input, select.form-input),
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body :is(input.form-input, select.form-input) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 20px !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body select.form-input,
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body select.form-input {
+  padding-right: 36px !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body input[type="date"].form-input,
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body input[type="date"].form-input {
+  padding-right: 12px !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .fk-searchable-display,
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .fk-searchable-display {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 42px 0 14px !important;
+  line-height: 20px !important;
+  white-space: nowrap !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body textarea.form-input,
+.server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body textarea.form-input {
+  min-height: 160px !important;
+}
+
+body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
-  margin-top: 8px !important;
+  margin-top: 18px !important;
 }
 
 /* 폼 라벨 */
@@ -1551,6 +1577,40 @@ body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-e
   font-size: var(--bls-field-label-size);
   font-weight: var(--bls-field-label-weight);
   color: var(--bls-field-label-color);
+}
+
+.form-row .vendor-logo-field > .vendor-logo-upload-btn {
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+  overflow: hidden !important;
+}
+
+.form-row .vendor-logo-field > .vendor-logo-upload-btn > input.vendor-logo-file-input {
+  display: none !important;
+}
+
+.form-row .vendor-logo-field > .vendor-logo-upload-btn > .vendor-logo-upload-icon {
+  flex: 0 0 18px !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  max-height: 18px !important;
+  margin: 0 !important;
+  object-fit: contain !important;
 }
 
 /* 태블릿 오버라이드 */

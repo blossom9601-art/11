@@ -2160,6 +2160,37 @@ body.page-gov-ad-policy .modal-overlay-full .form-grid .form-row > *{
 	border-color:#64748b;
 	box-shadow:0 0 0 3px rgba(100,116,139,.18);
 }
+
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) :is(input.form-input, select.form-input, textarea.form-input),
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) .fk-searchable-control .fk-searchable-display{
+	border-color:#e5e7eb;
+}
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) :is(input.form-input, select.form-input, textarea.form-input):hover,
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) .fk-searchable-control .fk-searchable-display:hover{
+	border-color:#d1d5db;
+}
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) :is(input.form-input, select.form-input, textarea.form-input):focus,
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) :is(input.form-input, select.form-input, textarea.form-input):focus-visible,
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) .fk-searchable-control .fk-searchable-display:focus,
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) .fk-searchable-control:focus-within .fk-searchable-display{
+	border-color:#d1d5db;
+	box-shadow:0 0 0 3px rgba(209,213,219,.45);
+}
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) form.show-required-errors :is(input.form-input, select.form-input, textarea.form-input):invalid,
+:is(#va-add-modal, #va-action-modal, #va-bulk-modal) form.show-required-errors .fk-searchable-control.is-invalid .fk-searchable-display{
+	border-color:#ef4444;
+	box-shadow:0 0 0 3px rgba(239,68,68,.12);
+}
+#va-add-modal .va-date-input,
+#va-bulk-modal .va-date-input{
+	padding-right:44px;
+	background-image:url('/static/image/svg/free-icon-calendar.svg');
+	background-repeat:no-repeat;
+	background-position:right 14px center;
+	background-size:16px 16px;
+	font-variant-numeric:tabular-nums;
+	font-feature-settings:"tnum" 1;
+}
 .server-add-modal select.form-input:disabled, .server-edit-modal select.form-input:disabled {
 	background-color:#f1f5f9; color:#94a3b8; cursor:not-allowed; border-color:#e2e8f0; }
 /* High contrast for value placeholder (empty) */

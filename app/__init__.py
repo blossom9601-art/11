@@ -56,6 +56,8 @@ from app.services.cmp_nic_type_service import init_cmp_nic_type_table
 from app.services.cmp_hba_type_service import init_cmp_hba_type_table
 from app.services.cmp_etc_type_service import init_cmp_etc_type_table
 from app.services.cmp_gpu_type_service import init_cmp_gpu_type_table
+from app.services.facility_security_infra_service import init_facility_security_infra_table
+from app.services.datacenter_facility_system_service import init_datacenter_facility_system_table
 from app.services.hw_server_type_service import init_hw_server_type_table
 from app.services.hw_storage_type_service import init_hw_storage_type_table
 from app.services.hw_san_type_service import init_hw_san_type_table
@@ -90,6 +92,7 @@ from app.services.data_delete_register_service import init_data_delete_register_
 from app.services.data_delete_system_service import init_data_delete_system_table
 from app.services.hw_interface_service import init_hw_interface_table
 from app.services.hw_interface_detail_service import init_hw_interface_detail_table
+from app.services.hw_server_vulnerability_service import init_hw_server_vulnerability_table
 from app.services.tab32_assign_group_service import init_tab32_assign_group_tables
 from app.services.hw_maintenance_contract_service import init_hw_maintenance_contract_table
 from app.services.hw_activate_service import init_hw_activate_table
@@ -128,6 +131,7 @@ CATEGORY_PK_GUARD_TABLES = (
     'cmp_hba_type',
     'cmp_etc_type',
     'cmp_gpu_type',
+    'facility_security_infra_type',
     'org_company',
     'org_department',
     'org_center',
@@ -163,6 +167,7 @@ CATEGORY_CODE_GUARD_COLUMNS = {
     'cmp_hba_type': 'hba_code',
     'cmp_etc_type': 'etc_code',
     'cmp_gpu_type': 'gpu_code',
+    'facility_security_infra_type': 'infra_code',
     'org_company': 'company_code',
     'org_department': 'dept_code',
     'org_center': 'center_code',
@@ -701,6 +706,13 @@ def create_app(config_name='default'):
             except Exception:
                 pass
         try:
+            init_hw_server_vulnerability_table(app)
+        except Exception as vuln_init_err:
+            try:
+                print('[hw-server-vulnerability] table init failed:', vuln_init_err, flush=True)
+            except Exception:
+                pass
+        try:
             init_hw_maintenance_contract_table(app)
         except Exception as maint_init_err:
             try:
@@ -1219,6 +1231,20 @@ def create_app(config_name='default'):
         except Exception as data_delete_system_init_err:
             try:
                 print('[data-delete-system] table init failed:', data_delete_system_init_err, flush=True)
+            except Exception:
+                pass
+        try:
+            init_facility_security_infra_table(app)
+        except Exception as facility_security_infra_init_err:
+            try:
+                print('[facility-security-infra] table init failed:', facility_security_infra_init_err, flush=True)
+            except Exception:
+                pass
+        try:
+            init_datacenter_facility_system_table(app)
+        except Exception as datacenter_facility_system_init_err:
+            try:
+                print('[datacenter-facility-system] table init failed:', datacenter_facility_system_init_err, flush=True)
             except Exception:
                 pass
         try:
@@ -2003,13 +2029,18 @@ def create_app(config_name='default'):
 
     # 사이드바 권한 컨텍스트 주입 (메뉴 기반 권한)
     from app.models import AuthRole
-    from app.services.permission_service import MENU_SEEDS as _PERM_MENU_SEEDS
+    from app.services.permission_service import (
+        MENU_SEEDS as _PERM_MENU_SEEDS,
+        clear_client_session_permission_cache as _clear_client_session_permission_cache,
+        get_session_permissions as _get_session_permissions,
+    )
     import json as _json
 
     # ── 세션 유휴/절대 만료 체크 (before_request) ──
     @app.before_request
     def _check_session_expiry():
         """보안정책의 idle_minutes / absolute_hours 에 따라 세션을 강제 만료한다."""
+        _clear_client_session_permission_cache(session)
         if 'user_id' not in session:
             return None
         # 정적 파일 요청은 세션 체크 제외
@@ -2019,13 +2050,13 @@ def create_app(config_name='default'):
         if request.path in ('/login', '/logout'):
             return None
         now = datetime.utcnow()
-        # ── _login_at 이 없는 구버전 세션은 강제 만료 ──
+        # ── _login_at 이 없는 구버전 세션은 현재 요청 시각을 기준으로 보정 ──
         login_at_raw = session.get('_login_at')
         if not login_at_raw:
-            session.clear()
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'error': 'session_expired', 'message': '세션이 만료되었습니다. 다시 로그인 해주세요.'}), 401
-            return redirect(url_for('auth.login'))
+            session['_login_at'] = now.isoformat()
+            session['_last_active'] = session.get('_last_active') or session['_login_at']
+            session.modified = True
+            return None
         # ── 유휴 시간 체크 ──
         last_active = session.get('_last_active')
         if last_active:
@@ -2084,7 +2115,7 @@ def create_app(config_name='default'):
             return None
         if (session.get('role') or '').upper() == 'ADMIN':
             return None
-        perm_cache = session.get('_perms')
+        perm_cache = _get_session_permissions(session)
         result = _check_perm(path, _fl.request.method, perm_cache)
         if result == 'forbidden':
             # API 요청은 JSON 403, 페이지 요청은 대시보드로 리다이렉트
@@ -2135,13 +2166,13 @@ def create_app(config_name='default'):
             print('[sidebar_escalation] exception', _esc_e, flush=True)
         role = session.get('role')
         perms = {}
-        # 새 메뉴 기반 권한 시스템: 세션 캐시 → effective 권한 → 사이드바 dict
-        _perm_cache = session.get('_perms') or {}
+        # 새 메뉴 기반 권한 시스템: 서버 계산 권한 → 사이드바 dict
+        _perm_cache = _get_session_permissions(session)
         # ADMIN 은 전체 WRITE
         if (session.get('role') or '').upper() == 'ADMIN':
             _perm_cache = {code: 'WRITE' for code, _, _, _ in _PERM_MENU_SEEDS}
             _perm_cache['settings'] = 'WRITE'
-        # 세션 캐시를 사이드바용 dict 로 변환
+        # 권한 맵을 사이드바용 dict 로 변환
         # 사이드바는 legacy format {section: {read: bool, write: bool}} 사용
         for _code, _level in _perm_cache.items():
             _section = _code.split('.')[0]  # 대분류 기준

@@ -452,15 +452,15 @@
             if(!filteredItems.length){
                 this.emptyEl.hidden = false;
                 if(removed > 0){
-                    this.emptyEl.textContent = '이미 배치된 CCTV를 제외하니 남은 결과가 없습니다.';
+                    this.emptyEl.textContent = '이미 배치된 영상감시를 제외하니 남은 결과가 없습니다.';
                 } else if(this.centerToken){
                     if(this.state.lastQuery){
                         this.emptyEl.textContent = '이 센터에서 검색 결과가 없습니다.';
                     } else {
-                        this.emptyEl.textContent = '이 센터에 등록된 CCTV가 없습니다.';
+                        this.emptyEl.textContent = '이 센터에 등록된 영상감시가 없습니다.';
                     }
                 } else if(ctx.initial){
-                    this.emptyEl.textContent = '등록된 CCTV를 찾지 못했습니다.';
+                    this.emptyEl.textContent = '등록된 영상감시를 찾지 못했습니다.';
                 } else if(ctx.fallback){
                     this.emptyEl.textContent = '연결된 센터와 전체 센터에서 검색 결과가 없습니다.';
                 } else if(this.state.lastQuery){

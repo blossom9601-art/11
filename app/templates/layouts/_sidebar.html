@@ -33,6 +33,36 @@
 		'cat_component_memory_file', 'cat_component_memory_log', 'cat_component_memory_system', 'cat_component_memory_task',
 		'cat_component_nic'
 	],
+	'facility_security': [
+		'cat_facility_security_access', 'cat_facility_security_access_detail', 'cat_facility_security_access_system',
+		'cat_facility_security_access_task', 'cat_facility_security_access_log', 'cat_facility_security_access_file',
+		'cat_facility_security_data_delete', 'cat_facility_security_data_delete_detail', 'cat_facility_security_data_delete_system',
+		'cat_facility_security_data_delete_task', 'cat_facility_security_data_delete_log', 'cat_facility_security_data_delete_file',
+		'cat_facility_security_cctv', 'cat_facility_security_cctv_detail', 'cat_facility_security_cctv_system',
+		'cat_facility_security_cctv_task', 'cat_facility_security_cctv_log', 'cat_facility_security_cctv_file',
+		'cat_facility_security_transformer', 'cat_facility_security_transformer_detail', 'cat_facility_security_transformer_system',
+		'cat_facility_security_transformer_task', 'cat_facility_security_transformer_log', 'cat_facility_security_transformer_file',
+		'cat_facility_security_generator', 'cat_facility_security_generator_detail', 'cat_facility_security_generator_system',
+		'cat_facility_security_generator_task', 'cat_facility_security_generator_log', 'cat_facility_security_generator_file',
+		'cat_facility_security_ups', 'cat_facility_security_ups_detail', 'cat_facility_security_ups_system',
+		'cat_facility_security_ups_task', 'cat_facility_security_ups_log', 'cat_facility_security_ups_file',
+		'cat_facility_security_battery', 'cat_facility_security_battery_detail', 'cat_facility_security_battery_system',
+		'cat_facility_security_battery_task', 'cat_facility_security_battery_log', 'cat_facility_security_battery_file',
+		'cat_facility_security_hvac', 'cat_facility_security_hvac_detail', 'cat_facility_security_hvac_system',
+		'cat_facility_security_hvac_task', 'cat_facility_security_hvac_log', 'cat_facility_security_hvac_file',
+		'cat_facility_security_thermometer', 'cat_facility_security_thermometer_detail', 'cat_facility_security_thermometer_system',
+		'cat_facility_security_thermometer_task', 'cat_facility_security_thermometer_log', 'cat_facility_security_thermometer_file',
+		'cat_facility_security_leak_detector', 'cat_facility_security_leak_detector_detail', 'cat_facility_security_leak_detector_system',
+		'cat_facility_security_leak_detector_task', 'cat_facility_security_leak_detector_log', 'cat_facility_security_leak_detector_file',
+		'cat_facility_security_rack', 'cat_facility_security_rack_detail', 'cat_facility_security_rack_system',
+		'cat_facility_security_rack_task', 'cat_facility_security_rack_log', 'cat_facility_security_rack_file',
+		'cat_facility_security_detection', 'cat_facility_security_detection_detail', 'cat_facility_security_detection_system',
+		'cat_facility_security_detection_task', 'cat_facility_security_detection_log', 'cat_facility_security_detection_file',
+		'cat_facility_security_fire_extinguishing', 'cat_facility_security_fire_extinguishing_detail', 'cat_facility_security_fire_extinguishing_system',
+		'cat_facility_security_fire_extinguishing_task', 'cat_facility_security_fire_extinguishing_log', 'cat_facility_security_fire_extinguishing_file',
+		'cat_facility_security_evacuation', 'cat_facility_security_evacuation_detail', 'cat_facility_security_evacuation_system',
+		'cat_facility_security_evacuation_task', 'cat_facility_security_evacuation_log', 'cat_facility_security_evacuation_file'
+	],
 	'company': [
 		'cat_company_center', 'cat_company_department'
 	],
@@ -138,8 +168,20 @@
 	'gov_unused_server': ['gov_unused_hardware', 'gov_unused_server', 'gov_unused_storage', 'gov_unused_san', 'gov_unused_network', 'gov_unused_security'],
 	'dc_access_control': ['dc_access_control', 'dc_access_records', 'dc_authority_control', 'dc_authority_records', 'dc_access_system'],
 	'dc_data_deletion': ['dc_data_deletion', 'dc_data_deletion_system'],
-	'dc_rack_list': ['dc_rack_lab1', 'dc_rack_lab2', 'dc_rack_lab3', 'dc_rack_lab4', 'dc_rack_list'],
+	'dc_rack_list': [
+		'dc_rack_lab1', 'dc_rack_lab2', 'dc_rack_lab3', 'dc_rack_lab4', 'dc_rack_list',
+		'dc_rack_detail_basic', 'dc_rack_detail_task', 'dc_rack_detail_log', 'dc_rack_detail_file'
+	],
 	'dc_thermometer_list': ['dc_thermo_lab1', 'dc_thermo_lab2', 'dc_thermo_lab3', 'dc_thermo_lab4', 'dc_thermometer_list', 'dc_thermometer_log'],
+	'dc_transformer_list': ['dc_transformer_lab1', 'dc_transformer_list'],
+	'dc_generator_list': ['dc_generator_lab1', 'dc_generator_list'],
+	'dc_ups_list': ['dc_ups_lab1', 'dc_ups_list'],
+	'dc_battery_list': ['dc_battery_lab1', 'dc_battery_list'],
+	'dc_hvac_list': ['dc_hvac_lab1', 'dc_hvac_list'],
+	'dc_leak_detector_list': ['dc_leak_detector_lab1', 'dc_leak_detector_list'],
+	'dc_detection_list': ['dc_detection_lab1', 'dc_detection_list'],
+	'dc_fire_extinguishing_list': ['dc_fire_extinguishing_lab1', 'dc_fire_extinguishing_list'],
+	'dc_evacuation_list': ['dc_evacuation_lab1', 'dc_evacuation_list'],
 	'dc_cctv_list': ['dc_cctv_lab1', 'dc_cctv_lab2', 'dc_cctv_lab3', 'dc_cctv_lab4', 'dc_cctv_list'],
 	'cost_opex_dashboard': [
 		'cost_opex_dashboard',
@@ -168,6 +210,7 @@
 	'cat_sw_dashboard': _category_match_map['sw'],
 	'cat_sw_os': _category_match_map['sw'],
 	'cat_component_cpu': _category_match_map['component'],
+	'cat_facility_security_access': _category_match_map['facility_security'],
 	'cat_company_center': _category_match_map['company'],
 	'cat_customer_client1': _category_match_map['customer'],
 	'cat_vendor_manufacturer': _category_match_map['vendor']
@@ -242,12 +285,25 @@
 			{% if sidebar_perms.get('datacenter', {}).get('read', True) %}
 			<li class="menu-item has-submenu">
 				<div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
-				<ul class="submenu">
-					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_access_control') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_access_control') or []) | join(',') }}">출입 관리</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_data_deletion') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_data_deletion') or []) | join(',') }}">데이터 삭제 관리</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_rack_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_rack_list') or []) | join(',') }}">RACK 관리</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_thermometer_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_thermometer_list') or []) | join(',') }}">온/습도 관리</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_cctv_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_cctv_list') or []) | join(',') }}">CCTV 관리</a></li>
+				<ul class="submenu datacenter-facility-submenu">
+					<li class="submenu-group-title">보안설비</li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_access_control') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_access_control') or []) | join(',') }}">- 출입관리</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_data_deletion') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_data_deletion') or []) | join(',') }}">- 데이터삭제</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_cctv_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_cctv_list') or []) | join(',') }}">- 영상감시</a></li>
+					<li class="submenu-group-title">전력설비</li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_transformer_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_transformer_list') or []) | join(',') }}">- 변압기</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_generator_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_generator_list') or []) | join(',') }}">- 발전기</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_ups_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_ups_list') or []) | join(',') }}">- 무정전전원장치</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_battery_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_battery_list') or []) | join(',') }}">- 배터리</a></li>
+					<li class="submenu-group-title">환경설비</li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_hvac_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_hvac_list') or []) | join(',') }}">- 항온항습기</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_thermometer_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_thermometer_list') or []) | join(',') }}">- 온/습도계</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_leak_detector_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_leak_detector_list') or []) | join(',') }}">- 누수감지</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_rack_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_rack_list') or []) | join(',') }}">- RACK</a></li>
+					<li class="submenu-group-title">안전설비</li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_detection_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_detection_list') or []) | join(',') }}">- 감지설비</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_fire_extinguishing_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_fire_extinguishing_list') or []) | join(',') }}">- 소화설비</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_evacuation_list') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_evacuation_list') or []) | join(',') }}">- 대피설비</a></li>
 				</ul>
 			</li>
 			{% endif %}
@@ -288,6 +344,7 @@
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_hw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_hw_dashboard') or []) | join(',') }}">하드웨어</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_sw_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_sw_dashboard') or []) | join(',') }}">소프트웨어</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_component_cpu') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_component_cpu') or []) | join(',') }}">컴포넌트</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_facility_security_access') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_facility_security_access') or []) | join(',') }}">시설·보안</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_company_company') }}" class="submenu-link" data-match-keys="{{ ((_sidebar_match_map.get('cat_company_company') or []) + (_sidebar_match_map.get('cat_company_center') or []) + (_sidebar_match_map.get('cat_company_department') or [])) | join(',') }}">회사</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_customer_client1') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_customer_client1') or []) | join(',') }}">고객</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cat_vendor_manufacturer') or []) | join(',') }}">벤더</a></li>

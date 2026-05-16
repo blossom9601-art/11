@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	const API_BASE = '/api/insight/blog/posts';
 	const API_TOP_TAGS = '/api/insight/blog/tags/top';
 	const PAGE_SIZE = 8;
+	const ATTACHMENT_MAX_MB = 100;
+	const ATTACHMENT_MAX_BYTES = ATTACHMENT_MAX_MB * 1024 * 1024;
 	const INSIGHT_RANDOM_IMAGES = [
 		'/static/image/insight/image1.jpg',
 		'/static/image/insight/image2.png',
@@ -177,10 +179,17 @@ document.addEventListener('DOMContentLoaded', () => {
 		const pid = String(postId || '').trim();
 		const list = Array.from(files || []).filter(Boolean).slice(0, 10);
 		if (!pid || list.length === 0) return { ok: true, status: 200, data: { success: true } };
-		const fd = new FormData();
-		for (const f of list) fd.append('attachments', f, f.name);
-		const replace = opts?.replace ? '1' : '0';
-		return await fetchMultipart(`${API_BASE}/${encodeURIComponent(pid)}/attachments?replace=${replace}`, fd, { method: 'POST' });
+		let attachments = [];
+		for (let index = 0; index < list.length; index += 1) {
+			const uploadFile = list[index];
+			const fd = new FormData();
+			fd.append('attachments', uploadFile, uploadFile.name);
+			const replace = opts?.replace && index === 0 ? '1' : '0';
+			const res = await fetchMultipart(`${API_BASE}/${encodeURIComponent(pid)}/attachments?replace=${replace}`, fd, { method: 'POST' });
+			if (!res.ok || !res.data?.success) return res;
+			attachments = Array.isArray(res.data.attachments) ? res.data.attachments : attachments;
+		}
+		return { ok: true, status: 200, data: { success: true, attachments } };
 	};
 
 	const readImageAsDataUrl = (file) => new Promise((resolve, reject) => {
@@ -350,7 +359,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	};
 
 	const setAttachments = (files) => {
-		const list = Array.from(files || []).slice(0, 10);
+		const list = [];
+		const sourceFiles = Array.from(files || []);
+		for (const uploadFile of sourceFiles) {
+			if (list.length >= 10) break;
+			if (uploadFile.size && uploadFile.size > ATTACHMENT_MAX_BYTES) {
+				alert(`첨부파일은 ${ATTACHMENT_MAX_MB}MB 이하만 업로드할 수 있습니다.`);
+				continue;
+			}
+			list.push(uploadFile);
+		}
 		attachmentFiles = list;
 		attachmentsTouched = true;
 		renderAttachList();

@@ -1197,12 +1197,12 @@
         const sub = document.getElementById('system-add-subtitle');
         const saveBtn = document.getElementById(ADD_SAVE_ID);
         if(isEdit){
-            if(title) title.textContent = 'CCTV 수정';
-            if(sub) sub.textContent = 'CCTV 정보를 수정합니다.';
+            if(title) title.textContent = '영상감시 수정';
+            if(sub) sub.textContent = '영상감시 정보를 수정합니다.';
             if(saveBtn) saveBtn.textContent = '저장';
         } else {
-            if(title) title.textContent = 'CCTV 등록';
-            if(sub) sub.textContent = '새로운 CCTV를 등록합니다.';
+            if(title) title.textContent = '영상감시 등록';
+            if(sub) sub.textContent = '새로운 영상감시를 등록합니다.';
             if(saveBtn) saveBtn.textContent = '등록';
             // Also set default color UI when entering add mode visuals
             try{

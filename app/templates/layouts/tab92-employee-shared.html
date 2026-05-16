@@ -11,8 +11,8 @@
 
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
-    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.1">
-    <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.0"></script>
+    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.5">
+    <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.4"></script>
 </head>
 <body class="page-tab92-employee-shared {{ tab92.body_class|default('page-workgroup-manager') }}" data-cat-detail-id="{{ cat_detail_id or '' }}" data-work-group-public-id="{{ work_group_public_id or '' }}">
     {% include 'layouts/_header.html' %}
@@ -45,12 +45,18 @@
             <div class="server-detail-content">
                 <div class="server-detail-pane active" id="basic">
                     <div class="detail-header-actions" aria-label="담당자 상단 동작">
-                        <button class="add-btn-icon" id="mg-email-send-btn" title="이메일 전송" type="button" aria-label="이메일 전송">
-                            <img src="/static/image/svg/free-icon-font-envelope-bulk.svg" alt="이메일 전송">
+                        <button class="add-btn-icon" id="mg-email-send-btn" title="사내메일 전송" type="button" aria-label="사내메일 전송">
+                            <img src="/static/image/svg/free-icon-font-envelope-bulk.svg" alt="사내메일 전송">
                         </button>
-                        <button class="add-btn-icon" id="hw-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
-                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
-                        </button>
+                        <div class="page-size-selector" id="hw-page-size-wrap" aria-label="보기 개수">
+                            <label for="hw-page-size" class="visually-hidden">보기 개수</label>
+                            <select id="hw-page-size" class="page-size-select" title="보기 개수">
+                                <option value="10">10개</option>
+                                <option value="20">20개</option>
+                                <option value="50">50개</option>
+                                <option value="100">100개</option>
+                            </select>
+                        </div>
                         <button class="add-btn-icon" id="hw-row-add" title="행 추가" type="button" aria-label="행 추가">
                             <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
                         </button>
@@ -59,22 +65,12 @@
                     <div class="detail-section">
                         <h3>
                             {{ tab92.section_title|default('담당자 정보') }}
-                            <div class="page-size-selector" id="hw-page-size-wrap" aria-label="보기 개수">
-                                <label for="hw-page-size" class="visually-hidden">보기 개수</label>
-                                <select id="hw-page-size" class="page-size-select" title="보기 개수">
-                                    <option value="10">10개</option>
-                                    <option value="20">20개</option>
-                                    <option value="50">50개</option>
-                                    <option value="100">100개</option>
-                                </select>
-                            </div>
                         </h3>
 
                         <div class="table-wrap">
                             <table class="hw-table cols-6" id="hw-spec-table" data-context="manager">
                                 <colgroup>
                                     <col>
-                                    <col class="equal-col">
                                     <col class="equal-col">
                                     <col class="equal-col">
                                     <col class="equal-col">
@@ -89,10 +85,9 @@
                                         <th>부서</th>
                                         <th>이름</th>
                                         <th>역할</th>
-                                        <th>연락처</th>
-                                        <th>이메일</th>
+                                        <th>사내번호</th>
+                                        <th>사내메일</th>
                                         <th>수신여부</th>
-                                        <th>비고</th>
                                         <th>관리</th>
                                     </tr>
                                 </thead>
@@ -134,7 +129,44 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
+
+    <div id="mgr-email-modal" class="server-add-modal modal-overlay-full tab92-email-modal" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>사내메일 전송</h3>
+                    <p class="server-add-subtitle">수신여부가 O인 담당자에게 메일을 보냅니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="mgr-email-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="form-grid tab92-email-form">
+                    <div class="form-row form-row-wide">
+                        <label for="mgr-email-to">받는 사람</label>
+                        <input type="text" class="form-input" id="mgr-email-to" autocomplete="off" placeholder="사내메일 주소를 쉼표로 구분">
+                    </div>
+                    <div class="form-row form-row-wide">
+                        <label for="mgr-email-subject">제목</label>
+                        <input type="text" class="form-input" id="mgr-email-subject" autocomplete="off" placeholder="제목">
+                    </div>
+                    <div class="form-row form-row-wide">
+                        <label for="mgr-email-body">본문</label>
+                        <textarea class="form-input textarea-large" id="mgr-email-body" rows="8" placeholder="메일 본문을 입력하세요."></textarea>
+                    </div>
+                </div>
+                <p class="tab92-email-status" id="mgr-email-status" role="status" aria-live="polite"></p>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="mgr-email-cancel">취소</button>
+                    <button type="button" class="btn-primary" id="mgr-email-send-confirm">보내기</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="mgr-delete-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">
         <div class="server-add-content">
@@ -166,25 +198,5 @@
             </div>
         </div>
     </div>
-
-        {% set dlm_modal_id = 'hw-download-modal' %}
-    {% set dlm_title_id = 'hw-download-modal-title' %}
-    {% set dlm_title = 'CSV 다운로드' %}
-    {% set dlm_subtitle_id = 'hw-download-subtitle' %}
-    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
-    {% set dlm_close_id = 'hw-download-close' %}
-    {% set dlm_confirm_id = 'hw-download-confirm' %}
-    {% set dlm_confirm_label = '다운로드' %}
-    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
-    {% set dlm_range_name = 'hw-csv-range' %}
-    {% set dlm_row_all_id = 'hw-csv-range-row-all' %}
-    {% set dlm_row_selected_id = 'hw-csv-range-row-selected' %}
-    {% set dlm_all_id = 'hw-csv-range-all' %}
-    {% set dlm_selected_id = 'hw-csv-range-selected' %}
-    {% set dlm_all_label = '전체 결과' %}
-    {% set dlm_selected_label = '선택된 행만' %}
-    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
-    {% set dlm_illustration_alt = 'Research Illustration' %}
-    {% include 'layouts/_download_modal_range.html' %}
 </body>
 </html>

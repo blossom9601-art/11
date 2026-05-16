@@ -65,6 +65,7 @@
       function showNoDataImage(container, altText){
         try{
           if(!container) return;
+          if(container.querySelector && container.querySelector('.bls-detail-no-data')) return;
           container.innerHTML = '';
           var wrap = document.createElement('span');
           wrap.style.display = 'flex';
@@ -117,6 +118,22 @@
             }catch(_f){ }
           }
           if(!renderLottie()){ if(!window.lottie){ loadLottieAndRender(); } else { renderImageFallback(); } }
+        }catch(_){ }
+      }
+
+      function renderSharedNoData(container, message){
+        try{
+          if(!container) return;
+          var text = message || '데이터가 없습니다.';
+          container.style.display = '';
+          container.setAttribute('data-bls-empty-message', text);
+          container.removeAttribute('data-bls-no-data-rendered');
+          container.removeAttribute('data-bls-no-data-owner');
+          container.removeAttribute('data-bls-no-data-anim');
+          container.removeAttribute('data-bls-no-data-loading');
+          container.textContent = text;
+          if(window.__blsRescanDetailStatEmpty) window.__blsRescanDetailStatEmpty();
+          else if(window.CustomEvent) document.dispatchEvent(new CustomEvent('bls-detail-stat-empty'));
         }catch(_){ }
       }
       // Helper: reflect computed total count into the OS quantity field
@@ -247,24 +264,24 @@
           var verDonut = document.getElementById('ver-donut');
           var verLegend = document.getElementById('ver-legend');
           function showPieEmpty(msg){
-            if(emptyPie){ emptyPie.style.display=''; try{ showNoDataImage(emptyPie, msg); }catch(_){} }
+            renderSharedNoData(emptyPie, msg);
             if(pie){ pie.style.visibility='hidden'; pie.style.display='none'; }
             if(legendPie) legendPie.style.display='none';
           }
           function showGroupEmpty(msg){
-            if(emptyGroup){ emptyGroup.style.display=''; try{ if(typeof showNoDataImage==='function') showNoDataImage(emptyGroup, msg); }catch(_){} }
+            renderSharedNoData(emptyGroup, msg);
             if(groupPie) groupPie.style.display='none';
             if(groupLegend) groupLegend.style.display='none';
           }
           function showVerEmpty(){
-            if(emptyVer){ emptyVer.style.display=''; try{ showNoDataImage(emptyVer, '할당 하드웨어 자산의\n소프트웨어 버전 정보가 없습니다.'); }catch(_){} }
+            renderSharedNoData(emptyVer, '할당 시스템 내역이 없습니다.');
             if(verDonut) verDonut.style.display='none';
             if(verLegend) verLegend.style.display='none';
           }
           showVerEmpty();
           if(!apiParam){
-            showPieEmpty('할당 하드웨어 자산이 없습니다.');
-            showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+            showPieEmpty('할당 시스템 내역이 없습니다.');
+            showGroupEmpty('할당 시스템 내역이 없습니다.');
             setOsQuantity(0);
             return;
           }
@@ -272,8 +289,8 @@
             .then(function(res){ return res.json(); })
             .then(function(data){
               if(!data.success || !data.items || !data.items.length){
-                showPieEmpty('할당 하드웨어 자산이 없습니다.');
-                showGroupEmpty('할당 하드웨어 자산이 없습니다.');
+                showPieEmpty('할당 시스템 내역이 없습니다.');
+                showGroupEmpty('할당 시스템 내역이 없습니다.');
                 setOsQuantity(0);
                 return;
               }
@@ -295,7 +312,7 @@
               Object.keys(statusMap).forEach(function(k){ if(stOrder.indexOf(k)===-1) stEntries.push({label:k, count:statusMap[k]}); });
               var stTotal = stEntries.reduce(function(s,e){ return s+e.count; }, 0);
               if(!stTotal){
-                showPieEmpty('할당 하드웨어 자산이 없습니다.');
+                showPieEmpty('할당 시스템 내역이 없습니다.');
               } else {
                 if(emptyPie) emptyPie.style.display='none';
                 if(pie){ pie.style.visibility=''; pie.style.display='block'; pie.style.width='220px'; pie.style.height='220px'; pie.style.borderRadius='50%'; }
@@ -336,7 +353,7 @@
               opOrder.forEach(function(name){ if(opMap[name]) opEntries.push({label:name, count:opMap[name]}); });
               Object.keys(opMap).forEach(function(k){ if(opOrder.indexOf(k)===-1) opEntries.push({label:k, count:opMap[k]}); });
               var gTotal = opEntries.reduce(function(s,e){ return s+e.count; }, 0);
-              if(!gTotal){ showGroupEmpty('할당 하드웨어 자산이 없습니다.'); return; }
+              if(!gTotal){ showGroupEmpty('할당 시스템 내역이 없습니다.'); return; }
               if(emptyGroup) emptyGroup.style.display='none';
               var fallbackColors = ['#ef4444','#94a3b8','#8b5cf6','#ec4899'];
               var gradParts = [], segData = [], degCur = 0, fcIdx = 0;

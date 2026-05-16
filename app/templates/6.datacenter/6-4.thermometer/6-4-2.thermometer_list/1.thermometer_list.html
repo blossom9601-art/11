@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
     <link rel="stylesheet" href="/static/css/detail6.css?v=1.4">
 </head>
 <body>
@@ -124,9 +124,10 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+        <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
-    <script src="/static/js/6.datacenter/6-4.thermometer/6-4-2.thermometer_list/1.thermometer_list.js?v=1.03"></script>
+    <script src="/static/js/6.datacenter/datacenter_facility_fk.js?v=20260515_dc_facility_scope2"></script>
+    <script src="/static/js/6.datacenter/6-4.thermometer/6-4-2.thermometer_list/1.thermometer_list.js?v=20260514_dc_facility_fk1"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -151,8 +152,8 @@
                         <div class="form-section">
                             <div class="section-header"><h4>시스템</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>시스템 제조사 <span class="required">*</span></label><input name="vendor" class="form-input" placeholder="입력" required></div>
-                                <div class="form-row"><label>시스템 모델명 <span class="required">*</span></label><input name="model" class="form-input" placeholder="입력" required></div>
+                                <div class="form-row"><label>시스템 제조사 <span class="required">*</span></label><select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true" required><option value="">제조사 검색</option></select></div>
+                                <div class="form-row"><label>시스템 모델명 <span class="required">*</span></label><select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true" required><option value="">모델명 검색</option></select></div>
                                 <div class="form-row"><label>시스템 일련번호</label><input name="serial" class="form-input"></div>
                                 <div class="form-row"><label>시스템 장소 <span class="required">*</span></label><input name="place" class="form-input search-select" placeholder="검색 선택" data-search-source="centers" required></div>
                             </div>

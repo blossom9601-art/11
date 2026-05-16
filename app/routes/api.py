@@ -155,6 +155,9 @@ from app.services.work_group_service import (
     soft_delete_work_groups as svc_soft_delete_work_groups,
     list_work_group_change_logs as svc_list_work_group_change_logs,
     list_work_group_managers as svc_list_work_group_managers,
+    list_work_group_manager_roles as svc_list_work_group_manager_roles,
+    create_work_group_manager_role as svc_create_work_group_manager_role,
+    update_work_group_manager_role as svc_update_work_group_manager_role,
     create_work_group_manager as svc_create_work_group_manager,
     update_work_group_manager as svc_update_work_group_manager,
     delete_work_group_manager as svc_delete_work_group_manager,
@@ -844,6 +847,23 @@ from app.services.cmp_memory_type_service import (
     update_cmp_memory_type as svc_update_cmp_memory_type,
     soft_delete_cmp_memory_types as svc_soft_delete_cmp_memory_types,
 )
+from app.services.facility_security_infra_service import (
+    RESOURCE_CONFIGS as FACILITY_SECURITY_RESOURCE_CONFIGS,
+    list_facility_security_source_models as svc_list_facility_security_source_models,
+    list_facility_security_infra_types as svc_list_facility_security_infra_types,
+    get_facility_security_infra_type as svc_get_facility_security_infra_type,
+    create_facility_security_infra_type as svc_create_facility_security_infra_type,
+    update_facility_security_infra_type as svc_update_facility_security_infra_type,
+    soft_delete_facility_security_infra_types as svc_soft_delete_facility_security_infra_types,
+)
+from app.services.datacenter_facility_system_service import (
+    RESOURCE_CONFIGS as DATACENTER_FACILITY_RESOURCE_CONFIGS,
+    list_datacenter_facility_systems as svc_list_datacenter_facility_systems,
+    get_datacenter_facility_system as svc_get_datacenter_facility_system,
+    create_datacenter_facility_system as svc_create_datacenter_facility_system,
+    update_datacenter_facility_system as svc_update_datacenter_facility_system,
+    soft_delete_datacenter_facility_systems as svc_soft_delete_datacenter_facility_systems,
+)
 from app.services.quality_type_service import (
     list_quality_types as svc_list_quality_types,
     create_quality_type as svc_create_quality_type,
@@ -852,6 +872,15 @@ from app.services.quality_type_service import (
 )
 
 api_bp = Blueprint('api', __name__)
+
+_INSIGHT_ATTACHMENT_DEFAULT_MAX_MB = 20
+_INSIGHT_ATTACHMENT_TECHNICAL_MAX_MB = 100
+_BLOG_ATTACHMENT_MAX_MB = 100
+
+
+def _set_single_detail_session_ctx(bucket: str, context_key: str, value):
+    session[bucket] = {context_key: value}
+    session.modified = True
 
 
 # ── 서버 시간 동기화 (클라이언트 표시 시각 보정용) ──
@@ -879,12 +908,23 @@ def check_session_validity():
     """
     from app import db
     
-    sid = session.get('_session_id')
-    emp_no = session.get('emp_no')
+    sid = (session.get('_session_id') or '').strip()
+    emp_no = (session.get('emp_no') or '').strip()
+    has_identity = bool(
+        emp_no
+        or session.get('user_id')
+        or session.get('user_profile_id')
+        or session.get('profile_user_id')
+    )
     
-    # 세션이 없거나 emp_no가 없으면 무효
-    if not sid or not emp_no:
+    # 세션 정체성이 아예 없는 경우만 확정 미인증으로 처리한다.
+    if not has_identity:
         return jsonify({"valid": False}), 401
+
+    # 레거시/테스트 세션은 before_app_request에서 active_sessions 자동 등록을 시도한다.
+    # 그래도 sid 또는 emp_no가 비어 있으면 heartbeat와 같은 기준으로 유효 처리한다.
+    if not sid or not emp_no:
+        return jsonify({"valid": True}), 200
     
     try:
         # active_sessions 테이블에서 해당 세션 확인
@@ -898,8 +938,8 @@ def check_session_validity():
         else:
             return jsonify({"valid": False}), 401
     except Exception as e:
-        current_app.logger.error(f"Session check error: {e}")
-        return jsonify({"valid": False, "error": str(e)}), 401
+        current_app.logger.warning(f"Session check degraded: {e}")
+        return jsonify({"valid": True, "degraded": True}), 200
 
 # ── 공통 유틸리티 (common.py) ──
 # 새 엔드포인트 작성 시 아래 유틸리티를 우선 사용한다.
@@ -12230,11 +12270,14 @@ def _vpn_policy_to_dict(row: NetVpnLinePolicy) -> dict:
 @api_bp.route('/api/session/heartbeat', methods=['GET'])
 def api_session_heartbeat():
     """세션 유효성 경량 확인. 프론트엔드 폴링용."""
-    # emp_no만 있거나 user_id만 있는 세션 허용(테스트 픽스처·예외 레이스 포함).
-    # emp_no="" 인데 user_id는 있는 경우 not session.get('emp_no') 가 True가 되어
-    # 허위 401 알림이 뜨는 문제 방지.
     emp = (session.get('emp_no') or '').strip()
-    if 'user_id' not in session and not emp:
+    has_identity = bool(
+        emp
+        or session.get('user_id')
+        or session.get('user_profile_id')
+        or session.get('profile_user_id')
+    )
+    if not has_identity:
         return jsonify({'alive': False}), 401
     return jsonify({'alive': True})
 
@@ -17549,6 +17592,7 @@ def delete_hw_server_backup_policy(policy_id: int):
 # -----------------------------------------------------------------------------
 
 
+@api_bp.route('/api/governance/vulnerability-analysis', methods=['GET'])
 @api_bp.route('/api/hardware/server/vulnerabilities', methods=['GET'])
 def list_hw_server_vulnerabilities():
     """List vulnerability rows.
@@ -17648,6 +17692,7 @@ def list_hw_server_vulnerabilities():
         return jsonify({'success': False, 'message': '취약점 목록 조회 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/governance/vulnerability-analysis', methods=['POST'])
 @api_bp.route('/api/hardware/server/vulnerabilities', methods=['POST'])
 def create_hw_server_vulnerability():
     if not _hw_server_vl_tables_ready():
@@ -17838,6 +17883,7 @@ def create_hw_server_vulnerability():
         return jsonify({'success': False, 'message': '취약점 등록 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/governance/vulnerability-analysis/<int:vuln_id>', methods=['PUT'])
 @api_bp.route('/api/hardware/server/vulnerabilities/<int:vuln_id>', methods=['PUT'])
 def update_hw_server_vulnerability(vuln_id: int):
     if not _hw_server_vl_tables_ready():
@@ -17926,6 +17972,7 @@ def update_hw_server_vulnerability(vuln_id: int):
         return jsonify({'success': False, 'message': '취약점 수정 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/governance/vulnerability-analysis/<int:vuln_id>', methods=['DELETE'])
 @api_bp.route('/api/hardware/server/vulnerabilities/<int:vuln_id>', methods=['DELETE'])
 def delete_hw_server_vulnerability(vuln_id: int):
     if not _hw_server_vl_tables_ready():
@@ -22030,12 +22077,7 @@ def set_cost_detail_context():
     if not manage_no:
         return jsonify({'success': False, 'message': '관리번호가 필요합니다.'}), 400
 
-    ctx = session.get('cost_detail_ctx_v1')
-    if not isinstance(ctx, dict):
-        ctx = {}
-    ctx[base_key] = manage_no
-    session['cost_detail_ctx_v1'] = ctx
-    session.modified = True
+    _set_single_detail_session_ctx('cost_detail_ctx_v1', base_key, manage_no)
 
     return jsonify({'success': True, 'base_key': base_key, 'manage_no': manage_no})
 
@@ -22101,12 +22143,7 @@ def set_vendor_detail_context():
 
     base_key = _vendor_base_key(raw_key)
 
-    ctx = session.get('vendor_detail_ctx_v1')
-    if not isinstance(ctx, dict):
-        ctx = {}
-    ctx[base_key] = vendor_id
-    session['vendor_detail_ctx_v1'] = ctx
-    session.modified = True
+    _set_single_detail_session_ctx('vendor_detail_ctx_v1', base_key, vendor_id)
 
     return jsonify({'success': True, 'base_key': base_key, 'vendor_id': vendor_id})
 
@@ -22156,9 +22193,6 @@ def set_category_detail_context():
     raw_title = (str(payload.get('title') or '')).strip()
     raw_subtitle = (str(payload.get('subtitle') or '')).strip()
 
-    ctx = session.get('cat_detail_ctx_v1')
-    if not isinstance(ctx, dict):
-        ctx = {}
     entry = {
         'id': raw_id or '',
         'title': raw_title or '',
@@ -22169,9 +22203,7 @@ def set_category_detail_context():
         _ev = (str(payload.get(_ep) or '')).strip()
         if _ev:
             entry[_ep] = _ev
-    ctx[base_key] = entry
-    session['cat_detail_ctx_v1'] = ctx
-    session.modified = True
+    _set_single_detail_session_ctx('cat_detail_ctx_v1', base_key, entry)
 
     return jsonify({'success': True, 'base_key': base_key})
 
@@ -22239,16 +22271,11 @@ def set_governance_detail_context():
     raw_title = (str(payload.get('title') or '')).strip()
     raw_subtitle = (str(payload.get('subtitle') or '')).strip()
 
-    ctx = session.get('gov_detail_ctx_v1')
-    if not isinstance(ctx, dict):
-        ctx = {}
-    ctx[base_key] = {
+    _set_single_detail_session_ctx('gov_detail_ctx_v1', base_key, {
         'id': raw_id or '',
         'title': raw_title or '',
         'subtitle': raw_subtitle or '',
-    }
-    session['gov_detail_ctx_v1'] = ctx
-    session.modified = True
+    })
 
     return jsonify({'success': True, 'base_key': base_key})
 
@@ -25872,6 +25899,194 @@ def delete_sw_ha_types():
         return jsonify({'success': False, 'message': '고가용성 유형 삭제 중 오류가 발생했습니다.'}), 500
 
 
+def _facility_security_resource_key(resource: str) -> str:
+    key = (resource or '').strip().lower().replace('-', '_')
+    if key not in FACILITY_SECURITY_RESOURCE_CONFIGS:
+        raise ValueError('지원하지 않는 시설·보안 구분입니다.')
+    return key
+
+
+@api_bp.route('/api/facility-security-infra/<resource>/source-models', methods=['GET'])
+def list_facility_security_source_models(resource: str):
+    try:
+        resource_key = _facility_security_resource_key(resource)
+        search = (request.args.get('q') or '').strip() or None
+        rows = svc_list_facility_security_source_models(resource_key, search=search)
+        return jsonify({'success': True, 'items': rows, 'rows': rows, 'total': len(rows)})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to fetch facility/security source models for %s', resource)
+        return jsonify({'success': False, 'message': '원본 모델명 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/facility-security-infra/<resource>', methods=['GET'])
+def list_facility_security_infra_types(resource: str):
+    try:
+        resource_key = _facility_security_resource_key(resource)
+        search = (request.args.get('q') or '').strip() or None
+        field = (request.args.get('kind') or request.args.get('field') or '').strip() or None
+        include_deleted = request.args.get('include_deleted') in ('1', 'true', 'TRUE')
+        rows = svc_list_facility_security_infra_types(
+            resource_key,
+            search=search,
+            include_deleted=include_deleted,
+            field=field,
+        )
+        return jsonify({'success': True, 'items': rows, 'rows': rows, 'total': len(rows)})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to fetch facility/security infra types for %s', resource)
+        return jsonify({'success': False, 'message': '시설·보안 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/facility-security-infra/<resource>', methods=['POST'])
+def create_facility_security_infra_type(resource: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        resource_key = _facility_security_resource_key(resource)
+        record = svc_create_facility_security_infra_type(resource_key, payload, _resolve_actor())
+        return jsonify({'success': True, 'item': record}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except sqlite3.IntegrityError:
+        logger.exception('Duplicate facility/security infra code')
+        return jsonify({'success': False, 'message': '동일한 인프라 코드가 이미 존재합니다.'}), 400
+    except Exception:
+        logger.exception('Failed to create facility/security infra type for %s', resource)
+        return jsonify({'success': False, 'message': '시설·보안 등록 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/facility-security-infra/<resource>/<int:record_id>', methods=['PUT'])
+def update_facility_security_infra_type(resource: str, record_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        resource_key = _facility_security_resource_key(resource)
+        old_data = svc_get_facility_security_infra_type(record_id, resource_type=resource_key)
+        record = svc_update_facility_security_infra_type(resource_key, record_id, payload, _resolve_actor())
+        if not record:
+            return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        _try_record_cat_hw_change(
+            entity_type=f'facility_security_{resource_key}_type',
+            entity_id=record_id,
+            old_data=old_data,
+            new_data=record,
+        )
+        return jsonify({'success': True, 'item': record})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to update facility/security infra type id=%s resource=%s', record_id, resource)
+        return jsonify({'success': False, 'message': '시설·보안 수정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/facility-security-infra/<resource>/bulk-delete', methods=['POST'])
+def delete_facility_security_infra_types(resource: str):
+    payload = request.get_json(silent=True) or {}
+    ids = payload.get('ids')
+    if not isinstance(ids, (list, tuple)) or not ids:
+        return jsonify({'success': False, 'message': '삭제할 항목을 선택하세요.'}), 400
+    try:
+        resource_key = _facility_security_resource_key(resource)
+        deleted = svc_soft_delete_facility_security_infra_types(resource_key, ids, _resolve_actor())
+        return jsonify({'success': True, 'deleted': deleted})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to delete facility/security infra types for %s', resource)
+        return jsonify({'success': False, 'message': '시설·보안 삭제 중 오류가 발생했습니다.'}), 500
+
+
+def _datacenter_facility_resource_key(resource: str) -> str:
+    key = (resource or '').strip().lower().replace('-', '_')
+    if key not in DATACENTER_FACILITY_RESOURCE_CONFIGS:
+        raise ValueError('지원하지 않는 데이터센터 시설 구분입니다.')
+    return key
+
+
+@api_bp.route('/api/datacenter-facility/<resource>', methods=['GET'])
+@api_bp.route('/api/datacenter-facility-systems/<resource>', methods=['GET'])
+def list_datacenter_facility_systems(resource: str):
+    try:
+        resource_key = _datacenter_facility_resource_key(resource)
+        search = (request.args.get('q') or '').strip() or None
+        layout_key = (request.args.get('layout_key') or request.args.get('route_key') or '').strip()
+        include_deleted = request.args.get('include_deleted') in ('1', 'true', 'TRUE')
+        rows = svc_list_datacenter_facility_systems(
+            resource_key,
+            search=search,
+            layout_key=layout_key if layout_key else None,
+            include_deleted=include_deleted,
+        )
+        return jsonify({'success': True, 'items': rows, 'rows': rows, 'total': len(rows)})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to fetch datacenter facility systems for %s', resource)
+        return jsonify({'success': False, 'message': '데이터센터 시설 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/datacenter-facility/<resource>', methods=['POST'])
+@api_bp.route('/api/datacenter-facility-systems/<resource>', methods=['POST'])
+def create_datacenter_facility_system(resource: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        resource_key = _datacenter_facility_resource_key(resource)
+        record = svc_create_datacenter_facility_system(resource_key, payload, _resolve_actor())
+        return jsonify({'success': True, 'item': record}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except sqlite3.IntegrityError:
+        logger.exception('Duplicate datacenter facility system code')
+        return jsonify({'success': False, 'message': '동일한 시스템 코드가 이미 존재합니다.'}), 400
+    except Exception:
+        logger.exception('Failed to create datacenter facility system for %s', resource)
+        return jsonify({'success': False, 'message': '데이터센터 시설 등록 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/datacenter-facility/<resource>/<int:record_id>', methods=['PUT'])
+@api_bp.route('/api/datacenter-facility-systems/<resource>/<int:record_id>', methods=['PUT'])
+def update_datacenter_facility_system(resource: str, record_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        resource_key = _datacenter_facility_resource_key(resource)
+        old_data = svc_get_datacenter_facility_system(record_id, resource_type=resource_key)
+        record = svc_update_datacenter_facility_system(resource_key, record_id, payload, _resolve_actor())
+        if not record:
+            return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        _try_record_cat_hw_change(
+            entity_type=f'datacenter_facility_{resource_key}',
+            entity_id=record_id,
+            old_data=old_data,
+            new_data=record,
+        )
+        return jsonify({'success': True, 'item': record})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to update datacenter facility system id=%s resource=%s', record_id, resource)
+        return jsonify({'success': False, 'message': '데이터센터 시설 수정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/datacenter-facility/<resource>/bulk-delete', methods=['POST'])
+@api_bp.route('/api/datacenter-facility-systems/<resource>/bulk-delete', methods=['POST'])
+def delete_datacenter_facility_systems(resource: str):
+    payload = request.get_json(silent=True) or {}
+    ids = payload.get('ids')
+    if not isinstance(ids, (list, tuple)) or not ids:
+        return jsonify({'success': False, 'message': '삭제할 항목을 선택하세요.'}), 400
+    try:
+        resource_key = _datacenter_facility_resource_key(resource)
+        deleted = svc_soft_delete_datacenter_facility_systems(resource_key, ids, _resolve_actor())
+        return jsonify({'success': True, 'deleted': deleted})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to delete datacenter facility systems for %s', resource)
+        return jsonify({'success': False, 'message': '데이터센터 시설 삭제 중 오류가 발생했습니다.'}), 500
+
+
 @api_bp.route('/api/cmp-cpu-types', methods=['GET'])
 def list_cmp_cpu_types():
     search = (request.args.get('q') or '').strip() or None
@@ -26384,6 +26599,64 @@ def get_work_group(group_id: int):
         return jsonify({'success': False, 'message': '업무 그룹 조회 중 오류가 발생했습니다.'}), 500
 
 
+@api_bp.route('/api/work-groups/manager-roles', methods=['GET'])
+def list_work_group_manager_roles():
+    include_inactive = (request.args.get('include_inactive') or request.args.get('includeInactive') or '').lower() in (
+        '1',
+        'true',
+        'yes',
+    )
+    try:
+        include_inactive = bool(include_inactive and _is_admin_session())
+        items = svc_list_work_group_manager_roles(include_inactive=include_inactive)
+        return jsonify({'success': True, 'items': items, 'rows': items, 'total': len(items)})
+    except Exception:
+        logger.exception('Failed to fetch work group manager roles')
+        return jsonify({'success': False, 'message': '담당자 역할 목록 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/work-groups/manager-roles', methods=['POST'])
+def create_work_group_manager_role():
+    auth = _require_login_for_write()
+    if auth:
+        return auth
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 역할을 추가할 수 있습니다.'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    actor_user_id = _coerce_positive_int(_resolve_actor_user_id(None))
+    try:
+        item = svc_create_work_group_manager_role(payload, actor_user_id)
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to create work group manager role')
+        return jsonify({'success': False, 'message': '담당자 역할 추가 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/work-groups/manager-roles/<int:role_id>', methods=['PUT'])
+def update_work_group_manager_role(role_id: int):
+    auth = _require_login_for_write()
+    if auth:
+        return auth
+    if not _is_admin_session():
+        return jsonify({'success': False, 'message': '관리자만 역할을 수정할 수 있습니다.'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    actor_user_id = _coerce_positive_int(_resolve_actor_user_id(None))
+    try:
+        item = svc_update_work_group_manager_role(role_id, payload, actor_user_id)
+        if not item:
+            return jsonify({'success': False, 'message': '대상을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception:
+        logger.exception('Failed to update work group manager role id=%s', role_id)
+        return jsonify({'success': False, 'message': '담당자 역할 수정 중 오류가 발생했습니다.'}), 500
+
+
 @api_bp.route('/api/work-groups/<int:group_id>/managers', methods=['GET'])
 def list_work_group_managers(group_id: int):
     """Work group managers – simple text-column rows in biz_work_group_manager."""
@@ -26443,7 +26716,7 @@ def create_work_group_manager(group_id: int):
                 if _uprofile:
                     if not (payload.get('name') or '').strip():
                         payload['name'] = _uprofile.name or _uprofile.nickname or _uprofile.emp_no
-                    payload['phone'] = _uprofile.mobile_phone or _uprofile.ext_phone or ''
+                    payload['phone'] = _uprofile.ext_phone or _uprofile.mobile_phone or ''
                     payload['email'] = _uprofile.email or ''
             except Exception:
                 pass
@@ -26513,7 +26786,7 @@ def update_work_group_manager(group_id: int, manager_id: int):
                 if _uprofile:
                     if not (payload.get('name') or '').strip():
                         payload['name'] = _uprofile.name or _uprofile.nickname or _uprofile.emp_no
-                    payload['phone'] = _uprofile.mobile_phone or _uprofile.ext_phone or ''
+                    payload['phone'] = _uprofile.ext_phone or _uprofile.mobile_phone or ''
                     payload['email'] = _uprofile.email or ''
             except Exception:
                 pass
@@ -27876,16 +28149,12 @@ def unified_search_pages():
     from app.routes.pages import TEMPLATE_MAP, _resolve_menu_code
     from app.models import Menu
 
-    # 권한 캐시가 없으면 계산하여 세션에 저장
-    if '_perms' not in session:
-        try:
-            from app.services.permission_service import cache_session_permissions
-            cache_session_permissions(session)
-        except Exception:
-            logger.exception('Unified search: failed to build session permission cache')
-            session['_perms'] = {}
-
-    perms = session.get('_perms') or {}
+    try:
+        from app.services.permission_service import get_session_permissions
+        perms = get_session_permissions(session)
+    except Exception:
+        logger.exception('Unified search: failed to build session permissions')
+        perms = {}
     is_admin = (session.get('role') or '').strip().upper() == 'ADMIN'
 
     def _has_read_permission(menu_code: Optional[str]) -> bool:
@@ -34736,6 +35005,20 @@ def upload_blog_post_attachments(post_id: int):
         if not files:
             return jsonify({'success': False, 'message': '첨부파일이 없습니다.'}), 400
 
+        max_bytes = _BLOG_ATTACHMENT_MAX_MB * 1024 * 1024
+        safe_files = []
+        for upload_file in files:
+            try:
+                upload_file.stream.seek(0, 2)
+                size = int(upload_file.stream.tell() or 0)
+                upload_file.stream.seek(0)
+            except Exception:
+                size = 0
+            if size and size > max_bytes:
+                return jsonify({'success': False, 'message': f'첨부파일은 {_BLOG_ATTACHMENT_MAX_MB}MB 이하만 업로드할 수 있습니다.'}), 400
+            safe_files.append(upload_file)
+        files = safe_files
+
         replace = (request.args.get('replace') or '').strip().lower() in ('1', 'true', 'yes', 'y')
         existing = _blog_json_text_to_obj(row.attachments_json or '')
         existing_norm = _blog_normalize_attachments_for_response(post_id, existing)
@@ -34765,23 +35048,32 @@ def upload_blog_post_attachments(post_id: int):
         os.makedirs(base_dir, exist_ok=True)
 
         new_items: List[dict] = []
-        for f in files[:remaining]:
-            original = (f.filename or '').strip() or 'attachment'
+        saved_paths: List[str] = []
+        for upload_file in files[:remaining]:
+            original = (upload_file.filename or '').strip() or 'attachment'
             safe = secure_filename(original) or 'file'
             stored = f"{uuid.uuid4().hex}_{safe}"[:255]
             full_path = os.path.join(base_dir, stored)
-            f.save(full_path)
+            upload_file.save(full_path)
+            saved_paths.append(full_path)
             try:
                 size = int(os.path.getsize(full_path))
             except Exception:
                 size = 0
+            if size > max_bytes:
+                for saved_path in saved_paths:
+                    try:
+                        os.remove(saved_path)
+                    except Exception:
+                        pass
+                return jsonify({'success': False, 'message': f'첨부파일은 {_BLOG_ATTACHMENT_MAX_MB}MB 이하만 업로드할 수 있습니다.'}), 400
 
             new_items.append({
                 'name': original,
                 'original_name': original,
                 'stored_name': stored,
                 'size': max(0, size),
-                'content_type': (getattr(f, 'mimetype', '') or '').strip(),
+                'content_type': (getattr(upload_file, 'mimetype', '') or '').strip(),
                 'download_url': f"/api/insight/blog/posts/{post_id}/attachments/{stored}/download",
             })
 
@@ -35578,20 +35870,22 @@ def upload_insight_item_attachments_api(item_id: int):
         if not files:
             return jsonify({'success': True, 'attachments': []}), 200
 
-        # Limits: max 10 files, each <= 20MB
+        # 최대 10개까지 저장하며 기술자료는 더 큰 첨부파일을 허용합니다.
         files = files[:10]
-        max_bytes = 20 * 1024 * 1024
+        item_category = str(item.get('category') or '').strip().lower()
+        max_mb = _INSIGHT_ATTACHMENT_TECHNICAL_MAX_MB if item_category == 'technical' else _INSIGHT_ATTACHMENT_DEFAULT_MAX_MB
+        max_bytes = max_mb * 1024 * 1024
         safe_files = []
-        for f in files:
+        for upload_file in files:
             try:
-                f.stream.seek(0, 2)
-                size = int(f.stream.tell() or 0)
-                f.stream.seek(0)
+                upload_file.stream.seek(0, 2)
+                size = int(upload_file.stream.tell() or 0)
+                upload_file.stream.seek(0)
             except Exception:
                 size = 0
             if size and size > max_bytes:
-                return jsonify({'success': False, 'message': '첨부파일은 20MB 이하만 업로드할 수 있습니다.'}), 400
-            safe_files.append(f)
+                return jsonify({'success': False, 'message': f'첨부파일은 {max_mb}MB 이하만 업로드할 수 있습니다.'}), 400
+            safe_files.append(upload_file)
 
         attachments = save_insight_item_attachments(item_id=item_id, files=safe_files)
         for a in attachments:
@@ -36658,12 +36952,7 @@ def hw_session_sync():
     if not base_key or not base_key.startswith('hw_'):
         return jsonify(success=False), 400
 
-    ctx = session.get('hw_detail_ctx')
-    if not isinstance(ctx, dict):
-        ctx = {}
-    ctx[base_key] = {'title': hw_title, 'subtitle': hw_subtitle}
-    session['hw_detail_ctx'] = ctx
-    session.modified = True
+    _set_single_detail_session_ctx('hw_detail_ctx', base_key, {'title': hw_title, 'subtitle': hw_subtitle})
     return jsonify(success=True)
 
 

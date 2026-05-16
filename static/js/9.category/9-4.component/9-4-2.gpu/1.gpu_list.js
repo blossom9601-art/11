@@ -167,6 +167,7 @@
         const gpuCode = item.gpu_code ?? item.code ?? '';
         return {
             id: Number.isFinite(id) ? id : item.id,
+            public_id: item.public_id ?? item.publicId ?? '',
             gpu_code: gpuCode,
             model: modelName,
             model_name: item.model_name ?? modelName,

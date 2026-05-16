@@ -45,8 +45,8 @@
 
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
-    <link rel="stylesheet" href="/static/css/tab93-hardware.css?v=1.0">
-    <script defer src="/static/js/_detail/tab93-hardware.js?v=1.1"></script>
+    <link rel="stylesheet" href="/static/css/tab93-hardware.css?v=1.2">
+    <script defer src="/static/js/_detail/tab93-hardware.js?v=1.3"></script>
 </head>
 <body>
     {% include 'layouts/_header.html' %}
@@ -55,8 +55,8 @@
     <main class="main-content">
         <div class="content-wrapper tab93-hw">
             {# ── 뒤로가기 버튼 ── #}
-            {% if back_key %}
-            <a href="{{ url_for('pages.blossom_hub', segment=back_key) }}" class="back-btn">
+            {% if secure_back_url or back_key %}
+            <a href="{{ secure_back_url or url_for('pages.blossom_hub', segment=back_key) }}" class="back-btn">
                 <img src="/static/image/svg/exit.svg" alt="뒤로가기">
                 {{ back_label or '목록으로 돌아가기' }}
             </a>
@@ -72,7 +72,7 @@
             {% if tabs %}
             <div class="server-detail-tabs">
                 {% for tab in tabs %}
-                <a href="{{ url_for('pages.blossom_hub', segment=tab.key) }}"
+                     <a href="{{ tab.href or url_for('pages.blossom_hub', segment=tab.key) }}"
                    class="server-detail-tab-btn {{ 'active' if current_key == tab.key else '' }}">{{ tab.label }}</a>
                 {% endfor %}
             </div>
@@ -117,6 +117,9 @@
                                    data-show-analytics="{{ 'true' if tab93.show_analytics else 'false' }}"
                                    data-analytics-group="{{ tab93.analytics_group or '' }}"
                                    data-csv-filename="{{ tab93.csv_filename or 'hardware_assets' }}"
+                                   {% if tab93.resource %}data-resource="{{ tab93.resource }}"{% endif %}
+                                   {% if tab93.resource_label %}data-resource-label="{{ tab93.resource_label }}"{% endif %}
+                                   {% if tab93.model %}data-model="{{ tab93.model }}"{% endif %}
                                    {% if hw_id %}data-hw-id="{{ hw_id }}"{% endif %}
                                    {% if server_code %}data-server-code="{{ server_code }}"{% endif %}>
                                 <thead>
@@ -132,12 +135,12 @@
                         </div>
 
                         {# ── 빈 상태 ── #}
-                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite" style="display:none;">
+                        <div id="hw-empty" class="system-empty" role="status" aria-live="polite" hidden>
                             <div class="empty-illustration">
                                 <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
                             </div>
                             <div class="empty-text">
-                                <h3 class="empty-title">하드웨어 항목이 없습니다.</h3>
+                                <h3 class="empty-title">{{ tab93.empty_title or '하드웨어 항목이 없습니다.' }}</h3>
                                 <p class="empty-desc">{{ tab93.empty_desc or '해당 조건에 일치하는 하드웨어 자산이 없습니다.' }}</p>
                             </div>
                         </div>
@@ -167,7 +170,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
 
     {# ══════════════════════════════════════════════════════════
        CSV 다운로드 확인 모달 (모든 컨텍스트 공통)
@@ -211,8 +214,9 @@
                 <div class="vendor-analytics-body">
                     <div class="va-tab-strip" id="hw-tab-strip"></div>
                     <div class="va-tab-content" id="hw-tab-content"></div>
-                    <div class="vendor-analytics-empty" id="hw-analytics-empty" style="display:none;">
-                        <div class="empty-text">분석할 데이터가 없습니다.</div>
+                    <div class="vendor-analytics-empty tab93-analytics-empty" id="hw-stats-empty" hidden>
+                        <div class="empty-title">통계 분석할 하드웨어 자산이 없습니다.</div>
+                        <div class="empty-desc">해당 모델과 일치하는 항목이 등록되면 통계가 표시됩니다.</div>
                     </div>
                 </div>
             </div>

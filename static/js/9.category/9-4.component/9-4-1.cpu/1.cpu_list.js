@@ -306,6 +306,7 @@
         const note = item.note ?? item.remark ?? '';
         return {
             id: Number.isFinite(normalizedId) ? normalizedId : item.id,
+            public_id: item.public_id ?? item.publicId ?? '',
             cpu_code: item.cpu_code ?? item.code ?? '',
             model: modelName,
             model_name: item.model_name ?? modelName,
@@ -901,7 +902,28 @@
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
-    const group = { title:'컴포넌트', cols:['model','spec','vendor','part_no','reference_tpmc'] };
+        syncVendorSelectInAddForm();
+        const sourceSection = document.querySelector('#' + ADD_FORM_ID + ' .form-section');
+        if(sourceSection){
+            const section = sourceSection.cloneNode(true);
+            section.querySelectorAll('input,select,textarea').forEach(function(field){
+                const name = field.name;
+                if(!name) return;
+                let value = row && row[name] != null ? row[name] : '';
+                if(name === 'reference_tpmc'){
+                    value = (value != null && value !== '') ? Number(String(value).replace(/,/g,'')).toLocaleString('ko-KR') : '';
+                }
+                if(field.tagName && field.tagName.toLowerCase() === 'select' && value !== ''){
+                    const hasOption = Array.prototype.some.call(field.options, function(option){ return option.value === String(value); });
+                    if(!hasOption){ field.appendChild(new Option(String(value), String(value))); }
+                }
+                field.value = value == null ? '' : String(value);
+            });
+            form.appendChild(section);
+            initCommaInputs(EDIT_FORM_ID);
+            return;
+        }
+        const group = { title:'컴포넌트', cols:['model','spec','vendor','part_no','reference_tpmc'] };
         const section = document.createElement('div'); section.className='form-section';
         section.innerHTML = `<div class="section-header"><h4>${group.title}</h4></div>`;
         const grid = document.createElement('div'); grid.className='form-grid';

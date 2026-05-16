@@ -374,6 +374,7 @@
         const qty = Number.isFinite(rawQty) ? rawQty : (parseInt(rawQty, 10) || 0);
         return {
             id: Number.isFinite(Number(item.id)) ? Number(item.id) : item.id,
+            public_id: String(item.public_id || '').trim(),
             security_code: item.security_code,
             server_code: item.security_code,
             model: item.server_model_name || item.model_name || '',

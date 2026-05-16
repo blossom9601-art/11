@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>blossom</title>
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.7">
 </head>
 <body>
         <nav class="sidebar" id="sidebar">
@@ -36,12 +36,25 @@
                     </li>
                     <li class="menu-item has-submenu">
                         <div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
-                        <ul class="submenu">
-                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_access_control') }}" class="submenu-link">출입 관리</a></li>
-                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_data_deletion') }}" class="submenu-link">데이터 삭제 관리</a></li>
-                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_rack_list') }}" class="submenu-link">RACK 관리</a></li>
-                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_thermometer_list') }}" class="submenu-link">온/습도 관리</a></li>
-                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_cctv_list') }}" class="submenu-link">CCTV 관리</a></li>
+                        <ul class="submenu datacenter-facility-submenu">
+                            <li class="submenu-group-title">보안설비</li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_access_control') }}" class="submenu-link">- 출입관리</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_data_deletion') }}" class="submenu-link">- 데이터삭제</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_cctv_list') }}" class="submenu-link">- 영상감시</a></li>
+                            <li class="submenu-group-title">전력설비</li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_transformer_list') }}" class="submenu-link">- 변압기</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_generator_list') }}" class="submenu-link">- 발전기</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_ups_list') }}" class="submenu-link">- 무정전전원장치</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_battery_list') }}" class="submenu-link">- 배터리</a></li>
+                            <li class="submenu-group-title">환경설비</li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_hvac_list') }}" class="submenu-link">- 항온항습기</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_thermometer_list') }}" class="submenu-link">- 온/습도계</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_leak_detector_list') }}" class="submenu-link">- 누수감지</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_rack_list') }}" class="submenu-link">- RACK</a></li>
+                            <li class="submenu-group-title">안전설비</li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_detection_list') }}" class="submenu-link">- 감지설비</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_fire_extinguishing_list') }}" class="submenu-link">- 소화설비</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='dc_evacuation_list') }}" class="submenu-link">- 대피설비</a></li>
                         </ul>
                     </li>
                     <li class="menu-item has-submenu">
@@ -66,6 +79,7 @@
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_hw_server') }}" class="submenu-link">하드웨어</a></li>
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_sw_os') }}" class="submenu-link">소프트웨어</a></li>
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_component_cpu') }}" class="submenu-link">컴포넌트</a></li>
+                            <li><a href="{{ url_for('pages.blossom_hub', segment='cat_facility_security_access') }}" class="submenu-link">시설·보안</a></li>
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_company_center') }}" class="submenu-link">회사</a></li>
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_customer_client1') }}" class="submenu-link">고객</a></li>
                             <li><a href="{{ url_for('pages.blossom_hub', segment='cat_vendor_manufacturer') }}" class="submenu-link">벤더</a></li>
@@ -80,7 +94,7 @@
         <p>사이드바 테스트</p>
     </div>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/blossom-query.js?v=20260320"></script>
     <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
     <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>

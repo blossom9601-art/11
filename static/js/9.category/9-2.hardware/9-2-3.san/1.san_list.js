@@ -317,6 +317,7 @@
         const vendorName = vendorNameByCode[vendorCode] || vendorCode;
         return {
             id: item.id,
+            public_id: String(item.public_id || '').trim(),
             san_code: item.san_code,
             server_code: item.san_code,
             model: item.server_model_name || item.model_name || '',

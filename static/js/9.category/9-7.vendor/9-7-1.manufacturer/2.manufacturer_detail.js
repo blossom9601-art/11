@@ -76,7 +76,7 @@
           if(total <= 0){
             if(pieWrap){ pieWrap.style.display='none'; }
             if(empty){
-              revealVendorStatEmpty(empty, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.');
+              revealVendorStatEmpty(empty, '할당 시스템 내역이 없습니다.');
             }
           } else {
             if(empty){ hideVendorStatEmpty(empty); }
@@ -104,10 +104,12 @@
           var pie = document.getElementById('stat-pie');
           var legendPie = document.getElementById('stat-legend');
           var emptyPie = document.getElementById('stat-empty');
+          var statPieWrap = null; try{ if(pie) statPieWrap = pie.closest('.pie-wrap'); }catch(_){ }
 
 
           function showStatEmpty(msg){
             if(emptyPie){ revealVendorStatEmpty(emptyPie, msg); }
+            if(statPieWrap){ statPieWrap.style.display='none'; }
             if(pie){ pie.style.display='none'; }
             if(legendPie) legendPie.style.display='none';
           }
@@ -135,6 +137,7 @@
             showStatEmpty('할당 자산이 없습니다.');
           } else {
             if(emptyPie) hideVendorStatEmpty(emptyPie);
+            if(statPieWrap){ statPieWrap.style.display=''; }
             if(pie){ pie.style.display='block'; pie.style.width='220px'; pie.style.height='220px'; pie.style.borderRadius='50%'; }
             if(legendPie) legendPie.style.display='';
             var stGrad = [], stSegs = [], stDeg = 0;
@@ -229,46 +232,92 @@
       var _vendorId = null;  // module-scoped for edit modal
       var _vendorData = null;
       var _liveCounts = { hw: 0, sw: 0, comp: 0 };
+      function getManufacturerPublicIdFromPath(){
+        try{
+          var parts = String(location.pathname || '').split('/b/');
+          if(parts.length < 2) return '';
+          var segment = decodeURIComponent(parts[1].split('/')[0].split('?')[0] || '');
+          return /^ven_/.test(segment) ? segment : '';
+        }catch(_){ return ''; }
+      }
+      function cacheManufacturerContext(row){
+        try{
+          if(!row || !row.id) return;
+          var ctx = Object.assign({}, row, {
+            id: String(row.id),
+            public_id: row.public_id || getManufacturerPublicIdFromPath(),
+            vendor: row.vendor || row.manufacturer_name || '',
+            manufacturer_name: row.manufacturer_name || row.vendor || ''
+          });
+          sessionStorage.setItem('manufacturer:context', JSON.stringify(ctx));
+        }catch(_){ }
+      }
+      function resolveManufacturerFromPublicId(){
+        var publicId = getManufacturerPublicIdFromPath();
+        if(!publicId) return Promise.resolve(null);
+        return fetch('/api/vendor-manufacturers', {credentials:'same-origin'})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            var rows = (d && (d.items || d.rows)) || [];
+            for(var i=0; i<rows.length; i++){
+              if(String(rows[i].public_id || '') === publicId) return rows[i];
+            }
+            return null;
+          });
+      }
+      function fetchVendorRecordById(vid, seed){
+        _vendorId = vid;
+        if(seed){
+          _vendorData = seed;
+          cacheManufacturerContext(seed);
+        }
+
+        // 1) Fetch vendor record (basic info fields)
+        fetch('/api/vendor-manufacturers/' + vid, {credentials:'same-origin'})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(!d || !d.success) return;
+            var v = d.item || d.data || d;
+            _vendorData = v;
+            cacheManufacturerContext(v);
+            // Populate basic-info card fields
+            var setText = function(id, val){ var el = document.getElementById(id); if(el) el.textContent = val || '–'; };
+            setText('mf-vendor', v.vendor || v.manufacturer_name);
+            setText('mf-address', v.address);
+            setText('mf-business-number', v.business_number || v.business_no);
+            setText('mf-call-center', v.call_center);
+            setText('mf-note', v.note || v.remark);
+          })
+          .catch(function(){});
+
+        // 2) Fetch live asset counts + items for stats
+        var base = '/api/vendor-manufacturers/' + vid;
+        var done = 0;
+        var _allItems = [];
+        function check(){
+          done++;
+          if(done >= 3){
+            applyVendorSystemStats(_liveCounts.hw, _liveCounts.sw, _liveCounts.comp);
+            renderVendorStatusStats(_allItems);
+          }
+        }
+        fetch(base + '/hw-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.hw = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
+        fetch(base + '/sw-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.sw = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
+        fetch(base + '/comp-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.comp = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
+      }
       (function fetchVendorRecord(){
         try{
           var raw = sessionStorage.getItem('manufacturer:context');
-          if(!raw){ applyVendorSystemStats(0,0,0); return; }
-          var obj = JSON.parse(raw);
-          var vid = obj && parseInt(obj.id, 10);
-          if(!vid || isNaN(vid) || vid <= 0){ applyVendorSystemStats(0,0,0); return; }
-          _vendorId = vid;
-
-          // 1) Fetch vendor record (basic info fields)
-          fetch('/api/vendor-manufacturers/' + vid, {credentials:'same-origin'})
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-              if(!d || !d.success) return;
-              var v = d.item || d.data || d;
-              _vendorData = v;
-              // Populate basic-info card fields
-              var setText = function(id, val){ var el = document.getElementById(id); if(el) el.textContent = val || '–'; };
-              setText('mf-vendor', v.vendor || v.manufacturer_name);
-              setText('mf-address', v.address);
-              setText('mf-business-number', v.business_number || v.business_no);
-              setText('mf-call-center', v.call_center);
-              setText('mf-note', v.note || v.remark);
-            })
-            .catch(function(){});
-
-          // 2) Fetch live asset counts + items for stats
-          var base = '/api/vendor-manufacturers/' + vid;
-          var done = 0;
-          var _allItems = [];
-          function check(){
-            done++;
-            if(done >= 3){
-              applyVendorSystemStats(_liveCounts.hw, _liveCounts.sw, _liveCounts.comp);
-              renderVendorStatusStats(_allItems);
-            }
+          if(raw){
+            var obj = JSON.parse(raw);
+            var vid = obj && parseInt(obj.id, 10);
+            if(vid && !isNaN(vid) && vid > 0){ fetchVendorRecordById(vid, obj); return; }
           }
-          fetch(base + '/hw-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.hw = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
-          fetch(base + '/sw-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.sw = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
-          fetch(base + '/comp-assets', {credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){ if(d&&d.success){ _liveCounts.comp = d.total || (d.items||[]).length; _allItems = _allItems.concat(d.items||[]); } }).catch(function(){}).then(check);
+          resolveManufacturerFromPublicId().then(function(row){
+            var vid = row && parseInt(row.id, 10);
+            if(vid && !isNaN(vid) && vid > 0){ fetchVendorRecordById(vid, row); return; }
+            applyVendorSystemStats(0,0,0);
+          }).catch(function(){ applyVendorSystemStats(0,0,0); });
         }catch(_){ applyVendorSystemStats(0,0,0); }
       })();
 

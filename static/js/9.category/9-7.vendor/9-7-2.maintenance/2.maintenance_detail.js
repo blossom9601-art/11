@@ -90,7 +90,7 @@
             if(legendEl){ legendEl.style.display='none'; }
             if(empty){
               empty.style.display='';
-              try{ showNoDataImage(empty, '할당 시스템 내역이 없습니다.\n시스템 탭에서 시스템을 할당하세요.'); }catch(_s){}
+              try{ showNoDataImage(empty, '할당 시스템 내역이 없습니다.'); }catch(_s){}
             }
           } else {
             if(empty){ empty.style.display='none'; }
@@ -372,7 +372,7 @@
         if(!vid){
           if(emptyEl){
             emptyEl.style.display='';
-            try{ showNoDataImage(emptyEl,'비용 데이터가 없습니다.'); }catch(_){}
+            try{ showNoDataImage(emptyEl,'할당 시스템 내역이 없습니다.'); }catch(_){}
           }
           return;
         }
@@ -395,7 +395,7 @@
         function renderAreaChart(months){
           var grand = months.reduce(function(a,m){ return a+m.total; },0);
           if(grand<=0){
-            if(emptyEl){ emptyEl.style.display=''; try{ showNoDataImage(emptyEl,'비용 데이터가 없습니다.'); }catch(_){} }
+            if(emptyEl){ emptyEl.style.display=''; try{ showNoDataImage(emptyEl,'할당 시스템 내역이 없습니다.'); }catch(_){} }
             chartEl.style.display='none';
             return;
           }

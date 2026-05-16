@@ -150,6 +150,7 @@ def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
 	manufacturer_name = row['manufacturer_name'] if 'manufacturer_name' in row.keys() else ''
 	return {
 		'id': row['id'],
+		'public_id': make_public_id(TABLE_NAME, 'cmp', row['id']),
 		'etc_code': row['etc_code'],
 		'model_name': row['model_name'],
 		'model': row['model_name'],

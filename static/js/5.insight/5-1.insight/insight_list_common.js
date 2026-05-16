@@ -81,6 +81,8 @@
     try{ document.body.dataset.blossomListEmptyManaged = '1'; }catch(_e){}
     const category = (opts && opts.category) ? String(opts.category) : '';
     const label = (opts && opts.label) ? String(opts.label) : '인사이트';
+    const attachmentMaxMb = category === 'technical' ? 100 : 20;
+    const attachmentMaxBytes = attachmentMaxMb * 1024 * 1024;
 
     const tableBody = document.getElementById('insight-table-body');
     const countEl = document.getElementById('insight-count');
@@ -124,6 +126,8 @@
     const attachDropEl = document.getElementById('insight-attach-drop');
     const attachmentsInputEl = document.getElementById('insight-add-attachments');
     const attachListEl = document.getElementById('insight-attach-list');
+    const attachLimitTextEl = attachDropEl ? attachDropEl.querySelector('.blog-dropzone-sub') : null;
+    if(attachLimitTextEl) attachLimitTextEl.textContent = `최대 10개 · ${attachmentMaxMb}MB 이하 · PNG, JPG, PDF, DOC, XLS 지원`;
 
     // Edit-mode existing attachments (download + delete)
     const editAttachmentsWrapEl = document.getElementById('insight-edit-attachments');
@@ -575,15 +579,14 @@
       if(!list.length) return;
 
       const maxFiles = 10;
-      const maxBytes = 20 * 1024 * 1024;
 
-      for(const f of list){
+      for(const uploadFile of list){
         if(attachmentFiles.length >= maxFiles) break;
-        if(f.size && f.size > maxBytes){
-          try{ if(typeof showToast === 'function') showToast('첨부파일은 20MB 이하만 업로드할 수 있습니다.', 'warning'); }catch(_e){}
+        if(uploadFile.size && uploadFile.size > attachmentMaxBytes){
+          try{ if(typeof showToast === 'function') showToast(`첨부파일은 ${attachmentMaxMb}MB 이하만 업로드할 수 있습니다.`, 'warning'); }catch(_e){}
           continue;
         }
-        attachmentFiles.push(f);
+        attachmentFiles.push(uploadFile);
       }
       renderAttachmentList();
     }
@@ -1587,20 +1590,23 @@
 
         // Upload attachments after create/update
         if(savedId && attachmentFiles.length){
-          const fd = new FormData();
-          attachmentFiles.slice(0,10).forEach(f => fd.append('attachments', f, f.name));
-          const up = await fetch(`/api/insight/items/${encodeURIComponent(String(savedId))}/attachments`, {
-            method:'POST',
-            body: fd,
-            credentials: 'same-origin',
-          });
-          if(!up.ok){
-            let msg = `첨부파일 업로드 실패 (${up.status})`;
-            try{
-              const j = await up.json();
-              if(j && j.message) msg = j.message;
-            }catch(_e){}
-            throw new Error(msg);
+          const uploadFiles = attachmentFiles.slice(0,10);
+          for(const uploadFile of uploadFiles){
+            const fd = new FormData();
+            fd.append('attachments', uploadFile, uploadFile.name);
+            const up = await fetch(`/api/insight/items/${encodeURIComponent(String(savedId))}/attachments`, {
+              method:'POST',
+              body: fd,
+              credentials: 'same-origin',
+            });
+            if(!up.ok){
+              let msg = `첨부파일 업로드 실패 (${up.status})`;
+              try{
+                const j = await up.json();
+                if(j && j.message) msg = j.message;
+              }catch(_e){}
+              throw new Error(msg);
+            }
           }
         }
 

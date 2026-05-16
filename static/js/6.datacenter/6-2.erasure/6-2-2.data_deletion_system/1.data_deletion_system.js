@@ -10,6 +10,7 @@
 (function(){
     const USE_SERVER = true;
     const API_BASE = '/api/datacenter/data-deletion-systems';
+    const FACILITY_SECURITY_RESOURCE = 'data_delete';
     const API_MAX_PAGE_SIZE = 500;
 
     // --- FK dropdown sources (reused across pages, similar to 2.hardware) ---
@@ -325,6 +326,15 @@
             }, 0);
         }catch(_e3){ /* ignore */ }
         return false;
+    }
+
+    function wireFacilityCategoryFk(form){
+        if(!form || !window.DcFacilityFk || typeof window.DcFacilityFk.wireForm !== 'function') return;
+        window.DcFacilityFk.wireForm(form, {
+            resource: FACILITY_SECURITY_RESOURCE,
+            manufacturerName: 'vendor',
+            modelName: 'model'
+        });
     }
 
     function isSearchableSelect(select){
@@ -1317,6 +1327,7 @@
                 wrap.innerHTML=`<label>${labelText}</label>${generateFieldInput(c,row[c])}`; grid.appendChild(wrap); });
             section.appendChild(grid); form.appendChild(section);
         });
+        wireFacilityCategoryFk(form);
     }
 
     function generateFieldInput(col,value=''){
@@ -1347,11 +1358,17 @@
         }
         if(col === 'vendor'){
             const v = String(value ?? '');
-            return `<input name="vendor" class="form-input" placeholder="입력" required value="${escapeAttr(v)}">`;
+            return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true" required>
+                <option value="">제조사 검색</option>
+                ${v ? `<option value="${escapeAttr(v)}" selected>${escapeHTML(v)}</option>` : ''}
+            </select>`;
         }
         if(col === 'model'){
             const v = String(value ?? '');
-            return `<input name="model" class="form-input search-select" placeholder="입력" required value="${escapeAttr(v)}">`;
+            return `<select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true" required>
+                <option value="">모델명 검색</option>
+                ${v ? `<option value="${escapeAttr(v)}" selected>${escapeHTML(v)}</option>` : ''}
+            </select>`;
         }
         if(col === 'serial'){
             const v = String(value ?? '');
@@ -1694,6 +1711,7 @@
         document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> {
             openModal(ADD_MODAL_ID);
             prepareFormFkSelects(ADD_FORM_ID, null);
+            wireFacilityCategoryFk(document.getElementById(ADD_FORM_ID));
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{

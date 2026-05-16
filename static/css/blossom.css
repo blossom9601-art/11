@@ -1980,6 +1980,30 @@ html.spa-loading::before {
     background-color: #6366f1;
 }
 
+.datacenter-facility-submenu .submenu-group-title {
+    position: relative;
+    padding: 10px 18px 4px 42px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.datacenter-facility-submenu .submenu-group-title::before {
+    content: '';
+    position: absolute;
+    left: 36px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 3px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+}
+
+.datacenter-facility-submenu .submenu-link::before {
+    content: none;
+}
+
 .sidebar::-webkit-scrollbar {
     width: 4px;
 }

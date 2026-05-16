@@ -34,10 +34,49 @@ _SEED_ROWS = [
      'tab_order': 2, 'route_key': 'dc_thermometer_list'},
     {'page_code': 'DC_THERMOMETER', 'tab_code': 'LOG', 'tab_name': '온/습도 로그',
      'tab_order': 3, 'route_key': 'dc_thermometer_log'},
+    # ── 데이터센터 > 전력설비 ─────────────────
+    {'page_code': 'DC_TRANSFORMER', 'tab_code': 'LAB1', 'tab_name': '변압기1',
+     'tab_order': 1, 'route_key': 'dc_transformer_lab1'},
+    {'page_code': 'DC_TRANSFORMER', 'tab_code': 'LIST', 'tab_name': '변압기 관리',
+     'tab_order': 2, 'route_key': 'dc_transformer_list'},
+    {'page_code': 'DC_GENERATOR', 'tab_code': 'LAB1', 'tab_name': '발전기1',
+     'tab_order': 1, 'route_key': 'dc_generator_lab1'},
+    {'page_code': 'DC_GENERATOR', 'tab_code': 'LIST', 'tab_name': '발전기 관리',
+     'tab_order': 2, 'route_key': 'dc_generator_list'},
+    {'page_code': 'DC_UPS', 'tab_code': 'LAB1', 'tab_name': '무정전전원장치1',
+     'tab_order': 1, 'route_key': 'dc_ups_lab1'},
+    {'page_code': 'DC_UPS', 'tab_code': 'LIST', 'tab_name': '무정전전원장치 관리',
+     'tab_order': 2, 'route_key': 'dc_ups_list'},
+    {'page_code': 'DC_BATTERY', 'tab_code': 'LAB1', 'tab_name': '배터리1',
+     'tab_order': 1, 'route_key': 'dc_battery_lab1'},
+    {'page_code': 'DC_BATTERY', 'tab_code': 'LIST', 'tab_name': '배터리 관리',
+     'tab_order': 2, 'route_key': 'dc_battery_list'},
+    # ── 데이터센터 > 항온항습기 관리 ───────────
+    {'page_code': 'DC_HVAC', 'tab_code': 'LAB1', 'tab_name': '항온항습기1',
+     'tab_order': 1, 'route_key': 'dc_hvac_lab1'},
+    {'page_code': 'DC_HVAC', 'tab_code': 'LIST', 'tab_name': '항온항습기 관리',
+     'tab_order': 2, 'route_key': 'dc_hvac_list'},
+    {'page_code': 'DC_LEAK_DETECTOR', 'tab_code': 'LAB1', 'tab_name': '누수감지1',
+     'tab_order': 1, 'route_key': 'dc_leak_detector_lab1'},
+    {'page_code': 'DC_LEAK_DETECTOR', 'tab_code': 'LIST', 'tab_name': '누수감지 관리',
+     'tab_order': 2, 'route_key': 'dc_leak_detector_list'},
+    # ── 데이터센터 > 안전설비 ─────────────────
+    {'page_code': 'DC_DETECTION', 'tab_code': 'LAB1', 'tab_name': '감지설비1',
+     'tab_order': 1, 'route_key': 'dc_detection_lab1'},
+    {'page_code': 'DC_DETECTION', 'tab_code': 'LIST', 'tab_name': '감지설비 관리',
+     'tab_order': 2, 'route_key': 'dc_detection_list'},
+    {'page_code': 'DC_FIRE_EXTINGUISHING', 'tab_code': 'LAB1', 'tab_name': '소화설비1',
+     'tab_order': 1, 'route_key': 'dc_fire_extinguishing_lab1'},
+    {'page_code': 'DC_FIRE_EXTINGUISHING', 'tab_code': 'LIST', 'tab_name': '소화설비 관리',
+     'tab_order': 2, 'route_key': 'dc_fire_extinguishing_list'},
+    {'page_code': 'DC_EVACUATION', 'tab_code': 'LAB1', 'tab_name': '대피설비1',
+     'tab_order': 1, 'route_key': 'dc_evacuation_lab1'},
+    {'page_code': 'DC_EVACUATION', 'tab_code': 'LIST', 'tab_name': '대피설비 관리',
+     'tab_order': 2, 'route_key': 'dc_evacuation_list'},
     # ── 데이터센터 > CCTV 관리 (초기 1개 탭) ───
     {'page_code': 'DC_CCTV', 'tab_code': 'LAB1', 'tab_name': 'Sample Datacenter',
      'tab_order': 1, 'route_key': 'dc_cctv_lab1'},
-    {'page_code': 'DC_CCTV', 'tab_code': 'LIST', 'tab_name': 'CCTV 관리',
+    {'page_code': 'DC_CCTV', 'tab_code': 'LIST', 'tab_name': '영상감시 관리',
      'tab_order': 2, 'route_key': 'dc_cctv_list'},
 ]
 
@@ -53,9 +92,45 @@ _REQUIRED_ROWS = [
      'tab_order': 2, 'route_key': 'dc_thermometer_list'},
     {'page_code': 'DC_THERMOMETER', 'tab_code': 'LOG', 'tab_name': '온/습도 로그',
      'tab_order': 3, 'route_key': 'dc_thermometer_log'},
-    {'page_code': 'DC_CCTV', 'tab_code': 'LAB1', 'tab_name': 'CCTV1',
+    {'page_code': 'DC_TRANSFORMER', 'tab_code': 'LAB1', 'tab_name': '변압기1',
+     'tab_order': 1, 'route_key': 'dc_transformer_lab1'},
+    {'page_code': 'DC_TRANSFORMER', 'tab_code': 'LIST', 'tab_name': '변압기 관리',
+     'tab_order': 2, 'route_key': 'dc_transformer_list'},
+    {'page_code': 'DC_GENERATOR', 'tab_code': 'LAB1', 'tab_name': '발전기1',
+     'tab_order': 1, 'route_key': 'dc_generator_lab1'},
+    {'page_code': 'DC_GENERATOR', 'tab_code': 'LIST', 'tab_name': '발전기 관리',
+     'tab_order': 2, 'route_key': 'dc_generator_list'},
+    {'page_code': 'DC_UPS', 'tab_code': 'LAB1', 'tab_name': '무정전전원장치1',
+     'tab_order': 1, 'route_key': 'dc_ups_lab1'},
+    {'page_code': 'DC_UPS', 'tab_code': 'LIST', 'tab_name': '무정전전원장치 관리',
+     'tab_order': 2, 'route_key': 'dc_ups_list'},
+    {'page_code': 'DC_BATTERY', 'tab_code': 'LAB1', 'tab_name': '배터리1',
+     'tab_order': 1, 'route_key': 'dc_battery_lab1'},
+    {'page_code': 'DC_BATTERY', 'tab_code': 'LIST', 'tab_name': '배터리 관리',
+     'tab_order': 2, 'route_key': 'dc_battery_list'},
+    {'page_code': 'DC_HVAC', 'tab_code': 'LAB1', 'tab_name': '항온항습기1',
+     'tab_order': 1, 'route_key': 'dc_hvac_lab1'},
+    {'page_code': 'DC_HVAC', 'tab_code': 'LIST', 'tab_name': '항온항습기 관리',
+     'tab_order': 2, 'route_key': 'dc_hvac_list'},
+    {'page_code': 'DC_LEAK_DETECTOR', 'tab_code': 'LAB1', 'tab_name': '누수감지1',
+     'tab_order': 1, 'route_key': 'dc_leak_detector_lab1'},
+    {'page_code': 'DC_LEAK_DETECTOR', 'tab_code': 'LIST', 'tab_name': '누수감지 관리',
+     'tab_order': 2, 'route_key': 'dc_leak_detector_list'},
+    {'page_code': 'DC_DETECTION', 'tab_code': 'LAB1', 'tab_name': '감지설비1',
+     'tab_order': 1, 'route_key': 'dc_detection_lab1'},
+    {'page_code': 'DC_DETECTION', 'tab_code': 'LIST', 'tab_name': '감지설비 관리',
+     'tab_order': 2, 'route_key': 'dc_detection_list'},
+    {'page_code': 'DC_FIRE_EXTINGUISHING', 'tab_code': 'LAB1', 'tab_name': '소화설비1',
+     'tab_order': 1, 'route_key': 'dc_fire_extinguishing_lab1'},
+    {'page_code': 'DC_FIRE_EXTINGUISHING', 'tab_code': 'LIST', 'tab_name': '소화설비 관리',
+     'tab_order': 2, 'route_key': 'dc_fire_extinguishing_list'},
+    {'page_code': 'DC_EVACUATION', 'tab_code': 'LAB1', 'tab_name': '대피설비1',
+     'tab_order': 1, 'route_key': 'dc_evacuation_lab1'},
+    {'page_code': 'DC_EVACUATION', 'tab_code': 'LIST', 'tab_name': '대피설비 관리',
+     'tab_order': 2, 'route_key': 'dc_evacuation_list'},
+    {'page_code': 'DC_CCTV', 'tab_code': 'LAB1', 'tab_name': '영상감시1',
      'tab_order': 1, 'route_key': 'dc_cctv_lab1'},
-    {'page_code': 'DC_CCTV', 'tab_code': 'LIST', 'tab_name': 'CCTV 관리',
+    {'page_code': 'DC_CCTV', 'tab_code': 'LIST', 'tab_name': '영상감시 관리',
      'tab_order': 2, 'route_key': 'dc_cctv_list'},
 ]
 
@@ -79,6 +154,7 @@ def init_page_tab_config_table(app):
                     permission_code VARCHAR(64),
                     route_key       VARCHAR(128),
                     extra_options   TEXT,
+                    tab_image       VARCHAR(512),
                     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at      TEXT,
                     is_deleted      INTEGER NOT NULL DEFAULT 0,
@@ -86,6 +162,15 @@ def init_page_tab_config_table(app):
                 )
             """))
             db.session.commit()
+
+            dialect = (db.engine.dialect.name or '').lower()
+            if dialect == 'sqlite':
+                columns = {row[1] for row in db.session.execute(db.text('PRAGMA table_info(page_tab_config)')).fetchall()}
+            else:
+                columns = {row[0] for row in db.session.execute(db.text('SHOW COLUMNS FROM page_tab_config')).fetchall()}
+            if 'tab_image' not in columns:
+                db.session.execute(db.text('ALTER TABLE page_tab_config ADD COLUMN tab_image VARCHAR(512)'))
+                db.session.commit()
 
             # 시드: 행이 하나도 없을 때만 삽입
             cnt = db.session.execute(

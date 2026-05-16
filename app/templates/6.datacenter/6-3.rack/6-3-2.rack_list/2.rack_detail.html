@@ -9,10 +9,10 @@
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <title>blossom</title>
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css">
-    <link rel="stylesheet" href="/static/css/detail-common.css?v=1.0">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
+    <link rel="stylesheet" href="/static/css/detail-common.css?v=20260512_no_data_spacing1">
     <link rel="stylesheet" href="/static/css/detail6.css?v=1.4">
-    <script src="/static/js/6.datacenter/6-3.rack/6-3-2.rack_list/2.rack_detail.js?v=1.11"></script>
+    <script src="/static/js/6.datacenter/6-3.rack/6-3-2.rack_list/2.rack_detail.js?v=20260513_public_id1"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -34,10 +34,16 @@
             </div>
 
             <!-- RACK 상세 탭 네비게이션 -->
-            <div class="server-detail-tabs" data-rack-code="{{ rack_code or '' }}">
+            <div class="server-detail-tabs" data-rack-code="{{ rack_code or '' }}" data-rack-public-id="{{ rack_public_id or '' }}">
+                {% if rack_public_id %}
+                <a href="{{ url_for('pages.blossom_hub', segment=rack_public_id) }}" class="server-detail-tab-btn active">기본정보</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=rack_public_id) }}?tab=log" class="server-detail-tab-btn">변경이력</a>
+                <a href="{{ url_for('pages.blossom_hub', segment=rack_public_id) }}?tab=file" class="server-detail-tab-btn">구성/파일</a>
+                {% else %}
                 <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_basic') }}" class="server-detail-tab-btn active">기본정보</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_log') }}" class="server-detail-tab-btn">변경이력</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='dc_rack_detail_file') }}" class="server-detail-tab-btn">구성/파일</a>
+                {% endif %}
             </div>
 
             <!-- 서버 상세 탭 컨텐츠 -->
@@ -97,7 +103,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260513_rack_nav1"></script>
 
     <!-- RACK 장비 추가 모달 -->
     <div id="rack-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true">

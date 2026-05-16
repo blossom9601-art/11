@@ -103,6 +103,94 @@
     margin-bottom: 8px;
 }
 
+.tab95-comp .detail-header-actions .add-btn-icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 50%;
+    border: 1px solid var(--tab95-accent);
+    background: var(--tab95-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28);
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease, filter 0.15s ease;
+}
+
+.tab95-comp .detail-header-actions .add-btn-icon:hover:not(:disabled) {
+    background: #4f46e5;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.38);
+    transform: translateY(-1px);
+}
+
+.tab95-comp .detail-header-actions .add-btn-icon:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.tab95-comp .detail-header-actions .add-btn-icon:disabled {
+    opacity: 0.5;
+    cursor: default;
+    filter: grayscale(0.1) brightness(0.95);
+    box-shadow: none;
+    transform: none;
+}
+
+.tab95-comp .detail-header-actions .add-btn-icon img {
+    display: block;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    filter: brightness(0) invert(1) saturate(1) contrast(1);
+}
+
+body.page-facility-security-system-tab #facility-security-system-pane .detail-header-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    min-height: 44px !important;
+    margin-bottom: 8px !important;
+}
+
+body.page-facility-security-system-tab #fsi-system-download-btn.add-btn-icon {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    flex: 0 0 44px !important;
+    overflow: hidden !important;
+}
+
+body.page-facility-security-system-tab #fsi-system-download-btn.add-btn-icon img {
+    display: block !important;
+    width: 20px !important;
+    min-width: 20px !important;
+    max-width: 20px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    max-height: 20px !important;
+    object-fit: contain !important;
+}
+
+.tab95-comp .system-empty .empty-illustration {
+    width: 120px;
+    height: 120px;
+    flex: 0 0 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab95-comp .system-empty .empty-icon-img {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    opacity: 0.75;
+}
+
 .tab95-comp .hw-table .col-chk {
     width: 36px;
     text-align: center;

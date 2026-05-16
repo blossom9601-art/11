@@ -102,6 +102,7 @@
     const ORG_THERMOMETER_API = '/api/org-thermometers';
     const ORG_THERMOMETER_BULK_DELETE_API = '/api/org-thermometers/bulk-delete';
     const ORG_THERMOMETER_BULK_UPDATE_API = '/api/org-thermometers/bulk-update';
+    const FACILITY_SECURITY_RESOURCE = 'thermometer';
 
     async function requestJSON(url, options){
         const opts = options ? { ...options } : {};
@@ -1438,6 +1439,15 @@
         return data;
     }
 
+    function wireFacilityCategoryFk(form){
+        if(!form || !window.DcFacilityFk || typeof window.DcFacilityFk.wireForm !== 'function') return;
+        window.DcFacilityFk.wireForm(form, {
+            resource: FACILITY_SECURITY_RESOURCE,
+            manufacturerName: 'vendor',
+            modelName: 'model'
+        });
+    }
+
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
@@ -1473,6 +1483,7 @@
             input.dataset.value = current;
             input.dataset.display = current;
         });
+        wireFacilityCategoryFk(form);
         initSearchSelects(form);
     }
 
@@ -1488,8 +1499,10 @@
             return `<input name="business_name" class="form-input" placeholder="필수" value="${val}" required>`;
         }
         if(col==='vendor'){
-            // 제조사: 외래키/검색선택 사용하지 않고 자유 입력
-            return `<input name="vendor" class="form-input" placeholder="입력" value="${val}"${requiredAttr}>`;
+            return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">제조사 검색</option>
+                ${val ? `<option value="${val}" selected>${val}</option>` : ''}
+            </select>`;
         }
         const sourceKey = FIELD_SEARCH_SOURCE[col];
         if(sourceKey){
@@ -1497,7 +1510,10 @@
             return `<input name="${col}" class="form-input search-select" placeholder="검색 선택" data-search-source="${sourceKey}"${parentAttr} value="${val}"${requiredAttr}>`;
         }
         if(col==='model'){
-            return `<input name="model" class="form-input" placeholder="입력" value="${val}"${requiredAttr}>`;
+            return `<select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">모델명 검색</option>
+                ${val ? `<option value="${val}" selected>${val}</option>` : ''}
+            </select>`;
         }
         if(col==='serial'){
             return `<input name="serial" class="form-input" value="${val}">`;
@@ -1902,7 +1918,7 @@
             }
         });
         // add modal
-        document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); });
+        document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); wireFacilityCategoryFk(document.getElementById(ADD_FORM_ID)); });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
             const form = document.getElementById(ADD_FORM_ID);

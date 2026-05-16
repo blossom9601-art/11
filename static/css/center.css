@@ -962,6 +962,37 @@ th[data-col="lic_period"] {
 	font-size:14px;
 	box-sizing:border-box;
 }
+.server-add-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+.server-edit-modal .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control){
+	width:100%;
+	max-width:100%;
+	min-width:0;
+	box-sizing:border-box;
+}
+.server-add-modal .form-row > :is(input.form-input, select.form-input),
+.server-edit-modal .form-row > :is(input.form-input, select.form-input),
+.server-add-modal .form-row > .fk-searchable-control > .fk-searchable-display,
+.server-edit-modal .form-row > .fk-searchable-control > .fk-searchable-display,
+.server-add-modal .form-row > :is(.thermo-status-display, .cctv-status-display),
+.server-edit-modal .form-row > :is(.thermo-status-display, .cctv-status-display){
+	height:44px;
+	min-height:44px;
+	padding-top:0;
+	padding-bottom:0;
+	line-height:20px;
+}
+.server-add-modal .form-row > .fk-searchable-control > .fk-searchable-display,
+.server-edit-modal .form-row > .fk-searchable-control > .fk-searchable-display,
+.server-add-modal .form-row > :is(.thermo-status-display, .cctv-status-display),
+.server-edit-modal .form-row > :is(.thermo-status-display, .cctv-status-display){
+	display:flex;
+	align-items:center;
+}
+.server-add-modal .form-row > textarea.form-input,
+.server-edit-modal .form-row > textarea.form-input{
+	min-height:120px;
+	height:auto;
+}
 .form-input:focus { outline:none; border-color:#e5e7eb; box-shadow:0 0 0 2px rgba(229,231,235,0.5); }
 /* Read-only calculated inputs: visually distinguish lic_assigned/lic_idle */
 .server-add-modal input.form-input[name="lic_assigned"]:disabled,
@@ -1688,7 +1719,6 @@ body.page-system-lab1 #system-download-modal .form-radio-group label{ display:fl
 .rack-overlay .slab-box .label .w { display:block; line-height:1.2; }
 .rack-overlay .slab-box .label mark.search-hit { background:rgba(255,255,255,0.35); color:#111827; padding:0 2px; border-radius:3px; }
 .rack-overlay .slab-box.is-dimmed { opacity:0.35; filter:saturate(60%); }
-
 /* Preserve spaces/line-breaks in view modal name field */
 .system-view-modal #system-view-name.form-readonly {
 	white-space: pre-wrap; /* keep spaces and wraps nicely */

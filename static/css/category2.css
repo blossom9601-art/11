@@ -931,18 +931,18 @@ th[data-col="lic_period"] {
 .server-edit-modal .server-edit-body .form-section + .form-section{ padding-top:24px; margin-top:20px; }
 .server-edit-modal .server-edit-body .form-section + .form-section::before{ content:""; position:absolute; top:0; left:-32px; right:-32px; border-top:1px dotted #e5e7eb; }
 
-/* Match *detail pages (detail-common.css): full-screen overlay edit modal grid + row rhythm */
+/* Keep category edit modals aligned with the add modal field rhythm. */
 .server-edit-modal.modal-overlay-full .server-edit-body .form-grid {
 	display:grid !important;
 	grid-template-columns:1fr 1fr !important;
-	gap:8px 20px !important;
+	gap:var(--bls-field-gap, 18px) !important;
 	align-items:start !important;
 }
 .server-edit-modal.modal-overlay-full .server-edit-body .form-row {
 	display:flex !important;
 	flex-direction:column !important;
-	gap:4px !important;
-	row-gap:4px !important;
+	gap:6px !important;
+	row-gap:6px !important;
 	margin:0 !important;
 	min-width:0 !important;
 }
@@ -957,7 +957,18 @@ th[data-col="lic_period"] {
 	margin:0 !important;
 }
 .server-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
-	margin-top:8px !important;
+	margin-top:12px !important;
+}
+
+#facility-security-edit-modal.server-edit-modal.modal-overlay-full .server-edit-body .form-grid {
+	gap:var(--bls-field-gap) !important;
+}
+#facility-security-edit-modal.server-edit-modal.modal-overlay-full .server-edit-body .form-row {
+	gap:6px !important;
+	row-gap:6px !important;
+}
+#facility-security-edit-modal.server-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
+	margin-top:12px !important;
 }
 
 /* Inline clear button helper (used by some detail modals, e.g. HSM basic-info edit) */
@@ -1305,6 +1316,30 @@ th[data-col="lic_period"] {
 .system-tabs .system-tab-btn:focus { text-decoration:none; }
 .system-tabs .system-tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); text-decoration:none; }
 .system-tabs .system-tab-btn:focus-visible { outline:2px solid #cbd5e1; outline-offset:2px; border-radius:4px 4px 0 0; }
+.facility-security-group-tabs { position:relative; overflow:visible; z-index:6000; align-items:flex-end; }
+.facility-security-group { position:relative; display:inline-flex; flex:0 0 auto; }
+.facility-security-group::after { content:""; position:absolute; left:0; right:0; top:100%; height:10px; }
+.facility-security-group-btn { display:inline-flex !important; align-items:center; gap:7px; }
+.facility-security-group-btn::after { content:""; width:6px; height:6px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg) translateY(-2px); opacity:.65; transition:transform .18s ease, opacity .18s ease; }
+.facility-security-group.open .facility-security-group-btn::after,
+.facility-security-group:hover .facility-security-group-btn::after,
+.facility-security-group:focus-within .facility-security-group-btn::after { transform:rotate(225deg) translateY(-1px); opacity:1; }
+.facility-security-dropdown { position:absolute; left:0; top:calc(100% + 8px); min-width:154px; padding:8px; display:flex; flex-direction:column; gap:2px; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 18px 42px -24px rgba(15,23,42,.42), 0 10px 18px -14px rgba(15,23,42,.28); opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-4px); transition:opacity .16s ease, transform .16s ease, visibility .16s ease; z-index:6001; }
+.main-content .facility-security-dropdown { background:#ffffff; background-color:#ffffff; }
+.facility-security-group.open .facility-security-dropdown,
+.facility-security-group:hover .facility-security-dropdown,
+.facility-security-group:focus-within .facility-security-dropdown { opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0); }
+.facility-security-dropdown-item,
+.facility-security-dropdown-item:link,
+.facility-security-dropdown-item:visited { display:block; padding:9px 12px; border-radius:6px; color:#64748b; font-size:13px; font-weight:600; line-height:1.35; text-decoration:none; white-space:nowrap; background-color:#ffffff; }
+.facility-security-dropdown-item:hover,
+.facility-security-dropdown-item:focus { color:var(--accent); background:#f8fafc; text-decoration:none; }
+.facility-security-dropdown-item.active { color:var(--accent); background:#eef2ff; background-color:#eef2ff; font-weight:700; }
+.facility-security-group:last-child .facility-security-dropdown { left:auto; right:0; }
+@media (max-width:680px){
+	.facility-security-group-tabs { flex-wrap:wrap; }
+	.facility-security-dropdown { min-width:140px; }
+}
 
 /* 시스템 카운터는 전용회선 페이지와 동일하게 전역 .count-badge 스타일을 그대로 사용합니다. */
 

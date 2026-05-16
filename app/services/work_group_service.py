@@ -17,8 +17,23 @@ logger = logging.getLogger(__name__)
 TABLE_NAME = 'biz_work_group'
 CHANGE_LOG_TABLE_NAME = 'biz_work_group_change_log'
 MANAGER_TABLE_NAME = 'biz_work_group_manager'
+MANAGER_ROLE_TABLE_NAME = 'biz_work_group_manager_role'
+MANAGER_ROLE_MAP_TABLE_NAME = 'biz_work_group_manager_role_map'
 SYSTEM_TABLE_NAME = 'system'
 SERVICE_TABLE_NAME = 'biz_work_group_service'
+
+DEFAULT_MANAGER_ROLE_NAMES = (
+    '서비스 오너',
+    '인프라 담당',
+    '네트워크 담당',
+    '백업 담당',
+    'DB 담당',
+    '미들웨어 담당',
+    '채널 담당',
+    'DR 담당',
+    '개발 담당',
+    '업무 담당',
+)
 
 # 업무 그룹 전용 상태 — 카테고리 > 비즈니스 > 업무 상태(biz_work_status) 테이블과 무관하게 저장
 WORK_GROUP_STATUS_VALUES = frozenset({'운영', '임시', '종료'})
@@ -46,6 +61,57 @@ LEGACY_WORK_GROUP_STATUS_SYNONYMS: Dict[str, str] = {
 
 def _now() -> str:
     return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _normalize_manager_role_name(value: Any) -> str:
+    return re.sub(r'\s+', ' ', str(value or '').strip())
+
+
+def _split_manager_role_names(value: Any) -> List[str]:
+    raw = str(value or '').strip()
+    if not raw:
+        return []
+    names: List[str] = []
+    seen = set()
+    for part in re.split(r'[,/|;\n]+', raw):
+        name = _normalize_manager_role_name(part)
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
+    return names
+
+
+def _coerce_role_id_list(value: Any) -> List[int]:
+    if value in (None, ''):
+        return []
+    source = value if isinstance(value, (list, tuple, set)) else [value]
+    ids: List[int] = []
+    seen = set()
+    for item in source:
+        if isinstance(item, dict):
+            item = item.get('id') or item.get('role_id') or item.get('value')
+        role_id = _coerce_positive_int(item)
+        if role_id and role_id not in seen:
+            ids.append(role_id)
+            seen.add(role_id)
+    return ids
+
+
+def _payload_role_names(payload: Dict[str, Any]) -> List[str]:
+    roles_value = payload.get('roles') if 'roles' in payload else payload.get('role_names')
+    if roles_value in (None, ''):
+        return []
+    source = roles_value if isinstance(roles_value, (list, tuple, set)) else [roles_value]
+    names: List[str] = []
+    seen = set()
+    for item in source:
+        if isinstance(item, dict):
+            item = item.get('name') or item.get('role_name') or item.get('label') or item.get('value')
+        for name in _split_manager_role_names(item):
+            if name not in seen:
+                names.append(name)
+                seen.add(name)
+    return names
 
 
 def _new_public_id() -> str:
@@ -532,6 +598,37 @@ def init_work_group_table(app=None) -> None:
                 )
                 """
             )
+
+            conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {MANAGER_ROLE_TABLE_NAME} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_system INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    created_by_user_id INTEGER,
+                    updated_at TEXT,
+                    updated_by_user_id INTEGER
+                )
+                """
+            )
+
+            conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {MANAGER_ROLE_MAP_TABLE_NAME} (
+                    manager_id INTEGER NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    created_by_user_id INTEGER,
+                    PRIMARY KEY (manager_id, role_id),
+                    FOREIGN KEY (manager_id) REFERENCES {MANAGER_TABLE_NAME}(id) ON DELETE CASCADE,
+                    FOREIGN KEY (role_id) REFERENCES {MANAGER_ROLE_TABLE_NAME}(id) ON DELETE CASCADE
+                )
+                """
+            )
             # ------ migration: add org / name / is_primary columns if missing ------
             try:
                 cols = [c[1] for c in conn.execute(f"PRAGMA table_info({MANAGER_TABLE_NAME})").fetchall()]
@@ -571,6 +668,17 @@ def init_work_group_table(app=None) -> None:
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_TABLE_NAME}_user_id ON {MANAGER_TABLE_NAME}(user_id)"
             )
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_ROLE_TABLE_NAME}_active ON {MANAGER_ROLE_TABLE_NAME}(is_active)"
+            )
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_ROLE_MAP_TABLE_NAME}_manager_id ON {MANAGER_ROLE_MAP_TABLE_NAME}(manager_id)"
+            )
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_{MANAGER_ROLE_MAP_TABLE_NAME}_role_id ON {MANAGER_ROLE_MAP_TABLE_NAME}(role_id)"
+            )
+            _ensure_default_manager_roles(conn)
+            _migrate_existing_manager_roles(conn)
 
             # Re-enable FK enforcement for subsequent operations.
             try:
@@ -1163,6 +1271,316 @@ def _manager_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     return d
 
 
+def _manager_role_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        'id': int(row['id']),
+        'name': row['name'] or '',
+        'description': row['description'] or '',
+        'sort_order': int(row['sort_order'] or 0),
+        'is_system': bool(row['is_system']),
+        'is_active': bool(row['is_active']),
+        'created_at': row['created_at'],
+        'created_by_user_id': row['created_by_user_id'],
+        'updated_at': row['updated_at'],
+        'updated_by_user_id': row['updated_by_user_id'],
+    }
+
+
+def _ensure_default_manager_roles(conn: sqlite3.Connection) -> None:
+    now = _now()
+    for idx, name in enumerate(DEFAULT_MANAGER_ROLE_NAMES, start=1):
+        clean = _normalize_manager_role_name(name)
+        if not clean:
+            continue
+        conn.execute(
+            f"""
+            INSERT OR IGNORE INTO {MANAGER_ROLE_TABLE_NAME}
+              (name, description, sort_order, is_system, is_active, created_at, updated_at)
+            VALUES (?, '', ?, 1, 1, ?, ?)
+            """,
+            (clean, idx * 10, now, now),
+        )
+
+
+def _get_or_create_manager_role_id(
+    conn: sqlite3.Connection,
+    role_name: Any,
+    actor_user_id: Optional[int] = None,
+    *,
+    is_system: bool = False,
+) -> Optional[int]:
+    clean = _normalize_manager_role_name(role_name)
+    if not clean:
+        return None
+    row = conn.execute(
+        f"SELECT id FROM {MANAGER_ROLE_TABLE_NAME} WHERE name = ?",
+        (clean,),
+    ).fetchone()
+    if row:
+        return int(row['id'])
+
+    now = _now()
+    sort_row = conn.execute(
+        f"SELECT COALESCE(MAX(sort_order), 0) AS max_sort FROM {MANAGER_ROLE_TABLE_NAME}"
+    ).fetchone()
+    sort_order = int((sort_row and sort_row['max_sort']) or 0) + 10
+    cur = conn.execute(
+        f"""
+        INSERT INTO {MANAGER_ROLE_TABLE_NAME}
+          (name, description, sort_order, is_system, is_active, created_at, created_by_user_id, updated_at, updated_by_user_id)
+        VALUES (?, '', ?, ?, 1, ?, ?, ?, ?)
+        """,
+        (clean, sort_order, 1 if is_system else 0, now, actor_user_id, now, actor_user_id),
+    )
+    return int(cur.lastrowid)
+
+
+def _roles_from_ids(conn: sqlite3.Connection, role_ids: Sequence[int]) -> List[Dict[str, Any]]:
+    ids = [int(rid) for rid in role_ids if _coerce_positive_int(rid)]
+    if not ids:
+        return []
+    placeholders = ','.join('?' for _ in ids)
+    rows = conn.execute(
+        f"""
+        SELECT * FROM {MANAGER_ROLE_TABLE_NAME}
+        WHERE id IN ({placeholders}) AND is_active = 1
+        ORDER BY sort_order ASC, name ASC
+        """,
+        tuple(ids),
+    ).fetchall()
+    by_id = {int(row['id']): _manager_role_row_to_dict(row) for row in rows}
+    ordered: List[Dict[str, Any]] = []
+    seen = set()
+    for rid in ids:
+        item = by_id.get(rid)
+        if item and item['id'] not in seen:
+            ordered.append(item)
+            seen.add(item['id'])
+    return ordered
+
+
+def _sync_manager_roles(
+    conn: sqlite3.Connection,
+    manager_id: int,
+    payload: Dict[str, Any],
+    actor_user_id: Optional[int],
+) -> Optional[List[Dict[str, Any]]]:
+    has_role_ids = 'role_ids' in payload or 'roleIds' in payload
+    has_role_names = 'roles' in payload or 'role_names' in payload or 'roleNames' in payload
+    role_ids = _coerce_role_id_list(payload.get('role_ids') if 'role_ids' in payload else payload.get('roleIds'))
+    role_names = _payload_role_names(payload)
+    if not role_names and 'roleNames' in payload:
+        role_names = _payload_role_names({'roles': payload.get('roleNames')})
+    if not has_role_ids and not has_role_names:
+        if 'role' not in payload:
+            return None
+        role_names = _split_manager_role_names(payload.get('role'))
+
+    roles: List[Dict[str, Any]] = _roles_from_ids(conn, role_ids) if role_ids else []
+    if role_names:
+        existing_names = {item['name'] for item in roles}
+        extra_ids: List[int] = []
+        for name in role_names:
+            if name in existing_names:
+                continue
+            role_id = _get_or_create_manager_role_id(conn, name, actor_user_id)
+            if role_id:
+                extra_ids.append(role_id)
+                existing_names.add(name)
+        roles.extend(_roles_from_ids(conn, extra_ids))
+
+    conn.execute(
+        f"DELETE FROM {MANAGER_ROLE_MAP_TABLE_NAME} WHERE manager_id = ?",
+        (manager_id,),
+    )
+    now = _now()
+    for role in roles:
+        conn.execute(
+            f"""
+            INSERT OR IGNORE INTO {MANAGER_ROLE_MAP_TABLE_NAME}
+              (manager_id, role_id, created_at, created_by_user_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (manager_id, int(role['id']), now, actor_user_id),
+        )
+    conn.execute(
+        f"UPDATE {MANAGER_TABLE_NAME} SET role = ? WHERE id = ?",
+        (', '.join(role['name'] for role in roles) or None, manager_id),
+    )
+    return roles
+
+
+def _attach_manager_roles(conn: sqlite3.Connection, managers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    ids = [int(item['id']) for item in managers if item.get('id') is not None]
+    role_map: Dict[int, List[Dict[str, Any]]] = {mid: [] for mid in ids}
+    if ids:
+        placeholders = ','.join('?' for _ in ids)
+        rows = conn.execute(
+            f"""
+            SELECT m.manager_id, r.*
+            FROM {MANAGER_ROLE_MAP_TABLE_NAME} m
+            JOIN {MANAGER_ROLE_TABLE_NAME} r ON r.id = m.role_id
+            WHERE m.manager_id IN ({placeholders}) AND r.is_active = 1
+            ORDER BY r.sort_order ASC, r.name ASC
+            """,
+            tuple(ids),
+        ).fetchall()
+        for row in rows:
+            role_map.setdefault(int(row['manager_id']), []).append(_manager_role_row_to_dict(row))
+
+    for item in managers:
+        mid = int(item['id']) if item.get('id') is not None else 0
+        roles = role_map.get(mid) or []
+        if not roles:
+            roles = [{'id': None, 'name': name} for name in _split_manager_role_names(item.get('role'))]
+        item['roles'] = roles
+        item['role_ids'] = [role['id'] for role in roles if role.get('id') is not None]
+        item['role'] = ', '.join(role.get('name') or '' for role in roles if role.get('name'))
+    return managers
+
+
+def _migrate_existing_manager_roles(conn: sqlite3.Connection) -> None:
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT id, role FROM {MANAGER_TABLE_NAME}
+            WHERE role IS NOT NULL AND TRIM(role) <> ''
+            """
+        ).fetchall()
+        now = _now()
+        for row in rows:
+            for name in _split_manager_role_names(row['role']):
+                role_id = _get_or_create_manager_role_id(conn, name)
+                if role_id:
+                    conn.execute(
+                        f"""
+                        INSERT OR IGNORE INTO {MANAGER_ROLE_MAP_TABLE_NAME}
+                          (manager_id, role_id, created_at, created_by_user_id)
+                        VALUES (?, ?, ?, NULL)
+                        """,
+                        (int(row['id']), role_id, now),
+                    )
+    except Exception as exc:
+        logger.warning('manager role migration skipped: %s', exc)
+
+
+def list_work_group_manager_roles(
+    app=None,
+    *,
+    include_inactive: bool = False,
+) -> List[Dict[str, Any]]:
+    app = app or current_app
+    with _get_connection(app) as conn:
+        _ensure_default_manager_roles(conn)
+        where = '' if include_inactive else 'WHERE is_active = 1'
+        rows = conn.execute(
+            f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} {where} ORDER BY sort_order ASC, name ASC"
+        ).fetchall()
+        return [_manager_role_row_to_dict(row) for row in rows]
+
+
+def create_work_group_manager_role(
+    payload: Dict[str, Any],
+    actor_user_id: Optional[int],
+    app=None,
+) -> Dict[str, Any]:
+    app = app or current_app
+    name = _normalize_manager_role_name(payload.get('name') or payload.get('role_name'))
+    if not name:
+        raise ValueError('역할명을 입력하세요.')
+    description = str(payload.get('description') or '').strip() or None
+    sort_order = _coerce_positive_int(payload.get('sort_order'))
+    now = _now()
+    with _get_connection(app) as conn:
+        exists = conn.execute(
+            f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} WHERE name = ?",
+            (name,),
+        ).fetchone()
+        if exists:
+            raise ValueError('이미 등록된 역할입니다.')
+        if not sort_order:
+            row = conn.execute(
+                f"SELECT COALESCE(MAX(sort_order), 0) AS max_sort FROM {MANAGER_ROLE_TABLE_NAME}"
+            ).fetchone()
+            sort_order = int((row and row['max_sort']) or 0) + 10
+        cur = conn.execute(
+            f"""
+            INSERT INTO {MANAGER_ROLE_TABLE_NAME}
+              (name, description, sort_order, is_system, is_active, created_at, created_by_user_id, updated_at, updated_by_user_id)
+            VALUES (?, ?, ?, 0, 1, ?, ?, ?, ?)
+            """,
+            (name, description, sort_order, now, actor_user_id, now, actor_user_id),
+        )
+        conn.commit()
+        row = conn.execute(
+            f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} WHERE id = ?",
+            (int(cur.lastrowid),),
+        ).fetchone()
+        return _manager_role_row_to_dict(row)
+
+
+def update_work_group_manager_role(
+    role_id: int,
+    payload: Dict[str, Any],
+    actor_user_id: Optional[int],
+    app=None,
+) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    rid = _coerce_positive_int(role_id)
+    if not rid:
+        return None
+    fields: List[str] = []
+    values: List[Any] = []
+    if 'name' in payload or 'role_name' in payload:
+        name = _normalize_manager_role_name(payload.get('name') or payload.get('role_name'))
+        if not name:
+            raise ValueError('역할명을 입력하세요.')
+        fields.append('name = ?')
+        values.append(name)
+    if 'description' in payload:
+        fields.append('description = ?')
+        values.append(str(payload.get('description') or '').strip() or None)
+    if 'sort_order' in payload:
+        fields.append('sort_order = ?')
+        values.append(_coerce_positive_int(payload.get('sort_order')) or 0)
+    if 'is_active' in payload:
+        fields.append('is_active = ?')
+        values.append(1 if payload.get('is_active') else 0)
+    if not fields:
+        with _get_connection(app) as conn:
+            row = conn.execute(
+                f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} WHERE id = ?",
+                (rid,),
+            ).fetchone()
+            return _manager_role_row_to_dict(row) if row else None
+
+    fields.append('updated_at = ?')
+    values.append(_now())
+    fields.append('updated_by_user_id = ?')
+    values.append(actor_user_id)
+
+    with _get_connection(app) as conn:
+        exists = conn.execute(
+            f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} WHERE id = ?",
+            (rid,),
+        ).fetchone()
+        if not exists:
+            return None
+        try:
+            conn.execute(
+                f"UPDATE {MANAGER_ROLE_TABLE_NAME} SET {', '.join(fields)} WHERE id = ?",
+                tuple(values + [rid]),
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError('이미 등록된 역할입니다.')
+        conn.commit()
+        row = conn.execute(
+            f"SELECT * FROM {MANAGER_ROLE_TABLE_NAME} WHERE id = ?",
+            (rid,),
+        ).fetchone()
+        return _manager_role_row_to_dict(row) if row else None
+
+
 def list_work_group_managers(
     group_id: int,
     app=None,
@@ -1182,7 +1600,7 @@ def list_work_group_managers(
             f"SELECT * FROM {MANAGER_TABLE_NAME} WHERE {where} ORDER BY id ASC",
             tuple(params),
         ).fetchall()
-        return [_manager_row_to_dict(r) for r in rows]
+        return _attach_manager_roles(conn, [_manager_row_to_dict(r) for r in rows])
 
 
 def create_work_group_manager(
@@ -1218,13 +1636,15 @@ def create_work_group_manager(
             (gid, department_id, user_id, org, name, role, phone, email, remark, is_primary,
              now, actor_user_id, now, actor_user_id),
         )
-        conn.commit()
         new_id = int(cur.lastrowid)
+        _sync_manager_roles(conn, new_id, payload, actor_user_id)
+        conn.commit()
         row = conn.execute(
             f"SELECT * FROM {MANAGER_TABLE_NAME} WHERE id = ?",
             (new_id,),
         ).fetchone()
-        return _manager_row_to_dict(row)
+        items = _attach_manager_roles(conn, [_manager_row_to_dict(row)])
+        return items[0] if items else {}
 
 
 def update_work_group_manager(
@@ -1242,6 +1662,7 @@ def update_work_group_manager(
 
     fields: List[str] = []
     values: List[Any] = []
+    has_role_payload = any(key in payload for key in ('role', 'role_ids', 'roleIds', 'roles', 'role_names', 'roleNames'))
     for key in ('org', 'name', 'role', 'phone', 'email', 'remark'):
         if key not in payload:
             continue
@@ -1261,7 +1682,7 @@ def update_work_group_manager(
         fields.append('is_primary = ?')
         values.append(1 if payload['is_primary'] else 0)
 
-    if not fields:
+    if not fields and not has_role_payload:
         return get_work_group_manager(group_id, manager_id, app=app)
 
     now = _now()
@@ -1282,12 +1703,15 @@ def update_work_group_manager(
             f"UPDATE {MANAGER_TABLE_NAME} SET {', '.join(fields)} WHERE id = ? AND group_id = ?",
             tuple(values + [mid, gid]),
         )
+        if has_role_payload:
+            _sync_manager_roles(conn, mid, payload, actor_user_id)
         conn.commit()
         row = conn.execute(
             f"SELECT * FROM {MANAGER_TABLE_NAME} WHERE id = ?",
             (mid,),
         ).fetchone()
-        return _manager_row_to_dict(row)
+        items = _attach_manager_roles(conn, [_manager_row_to_dict(row)])
+        return items[0] if items else None
 
 
 def get_work_group_manager(
@@ -1305,7 +1729,10 @@ def get_work_group_manager(
             f"SELECT * FROM {MANAGER_TABLE_NAME} WHERE group_id = ? AND id = ? AND (is_deleted = 0 OR is_deleted IS NULL)",
             (gid, mid),
         ).fetchone()
-        return _manager_row_to_dict(row) if row else None
+        if not row:
+            return None
+        items = _attach_manager_roles(conn, [_manager_row_to_dict(row)])
+        return items[0] if items else None
 
 
 def delete_work_group_manager(

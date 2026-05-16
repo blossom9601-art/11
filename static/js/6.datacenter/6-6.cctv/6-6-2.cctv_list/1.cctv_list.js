@@ -100,6 +100,7 @@
         });
     }
     const ORG_CCTV_API = '/api/org-cctvs';
+    const FACILITY_SECURITY_RESOURCE = 'cctv';
     const ORG_CCTV_BULK_DELETE_API = '/api/org-cctvs/bulk-delete';
     const ORG_CCTV_BULK_UPDATE_API = '/api/org-cctvs/bulk-update';
 
@@ -159,7 +160,7 @@
         const response = await requestJSON(ORG_CCTV_API, { method: 'POST', body: payload });
         const row = normalizeCctvRow(response?.item || response);
         if(!row){
-            throw new Error('등록된 CCTV 정보를 확인하지 못했습니다.');
+            throw new Error('등록된 영상감시 정보를 확인하지 못했습니다.');
         }
         return row;
     }
@@ -172,7 +173,7 @@
         const response = await requestJSON(url, { method: 'PUT', body: payload });
         const row = normalizeCctvRow(response?.item || response);
         if(!row){
-            throw new Error('수정된 CCTV 정보를 확인하지 못했습니다.');
+            throw new Error('수정된 영상감시 정보를 확인하지 못했습니다.');
         }
         return row;
     }
@@ -1149,7 +1150,7 @@
                     if(descEl) descEl.textContent = '검색어를 변경하거나 필터를 초기화하세요.';
                 } else {
                     if(titleEl) titleEl.textContent = 'CCTV가 없습니다.';
-                    if(descEl) descEl.textContent = "우측 상단 '추가' 버튼을 눌러 첫 CCTV를 등록하세요.";
+                    if(descEl) descEl.textContent = "우측 상단 '추가' 버튼을 눌러 첫 영상감시를 등록하세요.";
                 }
             }
         } else if(emptyEl){
@@ -1405,6 +1406,15 @@
         return data;
     }
 
+    function wireFacilityCategoryFk(form){
+        if(!form || !window.DcFacilityFk || typeof window.DcFacilityFk.wireForm !== 'function') return;
+        window.DcFacilityFk.wireForm(form, {
+            resource: FACILITY_SECURITY_RESOURCE,
+            manufacturerName: 'vendor',
+            modelName: 'model'
+        });
+    }
+
     function fillEditForm(row){
         const form = document.getElementById(EDIT_FORM_ID); if(!form) return;
         form.innerHTML='';
@@ -1441,6 +1451,7 @@
                 delete input.dataset.display;
             }
         });
+        wireFacilityCategoryFk(form);
         initSearchSelects(form);
     }
 
@@ -1457,7 +1468,10 @@
             return `<input name="business_name" class="form-input" placeholder="입력" value="${val}">`;
         }
         if(col==='vendor'){
-            return `<input name="vendor" class="form-input" placeholder="입력" value="${val}"${requiredAttr}>`;
+            return `<select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">제조사 검색</option>
+                ${val ? `<option value="${val}" selected>${val}</option>` : ''}
+            </select>`;
         }
         const sourceKey = FIELD_SEARCH_SOURCE[col];
         if(sourceKey){
@@ -1465,7 +1479,10 @@
             return `<input name="${col}" class="form-input search-select" placeholder="검색 선택" data-search-source="${sourceKey}"${parentAttr} value="${val}"${requiredAttr}>`;
         }
         if(col==='model'){
-            return `<input name="model" class="form-input" placeholder="입력" value="${val}"${requiredAttr}>`;
+            return `<select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true"${requiredAttr}>
+                <option value="">모델명 검색</option>
+                ${val ? `<option value="${val}" selected>${val}</option>` : ''}
+            </select>`;
         }
         if(col==='serial'){
             return `<input name="serial" class="form-input" value="${val}">`;
@@ -1851,7 +1868,7 @@
             }
         });
         // add modal
-        document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); });
+        document.getElementById(ADD_BTN_ID)?.addEventListener('click', ()=> { openModal(ADD_MODAL_ID); wireFacilityCategoryFk(document.getElementById(ADD_FORM_ID)); });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
         document.getElementById(ADD_SAVE_ID)?.addEventListener('click', async ()=>{
             const form = document.getElementById(ADD_FORM_ID);
@@ -1867,7 +1884,7 @@
                 showMessage('CCTV가 등록되었습니다.', '완료');
             } catch(error){
                 console.error(error);
-                showMessage(error?.message || 'CCTV 등록 중 오류가 발생했습니다.', '오류');
+                showMessage(error?.message || '영상감시 등록 중 오류가 발생했습니다.', '오류');
             } finally {
                 button.disabled = false;
             }
@@ -1881,7 +1898,7 @@
             if(!form.checkValidity()){ form.reportValidity(); return; }
             const recordId = parseInt(form.dataset.recordId || '', 10);
             if(!Number.isFinite(recordId)){
-                showMessage('수정할 CCTV를 찾을 수 없습니다.', '오류');
+                showMessage('수정할 영상감시를 찾을 수 없습니다.', '오류');
                 return;
             }
             const payload = collectForm(form);
@@ -1897,7 +1914,7 @@
                 showMessage('CCTV가 수정되었습니다.', '완료');
             } catch(error){
                 console.error(error);
-                showMessage(error?.message || 'CCTV 수정 중 오류가 발생했습니다.', '오류');
+                showMessage(error?.message || '영상감시 수정 중 오류가 발생했습니다.', '오류');
             } finally {
                 button.disabled = false;
             }

@@ -351,6 +351,7 @@
         const rawQty = (item.usage_count != null) ? item.usage_count : item.server_count;
         return {
             id: item.id,
+            public_id: String(item.public_id || '').trim(),
             server_code: item.server_code,
             model: item.server_model_name || item.model_name || '',
             vendor: vendorName || '',

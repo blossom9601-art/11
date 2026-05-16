@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css?v=20251208">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
 </head>
 <body class="{{ page_class }}">
     <!-- JS CONFIG (data-* 속성으로 전달) -->
@@ -30,15 +30,15 @@
         <main class="main-content">
             <div class="content-wrapper">
                 <div class="page-header">
-                    <div class="page-utility-right" data-info-key="datacenter.rack"></div>
-                    <h1>RACK 관리</h1>
-                    <p>RACK 자산을 관리 합니다.</p>
+                    <div class="page-utility-right" data-info-key="{{ lab_info_key|default('datacenter.rack') }}"></div>
+                    <h1>{{ lab_title|default('RACK 관리') }}</h1>
+                    <p>{{ lab_description|default('RACK 자산을 관리 합니다.') }}</p>
                 </div>
                 <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
                 <div id="dynamic-system-tabs"
-                     data-page-code="DC_RACK"
+                     data-page-code="{{ lab_page_code|default('DC_RACK') }}"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="RACK 관리 탭"
+                     data-aria-label="{{ lab_aria_label|default('RACK 관리 탭') }}"
                      data-layout-title-selector="#rack-layout-title"
                      data-layout-title-suffix=" 배치도"></div>
 
@@ -70,7 +70,7 @@
                         </div>
                         <div class="system-table-container server-table-container">
                             <div id="rack-layout" class="rack-layout"{% if layout_style %} style="{{ layout_style }}"{% endif %}>
-                                <img src="{{ bg_image }}" alt="{{ center_name }} RACK 배치도" class="rack-layout-image" loading="eager" decoding="async"/>
+                                <img src="{{ bg_image }}" alt="{{ center_name }} {{ lab_asset_label|default('RACK') }} 배치도" class="rack-layout-image" loading="eager" decoding="async"/>
                                 <div id="rack-overlay" class="rack-overlay" aria-live="polite" data-center-code="{{ center_code }}" data-rack-filter-code="{{ center_code }}"></div>
                                 <!-- Context menu for overlay boxes -->
                                 <div id="overlay-context-menu" class="overlay-context-menu" role="menu" aria-hidden="true">
@@ -85,7 +85,7 @@
                                 <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
                             </div>
                             <div class="empty-text">
-                                <h3 id="system-empty-title">RACK 시스템이 없습니다.</h3>
+                                <h3 id="system-empty-title">{{ lab_asset_label|default('RACK') }} 시스템이 없습니다.</h3>
                                 <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 시스템을 등록하세요.</p>
                             </div>
                         </div>
@@ -94,7 +94,7 @@
             </div>
         </main>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
     <script src="/static/js/6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.js?v=20251206b"></script>
 
@@ -134,7 +134,7 @@
                                     </div>
                                 </div>
                                 <div class="form-row">
-                                    <label>RACK 검색</label>
+                                    <label>{{ lab_asset_label|default('RACK') }} 검색</label>
                                     <div class="rack-search-wrap">
                                         <input type="text" id="rack-search-native" class="form-input search-select" placeholder="선택" data-placeholder="선택" readonly>
                                         <input type="hidden" name="selected_rack" id="selected-rack-hidden" value="">

@@ -1713,9 +1713,11 @@ table.hw-table td[data-col="status"].status-unregistered { color:#6b7280; }
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:8px;
+  gap:2px;
   width:100%;
-  min-height:170px;
+  min-height:220px;
+  box-sizing:border-box;
+  padding:4px 12px;
   margin:0;
   text-align:center;
   color:#64748b;
@@ -1728,25 +1730,120 @@ table.hw-table td[data-col="status"].status-unregistered { color:#6b7280; }
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:8px;
+  gap:0;
   width:100%;
-  min-height:170px;
+  min-height:220px;
+  box-sizing:border-box;
 }
 
 .bls-detail-no-data-anim {
-  display:block;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 180px;
   width:240px;
   max-width:100%;
   height:180px;
+  margin-bottom:-18px;
+  line-height:0;
   pointer-events:none;
 }
 
-.bls-detail-no-data-text {
+.bls-detail-no-data-anim svg,
+.bls-detail-no-data-anim canvas {
   display:block;
-  font-size:13px;
+  width:100% !important;
+  height:100% !important;
+}
+
+.bls-detail-no-data-text {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  max-width:280px;
+  min-height:26px;
+  margin:0 auto;
+  font-size:15px;
+  font-weight:600;
+  line-height:1.32;
   color:#64748b;
   text-align:center;
   white-space:pre-line;
+  word-break:keep-all;
+  overflow-wrap:break-word;
+}
+
+#sys-empty.info-desc > span,
+#svc-empty.info-desc > span,
+#stat-empty.info-desc > span,
+#group-empty.info-desc > span,
+#oper-empty.info-desc > span,
+#cost-empty.info-desc > span,
+#ver-empty.info-desc > span {
+  gap:0 !important;
+  padding-top:0 !important;
+  padding-bottom:0 !important;
+}
+
+#sys-empty.info-desc > span > .bls-detail-no-data-anim,
+#svc-empty.info-desc > span > .bls-detail-no-data-anim,
+#stat-empty.info-desc > span > .bls-detail-no-data-anim,
+#group-empty.info-desc > span > .bls-detail-no-data-anim,
+#oper-empty.info-desc > span > .bls-detail-no-data-anim,
+#cost-empty.info-desc > span > .bls-detail-no-data-anim,
+#ver-empty.info-desc > span > .bls-detail-no-data-anim,
+#sys-empty.info-desc > span > span[aria-label],
+#svc-empty.info-desc > span > span[aria-label],
+#stat-empty.info-desc > span > span[aria-label],
+#group-empty.info-desc > span > span[aria-label],
+#oper-empty.info-desc > span > span[aria-label],
+#cost-empty.info-desc > span > span[aria-label],
+#ver-empty.info-desc > span > span[aria-label],
+#sys-empty.info-desc > span > img,
+#svc-empty.info-desc > span > img,
+#stat-empty.info-desc > span > img,
+#group-empty.info-desc > span > img,
+#oper-empty.info-desc > span > img,
+#cost-empty.info-desc > span > img,
+#ver-empty.info-desc > span > img {
+  margin-bottom:-18px !important;
+}
+
+#sys-empty.info-desc .bls-detail-no-data-caption,
+#svc-empty.info-desc .bls-detail-no-data-caption,
+#stat-empty.info-desc .bls-detail-no-data-caption,
+#group-empty.info-desc .bls-detail-no-data-caption,
+#oper-empty.info-desc .bls-detail-no-data-caption,
+#cost-empty.info-desc .bls-detail-no-data-caption,
+#ver-empty.info-desc .bls-detail-no-data-caption,
+#sys-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#svc-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#stat-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#group-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#oper-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#cost-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]),
+#ver-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) {
+  margin-top:0 !important;
+}
+
+#sys-empty.info-desc .bls-detail-no-data-caption span,
+#svc-empty.info-desc .bls-detail-no-data-caption span,
+#stat-empty.info-desc .bls-detail-no-data-caption span,
+#group-empty.info-desc .bls-detail-no-data-caption span,
+#oper-empty.info-desc .bls-detail-no-data-caption span,
+#cost-empty.info-desc .bls-detail-no-data-caption span,
+#ver-empty.info-desc .bls-detail-no-data-caption span,
+#sys-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#svc-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#stat-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#group-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#oper-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#cost-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span,
+#ver-empty.info-desc > span > span:last-child:not(.bls-detail-no-data-anim):not([aria-label]) > span {
+  font-size:15px !important;
+  font-weight:600;
+  line-height:1.32;
 }
 
 /* Category detail edit modal: keep field rows compact and prevent old detail rules from adding vertical gaps. */

@@ -121,7 +121,7 @@
           }
           if(!model || model === '-' || model === '모델명'){
             hideChart(statPie, statEmpty, statLegendEl, '할당 시스템 내역이 없습니다.');
-            hideChart(operPie, operEmpty, operLegend, '업무운영 데이터가 없습니다.');
+            hideChart(operPie, operEmpty, operLegend, '할당 시스템 내역이 없습니다.');
             return;
           }
           var apiUrl = '/api/category/sw-model-assets?model=' + encodeURIComponent(model);
@@ -201,7 +201,7 @@
               }
               try{ attachPieInteractions(operPie, segments, opTotal); }catch(_){}
             } else {
-              hideChart(operPie, operEmpty, operLegend, '업무운영 데이터가 없습니다.');
+              hideChart(operPie, operEmpty, operLegend, '할당 시스템 내역이 없습니다.');
             }
           }).catch(function(){
             hideChart(statPie, statEmpty, statLegendEl, '데이터를 불러올 수 없습니다.');
@@ -734,6 +734,9 @@
           if(col==='note'){
             return '<textarea name="note" class="form-input textarea-large" rows="6">'+(value||'')+'</textarea>';
           }
+          if(col==='model'){
+            return '<input name="model" type="text" class="form-input" value="'+(value||'')+'" autocomplete="off" data-fk-ignore="1">';
+          }
           return '<input name="'+col+'" class="form-input" value="'+(value||'')+'">';
         }
         function getText(id){ var el=document.getElementById(id); return el? (el.textContent||'').trim() : ''; }
@@ -930,7 +933,8 @@
           var vendorCodeEl = document.getElementById('cat-sw-vendor-code');
           var vendorCode = vendorCodeEl ? vendorCodeEl.value.trim() : '';
           var payload = { model: fv('model'), release_date: fv('release_date'), eosl: fv('eosl'), note: fv('note') };
-          if(vendorCode){ payload.vendor_code = vendorCode; } else { payload.vendor = fv('vendor'); }
+          var vendorValue = fv('vendor');
+          if(vendorValue){ payload.vendor = vendorValue; } else if(vendorCode){ payload.vendor_code = vendorCode; }
           var m = (location.pathname||'').match(/\/p\/(\w+)/);
           var key = m ? m[1] : ''; key = key.replace(/_(detail|system|task|log|file)$/,'');
           var apiMap = {
@@ -1871,6 +1875,9 @@
 
 
       (function(){
+        var table = document.getElementById('mt-spec-table');
+        if(!table) return;
+
         // Add row
         var addBtn = document.getElementById('mt-row-add');
         if(addBtn){

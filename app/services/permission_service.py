@@ -408,8 +408,18 @@ def _topo_sort(menus, menu_by_id):
     return ordered
 
 
-def cache_session_permissions(sess):
-    """로그인 시 세션에 최종 권한 캐싱"""
+def clear_client_session_permission_cache(sess):
+    """Remove legacy permission payloads from the signed browser session."""
+    try:
+        if '_perms' in sess:
+            sess.pop('_perms', None)
+            sess.modified = True
+    except Exception:
+        pass
+
+
+def get_session_permissions(sess):
+    """Return effective permissions without storing them in the client cookie."""
     if (sess.get('role') or '').upper() == 'ADMIN':
         menus = Menu.query.all()
         perms = {m.menu_code: 'WRITE' for m in menus}
@@ -417,19 +427,22 @@ def cache_session_permissions(sess):
             # 메뉴 시드 전 — 기본 sections
             for code, _, _, _ in MENU_SEEDS:
                 perms[code] = 'WRITE'
-        sess['_perms'] = perms
-        return
+        return perms
 
-    uid = sess.get('user_id') or sess.get('profile_user_id')
+    uid = sess.get('user_id') or sess.get('profile_user_id') or sess.get('user_profile_id')
     if uid:
         try:
-            perms = get_effective_permissions(uid)
-            sess['_perms'] = perms
+            return get_effective_permissions(uid)
         except Exception as e:
             print('[cache_perms] error', e, flush=True)
-            sess['_perms'] = {}
-    else:
-        sess['_perms'] = {}
+            return {}
+    return {}
+
+
+def cache_session_permissions(sess):
+    """Compatibility hook used at login; permissions stay server-side now."""
+    clear_client_session_permission_cache(sess)
+    return get_session_permissions(sess)
 
 
 # ── URL → 메뉴 코드 매핑 ──

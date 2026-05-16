@@ -87,9 +87,9 @@
     function applyNoDataToStatsPlaceholders(){
         try{
             var targets = [
-                { id: 'stat-empty', msg: '통계 데이터가 없습니다.' },
-                { id: 'group-empty', msg: '통계 데이터가 없습니다.' },
-                { id: 'ver-empty', msg: '통계 데이터가 없습니다.' },
+                { id: 'stat-empty', msg: '할당 시스템 내역이 없습니다.' },
+                { id: 'group-empty', msg: '할당 시스템 내역이 없습니다.' },
+                { id: 'ver-empty', msg: '할당 시스템 내역이 없습니다.' },
             ];
             targets.forEach(function(t){
                 var el = document.getElementById(t.id);

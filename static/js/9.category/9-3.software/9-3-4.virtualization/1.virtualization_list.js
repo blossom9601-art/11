@@ -212,6 +212,7 @@
     const normalizedId=Number(item.id);
     return {
       id: Number.isFinite(normalizedId) ? normalizedId : item.id,
+      public_id: String(item.public_id || '').trim(),
       virtual_code: item.virtual_code || '',
       model: item.model ?? item.virtual_name ?? item.model_name ?? '',
       vendor: item.vendor ?? item.manufacturer_name ?? '',

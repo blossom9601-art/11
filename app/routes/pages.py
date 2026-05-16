@@ -57,12 +57,126 @@ from app.services.cmp_disk_type_service import get_cmp_disk_type as _svc_get_cmp
 from app.services.cmp_nic_type_service import get_cmp_nic_type as _svc_get_cmp_nic
 from app.services.cmp_hba_type_service import get_cmp_hba_type as _svc_get_cmp_hba
 from app.services.cmp_etc_type_service import get_cmp_etc_type as _svc_get_cmp_etc
+from app.services.facility_security_infra_service import (
+    TABLE_NAME as _FACILITY_SECURITY_TABLE,
+    get_facility_security_access_type as _svc_get_facility_security_access,
+    get_facility_security_data_delete_type as _svc_get_facility_security_data_delete,
+    get_facility_security_rack_type as _svc_get_facility_security_rack,
+    get_facility_security_thermometer_type as _svc_get_facility_security_thermometer,
+    get_facility_security_cctv_type as _svc_get_facility_security_cctv,
+    get_facility_security_transformer_type as _svc_get_facility_security_transformer,
+    get_facility_security_generator_type as _svc_get_facility_security_generator,
+    get_facility_security_ups_type as _svc_get_facility_security_ups,
+    get_facility_security_battery_type as _svc_get_facility_security_battery,
+    get_facility_security_hvac_type as _svc_get_facility_security_hvac,
+    get_facility_security_leak_detector_type as _svc_get_facility_security_leak_detector,
+    get_facility_security_detection_type as _svc_get_facility_security_detection,
+    get_facility_security_fire_extinguishing_type as _svc_get_facility_security_fire_extinguishing,
+    get_facility_security_evacuation_type as _svc_get_facility_security_evacuation,
+)
 from app.services.customer_member_service import get_customer_member as _svc_get_customer_member
 from app.services.customer_associate_service import get_customer_associate as _svc_get_customer_associate
 from app.services.customer_client_service import get_customer_client as _svc_get_customer_client
+from app.services.org_rack_service import (
+    TABLE_NAME as _ORG_RACK_TABLE,
+    _fetch_single as _svc_get_org_rack,
+    fetch_by_rack_code as _svc_get_org_rack_by_code,
+    fetch_by_rack_identifier as _svc_get_org_rack_by_identifier,
+)
 from app.models import NetVpnLine, NetLeasedLine, PageTabConfig
 
 pages_bp = Blueprint('pages', __name__)
+
+
+def _set_single_detail_session_ctx(bucket: str, context_key: str, value):
+    session[bucket] = {context_key: value}
+    session.modified = True
+
+
+_DC_FACILITY_LAB_META = {
+    'DC_TRANSFORMER': {'prefix': 'transformer', 'resource': 'transformer', 'label': '변압기', 'info_key': 'datacenter.transformer', 'style': 'rack'},
+    'DC_GENERATOR': {'prefix': 'generator', 'resource': 'generator', 'label': '발전기', 'info_key': 'datacenter.generator', 'style': 'rack'},
+    'DC_UPS': {'prefix': 'ups', 'resource': 'ups', 'label': '무정전전원장치', 'info_key': 'datacenter.ups', 'style': 'rack'},
+    'DC_BATTERY': {'prefix': 'battery', 'resource': 'battery', 'label': '배터리', 'info_key': 'datacenter.battery', 'style': 'rack'},
+    'DC_HVAC': {'prefix': 'hvac', 'resource': 'hvac', 'label': '항온항습기', 'info_key': 'datacenter.hvac', 'style': 'rack'},
+    'DC_LEAK_DETECTOR': {'prefix': 'leak_detector', 'resource': 'leak_detector', 'label': '누수감지', 'info_key': 'datacenter.leak_detector', 'style': 'rack'},
+    'DC_DETECTION': {'prefix': 'detection', 'resource': 'detection', 'label': '감지설비', 'info_key': 'datacenter.detection', 'style': 'thermo'},
+    'DC_FIRE_EXTINGUISHING': {'prefix': 'fire_extinguishing', 'resource': 'fire_extinguishing', 'label': '소화설비', 'info_key': 'datacenter.fire_extinguishing', 'style': 'thermo'},
+    'DC_EVACUATION': {'prefix': 'evacuation', 'resource': 'evacuation', 'label': '대피설비', 'info_key': 'datacenter.evacuation', 'style': 'thermo'},
+}
+
+
+def _dc_facility_meta_for_key(key: str, page_code: str | None = None):
+    if page_code and page_code in _DC_FACILITY_LAB_META:
+        return _DC_FACILITY_LAB_META[page_code]
+    route_key = (key or '').strip()
+    for meta in _DC_FACILITY_LAB_META.values():
+        prefix = meta['prefix']
+        if route_key.startswith(f'dc_{prefix}_lab') or route_key == f'dc_{prefix}_list':
+            return meta
+    return None
+
+
+def _dc_static_lab_image(tab_code: str) -> str:
+    static_map = {
+        'LAB1': '/static/image/center/system_lab1/system_lab1.png',
+        'LAB2': '/static/image/center/system_lab2/system_lab2.png',
+        'LAB3': '/static/image/center/system_lab3/system_lab3.png',
+        'LAB4': '/static/image/center/system_lab4/system_lab4.png',
+    }
+    return static_map.get((tab_code or '').strip().upper(), '/static/image/center/sample/sample_datacenter.svg?v=20260413_4')
+
+
+def _dc_lab_image_for_tab(tab_row, extra_options=None) -> str:
+    extra_options = extra_options or {}
+    bg_image = str(extra_options.get('bg_image') or '').strip()
+    if bg_image:
+        return bg_image
+    if tab_row is not None and getattr(tab_row, 'tab_image', None):
+        return f"/api/page-tabs/{getattr(tab_row, 'id')}/image"
+    return _dc_static_lab_image(getattr(tab_row, 'tab_code', '') if tab_row is not None else '')
+
+
+def _dc_facility_page_code(meta) -> str:
+    return next((code for code, item in _DC_FACILITY_LAB_META.items() if item is meta), '')
+
+
+def _dc_facility_standard_template(meta) -> str:
+    if not meta:
+        return ''
+    if meta.get('style') == 'thermo':
+        return '6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.html'
+    return '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html'
+
+
+def _dc_facility_standard_lab_context(key: str, tab_row=None, extra_options=None):
+    meta = _dc_facility_meta_for_key(key, getattr(tab_row, 'page_code', None) if tab_row is not None else None)
+    if not meta:
+        return {}
+    extra_options = extra_options or {}
+    tab_name = str(getattr(tab_row, 'tab_name', '') or '').strip() if tab_row is not None else ''
+    page_code = getattr(tab_row, 'page_code', None) or _dc_facility_page_code(meta)
+    route_key = (key or getattr(tab_row, 'route_key', '') or '').strip()
+    default_store_key = f"{route_key}_overlay_boxes" if route_key else f"dc_{meta['prefix']}_lab_overlay_boxes"
+    default_floor_key = f"{route_key}_layout" if route_key else f"dc-{meta['prefix']}-layout"
+    label = meta['label']
+    is_thermo_style = meta.get('style') == 'thermo'
+    return {
+        'page_class': extra_options.get('page_class', 'page-system-lab' if is_thermo_style else 'page-rack-lab'),
+        'center_name': extra_options.get('center_name', tab_name or f"{label}1"),
+        'bg_image': _dc_lab_image_for_tab(tab_row, extra_options),
+        'layout_style': extra_options.get('layout_style', ''),
+        'overlay_store_key': extra_options.get('overlay_store_key', default_store_key),
+        'overlay_floor_key': extra_options.get('overlay_floor_key', default_floor_key),
+        'surface_api_base': extra_options.get('surface_api_base', ''),
+        'center_code': extra_options.get('center_code', ''),
+        'lab_page_code': page_code,
+        'lab_title': f'{label} 관리',
+        'lab_description': f'{label} 자산을 관리 합니다.',
+        'lab_info_key': meta['info_key'],
+        'lab_aria_label': f'{label} 관리 탭',
+        'lab_asset_label': label,
+    }
 
 # page key → menu_code (화면권한 시스템 연동)
 _KEY_MENU_CODE = {
@@ -87,6 +201,11 @@ _KEY_MENU_CODE = {
     'dc_rack': 'datacenter.rack',
     'datacenter_temp': 'datacenter.temperature', 'datacenter_cctv': 'datacenter.cctv',
     'dc_thermo': 'datacenter.temperature', 'dc_cctv': 'datacenter.cctv',
+    'dc_transformer': 'datacenter.transformer', 'dc_generator': 'datacenter.generator',
+    'dc_ups': 'datacenter.ups', 'dc_battery': 'datacenter.battery',
+    'dc_hvac': 'datacenter.hvac', 'dc_leak_detector': 'datacenter.leak_detector',
+    'dc_detection': 'datacenter.detection', 'dc_fire_extinguishing': 'datacenter.fire_extinguishing',
+    'dc_evacuation': 'datacenter.evacuation',
     'cost_opex': 'cost.opex', 'cost_capex': 'cost.capex',
     'project': 'project',
     'insight_technical': 'insight.technical', 'insight_blog': 'insight.blog',
@@ -95,6 +214,7 @@ _KEY_MENU_CODE = {
     'category_software': 'category.software', 'category_component': 'category.component',
     'cat_hw_dashboard': 'category.hardware', 'cat_hw': 'category.hardware',
     'cat_sw_dashboard': 'category.software', 'cat_sw': 'category.software',
+    'cat_facility_security': 'category.component',
     'category_company': 'category.company', 'cat_company_company': 'category.company', 'cat_company_department': 'category.company', 'cat_company_center': 'category.company', 'category_customer': 'category.customer',
     'category_vendor': 'category.vendor',
     'admin_user': 'settings.user', 'admin_role': 'settings.permission',
@@ -523,6 +643,24 @@ TEMPLATE_MAP = {
     'dc_thermo_lab4': '6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.html',
     'dc_thermometer_list': '6.datacenter/6-4.thermometer/6-4-2.thermometer_list/1.thermometer_list.html',
     'dc_thermometer_log': '6.datacenter/6-4.thermometer/6-4-3.thermometer_log/1.thermometer_log.html',
+    'dc_transformer_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_transformer_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_generator_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_generator_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_ups_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_ups_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_battery_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_battery_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_hvac_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_hvac_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_leak_detector_lab1': '6.datacenter/6-3.rack/6-3-1.system_lab/1.system_lab.html',
+    'dc_leak_detector_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_detection_lab1': '6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.html',
+    'dc_detection_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_fire_extinguishing_lab1': '6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.html',
+    'dc_fire_extinguishing_list': '6.datacenter/facility_system/2.facility_system_list.html',
+    'dc_evacuation_lab1': '6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.html',
+    'dc_evacuation_list': '6.datacenter/facility_system/2.facility_system_list.html',
     'dc_cctv_lab1': '6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.html',
     'dc_cctv_lab2': '6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.html',
     'dc_cctv_lab3': '6.datacenter/6-6.cctv/6-6-1.system_lab/1.system_lab.html',
@@ -708,6 +846,90 @@ TEMPLATE_MAP = {
     'cat_component_etc_task': '9.category/9-4.component/9-4-7.etc/tab11-task.html',
     'cat_component_etc_log': '9.category/9-4.component/9-4-7.etc/tab14-log.html',
     'cat_component_etc_file': '9.category/9-4.component/9-4-7.etc/tab15-file.html',
+    'cat_facility_security_access': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_access_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_access_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_access_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_access_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_access_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_data_delete': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_data_delete_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_data_delete_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_data_delete_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_data_delete_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_data_delete_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_rack': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_rack_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_rack_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_rack_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_rack_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_rack_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_thermometer': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_thermometer_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_thermometer_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_thermometer_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_thermometer_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_thermometer_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_cctv': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_cctv_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_cctv_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_cctv_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_cctv_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_cctv_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_transformer': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_transformer_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_transformer_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_transformer_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_transformer_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_transformer_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_generator': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_generator_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_generator_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_generator_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_generator_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_generator_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_ups': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_ups_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_ups_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_ups_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_ups_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_ups_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_battery': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_battery_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_battery_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_battery_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_battery_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_battery_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_hvac': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_hvac_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_hvac_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_hvac_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_hvac_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_hvac_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_leak_detector': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_leak_detector_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_leak_detector_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_leak_detector_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_leak_detector_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_leak_detector_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_detection': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_detection_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_detection_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_detection_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_detection_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_detection_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_fire_extinguishing': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_fire_extinguishing_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_fire_extinguishing_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_fire_extinguishing_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_fire_extinguishing_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_fire_extinguishing_file': 'layouts/tab15-file-shared.html',
+    'cat_facility_security_evacuation': '9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.html',
+    'cat_facility_security_evacuation_detail': '9.category/9-4.component/9-4-8.facility_security/2.facility_security_detail.html',
+    'cat_facility_security_evacuation_system': '9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.html',
+    'cat_facility_security_evacuation_task': 'layouts/tab11-task-shared.html',
+    'cat_facility_security_evacuation_log': 'layouts/tab14-log-shared.html',
+    'cat_facility_security_evacuation_file': 'layouts/tab15-file-shared.html',
     'cat_company_company': '9.category/9-5.company/9-5-1.company/1.company_list.html',
     'cat_company_center': '9.category/9-5.company/9-5-1.center/1.center_list.html',
     'cat_company_department': '9.category/9-5.company/9-5-2.department/1.department_list.html',
@@ -813,15 +1035,10 @@ def business_group_detail(public_id: str):
     row = _svc_get_work_group_by_public_id(public_id)
     if not row:
         abort(404)
-    _ctx = session.get('cat_detail_ctx_v1')
-    if not isinstance(_ctx, dict):
-        _ctx = {}
-    _ctx['cat_business_group'] = {
+    _set_single_detail_session_ctx('cat_detail_ctx_v1', 'cat_business_group', {
         'id': str(row.get('id') or ''),
         'public_id': str(row.get('public_id') or public_id),
-    }
-    session['cat_detail_ctx_v1'] = _ctx
-    session.modified = True
+    })
     target = url_for('pages.blossom_hub', segment=row.get('public_id') or public_id)
     if tab != 'basic':
         target = f'{target}?tab={tab}'
@@ -847,6 +1064,101 @@ _CATEGORY_KEY_TO_TAB = {
     suffix: tab for tab, suffix in _CATEGORY_TAB_TO_SUFFIX.items() if tab != 'detail'
 }
 _CATEGORY_KEY_TO_TAB['_detail'] = 'basic'
+
+_RACK_PUBLIC_ID_PREFIX = 'rack'
+_RACK_SECURE_TAB_TO_KEY = {
+    'basic': 'dc_rack_detail_basic',
+    'task': 'dc_rack_detail_task',
+    'log': 'dc_rack_detail_log',
+    'file': 'dc_rack_detail_file',
+}
+_RACK_KEY_TO_SECURE_TAB = {value: key for key, value in _RACK_SECURE_TAB_TO_KEY.items()}
+_RACK_DETAIL_KEYS = set(_RACK_KEY_TO_SECURE_TAB)
+
+
+def _rack_public_id_from_row(row: dict | None) -> str:
+    if not row:
+        return ''
+    public_id = str(row.get('public_id') or '').strip()
+    if public_id:
+        return public_id
+    return make_public_id(_ORG_RACK_TABLE, _RACK_PUBLIC_ID_PREFIX, row.get('id'))
+
+
+def _rack_detail_url(public_id: str, tab: str = 'basic') -> str:
+    target = url_for('pages.blossom_hub', segment=public_id)
+    clean_tab = (tab or 'basic').strip().lower() or 'basic'
+    if clean_tab != 'basic':
+        target = f'{target}?tab={clean_tab}'
+    return target
+
+
+def _store_rack_detail_ctx(row: dict, public_id: str) -> None:
+    session['_rack_id'] = str(row.get('id') or '')
+    session['_rack_code'] = str(row.get('rack_code') or '').strip()
+    session['_rack_public_id'] = public_id
+    session.modified = True
+
+
+def _rack_row_from_legacy_args() -> dict | None:
+    rack_code = (request.args.get('rack_code') or request.args.get('rack') or '').strip()
+    if rack_code:
+        return _svc_get_org_rack_by_identifier(rack_code)
+    rack_id = (request.args.get('rack_id') or request.args.get('id') or '').strip()
+    if rack_id:
+        try:
+            return _svc_get_org_rack(int(rack_id))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _has_rack_legacy_args() -> bool:
+    return any((request.args.get(name) or '').strip() for name in ('rack_code', 'rack', 'rack_id', 'id'))
+
+
+def _rack_legacy_redirect(key: str):
+    row = _rack_row_from_legacy_args()
+    if not row:
+        abort(404)
+    public_id = _rack_public_id_from_row(row)
+    if not public_id:
+        abort(404)
+    _store_rack_detail_ctx(row, public_id)
+    return redirect(_rack_detail_url(public_id, _RACK_KEY_TO_SECURE_TAB.get(key, 'basic')), code=302)
+
+
+def _rack_opaque_tab_target(public_id: str, row: dict, url_token: str | None = None):
+    tab = (request.args.get('tab') or 'basic').strip().lower()
+    key = _RACK_SECURE_TAB_TO_KEY.get(tab)
+    if not key or key not in TEMPLATE_MAP:
+        abort(404)
+    if tab == 'basic' and request.query_string:
+        return redirect(request.path, code=302)
+    forbidden_query = set(request.args) - {'tab'}
+    if forbidden_query:
+        return redirect(request.path + (f'?tab={tab}' if tab != 'basic' else ''), code=302)
+    _store_rack_detail_ctx(row, public_id)
+    return show(key, url_token)
+
+
+def _apply_rack_detail_tab_defaults(tabs: list[dict]) -> list[dict]:
+    order = ('_basic', '_task', '_log', '_file')
+    labels = {
+        '_basic': '기본정보',
+        '_task': '작업이력',
+        '_log': '변경이력',
+        '_file': '구성/파일',
+    }
+    filtered = [tab for tab in tabs if any(str(tab.get('key', '')).endswith(suffix) for suffix in order)]
+    for tab in filtered:
+        tab_key = str(tab.get('key', ''))
+        for suffix, label in labels.items():
+            if tab_key.endswith(suffix):
+                tab['label'] = label
+                break
+    filtered.sort(key=lambda tab: next((idx for idx, suffix in enumerate(order) if str(tab.get('key', '')).endswith(suffix)), 99))
+    return filtered
 
 
 def _secure_category_route_map():
@@ -889,6 +1201,20 @@ def _secure_category_route_map():
         ('components', 'nic'): {'base': 'cat_component_nic', 'table': 'cmp_nic_type', 'prefix': 'nic', 'get': _svc_get_cmp_nic, 'code': 'nic_code', 'title': 'model_name'},
         ('components', 'hba'): {'base': 'cat_component_hba', 'table': 'cmp_hba_type', 'prefix': 'hba', 'get': _svc_get_cmp_hba, 'code': 'hba_code', 'title': 'model_name'},
         ('components', 'etc'): {'base': 'cat_component_etc', 'table': 'cmp_etc_type', 'prefix': 'cmp', 'get': _svc_get_cmp_etc, 'code': 'etc_code', 'title': 'model_name'},
+        ('facility-security', 'access'): {'base': 'cat_facility_security_access', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsacc', 'get': _svc_get_facility_security_access, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'data-delete'): {'base': 'cat_facility_security_data_delete', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsdel', 'get': _svc_get_facility_security_data_delete, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'rack'): {'base': 'cat_facility_security_rack', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsrack', 'get': _svc_get_facility_security_rack, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'thermometer'): {'base': 'cat_facility_security_thermometer', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsth', 'get': _svc_get_facility_security_thermometer, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'cctv'): {'base': 'cat_facility_security_cctv', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fscctv', 'get': _svc_get_facility_security_cctv, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'transformer'): {'base': 'cat_facility_security_transformer', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fstrans', 'get': _svc_get_facility_security_transformer, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'generator'): {'base': 'cat_facility_security_generator', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsgen', 'get': _svc_get_facility_security_generator, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'ups'): {'base': 'cat_facility_security_ups', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsups', 'get': _svc_get_facility_security_ups, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'battery'): {'base': 'cat_facility_security_battery', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsbat', 'get': _svc_get_facility_security_battery, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'hvac'): {'base': 'cat_facility_security_hvac', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fshvac', 'get': _svc_get_facility_security_hvac, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'leak-detector'): {'base': 'cat_facility_security_leak_detector', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsleak', 'get': _svc_get_facility_security_leak_detector, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'detection'): {'base': 'cat_facility_security_detection', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsdet', 'get': _svc_get_facility_security_detection, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'fire-extinguishing'): {'base': 'cat_facility_security_fire_extinguishing', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsfire', 'get': _svc_get_facility_security_fire_extinguishing, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
+        ('facility-security', 'evacuation'): {'base': 'cat_facility_security_evacuation', 'table': _FACILITY_SECURITY_TABLE, 'prefix': 'fsevac', 'get': _svc_get_facility_security_evacuation, 'code': 'infra_code', 'type': 'resource_label', 'count': 'infra_count', 'title': 'model_name'},
         ('vendors', 'manufacturers'): {'base': 'cat_vendor_manufacturer', 'table': 'biz_vendor_manufacturer', 'prefix': 'ven', 'get': svc_get_manufacturer_vendor, 'vendor': True, 'title': 'manufacturer_name'},
         ('vendors', 'maintenance'): {'base': 'cat_vendor_maintenance', 'table': 'biz_vendor_maintenance', 'prefix': 'mnt', 'get': svc_get_maintenance_vendor, 'vendor': True, 'title': 'maintenance_name'},
         ('customers', 'clients'): {'base': 'cat_customer_client1', 'table': 'biz_customer_associate', 'prefix': 'cust', 'get': _svc_get_customer_associate, 'title': 'customer_name'},
@@ -899,7 +1225,7 @@ _SECURE_CATEGORY_ROUTES = _secure_category_route_map()
 _SECURE_CATEGORY_BY_BASE = {value['base']: ((section, resource), value) for (section, resource), value in _SECURE_CATEGORY_ROUTES.items()}
 _SECURE_CATEGORY_BY_PREFIX = {value['prefix']: ((section, resource), value) for (section, resource), value in _SECURE_CATEGORY_ROUTES.items()}
 # Signed opaque public_id branch prefixes (exclude cat_* UI keys — those are never opaque IDs here).
-_OPAQUE_PUBLIC_ID_PREFIXES = frozenset(_SECURE_CATEGORY_BY_PREFIX.keys()) | {'bg'}
+_OPAQUE_PUBLIC_ID_PREFIXES = frozenset(_SECURE_CATEGORY_BY_PREFIX.keys()) | {'bg', _RACK_PUBLIC_ID_PREFIX}
 
 
 def _category_tab_key(base_key: str) -> str:
@@ -920,20 +1246,12 @@ def _vendor_name_from_row(row: dict) -> str:
 def _store_category_resource_ctx(route_info: dict, record_id: int, row: dict, public_id: str) -> None:
     base = route_info['base']
     if route_info.get('vendor'):
-        ctx = session.get('vendor_detail_ctx_v1')
-        if not isinstance(ctx, dict):
-            ctx = {}
-        ctx[base] = record_id
-        session['vendor_detail_ctx_v1'] = ctx
-        session.modified = True
+        _set_single_detail_session_ctx('vendor_detail_ctx_v1', base, record_id)
         return
 
     title_key = route_info.get('title') or 'model_name'
     title_value = str(row.get(title_key) or row.get('model_name') or row.get('customer_name') or '').strip()
     subtitle_value = str(row.get('address') or _vendor_name_from_row(row) or row.get('business_no') or '').strip()
-    ctx = session.get('cat_detail_ctx_v1')
-    if not isinstance(ctx, dict):
-        ctx = {}
     detail_ctx = {
         'id': str(record_id),
         'public_id': public_id,
@@ -946,13 +1264,17 @@ def _store_category_resource_ctx(route_info: dict, record_id: int, row: dict, pu
         ('release_date', 'release_date'),
         ('eosl_date', 'eosl'),
         (route_info.get('count'), 'qty'),
+        ('resource_type', 'resource_type'),
+        ('resource_label', 'resource_label'),
+        ('source_resource_id', 'source_resource_id'),
+        ('source_resource_code', 'source_resource_code'),
+        ('source_resource_name', 'source_resource_name'),
+        ('source_fk', 'source_fk'),
         ('remark', 'note'),
     ):
         if source_key and row.get(source_key) not in (None, ''):
             detail_ctx[target_key] = str(row.get(source_key))
-    ctx[base] = detail_ctx
-    session['cat_detail_ctx_v1'] = ctx
-    session.modified = True
+    _set_single_detail_session_ctx('cat_detail_ctx_v1', base, detail_ctx)
 
 
 def _page_url_for_key(key: str, token: str | None = None, **qs) -> str:
@@ -967,6 +1289,16 @@ def _is_category_nav_path(path: str) -> bool:
     """Legacy ?id= flows are honored on /b/… (after /p → /b redirect)."""
     p = path or ''
     return p.startswith('/b/')
+
+
+def _is_category_key_path(path: str, key: str) -> bool:
+    """True only for canonical route-key URLs such as /b/cat_sw_os_detail."""
+    p = path or ''
+    k = (key or '').strip()
+    if not p.startswith('/b/') or not k:
+        return False
+    segment = p[len('/b/'):].strip('/').split('/', 1)[0]
+    return segment == k
 
 
 def _secure_detail_url(base_key: str, public_id: str, tab_key: str | None = None) -> str:
@@ -1007,16 +1339,20 @@ def _opaque_branch_response(value: str, url_token: str | None = None):
         row = _svc_get_work_group_by_public_id(value)
         if not row:
             abort(404)
-        ctx = session.get('cat_detail_ctx_v1')
-        if not isinstance(ctx, dict):
-            ctx = {}
-        ctx['cat_business_group'] = {
+        _set_single_detail_session_ctx('cat_detail_ctx_v1', 'cat_business_group', {
             'id': str(row.get('id') or ''),
             'public_id': str(row.get('public_id') or value),
-        }
-        session['cat_detail_ctx_v1'] = ctx
-        session.modified = True
+        })
         return _opaque_tab_target('cat_business_group', url_token)
+
+    if prefix == _RACK_PUBLIC_ID_PREFIX:
+        record_id = resolve_public_id(_ORG_RACK_TABLE, _RACK_PUBLIC_ID_PREFIX, value)
+        if not record_id:
+            abort(404)
+        row = _svc_get_org_rack(record_id)
+        if not row:
+            abort(404)
+        return _rack_opaque_tab_target(value, row, url_token)
 
     entry = _SECURE_CATEGORY_BY_PREFIX.get(prefix)
     if not entry:
@@ -1080,6 +1416,7 @@ def legacy_b_page_redirect(key: str, token: str | None = None):
 @pages_bp.route('/hardware/<resource>/<public_id>')
 @pages_bp.route('/software/<resource>/<public_id>')
 @pages_bp.route('/components/<resource>/<public_id>')
+@pages_bp.route('/facility-security/<resource>/<public_id>')
 @pages_bp.route('/vendors/<resource>/<public_id>')
 def category_resource_detail(resource: str, public_id: str):
     section = (request.path.split('/', 2)[1] or '').strip()
@@ -1113,6 +1450,8 @@ def customer_detail(public_id: str):
 def legacy_p_route(key: str, token: str | None = None):
     """Permanent redirect: /p/* → /b/* (same policy as blossom_hub)."""
     k = (key or '').strip()
+    if k in _RACK_DETAIL_KEYS and _has_rack_legacy_args():
+        return _rack_legacy_redirect(k)
     target = (
         url_for('pages.blossom_hub_token', segment=k, token=token)
         if token
@@ -1134,7 +1473,7 @@ def show(key: str, token: str | None = None):
             _target = f"{_target}?{_qs}"
         return redirect(_target, code=302)
     _rp = request.path or ''
-    if key in _WG_DETAIL_KEYS and _is_category_nav_path(_rp):
+    if key in _WG_DETAIL_KEYS and _is_category_key_path(_rp, key):
         legacy_id = (request.args.get('group_id') or request.args.get('id') or '').strip()
         if not legacy_id:
             abort(404)
@@ -1149,7 +1488,7 @@ def show(key: str, token: str | None = None):
         if tab != 'basic':
             target = f"{target}?tab={tab}"
         return redirect(target, code=302)
-    if _is_category_nav_path(_rp):
+    if _is_category_key_path(_rp, key):
         _legacy_base = None
         _legacy_route_info = None
         for _base_key, (_route_key, _info) in _SECURE_CATEGORY_BY_BASE.items():
@@ -1190,6 +1529,12 @@ def show(key: str, token: str | None = None):
                 return redirect(_target, code=302)
             if any((request.args.get(_name) or '').strip() for _name in _legacy_forbidden):
                 abort(404)
+    if key in _RACK_DETAIL_KEYS and _is_category_key_path(_rp, key):
+        if _has_rack_legacy_args():
+            return _rack_legacy_redirect(key)
+        _rack_session_public_id = str(session.get('_rack_public_id') or '').strip()
+        if _rack_session_public_id:
+            return redirect(_rack_detail_url(_rack_session_public_id, _RACK_KEY_TO_SECURE_TAB.get(key, 'basic')), code=302)
     # ── SPA 모드: 직접 브라우저 방문 → SPA 셸 반환 ──
     # blossom.js SPA fetch 요청(X-Requested-With 헤더)이 아닌 경우
     # 최소 셸(header+sidebar+skeleton)을 반환하고, JS가 콘텐츠를 비동기 로드한다.
@@ -1240,6 +1585,7 @@ def show(key: str, token: str | None = None):
         'cat_hw_',
         'cat_sw_',
         'cat_component_',
+        'cat_facility_security_',
         'cat_company_',
         'cat_customer_',
         'cat_vendor_',
@@ -1318,8 +1664,107 @@ def show(key: str, token: str | None = None):
                             {'key': 'line_qty', 'label': '수량'},
                         ],
                     },
+                    'DC_TRANSFORMER': {
+                        'title': '변압기 관리',
+                        'info_key': 'datacenter.transformer',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_GENERATOR': {
+                        'title': '발전기 관리',
+                        'info_key': 'datacenter.generator',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_UPS': {
+                        'title': '무정전전원장치 관리',
+                        'info_key': 'datacenter.ups',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_BATTERY': {
+                        'title': '배터리 관리',
+                        'info_key': 'datacenter.battery',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_HVAC': {
+                        'title': '항온항습기 관리',
+                        'info_key': 'datacenter.hvac',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_LEAK_DETECTOR': {
+                        'title': '누수감지 관리',
+                        'info_key': 'datacenter.leak_detector',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_DETECTION': {
+                        'title': '감지설비 관리',
+                        'info_key': 'datacenter.detection',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_FIRE_EXTINGUISHING': {
+                        'title': '소화설비 관리',
+                        'info_key': 'datacenter.fire_extinguishing',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
+                    'DC_EVACUATION': {
+                        'title': '대피설비 관리',
+                        'info_key': 'datacenter.evacuation',
+                        'css': 'center.css',
+                        'columns': [
+                            {'key': 'business_status', 'label': '업무 상태'},
+                            {'key': 'business_name', 'label': '업무 이름'},
+                            {'key': 'manufacturer_name', 'label': '시스템 제조사'},
+                            {'key': 'model_name', 'label': '시스템 모델명'},
+                        ],
+                    },
                     'DC_CCTV': {
-                        'title': 'CCTV 관리',
+                        'title': '영상감시 관리',
                         'info_key': 'datacenter.cctv',
                         'css': 'center.css',
                         'columns': [
@@ -1392,6 +1837,38 @@ def show(key: str, token: str | None = None):
                             overlay_store_key=_extra_rk.get('overlay_store_key', ''),
                             surface_api_base=_extra_rk.get('surface_api_base', ''),
                             center_code=_extra_rk.get('center_code', ''),
+                        )
+                _facility_meta = _dc_facility_meta_for_key(key, tab_row.page_code)
+                if _facility_meta and str(tab_row.tab_code or '').strip().upper().startswith('LAB'):
+                    import json as _json_dyn_dc_facility
+                    try:
+                        _extra_dc_facility = _json_dyn_dc_facility.loads(tab_row.extra_options or '{}') or {}
+                    except Exception:
+                        _extra_dc_facility = {}
+                    return render_template(
+                        _dc_facility_standard_template(_facility_meta),
+                        current_key=key,
+                        menu_code=_resolve_menu_code(key),
+                        **_dc_facility_standard_lab_context(key, tab_row, _extra_dc_facility),
+                    )
+                if tab_row.page_code in ('DC_UPS', 'DC_HVAC') and tab_row.extra_options:
+                    import json as _json_dyn_fac
+                    try:
+                        _extra_fac = _json_dyn_fac.loads(tab_row.extra_options) or {}
+                    except Exception:
+                        _extra_fac = {}
+                    if _extra_fac.get('template_type') == 'system_lab':
+                        _template = '6.datacenter/6-7.ups/6-7-1.system_lab/1.system_lab.html'
+                        if tab_row.page_code == 'DC_HVAC':
+                            _template = '6.datacenter/6-8.hvac/6-8-1.system_lab/1.system_lab.html'
+                        return render_template(
+                            _template,
+                            current_key=key,
+                            menu_code=_resolve_menu_code(key),
+                            page_code=tab_row.page_code,
+                            page_title=_dm.get('title', tab_row.tab_name),
+                            page_label=_dm.get('title', tab_row.tab_name).replace(' 관리', ''),
+                            center_name=_extra_fac.get('center_name', tab_row.tab_name),
                         )
                 return render_template(
                     'common/dynamic_tab_placeholder.html',
@@ -1514,6 +1991,16 @@ def show(key: str, token: str | None = None):
             tabs = [t for t in tabs if t['key'].endswith(('_detail', '_system', '_log', '_file'))]
             back_label = '목록으로 돌아가기'
 
+        # 카테고리>시설·보안 인프라 상세: 기본정보, 시설·보안, 변경/파일 탭
+        if str(base_key).startswith('cat_facility_security_'):
+            _fsi_order = ('_detail', '_system', '_log', '_file')
+            for tab in tabs:
+                if tab['key'].endswith('_system'):
+                    tab['label'] = '시설·보안'
+            tabs = [t for t in tabs if t['key'].endswith(_fsi_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_fsi_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+
         # 카테고리>하드웨어 / 하드웨어 상세: 목록 돌아가기 텍스트
         if str(base_key).startswith(('cat_hw_', 'hw_')):
             back_label = '목록으로 돌아가기'
@@ -1555,6 +2042,11 @@ def show(key: str, token: str | None = None):
 
         # 거버넌스 VPN 정책: 목록 돌아가기 텍스트
         if str(base_key).startswith('gov_vpn_policy'):
+            back_label = '목록으로 돌아가기'
+
+        if base_key == 'dc_rack_detail':
+            tabs = _apply_rack_detail_tab_defaults(tabs)
+            back_key = 'dc_rack_list'
             back_label = '목록으로 돌아가기'
 
         template = 'layouts/tab14-log-shared.html'
@@ -2017,6 +2509,15 @@ def show(key: str, token: str | None = None):
             tabs = [t for t in tabs if t['key'].endswith(('_detail', '_system', '_log', '_file'))]
             back_label = '목록으로 돌아가기'
 
+        if str(base_key).startswith('cat_facility_security_'):
+            _fsi_order = ('_detail', '_system', '_log', '_file')
+            for tab in tabs:
+                if tab['key'].endswith('_system'):
+                    tab['label'] = '시설·보안'
+            tabs = [t for t in tabs if t['key'].endswith(_fsi_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_fsi_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+
         if str(base_key).startswith(('cat_hw_', 'hw_')):
             back_label = '목록으로 돌아가기'
 
@@ -2047,6 +2548,8 @@ def show(key: str, token: str | None = None):
             back_label = '목록으로 돌아가기'
 
         if base_key == 'dc_rack_detail':
+            tabs = _apply_rack_detail_tab_defaults(tabs)
+            back_key = 'dc_rack_list'
             back_label = '목록으로 돌아가기'
 
         try:
@@ -2372,6 +2875,15 @@ def show(key: str, token: str | None = None):
             tabs = [t for t in tabs if t['key'].endswith(('_detail', '_system', '_log', '_file'))]
             back_label = '목록으로 돌아가기'
 
+        if str(base_key).startswith('cat_facility_security_'):
+            _fsi_order = ('_detail', '_system', '_log', '_file')
+            for tab in tabs:
+                if tab['key'].endswith('_system'):
+                    tab['label'] = '시설·보안'
+            tabs = [t for t in tabs if t['key'].endswith(_fsi_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_fsi_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+
         # 카테고리>하드웨어 / 하드웨어 상세
         if str(base_key).startswith(('cat_hw_', 'hw_')):
             back_label = '목록으로 돌아가기'
@@ -2431,6 +2943,8 @@ def show(key: str, token: str | None = None):
 
         # 데이터센터 랙
         if base_key == 'dc_rack_detail':
+            tabs = _apply_rack_detail_tab_defaults(tabs)
+            back_key = 'dc_rack_list'
             back_label = '목록으로 돌아가기'
 
         template = 'layouts/tab15-file-shared.html'
@@ -3235,7 +3749,7 @@ def show(key: str, token: str | None = None):
         ]
 
         if str(base_key).startswith('cat_component_'):
-            _comp_tab_order = ('_detail', '_system', '_task', '_log', '_file')
+            _comp_tab_order = ('_detail', '_system', '_log', '_file')
             tabs = [t for t in tabs if t['key'].endswith(_comp_tab_order)]
             tabs.sort(key=lambda t: next((i for i, s in enumerate(_comp_tab_order) if t['key'].endswith(s)), 99))
             for t in tabs:
@@ -3729,6 +4243,76 @@ def show(key: str, token: str | None = None):
         'cat_component_etc_task': ('모델명', '제조사'),
         'cat_component_etc_log': ('모델명', '제조사'),
         'cat_component_etc_file': ('모델명', '제조사'),
+        'cat_facility_security_access_detail': ('모델명', '원본 시스템'),
+        'cat_facility_security_access_system': ('모델명', '원본 시스템'),
+        'cat_facility_security_access_task': ('모델명', '원본 시스템'),
+        'cat_facility_security_access_log': ('모델명', '원본 시스템'),
+        'cat_facility_security_access_file': ('모델명', '원본 시스템'),
+        'cat_facility_security_data_delete_detail': ('모델명', '원본 시스템'),
+        'cat_facility_security_data_delete_system': ('모델명', '원본 시스템'),
+        'cat_facility_security_data_delete_task': ('모델명', '원본 시스템'),
+        'cat_facility_security_data_delete_log': ('모델명', '원본 시스템'),
+        'cat_facility_security_data_delete_file': ('모델명', '원본 시스템'),
+        'cat_facility_security_rack_detail': ('모델명', '원본 시스템'),
+        'cat_facility_security_rack_system': ('모델명', '원본 시스템'),
+        'cat_facility_security_rack_task': ('모델명', '원본 시스템'),
+        'cat_facility_security_rack_log': ('모델명', '원본 시스템'),
+        'cat_facility_security_rack_file': ('모델명', '원본 시스템'),
+        'cat_facility_security_thermometer_detail': ('모델명', '원본 시스템'),
+        'cat_facility_security_thermometer_system': ('모델명', '원본 시스템'),
+        'cat_facility_security_thermometer_task': ('모델명', '원본 시스템'),
+        'cat_facility_security_thermometer_log': ('모델명', '원본 시스템'),
+        'cat_facility_security_thermometer_file': ('모델명', '원본 시스템'),
+        'cat_facility_security_cctv_detail': ('모델명', '원본 시스템'),
+        'cat_facility_security_cctv_system': ('모델명', '원본 시스템'),
+        'cat_facility_security_cctv_task': ('모델명', '원본 시스템'),
+        'cat_facility_security_cctv_log': ('모델명', '원본 시스템'),
+        'cat_facility_security_cctv_file': ('모델명', '원본 시스템'),
+        'cat_facility_security_transformer_detail': ('모델명', '제조사'),
+        'cat_facility_security_transformer_system': ('모델명', '제조사'),
+        'cat_facility_security_transformer_task': ('모델명', '제조사'),
+        'cat_facility_security_transformer_log': ('모델명', '제조사'),
+        'cat_facility_security_transformer_file': ('모델명', '제조사'),
+        'cat_facility_security_generator_detail': ('모델명', '제조사'),
+        'cat_facility_security_generator_system': ('모델명', '제조사'),
+        'cat_facility_security_generator_task': ('모델명', '제조사'),
+        'cat_facility_security_generator_log': ('모델명', '제조사'),
+        'cat_facility_security_generator_file': ('모델명', '제조사'),
+        'cat_facility_security_ups_detail': ('모델명', '제조사'),
+        'cat_facility_security_ups_system': ('모델명', '제조사'),
+        'cat_facility_security_ups_task': ('모델명', '제조사'),
+        'cat_facility_security_ups_log': ('모델명', '제조사'),
+        'cat_facility_security_ups_file': ('모델명', '제조사'),
+        'cat_facility_security_battery_detail': ('모델명', '제조사'),
+        'cat_facility_security_battery_system': ('모델명', '제조사'),
+        'cat_facility_security_battery_task': ('모델명', '제조사'),
+        'cat_facility_security_battery_log': ('모델명', '제조사'),
+        'cat_facility_security_battery_file': ('모델명', '제조사'),
+        'cat_facility_security_hvac_detail': ('모델명', '제조사'),
+        'cat_facility_security_hvac_system': ('모델명', '제조사'),
+        'cat_facility_security_hvac_task': ('모델명', '제조사'),
+        'cat_facility_security_hvac_log': ('모델명', '제조사'),
+        'cat_facility_security_hvac_file': ('모델명', '제조사'),
+        'cat_facility_security_leak_detector_detail': ('모델명', '제조사'),
+        'cat_facility_security_leak_detector_system': ('모델명', '제조사'),
+        'cat_facility_security_leak_detector_task': ('모델명', '제조사'),
+        'cat_facility_security_leak_detector_log': ('모델명', '제조사'),
+        'cat_facility_security_leak_detector_file': ('모델명', '제조사'),
+        'cat_facility_security_detection_detail': ('모델명', '제조사'),
+        'cat_facility_security_detection_system': ('모델명', '제조사'),
+        'cat_facility_security_detection_task': ('모델명', '제조사'),
+        'cat_facility_security_detection_log': ('모델명', '제조사'),
+        'cat_facility_security_detection_file': ('모델명', '제조사'),
+        'cat_facility_security_fire_extinguishing_detail': ('모델명', '제조사'),
+        'cat_facility_security_fire_extinguishing_system': ('모델명', '제조사'),
+        'cat_facility_security_fire_extinguishing_task': ('모델명', '제조사'),
+        'cat_facility_security_fire_extinguishing_log': ('모델명', '제조사'),
+        'cat_facility_security_fire_extinguishing_file': ('모델명', '제조사'),
+        'cat_facility_security_evacuation_detail': ('모델명', '제조사'),
+        'cat_facility_security_evacuation_system': ('모델명', '제조사'),
+        'cat_facility_security_evacuation_task': ('모델명', '제조사'),
+        'cat_facility_security_evacuation_log': ('모델명', '제조사'),
+        'cat_facility_security_evacuation_file': ('모델명', '제조사'),
         # Category Vendor Manufacturer meta (detail + tabs) - static placeholders
         'cat_vendor_manufacturer_detail': ('제조사', 'Vendor Manufacturer'),
         'cat_vendor_manufacturer_manager': ('제조사', 'Vendor Manufacturer'),
@@ -3820,16 +4404,11 @@ def show(key: str, token: str | None = None):
                         _hw_sys  = _hw_sys  or (_ha.get('system_name') or '')
                 except Exception:
                     pass
-            _hw_ctx = session.get('hw_detail_ctx')
-            if not isinstance(_hw_ctx, dict):
-                _hw_ctx = {}
-            _hw_ctx[_hwb] = {
+            _set_single_detail_session_ctx('hw_detail_ctx', _hwb, {
                 'title': _hw_work,
                 'subtitle': _hw_sys,
                 'id': _hw_aid,
-            }
-            session['hw_detail_ctx'] = _hw_ctx
-            session.modified = True
+            })
             return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # ── No query params — read title/subtitle from session ──
@@ -3860,6 +4439,7 @@ def show(key: str, token: str | None = None):
     virtualization_detail = None
     security_detail = None
     ha_detail = None
+    facility_security_detail = None
 
     COST_DETAIL_KEYS = {
         'cost_opex_hardware_detail',
@@ -3909,12 +4489,7 @@ def show(key: str, token: str | None = None):
         base_key = _cost_base_key(key)
 
         def _set_cost_ctx(manage_no: str) -> None:
-            ctx = session.get('cost_detail_ctx_v1')
-            if not isinstance(ctx, dict):
-                ctx = {}
-            ctx[base_key] = manage_no
-            session['cost_detail_ctx_v1'] = ctx
-            session.modified = True
+            _set_single_detail_session_ctx('cost_detail_ctx_v1', base_key, manage_no)
 
         # 1) Legacy token path: decode token, store in session, redirect to clean URL.
         if token:
@@ -4153,16 +4728,11 @@ def show(key: str, token: str | None = None):
 
         if _gov_id:
             # Store in session and redirect to clean URL
-            _ctx = session.get('gov_detail_ctx_v1')
-            if not isinstance(_ctx, dict):
-                _ctx = {}
-            _ctx[_gb] = {
+            _set_single_detail_session_ctx('gov_detail_ctx_v1', _gb, {
                 'id': _gov_id,
                 'title': _gov_title,
                 'subtitle': _gov_subtitle,
-            }
-            session['gov_detail_ctx_v1'] = _ctx
-            session.modified = True
+            })
             return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # No query params — read from session
@@ -4361,6 +4931,25 @@ def show(key: str, token: str | None = None):
         'cat_business_group': 'group_id',
     }
 
+    def _cat_public_id_from_session(base_key: str, cat_sess: dict) -> str:
+        entry = _SECURE_CATEGORY_BY_BASE.get(base_key)
+        if not entry or not isinstance(cat_sess, dict):
+            return ''
+        public_id = str(cat_sess.get('public_id') or '').strip()
+        if public_id:
+            return public_id
+        record_id = str(cat_sess.get('id') or '').strip()
+        if not record_id:
+            return ''
+        try:
+            numeric_id = int(record_id)
+        except (TypeError, ValueError):
+            return ''
+        if numeric_id <= 0:
+            return ''
+        _route_key, route_info = entry
+        return make_public_id(route_info['table'], route_info['prefix'], numeric_id)
+
     # Vendor detail keys — defined early so the category block can exclude them
     VENDOR_DETAIL_KEYS = {
         'cat_vendor_manufacturer_detail',
@@ -4403,17 +4992,12 @@ def show(key: str, token: str | None = None):
 
         if _qp_id or _qp_model:
             # Store in session and redirect to clean URL
-            _ctx = session.get('cat_detail_ctx_v1')
-            if not isinstance(_ctx, dict):
-                _ctx = {}
-            _ctx[_cb] = {
+            _set_single_detail_session_ctx('cat_detail_ctx_v1', _cb, {
                 'id': _qp_id,
                 'title': _qp_model,
                 'subtitle': _qp_vendor,
                 **_qp_extra,
-            }
-            session['cat_detail_ctx_v1'] = _ctx
-            session.modified = True
+            })
             return redirect(url_for('pages.blossom_hub', segment=key), code=302)
 
         # No query params — read from session
@@ -4424,6 +5008,10 @@ def show(key: str, token: str | None = None):
                 _cat_sess = _raw
         except Exception:
             pass
+
+        _cat_public_id = _cat_public_id_from_session(_cb, _cat_sess)
+        if _cat_public_id and _is_category_key_path(_rp, key):
+            return redirect(_secure_detail_url(_cb, _cat_public_id, key), code=302)
 
         if not _cat_sess.get('id') and not _cat_sess.get('title'):
             # No context — redirect to list
@@ -4441,14 +5029,23 @@ def show(key: str, token: str | None = None):
         'cat_component_disk', 'cat_component_nic', 'cat_component_hba',
         'cat_component_etc',
     }
+    _FACILITY_SECURITY_DETAIL_KEYS = {
+        'cat_facility_security_access', 'cat_facility_security_data_delete',
+        'cat_facility_security_rack', 'cat_facility_security_thermometer',
+        'cat_facility_security_cctv', 'cat_facility_security_transformer',
+        'cat_facility_security_generator', 'cat_facility_security_ups',
+        'cat_facility_security_battery', 'cat_facility_security_hvac',
+        'cat_facility_security_leak_detector', 'cat_facility_security_detection',
+        'cat_facility_security_fire_extinguishing', 'cat_facility_security_evacuation',
+    }
     _hw_id_for_ctx = ''
     _server_code_for_ctx = ''
     _hw_extra_for_ctx = {}          # hw_type, release_date, eosl, qty, note
     if _is_cat_tab_key(key):
         _simple_base = _cat_base_key(key)
-        if _simple_base in _HW_DETAIL_KEYS or _simple_base in _COMPONENT_DETAIL_KEYS:
+        if _simple_base in _HW_DETAIL_KEYS or _simple_base in _COMPONENT_DETAIL_KEYS or _simple_base in _FACILITY_SECURITY_DETAIL_KEYS:
             title = _cat_sess.get('title', '') or '모델명'
-            subtitle = _cat_sess.get('subtitle', '') or '제조사'
+            subtitle = _cat_sess.get('subtitle', '') or ('원본 시스템' if _simple_base in _FACILITY_SECURITY_DETAIL_KEYS else '제조사')
             # Expose the hardware row id and server_code so tab43-hardware can query by it
             _hw_id_for_ctx = _cat_sess.get('id', '')
             _server_code_for_ctx = _cat_sess.get('server_code', '')
@@ -4506,6 +5103,48 @@ def show(key: str, token: str | None = None):
                                     session.modified = True
                     except Exception:
                         pass
+
+            if _hw_id_for_ctx and _simple_base in _FACILITY_SECURITY_DETAIL_KEYS:
+                _FSI_DB_LOOKUP = {
+                    'cat_facility_security_access': _svc_get_facility_security_access,
+                    'cat_facility_security_data_delete': _svc_get_facility_security_data_delete,
+                    'cat_facility_security_rack': _svc_get_facility_security_rack,
+                    'cat_facility_security_thermometer': _svc_get_facility_security_thermometer,
+                    'cat_facility_security_cctv': _svc_get_facility_security_cctv,
+                    'cat_facility_security_transformer': _svc_get_facility_security_transformer,
+                    'cat_facility_security_generator': _svc_get_facility_security_generator,
+                    'cat_facility_security_ups': _svc_get_facility_security_ups,
+                    'cat_facility_security_battery': _svc_get_facility_security_battery,
+                    'cat_facility_security_hvac': _svc_get_facility_security_hvac,
+                    'cat_facility_security_leak_detector': _svc_get_facility_security_leak_detector,
+                    'cat_facility_security_detection': _svc_get_facility_security_detection,
+                    'cat_facility_security_fire_extinguishing': _svc_get_facility_security_fire_extinguishing,
+                    'cat_facility_security_evacuation': _svc_get_facility_security_evacuation,
+                }
+                try:
+                    _fsi_row = _FSI_DB_LOOKUP[_simple_base](int(_hw_id_for_ctx))
+                    if _fsi_row:
+                        facility_security_detail = _fsi_row
+                        title = str(_fsi_row.get('model_name') or '').strip() or '모델명'
+                        subtitle = str(_fsi_row.get('source_resource_name') or _fsi_row.get('source_resource_code') or _fsi_row.get('manufacturer_name') or '').strip() or '원본 시스템'
+                        _server_code_for_ctx = str(_fsi_row.get('infra_code') or '').strip()
+                        _hw_extra_for_ctx['hw_type'] = str(_fsi_row.get('resource_label') or '').strip()
+                        _hw_extra_for_ctx['qty'] = str(_fsi_row.get('infra_count') or _fsi_row.get('qty') or '')
+                        _hw_extra_for_ctx['note'] = str(_fsi_row.get('remark') or '').strip()
+                        _ctx_store = session.get('cat_detail_ctx_v1')
+                        if isinstance(_ctx_store, dict):
+                            _existing = _ctx_store.get(_simple_base)
+                            if isinstance(_existing, dict):
+                                _existing['title'] = title
+                                _existing['subtitle'] = subtitle
+                                _existing['server_code'] = _server_code_for_ctx
+                                _existing['source_resource_id'] = str(_fsi_row.get('source_resource_id') or '')
+                                _existing['source_resource_code'] = str(_fsi_row.get('source_resource_code') or '')
+                                _existing['source_resource_name'] = str(_fsi_row.get('source_resource_name') or '')
+                                _existing['source_fk'] = str(_fsi_row.get('source_fk') or '')
+                                session.modified = True
+                except Exception:
+                    pass
 
     # Category > Business > Work Group detail pages
     # Title: group name, Subtitle: group_code
@@ -4911,12 +5550,7 @@ def show(key: str, token: str | None = None):
         _vd_is_manufacturer = _vd_base.endswith('_manufacturer')
 
         def _set_vendor_ctx(vid: int) -> None:
-            ctx = session.get('vendor_detail_ctx_v1')
-            if not isinstance(ctx, dict):
-                ctx = {}
-            ctx[_vd_base] = vid
-            session['vendor_detail_ctx_v1'] = ctx
-            session.modified = True
+            _set_single_detail_session_ctx('vendor_detail_ctx_v1', _vd_base, vid)
 
         # Legacy query params → store in session and redirect to clean URL
         _vd_qp_id = request.args.get('vendor_id') or request.args.get('id') or ''
@@ -4964,12 +5598,19 @@ def show(key: str, token: str | None = None):
         else:
             title = _vd_vendor_name or '유지보수사'
         subtitle = _vd_business_no or '-'
-    rack_code = (request.args.get('rack_code') or '').strip() or None
-    if rack_code and key.startswith('dc_rack_detail_'):
-        session['_rack_code'] = rack_code
-        return redirect(url_for('pages.blossom_hub', segment=key))
-    if not rack_code and key.startswith('dc_rack_detail_'):
-        rack_code = session.get('_rack_code')
+    rack_code = None
+    rack_public_id = None
+    if key in _RACK_DETAIL_KEYS:
+        rack_code = (session.get('_rack_code') or '').strip() or None
+        rack_public_id = (session.get('_rack_public_id') or '').strip() or None
+        if rack_code and not rack_public_id:
+            try:
+                _rack_ctx_row = _svc_get_org_rack_by_identifier(rack_code)
+                rack_public_id = _rack_public_id_from_row(_rack_ctx_row)
+                if rack_public_id and _rack_ctx_row:
+                    _store_rack_detail_ctx(_rack_ctx_row, rack_public_id)
+            except Exception:
+                rack_public_id = None
 
     # Expose the category-session ID for any cat_ detail/tab page.
     _cat_detail_id = _cat_sess.get('id', '') if _cat_sess else ''
@@ -4984,9 +5625,11 @@ def show(key: str, token: str | None = None):
         'virtualization_detail': virtualization_detail,
         'security_detail': security_detail,
         'ha_detail': ha_detail,
+        'facility_security_detail': facility_security_detail,
         'hw_id': _hw_id_for_ctx,
         'server_code': _server_code_for_ctx,
         'cat_detail_id': _cat_detail_id,
+        'cat_detail_public_id': _cat_sess.get('public_id', '') if _cat_sess else '',
         'work_group_public_id': _wg_public_id,
         'work_group_secure_tab': _WG_KEY_TO_SECURE_TAB.get(key, ''),
         'gov_detail_id': _gov_detail_id,
@@ -5045,8 +5688,7 @@ def show(key: str, token: str | None = None):
     # 데이터센터 RACK: 중앙 변경이력 entity 컨텍스트 전달
     if key == 'dc_rack_detail_log' and rack_code:
         try:
-            from app.services.org_rack_service import fetch_by_rack_code as _svc_rack_by_code
-            _rack_rec = _svc_rack_by_code(rack_code)
+            _rack_rec = _svc_get_org_rack_by_code(rack_code)
             if _rack_rec and _rack_rec.get('id'):
                 context['tab14_entity_type'] = 'org_rack'
                 context['tab14_entity_id'] = str(_rack_rec['id'])
@@ -5087,6 +5729,26 @@ def show(key: str, token: str | None = None):
     }
     if key in _CAT_COMPONENT_LOG_ENTITY_MAP and _cat_detail_id:
         context['tab14_entity_type'] = _CAT_COMPONENT_LOG_ENTITY_MAP[key]
+        context['tab14_entity_id'] = str(_cat_detail_id)
+    # 카테고리>시설·보안 인프라: 변경이력 entity 컨텍스트 전달
+    _CAT_FACILITY_SECURITY_LOG_ENTITY_MAP = {
+        'cat_facility_security_access_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_data_delete_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_rack_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_thermometer_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_cctv_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_transformer_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_generator_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_ups_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_battery_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_hvac_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_leak_detector_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_detection_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_fire_extinguishing_log': _FACILITY_SECURITY_TABLE,
+        'cat_facility_security_evacuation_log': _FACILITY_SECURITY_TABLE,
+    }
+    if key in _CAT_FACILITY_SECURITY_LOG_ENTITY_MAP and _cat_detail_id:
+        context['tab14_entity_type'] = _CAT_FACILITY_SECURITY_LOG_ENTITY_MAP[key]
         context['tab14_entity_id'] = str(_cat_detail_id)
     # 카테고리>비즈니스>업무그룹: 변경이력 entity 컨텍스트 전달
     if key == 'cat_business_group_log' and _cat_detail_id:
@@ -5485,6 +6147,23 @@ def show(key: str, token: str | None = None):
         context['overlay_store_key'] = _cctv_cfg.get('overlay_store_key', '')
         context['legacy_overlay_keys'] = _cctv_cfg.get('legacy_overlay_keys', [])
 
+    _facility_lab_meta = _dc_facility_meta_for_key(key)
+    if _facility_lab_meta and key.startswith(f"dc_{_facility_lab_meta['prefix']}_lab"):
+        import json as _json_dc_facility
+        _facility_cfg = {}
+        _tab = None
+        try:
+            _tab = PageTabConfig.query.filter(
+                PageTabConfig.route_key == key,
+                PageTabConfig.is_active == 1,
+                PageTabConfig.is_deleted == 0,
+            ).first()
+            if _tab and _tab.extra_options:
+                _facility_cfg = _json_dc_facility.loads(_tab.extra_options) or {}
+        except Exception:
+            pass
+        context.update(_dc_facility_standard_lab_context(key, _tab, _facility_cfg))
+
     # ── tab72 계약정보(CAPEX) 공유 템플릿 ─────────────────────────────────
     # TEMPLATE_MAP이 직접 layouts/tab72-capex-shared.html을 가리킨다.
     # 페이지별 차이(뒤로가기, 탭 목록)는 컨텍스트 변수로 주입.
@@ -5567,11 +6246,18 @@ def show(key: str, token: str | None = None):
         'cat_hw_network_hardware', 'cat_hw_security_hardware',
         'cat_vendor_manufacturer_hardware', 'cat_vendor_maintenance_hardware',
     }
+    _TAB93_FACILITY_KEYS = {f'{_base93}_system' for _base93 in _FACILITY_SECURITY_DETAIL_KEYS}
+    _TAB93_KEYS = _TAB93_KEYS | _TAB93_FACILITY_KEYS
     if key in _TAB93_KEYS:
         import json as _json_tab93
 
-        # base_key: _hardware 접미사 제거
-        _tab93_base = key.rsplit('_hardware', 1)[0]
+        _is_tab93_facility = key in _TAB93_FACILITY_KEYS
+        if _is_tab93_facility:
+            template = 'layouts/tab93-hardware-shared.html'
+            _tab93_base = key.rsplit('_system', 1)[0]
+        else:
+            # base_key: _hardware 접미사 제거
+            _tab93_base = key.rsplit('_hardware', 1)[0]
 
         # 뒤로가기
         back_key = _tab93_base if _tab93_base in TEMPLATE_MAP else None
@@ -5581,18 +6267,26 @@ def show(key: str, token: str | None = None):
             back_label = '목록으로 돌아가기'
 
         # 탭 네비게이션 자동 생성
-        _TAB93_SPECS = [
-            ('_detail', '기본정보'),
-            ('_manager', '담당자'),
-            ('_hardware', '하드웨어'),
-            ('_software', '소프트웨어'),
-            ('_component', '컴포넌트'),
-            ('_sla', 'SLA'),
-            ('_issue', '이슈관리'),
-            ('_task', '작업이력'),
-            ('_log', '변경이력'),
-            ('_file', '구성/파일'),
-        ]
+        if _is_tab93_facility:
+            _TAB93_SPECS = [
+                ('_detail', '기본정보'),
+                ('_system', '시설·보안'),
+                ('_log', '변경이력'),
+                ('_file', '구성/파일'),
+            ]
+        else:
+            _TAB93_SPECS = [
+                ('_detail', '기본정보'),
+                ('_manager', '담당자'),
+                ('_hardware', '하드웨어'),
+                ('_software', '소프트웨어'),
+                ('_component', '컴포넌트'),
+                ('_sla', 'SLA'),
+                ('_issue', '이슈관리'),
+                ('_task', '작업이력'),
+                ('_log', '변경이력'),
+                ('_file', '구성/파일'),
+            ]
         tabs = []
         for _suf93, _lbl93 in _TAB93_SPECS:
             _tk93 = _tab93_base + _suf93
@@ -5670,6 +6364,57 @@ def show(key: str, token: str | None = None):
                 'analytics_subtitle': '',
                 'analytics_group': '',
                 'csv_filename': 'maintenance_hw',
+            }
+        elif _is_tab93_facility:
+            _tab93_columns = [
+                {'key': 'category', 'label': '구분'},
+                {'key': 'type', 'label': '유형'},
+                {'key': 'work_operation', 'label': '업무운영'},
+                {'key': 'work_group', 'label': '업무그룹'},
+                {'key': 'work_name', 'label': '업무명', 'statusDot': True},
+                {'key': 'system_name', 'label': '시스템명'},
+                {'key': 'serial_number', 'label': '일련번호'},
+                {'key': 'firmware', 'label': '펌웨어'},
+                {'key': 'qty', 'label': '할당수량', 'numeric': True},
+            ]
+            _tab93_facility_label_map = {
+                'access': '출입관리',
+                'data_delete': '데이터삭제',
+                'rack': 'RACK',
+                'thermometer': '온/습도계',
+                'cctv': '영상감시',
+                'transformer': '변압기',
+                'generator': '발전기',
+                'ups': '무정전전원장치',
+                'battery': '배터리',
+                'hvac': '항온항습기',
+                'leak_detector': '누수감지',
+                'detection': '감지설비',
+                'fire_extinguishing': '소화설비',
+                'evacuation': '대피설비',
+            }
+            _tab93_resource = _tab93_base.replace('cat_facility_security_', '')
+            _tab93_facility_row = locals().get('facility_security_detail') or {}
+            _tab93_model = str(
+                (_tab93_facility_row.get('model_name') if isinstance(_tab93_facility_row, dict) else '')
+                or title
+                or ''
+            ).strip()
+            context['tab93'] = {
+                'data_context': 'facility-security-assets',
+                'section_title': '모델별 하드웨어',
+                'cols_class': 'cols-10',
+                'columns': _tab93_columns,
+                'columns_json': _json_tab93.dumps(_tab93_columns, ensure_ascii=False),
+                'empty_title': '하드웨어 항목이 없습니다.',
+                'empty_desc': '해당 모델과 일치하는 하드웨어 자산이 없습니다.',
+                'show_analytics': True,
+                'analytics_subtitle': '유형별 업무그룹 분포',
+                'analytics_group': 'work_group',
+                'csv_filename': 'facility_security_model_assets',
+                'resource': _tab93_resource,
+                'resource_label': _tab93_facility_label_map.get(_tab93_resource, '시설·보안'),
+                'model': _tab93_model,
             }
 
     # ── tab94 소프트웨어 공통 컴포넌트 ─────────────────────────────────────
@@ -6010,14 +6755,14 @@ def show(key: str, token: str | None = None):
     if (
         'tabs' not in dir()
         and _is_cat_tab_key(key)
-        and _cat_base_key(key) in _COMPONENT_DETAIL_KEYS
+        and (_cat_base_key(key) in _COMPONENT_DETAIL_KEYS or _cat_base_key(key) in _FACILITY_SECURITY_DETAIL_KEYS)
     ):
         _comp_base = _cat_base_key(key)
-        _comp_tab_order_d = ('_detail', '_system', '_task', '_log', '_file')
+        _is_facility_security_detail = _comp_base in _FACILITY_SECURITY_DETAIL_KEYS
+        _comp_tab_order_d = ('_detail', '_system', '_log', '_file')
         _comp_tab_labels_d = {
             '_detail': '기본정보',
-            '_system': '컴포넌트',
-            '_task': '작업이력',
+            '_system': '시설·보안' if _is_facility_security_detail else '컴포넌트',
             '_log': '변경이력',
             '_file': '구성/파일',
         }
@@ -6042,6 +6787,33 @@ def show(key: str, token: str | None = None):
     except Exception:
         pass
 
+    try:
+        if rack_public_id and 'tabs' in locals() and isinstance(tabs, list):
+            for _tab in tabs:
+                _tab_key = _tab.get('key') if isinstance(_tab, dict) else ''
+                _secure_tab = _RACK_KEY_TO_SECURE_TAB.get(_tab_key)
+                if _secure_tab:
+                    _tab['href'] = _rack_detail_url(rack_public_id, _secure_tab)
+            context['secure_back_url'] = url_for('pages.blossom_hub', segment='dc_rack_list')
+    except Exception:
+        pass
+
+    try:
+        if 'tabs' in locals() and isinstance(tabs, list) and _is_cat_tab_key(key):
+            _secure_cat_base = _cat_base_key(key)
+            _secure_cat_public_id = _cat_public_id_from_session(_secure_cat_base, locals().get('_cat_sess') or {})
+            if _secure_cat_public_id and _SECURE_CATEGORY_BY_BASE.get(_secure_cat_base):
+                for _tab in tabs:
+                    _tab_key = _tab.get('key') if isinstance(_tab, dict) else ''
+                    if _tab_key:
+                        _tab['href'] = _secure_detail_url(_secure_cat_base, _secure_cat_public_id, _tab_key)
+                context['secure_back_url'] = url_for('pages.blossom_hub', segment=_secure_cat_base)
+                context['category_public_id'] = _secure_cat_public_id
+                if str(_secure_cat_base).startswith('cat_facility_security_'):
+                    context['facility_security_public_id'] = _secure_cat_public_id
+    except Exception:
+        pass
+
     return render_template(
         template,
         current_key=key,
@@ -6055,6 +6827,7 @@ def show(key: str, token: str | None = None):
         detail_entity_key=detail_entity_key,
         detail_contract=detail_contract,
         rack_code=rack_code,
+        rack_public_id=rack_public_id,
         back_key=locals().get('back_key'),
         back_label=locals().get('back_label'),
         tabs=locals().get('tabs'),

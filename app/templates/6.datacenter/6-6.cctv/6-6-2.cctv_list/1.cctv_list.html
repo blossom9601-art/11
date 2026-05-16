@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
     <link rel="stylesheet" href="/static/css/detail6.css?v=1.4">
 </head>
 <body>
@@ -22,26 +22,26 @@
             <div class="content-wrapper">
                 <div class="page-header">
                     <div class="page-utility-right" data-info-key="datacenter.cctv"></div>
-                    <h1>CCTV 관리</h1>
-                    <p>CCTV 자산을 관리 합니다.</p>
+                    <h1>영상감시 관리</h1>
+                    <p>영상감시 자산을 관리합니다.</p>
                 </div>
                 <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
                 <div id="dynamic-system-tabs"
                      data-page-code="DC_CCTV"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="CCTV 관리 탭"></div>
+                     data-aria-label="영상감시 관리 탭"></div>
 
                 <div class="tab-content single-pane">
                     <div class="tab-pane active" id="system-list-pane">
                         <div class="tab-header">
                             <div class="tab-header-left">
-                                <h2>CCTV 관리 <span class="count-badge" id="system-count">0</span></h2>
+                                <h2>영상감시 관리 <span class="count-badge" id="system-count">0</span></h2>
                             </div>
                             <div class="tab-header-right">
                                 <div class="search-container" role="search">
                                     <div class="search-input-wrapper" id="system-search-wrapper">
                                         <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="CCTV 검색" autocomplete="off">
+                                        <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="영상감시 검색" autocomplete="off">
                                         <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
                                             <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
                                         </button>
@@ -105,8 +105,8 @@
                                 <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
                             </div>
                             <div class="empty-text">
-                                <h3 id="system-empty-title">등록된 CCTV가 없습니다.</h3>
-                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 CCTV를 등록하세요.</p>
+                                <h3 id="system-empty-title">등록된 영상감시가 없습니다.</h3>
+                                <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 영상감시를 등록하세요.</p>
                             </div>
                         </div>
                         <div class="modern-pagination" id="system-pagination">
@@ -124,15 +124,16 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+        <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
-    <script src="/static/js/6.datacenter/6-6.cctv/6-6-2.cctv_list/1.cctv_list.js?v=1.03"></script>
+    <script src="/static/js/6.datacenter/datacenter_facility_fk.js?v=20260515_dc_facility_scope2"></script>
+    <script src="/static/js/6.datacenter/6-6.cctv/6-6-2.cctv_list/1.cctv_list.js?v=20260514_dc_facility_fk1"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
             <div class="server-add-content">
                 <div class="server-add-header">
-                    <div class="server-add-title"><h3>CCTV 등록</h3><p class="server-add-subtitle">CCTV 정보를 입력하세요.</p></div>
+                    <div class="server-add-title"><h3>영상감시 등록</h3><p class="server-add-subtitle">영상감시 정보를 입력하세요.</p></div>
                     <button class="close-btn" type="button" id="system-add-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -151,8 +152,8 @@
                         <div class="form-section">
                             <div class="section-header"><h4>시스템</h4></div>
                             <div class="form-grid">
-                                <div class="form-row"><label>시스템 제조사 <span class="required">*</span></label><input name="vendor" class="form-input" placeholder="입력" required></div>
-                                <div class="form-row"><label>시스템 모델명 <span class="required">*</span></label><input name="model" class="form-input" placeholder="입력" required></div>
+                                <div class="form-row"><label>시스템 제조사 <span class="required">*</span></label><select name="vendor" class="form-input search-select" data-searchable="true" data-placeholder="제조사 검색" data-allow-clear="true" required><option value="">제조사 검색</option></select></div>
+                                <div class="form-row"><label>시스템 모델명 <span class="required">*</span></label><select name="model" class="form-input search-select" data-searchable="true" data-placeholder="모델명 검색" data-allow-clear="true" required><option value="">모델명 검색</option></select></div>
                                 <div class="form-row"><label>시스템 일련번호</label><input name="serial" class="form-input"></div>
                                 <div class="form-row"><label>시스템 장소 <span class="required">*</span></label><input name="place" class="form-input search-select" placeholder="검색 선택" data-search-source="centers" required></div>
                             </div>
@@ -179,7 +180,7 @@
         <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
             <div class="server-edit-content">
                 <div class="server-edit-header">
-                    <div class="server-edit-title"><h3>CCTV 수정</h3><p class="server-edit-subtitle">선택한 CCTV 정보를 수정합니다.</p></div>
+                    <div class="server-edit-title"><h3>영상감시 수정</h3><p class="server-edit-subtitle">선택한 영상감시 정보를 수정합니다.</p></div>
                     <button class="close-btn" type="button" id="system-edit-close" title="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                 </div>
                 <div class="server-edit-body">
@@ -224,7 +225,7 @@
                 <div class="server-add-header">
                     <div class="server-add-title dispose-title">
                         <h3>삭제처리</h3>
-                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 CCTV를 정말 삭제처리하시겠습니까?</p>
+                        <p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 영상감시를 정말 삭제처리하시겠습니까?</p>
                     </div>
                     <button class="close-btn" type="button" id="system-delete-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -266,7 +267,7 @@
                     <div class="dispose-content">
                         <div class="dispose-text">
                             <p>선택된 행의 복제본을 생성합니다.</p>
-                            <p>복제 후 <strong>CCTV 이름</strong> 끝에 _COPY가 붙습니다.</p>
+                            <p>복제 후 <strong>영상감시 이름</strong> 끝에 _COPY가 붙습니다.</p>
                         </div>
                         <div class="dispose-illust">
                             <img src="/static/image/svg/list/free-sticker-programming.svg" alt="Programming Illustration" loading="lazy" />
@@ -295,7 +296,7 @@
                 <div class="server-add-header">
                     <div class="server-add-title">
                         <h3>일괄변경</h3>
-                        <p class="server-add-subtitle" id="bulk-subtitle">선택된 0개의 CCTV에서 지정한 필드를 일괄 변경합니다.</p>
+                        <p class="server-add-subtitle" id="bulk-subtitle">선택된 0개의 영상감시에서 지정한 필드를 일괄 변경합니다.</p>
                     </div>
                     <button class="close-btn" type="button" id="system-bulk-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -320,7 +321,7 @@
                 <div class="server-add-header">
                     <div class="server-add-title">
                         <h3>엑셀 업로드</h3>
-                        <p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 CCTV를 등록합니다.</p>
+                        <p class="server-add-subtitle">XLS 또는 XLSX 파일을 업로드하여 영상감시를 등록합니다.</p>
                     </div>
                     <button class="close-btn" type="button" id="system-upload-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>

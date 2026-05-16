@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
+    <link rel="stylesheet" href="/static/css/tab95-component.css?v=1.4">
+</head>
+<body class="page-facility-security-system-tab">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set facility_tabs = [
+        ('cat_facility_security_access', 'access', '출입관리'),
+        ('cat_facility_security_data_delete', 'data_delete', '데이터삭제'),
+        ('cat_facility_security_cctv', 'cctv', '영상감시'),
+        ('cat_facility_security_transformer', 'transformer', '변압기'),
+        ('cat_facility_security_generator', 'generator', '발전기'),
+        ('cat_facility_security_ups', 'ups', '무정전전원장치'),
+        ('cat_facility_security_battery', 'battery', '배터리'),
+        ('cat_facility_security_hvac', 'hvac', '항온항습기'),
+        ('cat_facility_security_thermometer', 'thermometer', '온/습도계'),
+        ('cat_facility_security_leak_detector', 'leak_detector', '누수감지'),
+        ('cat_facility_security_rack', 'rack', 'RACK'),
+        ('cat_facility_security_detection', 'detection', '감지설비'),
+        ('cat_facility_security_fire_extinguishing', 'fire_extinguishing', '소화설비'),
+        ('cat_facility_security_evacuation', 'evacuation', '대피설비')
+    ] %}
+    {% set detail_base = current_key.replace('_system', '') %}
+    {% set ns = namespace(resource='access', label='출입관리') %}
+    {% for tab_key, resource_key, tab_label in facility_tabs %}
+        {% if detail_base == tab_key %}
+            {% set ns.resource = resource_key %}
+            {% set ns.label = tab_label %}
+        {% endif %}
+    {% endfor %}
+    {% set item = facility_security_detail or {} %}
+
+    <main class="main-content">
+        <div class="content-wrapper tab95-comp facility-security-system-root">
+            <a href="{{ secure_back_url or url_for('pages.blossom_hub', segment=detail_base) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                목록으로 돌아가기
+            </a>
+
+            <div class="page-header">
+                <h1 id="page-header-title">{{ title }}</h1>
+                <p id="page-header-subtitle">{{ subtitle }}</p>
+            </div>
+
+            <div class="server-detail-tabs">
+                {% if tabs %}
+                    {% for t in tabs %}
+                    <a href="{{ t.href or url_for('pages.blossom_hub', segment=t.key) }}" class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                    {% endfor %}
+                {% else %}
+                    <a href="{{ url_for('pages.blossom_hub', segment=facility_security_public_id) if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_detail') }}" class="server-detail-tab-btn">기본정보</a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=system') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_system') }}" class="server-detail-tab-btn active">시설·보안</a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=log') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_log') }}" class="server-detail-tab-btn">변경이력</a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=file') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_file') }}" class="server-detail-tab-btn">구성/파일</a>
+                {% endif %}
+            </div>
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="facility-security-system-pane">
+                    <div class="detail-header-actions" aria-label="시설·보안 상단 동작">
+                        <button class="add-btn-icon" id="fsi-system-download-btn" title="CSV 다운로드" type="button" aria-label="CSV 다운로드">
+                            <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV 다운로드">
+                        </button>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>
+                            데이터센터 등록 시스템
+                            <div class="page-size-selector" aria-label="보기 개수">
+                                <label for="fsi-system-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="fsi-system-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </h3>
+
+                        <div class="table-wrap">
+                            <table class="hw-table cols-10 vendor-asset-table" id="fsi-system-table" data-resource="{{ ns.resource }}" data-model="{{ item.get('model_name') or '' }}">
+                                <thead>
+                                    <tr>
+                                        <th class="col-chk"><input type="checkbox" id="fsi-system-select-all" aria-label="전체 선택"></th>
+                                        <th data-sort-col="business_status" class="sortable">업무 상태</th>
+                                        <th data-sort-col="business_name" class="sortable">업무 이름</th>
+                                        <th data-sort-col="manufacturer_name" class="sortable">시스템 제조사</th>
+                                        <th data-sort-col="model_name" class="sortable">시스템 모델명</th>
+                                        <th data-sort-col="serial_number" class="sortable">시스템 일련번호</th>
+                                        <th data-sort-col="place_name" class="sortable">시스템 장소</th>
+                                        <th data-sort-col="system_owner_dept" class="sortable">시스템 담당부서</th>
+                                        <th data-sort-col="system_owner" class="sortable">시스템 담당자</th>
+                                        <th data-sort-col="service_owner_dept" class="sortable">서비스 담당부서</th>
+                                        <th data-sort-col="service_owner" class="sortable">서비스 담당자</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fsi-system-table-body"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="fsi-system-empty" class="system-empty" role="status" aria-live="polite" hidden>
+                            <div class="empty-illustration">
+                                <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+                            </div>
+                            <div class="empty-text">
+                                <h3 class="empty-title">등록된 시스템 정보가 없습니다.</h3>
+                                <p class="empty-desc">현재 모델과 일치하는 데이터센터 등록 시스템이 없습니다.</p>
+                            </div>
+                        </div>
+
+                        <div class="modern-pagination" id="fsi-system-pagination">
+                            <div class="pagination-info"><span id="fsi-system-pagination-info">0개 항목</span></div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="fsi-system-first" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음">
+                                </button>
+                                <button class="pagination-btn" id="fsi-system-prev" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전">
+                                </button>
+                                <div class="page-numbers" id="fsi-system-page-numbers"></div>
+                                <button class="pagination-btn" id="fsi-system-next" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음">
+                                </button>
+                                <button class="pagination-btn" id="fsi-system-last" disabled>
+                                    <img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막">
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    {% set dlm_modal_id = 'fsi-system-download-modal' %}
+    {% set dlm_title_id = 'fsi-system-download-modal-title' %}
+    {% set dlm_title = 'CSV 다운로드' %}
+    {% set dlm_subtitle_id = 'fsi-system-download-subtitle' %}
+    {% set dlm_subtitle = '현재 결과를 CSV로 내보냅니다.' %}
+    {% set dlm_close_id = 'fsi-system-download-close' %}
+    {% set dlm_confirm_id = 'fsi-system-download-confirm' %}
+    {% set dlm_confirm_label = '다운로드' %}
+    {% set dlm_primary_message = '내보낼 범위를 선택하세요.' %}
+    {% set dlm_range_name = 'fsi-system-csv-range' %}
+    {% set dlm_row_all_id = 'fsi-system-csv-range-row-all' %}
+    {% set dlm_row_selected_id = 'fsi-system-csv-range-row-selected' %}
+    {% set dlm_all_id = 'fsi-system-csv-range-all' %}
+    {% set dlm_selected_id = 'fsi-system-csv-range-selected' %}
+    {% set dlm_all_label = '전체 결과' %}
+    {% set dlm_selected_label = '선택된 행만' %}
+    {% set dlm_illustration_src = '/static/image/svg/list/free-sticker-research.svg' %}
+    {% set dlm_illustration_alt = 'Research Illustration' %}
+    {% include 'layouts/_download_modal_range.html' %}
+
+    <script src="/static/js/blossom.js?v=20260515_facility_public1"></script>
+    <script>
+        window.__FACILITY_SECURITY_SYSTEM_TAB__ = {
+            resource: {{ ns.resource|tojson }},
+            label: {{ ns.label|tojson }},
+            item: {{ item|tojson|safe }}
+        };
+    </script>
+    <script src="/static/js/9.category/9-4.component/9-4-8.facility_security/tab45-facility-security.js?v=20260516_system_tab1"></script>
+    {% include 'layouts/_message_modal.html' %}
+</body>
+</html>

@@ -196,7 +196,7 @@
           }
           if(!model || model === '-' || model === '모델명'){
             hideChart(statPie, statEmpty, statLegendEl, '할당 시스템 내역이 없습니다.');
-            hideChart(operPie, operEmpty, operLegend, '업무운영 데이터가 없습니다.');
+            hideChart(operPie, operEmpty, operLegend, '할당 시스템 내역이 없습니다.');
             return;
           }
           var apiUrl = '/api/category/comp-model-assets?model=' + encodeURIComponent(model);
@@ -291,7 +291,7 @@
               }
               try{ attachPieInteractions(operPie, segments, opTotal); }catch(_){}
             } else {
-              hideChart(operPie, operEmpty, operLegend, '업무운영 데이터가 없습니다.');
+              hideChart(operPie, operEmpty, operLegend, '할당 시스템 내역이 없습니다.');
             }
           }).catch(function(){
             hideChart(statPie, statEmpty, statLegendEl, '데이터를 불러올 수 없습니다.');
@@ -723,7 +723,10 @@
           if(col==='note'){
             return '<textarea name="note" class="form-input textarea-large" rows="6">'+(value||'')+'</textarea>';
           }
-          // default text input for model, spec, vendor
+          if(col==='vendor'){
+            return '<input name="vendor" class="form-input" value="'+(value||'')+'" placeholder="제조사">';
+          }
+          // default text input for model, spec
           return '<input name="'+col+'" class="form-input" value="'+(value||'')+'" data-fk-ignore="1">';
         }
         function getText(id){ var el=document.getElementById(id); return el? (el.textContent||'').trim() : ''; }
@@ -1724,6 +1727,9 @@
 
 
       (function(){
+        var table = document.getElementById('mt-spec-table');
+        if(!table) return;
+
         // Add row
         var addBtn = document.getElementById('mt-row-add');
         if(addBtn){

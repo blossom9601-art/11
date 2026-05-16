@@ -11,6 +11,7 @@
 {% set submit_type = modal_submit_type|default('button') %}
 {% set submit_text = modal_submit_text|default('등록') %}
 {% set allow_table = modal_allow_table|default(true) %}
+{% set attachment_max_mb = modal_attachment_max_mb|default(20) %}
 
 <div id="{{ prefix }}-add-modal" class="server-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="{{ prefix }}-add-title">
 	<div class="server-add-content">
@@ -120,7 +121,7 @@
 										<img src="/static/image/svg/list/free-icon-upload.svg" alt="" class="blog-dropzone-icon" aria-hidden="true">
 										<div class="blog-dropzone-text">
 											<div class="blog-dropzone-title">파일을 업로드하려면 클릭하거나 끌어다 놓으세요</div>
-											<div class="blog-dropzone-sub">최대 10개 · 20MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</div>
+											<div class="blog-dropzone-sub">최대 10개 · {{ attachment_max_mb }}MB 이하 · PNG, JPG, PDF, DOC, XLS 지원</div>
 										</div>
 									</div>
 								</div>

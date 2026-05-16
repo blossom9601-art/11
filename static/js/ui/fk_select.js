@@ -92,6 +92,25 @@
     }
   }
 
+  function isSoftwareCategoryPage() {
+    const key = detectHwPageKeyFromUrl();
+    return key.indexOf('cat_sw_') === 0;
+  }
+
+  function isComponentCategoryPage() {
+    const key = detectHwPageKeyFromUrl();
+    return key.indexOf('cat_component_') === 0;
+  }
+
+  function shouldSkipCategoryFkField(fieldEl, fkName) {
+    if (fkName === 'model' && (isSoftwareCategoryPage() || isComponentCategoryPage())) return true;
+    if (fkName === 'vendor' && (isSoftwareCategoryPage() || isComponentCategoryPage())) {
+      const tag = fieldEl && fieldEl.tagName ? fieldEl.tagName.toLowerCase() : '';
+      return tag === 'select' && fieldEl.classList && fieldEl.classList.contains('search-select');
+    }
+    return false;
+  }
+
   function detectHwScriptSrc() {
     const scripts = Array.from(document.querySelectorAll('script[src]'));
     return (
@@ -235,8 +254,8 @@
     function normalizeServerFormFactor(raw) {
       const rawStr = String(raw == null ? '' : raw).trim();
       // Legacy mojibake values observed in some SQLite rows.
-      if (rawStr === 'Ŭ����') return '클라우드';
-      if (rawStr === '����') return '서버';
+      if (rawStr === '\u016c\ufffd\ufffd\ufffd\ufffd') return '클라우드';
+      if (rawStr === '\ufffd\ufffd\ufffd\ufffd') return '서버';
 
       const v = normalizeCompactUpper(rawStr);
       if (!v) return '';
@@ -270,13 +289,16 @@
   }
 
   function fieldSpec(field) {
+    const categoryVendorByName = isSoftwareCategoryPage() || isComponentCategoryPage();
     const base = {
       work_type: { endpoint: '/api/work-categories', valueKey: 'category_code', labelKey: 'wc_name' },
       work_category: { endpoint: '/api/work-divisions', valueKey: 'division_code', labelKey: 'wc_name' },
       work_status: { endpoint: '/api/work-statuses', valueKey: 'status_code', labelKey: 'wc_name' },
       work_operation: { endpoint: '/api/work-operations', valueKey: 'operation_code', labelKey: 'wc_name' },
       work_group: { endpoint: '/api/work-groups', valueKey: 'group_code', labelKey: 'group_name' },
-      vendor: { endpoint: '/api/vendor-manufacturers', valueKey: 'manufacturer_code', labelKey: 'manufacturer_name' },
+      vendor: categoryVendorByName
+        ? { endpoint: '/api/vendor-manufacturers', valueKey: 'manufacturer_name', labelKey: 'manufacturer_name' }
+        : { endpoint: '/api/vendor-manufacturers', valueKey: 'manufacturer_code', labelKey: 'manufacturer_name' },
       model: modelSourceForGroup(),
       location_place: { endpoint: '/api/org-centers', valueKey: 'center_code', labelKey: 'center_name' },
       location_pos: { endpoint: '/api/org-racks', valueKey: 'rack_code', labelKey: 'rack_name', dependsOn: 'location_place', dependsParam: 'center_code' },
@@ -921,6 +943,10 @@
 
         // Allow page templates to opt out from FK conversion.
         if (isFkIgnored(fieldEl)) return;
+
+        // Category software/component `model` is a catalog name, not a hardware-model FK.
+        // Existing category vendor selects already provide name-valued options and only need searchable UI.
+        if (shouldSkipCategoryFkField(fieldEl, fkName)) return;
 
         // Replace input with select if needed.
         const select = ensureSelectFromField(fieldEl, fkName);

@@ -12,7 +12,8 @@
   modal_allow_table=false,
   modal_submit_type='submit',
   modal_submit_text='등록',
-  modal_form_autocomplete_off=true
+  modal_form_autocomplete_off=true,
+  modal_attachment_max_mb=insight_attachment_max_mb|default(20)
 %}
 	{% include '5.insight/_shared/_content_editor_modal.html' %}
 {% endwith %}

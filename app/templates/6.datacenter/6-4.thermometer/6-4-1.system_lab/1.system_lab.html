@@ -9,7 +9,7 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/center.css">
+    <link rel="stylesheet" href="/static/css/center.css?v=20260515_modal_uniform1">
 </head>
 <body class="{{ page_class }}">
     <!-- JS CONFIG (data-* 속성으로 전달) -->
@@ -29,15 +29,15 @@
         <main class="main-content">
             <div class="content-wrapper">
                 <div class="page-header">
-                    <div class="page-utility-right" data-info-key="datacenter.temperature_humidity"></div>
-                    <h1>온/습도 관리</h1>
-                    <p>온/습도 자산을 관리 합니다.</p>
+                    <div class="page-utility-right" data-info-key="{{ lab_info_key|default('datacenter.temperature_humidity') }}"></div>
+                    <h1>{{ lab_title|default('온/습도 관리') }}</h1>
+                    <p>{{ lab_description|default('온/습도 자산을 관리 합니다.') }}</p>
                 </div>
                 <!-- 시스템 탭 네비게이션 (동적 렌더링) -->
                 <div id="dynamic-system-tabs"
-                     data-page-code="DC_THERMOMETER"
+                     data-page-code="{{ lab_page_code|default('DC_THERMOMETER') }}"
                      data-current-key="{{ current_key }}"
-                     data-aria-label="온/습도 관리 탭"
+                     data-aria-label="{{ lab_aria_label|default('온/습도 관리 탭') }}"
                      data-layout-title-selector="#thermo-layout-title"
                      data-layout-title-suffix=" 배치도"></div>
 
@@ -69,7 +69,7 @@
                         </div>
                         <div class="system-table-container server-table-container">
                             <div id="rack-layout" class="rack-layout"{% if layout_style %} style="{{ layout_style }}"{% endif %}>
-                                <img src="{{ bg_image }}" alt="{{ center_name }} RACK 배치도" class="rack-layout-image" loading="eager" decoding="async"/>
+                                <img src="{{ bg_image }}" alt="{{ center_name }} {{ lab_asset_label|default('온/습도계') }} 배치도" class="rack-layout-image" loading="eager" decoding="async"/>
                                 <div id="rack-overlay" class="rack-overlay" aria-live="polite"></div>
                                 <!-- Context menu for overlay boxes -->
                                 <div id="overlay-context-menu" class="overlay-context-menu" role="menu" aria-hidden="true">
@@ -85,7 +85,7 @@
                                 <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
                             </div>
                             <div class="empty-text">
-                                <h3 id="system-empty-title">RACK 시스템이 없습니다.</h3>
+                                <h3 id="system-empty-title">{{ lab_asset_label|default('온/습도계') }} 시스템이 없습니다.</h3>
                                 <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 시스템을 등록하세요.</p>
                             </div>
                         </div>
@@ -94,7 +94,7 @@
             </div>
         </main>
 
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <script src="/static/js/common/page_tab_renderer.js?v=20260501_fouc1"></script>
     <script src="/static/js/6.datacenter/6-4.thermometer/thermo_status.js?v=20251207a"></script>
     <script src="/static/js/6.datacenter/6-4.thermometer/6-4-1.system_lab/1.system_lab.js?v=20251206b"></script>
@@ -103,7 +103,7 @@
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
             <div class="server-add-content">
                 <div class="server-add-header">
-                    <div class="server-add-title"><h3 id="system-add-title">온/습도계 등록</h3><p class="server-add-subtitle" id="system-add-subtitle">온/습도계 정보를 입력하세요.</p></div>
+                    <div class="server-add-title"><h3 id="system-add-title">{{ lab_asset_label|default('온/습도계') }} 등록</h3><p class="server-add-subtitle" id="system-add-subtitle">{{ lab_asset_label|default('온/습도계') }} 정보를 입력하세요.</p></div>
                     <button class="close-btn" type="button" id="system-add-close" title="닫기">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
@@ -114,7 +114,7 @@
                             <div class="section-header"><h4>온/습도계 정보</h4></div>
                             <div class="form-grid">
                                 <div class="form-row slab-name-row">
-                                    <label>온/습도계 이름 <span class="required">*</span></label>
+                                    <label>{{ lab_asset_label|default('온/습도계') }} 이름 <span class="required">*</span></label>
                                     <div class="status-input-wrap thermo-search-wrap">
                                         <div class="fk-searchable-control thermo-search-control">
                                             <button type="button" class="fk-searchable-display thermo-display-btn" data-thermo-display="true" aria-haspopup="dialog" aria-expanded="false">
@@ -130,7 +130,7 @@
                                     </div>
                                 </div>
                                 <div class="form-row">
-                                    <label>온/습도계 상태</label>
+                                    <label>{{ lab_asset_label|default('온/습도계') }} 상태</label>
                                     <div id="thermo-status-display" class="form-readonly thermo-status-display fk-searchable-display" aria-live="polite">상태 표시</div>
                                 </div>
                                 <input type="hidden" name="selected_rack" id="selected-rack-hidden" value="">

@@ -363,6 +363,7 @@
         const qty = item.usage_count ?? 0;
         return {
             id: Number.isFinite(Number(item.id)) ? Number(item.id) : item.id,
+            public_id: String(item.public_id || '').trim(),
             os_code: item.os_code,
             model: item.model_name || '',
             vendor: vendorName,

@@ -156,11 +156,12 @@ def _unregister_active_session():
     try:
         db.session.execute(db.text("DELETE FROM active_sessions WHERE session_id = :sid"), {'sid': sid})
         db.session.commit()
-    except Exception:
+    except Exception as e:
         try:
             db.session.rollback()
         except Exception:
             pass
+        current_app.logger.warning(f"[active-session] enforcement degraded: {e}")
 
 
 def _unregister_all_user_sessions(emp_no):
@@ -794,7 +795,7 @@ def login():
                 print('[login_admin_escalation] escalation failed', _e_admin, flush=True)
         session['role'] = 'ADMIN' if _is_admin_identity else user.role
 
-        # ── 권한 캐시 (session['_perms']) ──
+        # ── 권한 초기화 (쿠키에는 권한 맵을 저장하지 않음) ──
         _cache_session_permissions(session)
 
         # Ensure a corresponding UserProfile exists (many API endpoints resolve actor from org_user).
@@ -4652,7 +4653,7 @@ def _complete_login_after_mfa(emp_no):
             db.session.rollback()
     session['role'] = 'ADMIN' if _is_admin_identity else user.role
 
-    # ── 권한 캐시 (session['_perms']) ──
+    # ── 권한 초기화 (쿠키에는 권한 맵을 저장하지 않음) ──
     _cache_session_permissions(session)
 
     try:

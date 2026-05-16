@@ -221,8 +221,6 @@ def addon_search():
 
 @main_bp.route('/p/compose-email')
 def compose_email():
-    if not _is_spa_fetch():
-        return render_template('layouts/spa_shell.html', current_key='compose_email', menu_code=None)
     return render_template('8.project/8-2.task/8-2-3.task_list/3.compose_email.html')
 
 
