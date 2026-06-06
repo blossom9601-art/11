@@ -3,7 +3,7 @@
 ;        또는 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" lumina-setup.iss
 
 #define MyAppName "Lumina Server Agent"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.5"
 #define MyAppPublisher "Blossom IT Asset Management"
 #define MyAppExeName "Lumina.exe"
 #define MyAppDescription "Lumina AP 연동 · PC 자산 자동 수집"

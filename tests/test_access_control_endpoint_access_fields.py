@@ -3,6 +3,45 @@ import pytest
 from app.services import web_access_control_service as service
 
 
+def _seed_work_operation(app, code='OPS_APP', name='서비스 운영'):
+    with service._get_connection(app) as conn:
+        conn.execute(
+            f'''
+            CREATE TABLE IF NOT EXISTS {service.WORK_OPERATION_TABLE} (
+                operation_code TEXT PRIMARY KEY,
+                operation_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                updated_at TEXT,
+                updated_by TEXT,
+                is_deleted INTEGER NOT NULL DEFAULT 0
+            )
+            '''
+        )
+        columns = {row[1] for row in conn.execute(f'PRAGMA table_info({service.WORK_OPERATION_TABLE})').fetchall()}
+        values = {
+            'operation_code': code,
+            'operation_name': name,
+            'description': '',
+            'hw_count': 0,
+            'sw_count': 0,
+            'remark': '',
+            'created_at': '2026-01-01 00:00:00',
+            'created_by': 'pytest',
+            'updated_at': '2026-01-01 00:00:00',
+            'updated_by': 'pytest',
+            'is_deleted': 0,
+        }
+        insert_columns = [col for col in values if col in columns]
+        placeholders = ', '.join('?' for _ in insert_columns)
+        conn.execute(
+            f"INSERT OR REPLACE INTO {service.WORK_OPERATION_TABLE} ({', '.join(insert_columns)}) VALUES ({placeholders})",
+            [values[col] for col in insert_columns],
+        )
+        conn.commit()
+    return code, name
+
+
 def test_endpoint_access_type_and_info_are_stored_and_exposed(app):
     with app.app_context():
         service.init_web_access_control_tables(app)
@@ -65,6 +104,128 @@ def test_endpoint_access_type_and_info_are_stored_and_exposed(app):
         assert listed['access_info'] == 'https://portal.example.com/admin'
         assert listed['primary_access_type'] == 'WEB'
         assert listed['primary_access_info'] == 'https://portal.example.com/admin'
+
+
+def test_resource_category_detail_is_stored_normalized_and_cleared(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        item = service.create_resource(
+            {
+                'resource_name': 'CATEGORY-DETAIL-TEST',
+                'category': '관리 콘솔',
+                'category_detail': 'storage',
+                'endpoints': [
+                    {
+                        'label': '관리 웹',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'category.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+
+        with service._get_connection(app) as conn:
+            resource_columns = {row[1] for row in conn.execute(f'PRAGMA table_info({service.RESOURCE_TABLE})').fetchall()}
+
+        assert 'category_detail' in resource_columns
+        assert item['category_name'] == '관리콘솔'
+        assert item['category_detail'] == '스토리지'
+        assert item['category_path'] == '관리콘솔 / 스토리지'
+
+        listed = next(row for row in service.list_resources(app=app) if row['id'] == item['id'])
+        assert listed['category_name'] == '관리콘솔'
+        assert listed['category_detail'] == '스토리지'
+        assert listed['category_path'] == '관리콘솔 / 스토리지'
+
+        updated = service.update_resource(
+            item['id'],
+            {
+                'category': '서비스',
+                'category_detail': '서버',
+                'resource_name': 'CATEGORY-DETAIL-TEST',
+                'endpoints': item['endpoints'],
+            },
+            'pytest',
+            app,
+        )
+        assert updated['category_name'] == '서비스'
+        assert updated['category_detail'] == ''
+        assert updated['category_path'] == '서비스'
+
+        updated_again = service.update_resource(
+            item['id'],
+            {
+                'category': '관리콘솔',
+                'category_detail': 'SAN',
+                'resource_name': 'CATEGORY-DETAIL-TEST',
+                'endpoints': updated['endpoints'],
+            },
+            'pytest',
+            app,
+        )
+        assert updated_again['category_name'] == '관리콘솔'
+        assert updated_again['category_detail'] == 'SAN'
+        assert updated_again['category_path'] == '관리콘솔 / SAN'
+
+
+def test_resource_work_operation_is_stored_exposed_and_cleared_for_console(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        code, name = _seed_work_operation(app)
+        item = service.create_resource(
+            {
+                'resource_name': 'WORK-OPERATION-RESOURCE-TEST',
+                'category': '시스템',
+                'work_operation_code': code,
+                'endpoints': [
+                    {
+                        'label': '운영 SSH',
+                        'kind': 'SSH',
+                        'protocol': 'SSH',
+                        'host': '10.10.0.21',
+                        'port': 22,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+
+        with service._get_connection(app) as conn:
+            resource_columns = {row[1] for row in conn.execute(f'PRAGMA table_info({service.RESOURCE_TABLE})').fetchall()}
+
+        assert 'work_operation_code' in resource_columns
+        assert item['category_name'] == '시스템'
+        assert item['work_operation_code'] == code
+        assert item['work_operation_name'] == name
+        assert item['work_operation'] == name
+
+        listed = next(row for row in service.list_resources(app=app) if row['id'] == item['id'])
+        assert listed['work_operation_code'] == code
+        assert listed['work_operation_name'] == name
+
+        updated = service.update_resource(
+            item['id'],
+            {
+                'resource_name': 'WORK-OPERATION-RESOURCE-TEST',
+                'category': '관리콘솔',
+                'category_detail': '서버',
+                'work_operation_code': code,
+                'endpoints': item['endpoints'],
+            },
+            'pytest',
+            app,
+        )
+        assert updated['category_name'] == '관리콘솔'
+        assert updated['category_detail'] == '서버'
+        assert updated['work_operation_code'] == ''
+        assert updated['work_operation_name'] == ''
 
 
 def test_audit_logs_store_and_expose_resource_name_and_access_info(app):
@@ -131,6 +292,146 @@ def test_audit_logs_store_and_expose_resource_name_and_access_info(app):
         assert row['access_type'] == 'SSH'
         assert row['access_info'] == '10.0.0.15:2222'
         assert row['action_result'] == service.AUDIT_ACCESS_OUTCOME_PENDING
+
+
+def test_audit_logs_filter_by_management_console_category_detail(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        console_item = service.create_resource(
+            {
+                'resource_name': 'AUDIT-CONSOLE-CATEGORY-TEST',
+                'category': '관리콘솔',
+                'category_detail': '서버',
+                'endpoints': [
+                    {
+                        'label': '콘솔',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'console-category.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        service_item = service.create_resource(
+            {
+                'resource_name': 'AUDIT-SERVICE-CATEGORY-TEST',
+                'category': '서비스',
+                'endpoints': [
+                    {
+                        'label': '서비스',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'service-category.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        actor = {'user_id': 7011, 'emp_no': 'CAT001', 'name': 'Category Audit'}
+
+        with service._get_connection(app) as conn:
+            for resource_id in (console_item['id'], service_item['id']):
+                conn.execute(
+                    f'''
+                    INSERT INTO {service.GRANT_TABLE}
+                        (resource_id, user_id, grant_status, grant_start_date, grant_end_date, created_by, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (resource_id, actor['user_id'], service.GRANT_STATUS_ACTIVE, '2000-01-01', '9999-12-31', 'pytest', 'pytest'),
+                )
+            conn.commit()
+
+        service.touch_access(console_item['id'], actor['user_id'], actor, endpoint_id=console_item['endpoints'][0]['id'], app=app)
+        service.touch_access(service_item['id'], actor['user_id'], actor, endpoint_id=service_item['endpoints'][0]['id'], app=app)
+
+        result = service.list_audit_logs(
+            {'audit_scope': 'access', 'category': '관리콘솔', 'category_detail': '서버'},
+            app=app,
+        )
+        assert result['total'] == 1
+        row = result['rows'][0]
+        assert row['resource_name'] == 'AUDIT-CONSOLE-CATEGORY-TEST'
+        assert row['category_name'] == '관리콘솔'
+        assert row['category_detail'] == '서버'
+        assert row['category_path'] == '관리콘솔 / 서버'
+
+
+def test_audit_logs_filter_and_expose_work_operation(app):
+    with app.app_context():
+        service.init_web_access_control_tables(app)
+        code_a, name_a = _seed_work_operation(app, 'OPS_CORE', '핵심 업무 운영')
+        code_b, _name_b = _seed_work_operation(app, 'OPS_SUPPORT', '지원 업무 운영')
+        resource_a = service.create_resource(
+            {
+                'resource_name': 'AUDIT-WORK-OP-A',
+                'category': '서비스',
+                'work_operation_code': code_a,
+                'endpoints': [
+                    {
+                        'label': '서비스 A',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'work-op-a.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        resource_b = service.create_resource(
+            {
+                'resource_name': 'AUDIT-WORK-OP-B',
+                'category': '서비스',
+                'work_operation_code': code_b,
+                'endpoints': [
+                    {
+                        'label': '서비스 B',
+                        'kind': 'WEB',
+                        'protocol': 'HTTPS',
+                        'host': 'work-op-b.example.com',
+                        'port': 443,
+                        'is_primary': 1,
+                    },
+                ],
+            },
+            'pytest',
+            app,
+        )
+        actor = {'user_id': 7021, 'emp_no': 'WOP001', 'name': 'Work Operation Audit'}
+
+        with service._get_connection(app) as conn:
+            for resource_id in (resource_a['id'], resource_b['id']):
+                conn.execute(
+                    f'''
+                    INSERT INTO {service.GRANT_TABLE}
+                        (resource_id, user_id, grant_status, grant_start_date, grant_end_date, created_by, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (resource_id, actor['user_id'], service.GRANT_STATUS_ACTIVE, '2000-01-01', '9999-12-31', 'pytest', 'pytest'),
+                )
+            conn.commit()
+
+        service.touch_access(resource_a['id'], actor['user_id'], actor, endpoint_id=resource_a['endpoints'][0]['id'], app=app)
+        service.touch_access(resource_b['id'], actor['user_id'], actor, endpoint_id=resource_b['endpoints'][0]['id'], app=app)
+
+        result = service.list_audit_logs(
+            {'audit_scope': 'access', 'category': '서비스', 'work_operation_code': code_a},
+            app=app,
+        )
+        assert result['total'] == 1
+        row = result['rows'][0]
+        assert row['resource_name'] == 'AUDIT-WORK-OP-A'
+        assert row['work_operation_code'] == code_a
+        assert row['work_operation_name'] == name_a
 
 
 def test_touch_web_access_audit_is_success_not_pending(app):

@@ -20,8 +20,116 @@
         sessionUser: null,
         selectedRequest: null,
         pendingPayload: null,
-        requestType: 'use',
-        category: ''
+        requestType: '',
+        currentStep: 1,
+        systemAction: '',
+        systemActionFlow: '',
+        actionLocked: false,
+        requestedUserId: '',
+        userIdChecked: '',
+        userIdAvailable: false,
+        category: '시스템',
+        categoryDetail: '',
+        workOperationCode: '',
+        workOperations: []
+    };
+
+    var SYSTEM_ACTION_FLOWS = {
+        'id-request': {
+            desc: '최초 1회 내 기본 사용자 ID를 생성하는 신청입니다.',
+            help: '자원 선택 없이 사용자 ID 중복 점검 후 신청 사유와 승인자 단계만 진행합니다.',
+            reason: '사용자 ID가 필요한 업무 목적을 입력하세요.',
+            selected: '사용자 ID 신청',
+            noResource: true,
+            noPeriod: true
+        },
+        'account-create': {
+            desc: '대상 시스템에 새 계정을 생성하는 신청입니다.',
+            help: '선택한 시스템에 계정 신규 생성을 요청합니다. 신청 사유에는 계정 용도, 담당자, 필요한 권한 범위를 적어주세요.',
+            reason: '계정 용도, 담당자, 필요한 권한 범위를 입력하세요.',
+            selected: '선택된 계정 생성 대상'
+        },
+        'account-extend': {
+            desc: '기존 계정의 사용 기간을 연장하는 신청입니다.',
+            help: '선택한 시스템 계정의 사용 기간 연장을 요청합니다. 연장 사유와 희망 기간을 함께 적어주세요.',
+            reason: '연장 사유와 희망 기간을 입력하세요.',
+            selected: '선택된 연장 대상'
+        },
+        'account-delete': {
+            desc: '더 이상 사용하지 않는 계정을 삭제하는 신청입니다.',
+            help: '선택한 시스템 계정의 삭제를 요청합니다. 삭제 대상 계정과 회수 사유를 적어주세요.',
+            reason: '삭제 대상 계정과 회수 사유를 입력하세요.',
+            selected: '선택된 계정 삭제 대상',
+            noPeriod: true
+        },
+        unlock: {
+            desc: '잠긴 시스템 계정의 잠금 해제를 요청합니다.',
+            help: '선택한 시스템 계정의 잠금 해제를 요청합니다. 대상 계정과 잠금 발생 상황을 적어주세요.',
+            reason: '잠금 해제 대상 계정과 발생 상황을 입력하세요.',
+            selected: '선택된 잠금 해제 대상',
+            noPeriod: true
+        },
+        'password-change': {
+            desc: '시스템 계정의 패스워드 변경을 요청합니다.',
+            help: '선택한 시스템 계정의 패스워드 변경을 요청합니다. 대상 계정과 변경 사유를 적어주세요.',
+            reason: '패스워드 변경 대상 계정과 변경 사유를 입력하세요.',
+            selected: '선택된 패스워드 변경 대상',
+            noPeriod: true
+        },
+        'group-create': {
+            desc: '그룹을 새로 생성하는 신청입니다.',
+            help: '선택한 시스템에 그룹 생성을 요청합니다. 그룹명, 용도, 소유자, 기본 권한 범위를 적어주세요.',
+            reason: '생성할 그룹명, 용도, 소유자, 권한 범위를 입력하세요.',
+            selected: '선택된 그룹 생성 대상',
+            noPeriod: true
+        },
+        'group-add': {
+            desc: '계정에 그룹을 추가하는 신청입니다.',
+            help: '선택한 시스템 계정에 그룹 추가를 요청합니다. 대상 계정과 추가할 그룹명을 적어주세요.',
+            reason: '대상 계정과 추가할 그룹명, 업무 목적을 입력하세요.',
+            selected: '선택된 그룹 추가 대상'
+        },
+        'group-delete': {
+            desc: '계정에서 그룹을 삭제하는 신청입니다.',
+            help: '선택한 시스템 계정에서 그룹 삭제를 요청합니다. 대상 계정과 삭제할 그룹명을 적어주세요.',
+            reason: '대상 계정과 삭제할 그룹명, 회수 사유를 입력하세요.',
+            selected: '선택된 그룹 삭제 대상',
+            noPeriod: true
+        },
+        'owner-change': {
+            desc: '서비스 계정의 관리자를 변경하는 신청입니다.',
+            help: '선택한 서비스 계정의 관리자 변경을 요청합니다. 현재 관리자와 변경할 관리자를 적어주세요.',
+            reason: '현재 관리자, 변경할 관리자, 변경 사유를 입력하세요.',
+            selected: '선택된 관리자 변경 대상',
+            noPeriod: true
+        },
+        'user-change': {
+            desc: '서비스 계정의 사용자를 변경하는 신청입니다.',
+            help: '선택한 서비스 계정의 사용자 변경을 요청합니다. 추가 또는 제외할 사용자와 사유를 적어주세요.',
+            reason: '변경할 사용자와 변경 사유를 입력하세요.',
+            selected: '선택된 사용자 변경 대상',
+            noPeriod: true
+        },
+        sftp: {
+            desc: '시스템 계정의 SFTP 권한을 요청합니다.',
+            help: '선택한 시스템 계정에 SFTP 권한을 요청합니다. 대상 경로, 계정, 권한 범위를 적어주세요.',
+            reason: '대상 계정, SFTP 경로, 필요한 권한 범위를 입력하세요.',
+            selected: '선택된 SFTP 권한 대상'
+        }
+    };
+
+    var CATEGORY_ALIASES = {
+        '시스템': '시스템', system: '시스템', os: '시스템', linux: '시스템', windows: '시스템', unix: '시스템', vm: '시스템', '서버': '시스템', server: '시스템', ssh: '시스템', db: '시스템', '기타': '시스템', etc: '시스템',
+        '서비스': '서비스', service: '서비스', webservice: '서비스', '웹서비스': '서비스', '내부서비스': '서비스', '외부서비스': '서비스', internal: '서비스', external: '서비스', '웹': '서비스', web: '서비스',
+        '컨테이너': '컨테이너', container: '컨테이너', kubernetes: '컨테이너', k8s: '컨테이너', '쿠버네티스': '컨테이너', openshift: '컨테이너', rancher: '컨테이너', portainer: '컨테이너',
+        '관리콘솔': '관리콘솔', adminconsole: '관리콘솔', managementconsole: '관리콘솔', console: '관리콘솔'
+    };
+    var CONSOLE_GROUP_ALIASES = {
+        '서버': '서버', server: '서버', ilo: '서버', idrac: '서버', cimc: '서버', imm: '서버',
+        '스토리지': '스토리지', storage: '스토리지', netapp: '스토리지', emc: '스토리지', hpestorage: '스토리지',
+        san: 'SAN', brocade: 'SAN', ciscosan: 'SAN',
+        '네트워크': '네트워크', network: '네트워크', cisco: '네트워크', juniper: '네트워크', arista: '네트워크', l4l7: '네트워크',
+        '보안장비': '보안장비', security: '보안장비', firewall: '보안장비', vpn: '보안장비', waf: '보안장비', ips: '보안장비'
     };
 
     function qs(id) { return document.getElementById(id); }
@@ -71,10 +179,25 @@
         if (variant) cls += ' status-badge--' + variant;
         return '<span class="' + cls + '">' + esc(status || '-') + '</span>';
     }
+    function statusStateClass(status) {
+        if (status === '승인') return 'status-approved';
+        if (status === '부분 승인') return 'status-draft';
+        if (status === '승인대기' || status === '승인 대기') return 'status-pending';
+        if (status === '반려' || status === '취소') return 'status-rejected';
+        if (status === '만료') return 'status-expired';
+        return 'status-blocked';
+    }
+    function formatStatusPlain(status) {
+        return '<span class="request-item-status-plain ' + statusStateClass(status) + '"><span class="request-item-status-dot"></span>' + esc(status || '-') + '</span>';
+    }
     function byId(list, id) {
         for (var i = 0; i < list.length; i++) if (String(list[i].id) === String(id)) return list[i];
         return null;
     }
+
+    function categoryKey(value) { return String(value || '').replace(/[\s\/_-]+/g, '').toLowerCase(); }
+    function normalizeCategoryValue(value) { return CATEGORY_ALIASES[categoryKey(value)] || (String(value || '').trim() || '시스템'); }
+    function normalizeConsoleGroup(value) { return CONSOLE_GROUP_ALIASES[categoryKey(value)] || ''; }
     function selectedResources() {
         return state.selectedIds.map(function (id) { return byId(state.resources, id); }).filter(function (row) { return !!row; });
     }
@@ -86,6 +209,23 @@
     }
     function isDeleteRequestMode() {
         return state.requestType === 'delete';
+    }
+    function isSystemRequestMode() {
+        return (state.category || '') === '시스템';
+    }
+    function requestDisplayLabel(payload) {
+        if (payload && payload.system_action) return payload.system_action;
+        if (!payload && isSystemRequestMode() && state.systemAction) return state.systemAction;
+        return requestTypeLabel(payload && payload.request_type);
+    }
+    function hasSelectedRequestAction() {
+        return isSystemRequestMode() ? !!state.systemAction : !!state.requestType;
+    }
+    function activeSystemFlow() {
+        return SYSTEM_ACTION_FLOWS[state.systemActionFlow] || {};
+    }
+    function actionReady() {
+        return state.actionLocked && hasSelectedRequestAction();
     }
     function primaryUrl(row) {
         if (!row) return '';
@@ -115,16 +255,60 @@
         addKind(row.resource_type);
         return result;
     }
-    function normalizeCategory(value) {
-        return String(value || '').replace(/\s+/g, '').toLowerCase();
+    function normalizeProtocolLabel(value, url) {
+        var text = String(value || '').trim();
+        var upper = text.toUpperCase();
+        var target = String(url || '').trim().toLowerCase();
+        if (upper === 'HTTP' || upper === 'HTTPS' || upper === 'SSH') return upper;
+        if (target.indexOf('https://') === 0) return 'HTTPS';
+        if (target.indexOf('http://') === 0) return 'HTTP';
+        if (target.indexOf(':443') >= 0) return 'HTTPS';
+        if (target.indexOf(':80') >= 0) return 'HTTP';
+        return upper || '';
+    }
+    function protocolKindPairs(row) {
+        var map = {}, result = [];
+        function addPair(protocol, kind, url) {
+            protocol = normalizeProtocolLabel(protocol, url);
+            kind = normalizeKindLabel(kind);
+            if (!protocol && (kind === 'HTTP' || kind === 'HTTPS')) { protocol = kind; kind = 'WEB'; }
+            if (protocol && (kind === 'HTTP' || kind === 'HTTPS')) kind = 'WEB';
+            if (!kind && (protocol === 'HTTP' || protocol === 'HTTPS')) kind = 'WEB';
+            if (!protocol && kind === 'WEB') protocol = normalizeProtocolLabel('', url) || 'HTTPS';
+            if (!protocol && kind === 'SSH') protocol = 'SSH';
+            if (!protocol && !kind) return;
+            var label = protocol && kind && protocol !== kind ? protocol + ', ' + kind : (protocol || kind);
+            if (!map[label]) { map[label] = true; result.push(label); }
+        }
+        (row.endpoints || []).forEach(function (ep) {
+            addPair(ep.protocol || ep.scheme || ep.type, ep.kind || row.primary_kind || row.resource_type, ep.url || ep.host || row.primary_url || row.resource_url);
+        });
+        if (!result.length) {
+            addPair(row.protocol || row.scheme || row.primary_kind || row.resource_type, row.primary_kind || row.resource_type, primaryUrl(row));
+        }
+        return result;
     }
     function categoryLabel(row) {
-        var raw = normalizeCategory(row && (row.category_name || row.category || ''));
-        if (raw === '내부서비스' || raw === 'internal' || raw.indexOf('내부') >= 0) return '내부 서비스';
-        if (raw === '외부서비스' || raw === 'external' || raw === '웹' || raw === 'web' || raw.indexOf('외부') >= 0) return '외부 서비스';
-        if (raw === '관리콘솔' || raw === 'adminconsole' || raw === 'console' || raw.indexOf('관리콘솔') >= 0 || raw.indexOf('콘솔') >= 0) return '관리 콘솔';
-        if (raw === '기타' || raw === 'etc') return '기타';
-        return '기타';
+        return normalizeCategoryValue(row && (row.category_name || row.category_label || row.category));
+    }
+    function categoryDetail(row) {
+        return categoryLabel(row) === '관리콘솔' ? normalizeConsoleGroup(row && (row.category_detail || row.console_group)) : '';
+    }
+    function workOperationCode(row) { return categoryLabel(row) === '관리콘솔' ? '' : String(row && (row.work_operation_code || '') || '').trim(); }
+    function workOperationLabel(row) { return categoryLabel(row) === '관리콘솔' ? '' : String(row && (row.work_operation_name || row.work_operation || row.work_operation_code || '') || '').trim(); }
+    function categoryPath(row) {
+        var category = categoryLabel(row);
+        var detail = categoryDetail(row);
+        return category === '관리콘솔' && detail ? category + ' / ' + detail : category;
+    }
+    function operationOptionsHtml() {
+        var html = '<option value="">전체</option>';
+        state.workOperations.forEach(function (item) {
+            var code = item.operation_code || '';
+            var name = item.wc_name || item.operation_name || code;
+            if (code) html += '<option value="' + esc(code) + '">' + esc(name) + '</option>';
+        });
+        return html;
     }
     function endpointTarget(ep) {
         if (!ep) return '-';
@@ -276,6 +460,60 @@
     function isPermanentMode() {
         return state.periodMode === 'permanent';
     }
+    function requiresPeriod() {
+        return !isDeleteRequestMode() && !activeSystemFlow().noPeriod;
+    }
+    function requiresResourceSelection() {
+        return !activeSystemFlow().noResource;
+    }
+    function isUserIdRequestFlow() {
+        return state.systemActionFlow === 'id-request';
+    }
+    function setUserIdStatus(message, kind) {
+        var el = qs('request-user-id-status');
+        if (!el) return;
+        el.textContent = message || '';
+        el.classList.toggle('is-ok', kind === 'ok');
+        el.classList.toggle('is-error', kind === 'error');
+    }
+    function resetUserIdCheck() {
+        state.userIdChecked = '';
+        state.userIdAvailable = false;
+        setUserIdStatus('사용할 ID를 입력한 뒤 중복 점검을 진행하세요.', '');
+    }
+    function normalizeRequestedUserId(value) {
+        return String(value || '').trim();
+    }
+    function validateRequestedUserId(value) {
+        var id = normalizeRequestedUserId(value);
+        if (!id) return '신청할 사용자 ID를 입력하세요.';
+        if (!/^[A-Za-z0-9._-]{3,32}$/.test(id)) return '사용자 ID는 영문, 숫자, 점, 밑줄, 하이픈 3~32자로 입력하세요.';
+        return '';
+    }
+    function checkRequestedUserId() {
+        var input = qs('request-user-id');
+        var id = normalizeRequestedUserId(input && input.value);
+        var message = validateRequestedUserId(id);
+        if (message) {
+            state.userIdAvailable = false;
+            state.userIdChecked = '';
+            setUserIdStatus(message, 'error');
+            return;
+        }
+        setUserIdStatus('중복 점검 중입니다...', '');
+        fetchJson('/api/access-control/user-id/check?user_id=' + encodeURIComponent(id))
+            .then(function (data) {
+                state.requestedUserId = id;
+                state.userIdChecked = id;
+                state.userIdAvailable = !!data.available;
+                setUserIdStatus(data.message || (data.available ? '사용 가능한 ID입니다.' : '이미 사용 중인 ID입니다.'), data.available ? 'ok' : 'error');
+            })
+            .catch(function (err) {
+                state.userIdAvailable = false;
+                state.userIdChecked = '';
+                setUserIdStatus(err.message || '중복 점검에 실패했습니다.', 'error');
+            });
+    }
     function updateApproverLabel() {
         var approver = qs('request-approver');
         if (!approver) return;
@@ -300,12 +538,14 @@
         var periodPanel = qs('request-period-mode-panel');
         var dateGrid = qs('request-period-date-grid');
         var quickPeriods = qs('request-quick-periods');
-        var permanent = isPermanentMode() && !isDeleteRequestMode();
+        var needsPeriod = requiresPeriod();
+        var permanent = isPermanentMode() && needsPeriod;
+        var periodStepActive = (state.currentStep || 1) === 2;
         if (form) form.classList.toggle('is-permanent', permanent);
         if (form) form.classList.toggle('is-delete-request', isDeleteRequestMode());
-        if (periodPanel) periodPanel.hidden = isDeleteRequestMode();
-        if (dateGrid) dateGrid.hidden = isDeleteRequestMode();
-        if (quickPeriods) quickPeriods.hidden = isDeleteRequestMode();
+        if (periodPanel) periodPanel.hidden = !needsPeriod || !periodStepActive;
+        if (dateGrid) dateGrid.hidden = !needsPeriod || !periodStepActive;
+        if (quickPeriods) quickPeriods.hidden = !needsPeriod || !periodStepActive;
         if (end) {
             end.disabled = permanent;
             if (permanent && end._flatpickr) end._flatpickr.clear();
@@ -315,7 +555,7 @@
             card.classList.toggle('is-active', !!input && input.checked);
         });
         Array.prototype.slice.call(document.querySelectorAll('[data-period-days]')).forEach(function (button) { button.disabled = permanent; });
-        if (note) note.hidden = !permanent;
+        if (note) note.hidden = !permanent || !periodStepActive;
         updateApproverLabel();
         syncDateConstraints();
     }
@@ -337,6 +577,145 @@
         if (submit) submit.textContent = isDelete ? '삭제 신청 제출' : '사용 신청 제출';
         if (hideOwnedLabel) hideOwnedLabel.textContent = isDelete ? '권한 없는 자원 숨김' : '이미 승인된 자원 숨김';
         syncPeriodMode();
+    }
+    function updateActionSummary() {
+        var summary = qs('request-action-summary');
+        var title = qs('request-action-summary-title');
+        var desc = qs('request-action-summary-desc');
+        var help = qs('request-action-help');
+        var userIdPanel = qs('user-id-request-panel');
+        var resourcePicker = document.querySelector('.resource-picker');
+        var selectedPanel = document.querySelector('.selected-resource-panel');
+        var selectedTitle = document.querySelector('.selected-resource-head strong');
+        var firstStep = document.querySelector('.request-step[data-request-step="1"]');
+        var firstStepLabel = document.querySelector('.request-step[data-request-step="1"] strong');
+        var secondStep = document.querySelector('.request-step[data-request-step="2"] strong');
+        var label = requestDisplayLabel();
+        var flow = activeSystemFlow();
+        var visible = actionReady();
+        if (summary) summary.hidden = !visible;
+        if (title) title.textContent = visible ? label : '-';
+        if (desc) desc.textContent = isSystemRequestMode() && flow.desc ? flow.desc : '자원을 선택해 신청서를 계속 작성합니다.';
+        if (help) {
+            help.textContent = isSystemRequestMode() && flow.help ? flow.help : '';
+            help.hidden = !visible || !isSystemRequestMode() || !flow.help || state.currentStep !== 1;
+        }
+        if (userIdPanel) userIdPanel.hidden = !visible || !isUserIdRequestFlow() || state.currentStep !== 1;
+        if (resourcePicker && visible && isUserIdRequestFlow()) resourcePicker.hidden = true;
+        if (selectedPanel && visible && isUserIdRequestFlow()) selectedPanel.hidden = true;
+        if (selectedTitle) selectedTitle.textContent = isSystemRequestMode() && flow.selected ? flow.selected : '선택된 자원';
+        if (firstStep) firstStep.hidden = false;
+        if (firstStepLabel) firstStepLabel.textContent = isUserIdRequestFlow() ? 'ID 추가' : '자원 선택';
+        if (secondStep) secondStep.textContent = isSystemRequestMode() && flow.noPeriod ? '사유/정보' : '사유/기간';
+    }
+    function setFormStep(step) {
+        var hasAction = actionReady();
+        var nextStep = Math.max(1, Math.min(3, Number(step) || 1));
+        state.currentStep = nextStep;
+        var stepper = document.querySelector('.request-stepper');
+        if (stepper) stepper.hidden = !hasAction;
+        Array.prototype.slice.call(document.querySelectorAll('.request-step')).forEach(function (button) {
+            var active = Number(button.getAttribute('data-request-step')) === nextStep;
+            button.classList.toggle('is-active', active);
+            button.classList.toggle('is-complete', Number(button.getAttribute('data-request-step')) < nextStep);
+        });
+        Array.prototype.slice.call(document.querySelectorAll('.request-step-block')).forEach(function (block) {
+            block.hidden = !hasAction || !block.classList.contains('request-step-block-' + nextStep);
+        });
+        var prev = qs('request-step-prev');
+        var next = qs('request-step-next');
+        if (prev) prev.hidden = !hasAction || nextStep === 1;
+        if (next) next.hidden = !hasAction || nextStep === 3;
+        updateActionSummary();
+        syncPeriodMode();
+    }
+    function validateStep(step) {
+        if (step === 1 && isUserIdRequestFlow()) {
+            var id = normalizeRequestedUserId(qs('request-user-id') && qs('request-user-id').value);
+            var idMessage = validateRequestedUserId(id);
+            if (idMessage) return idMessage;
+            if (!state.userIdAvailable || state.userIdChecked !== id) return '사용자 ID 중복 점검을 완료하세요.';
+        }
+        if (step === 1 && requiresResourceSelection() && !state.selectedIds.length) return '신청 대상 자원을 선택하세요.';
+        if (step === 2) {
+            var reason = qs('request-reason').value.trim();
+            if (!reason) return '신청 사유를 입력하세요.';
+            if (reason.length < REASON_MIN_LENGTH) return (isDeleteRequestMode() ? '삭제 사유' : '신청 사유') + '는 10자 이상 입력하세요.';
+            if (requiresPeriod()) {
+                if (!qs('request-start-date').value) return '사용 시작일을 입력하세요.';
+                if (!isPermanentMode() && !qs('request-end-date').value) return '사용 종료일을 입력하세요.';
+                if (!isPermanentMode() && qs('request-start-date').value > qs('request-end-date').value) return '시작일은 종료일보다 늦을 수 없습니다.';
+            }
+        }
+        return '';
+    }
+    function updateSystemActionText() {
+        var label = requestDisplayLabel();
+        var flow = activeSystemFlow();
+        var title = qs('request-form-title');
+        var desc = qs('request-form-desc');
+        var reason = qs('request-reason');
+        var submit = qs('request-submit-button');
+        var hidden = qs('request-system-action');
+        if (hidden) hidden.value = state.systemAction || '';
+        if (!isSystemRequestMode()) return;
+        if (title) title.textContent = label + ' 신청서 작성';
+        if (desc) desc.textContent = flow.desc || '시스템 자원을 선택한 뒤 계정 작업 정보를 단계별로 입력합니다.';
+        if (reason) reason.placeholder = flow.reason || (label + '이 필요한 업무 목적과 기간을 구체적으로 입력하세요.');
+        if (submit) submit.textContent = label + ' 제출';
+        updateActionSummary();
+    }
+    function setSystemAction(action, requestType, flow) {
+        state.systemAction = action || '공통 - 사용자 ID 신청';
+        state.systemActionFlow = flow || '';
+        state.actionLocked = true;
+        if (activeSystemFlow().noResource) state.selectedIds = [];
+        if (flow === 'id-request') resetUserIdCheck();
+        if (requestType) state.requestType = requestType === 'delete' ? 'delete' : 'use';
+        Array.prototype.slice.call(document.querySelectorAll('.system-request-option')).forEach(function (button) {
+            button.classList.toggle('is-active', button.getAttribute('data-system-action') === state.systemAction);
+        });
+        var radio = qs(state.requestType === 'delete' ? 'request-type-delete' : 'request-type-use');
+        if (radio) radio.checked = true;
+        syncRequestTypeUI();
+        updateSystemActionText();
+        syncSystemRequestPanel();
+        applyResourceFilters();
+        renderResources();
+        renderSelected();
+        setFormStep(1);
+    }
+    function syncSystemRequestPanel() {
+        var system = isSystemRequestMode();
+        var panel = qs('system-request-panel');
+        var typePanel = qs('request-type-panel');
+        var categoryTabs = document.querySelector('.request-category-tabs');
+        if (panel) panel.hidden = !system || state.actionLocked;
+        if (typePanel) typePanel.hidden = system || state.actionLocked;
+        if (categoryTabs) categoryTabs.hidden = state.actionLocked;
+        if (system) updateSystemActionText();
+        else syncRequestTypeUI();
+        updateActionSummary();
+        setFormStep(state.currentStep || 1);
+    }
+    function clearRequestAction() {
+        state.requestType = '';
+        state.systemAction = '';
+        state.systemActionFlow = '';
+        state.actionLocked = false;
+        state.requestedUserId = '';
+        resetUserIdCheck();
+        state.selectedIds = [];
+        setResourceErrors([]);
+        Array.prototype.slice.call(document.querySelectorAll('input[name="requestType"]')).forEach(function (input) { input.checked = false; });
+        Array.prototype.slice.call(document.querySelectorAll('.request-type-card')).forEach(function (card) { card.classList.remove('is-active'); });
+        Array.prototype.slice.call(document.querySelectorAll('.system-request-option')).forEach(function (button) { button.classList.remove('is-active'); });
+        var hidden = qs('request-system-action');
+        if (hidden) hidden.value = '';
+        renderSelected();
+        renderResources();
+        syncSystemRequestPanel();
+        setFormStep(1);
     }
     function ensureTodayButton(instance) {
         var container = instance && instance.calendarContainer;
@@ -423,7 +802,7 @@
             var kinds = resourceKinds(row).join('/');
             return '<div class="selected-resource-item" data-id="' + esc(row.id) + '">' +
                 '<div><strong>' + esc(row.resource_name || '-') + '</strong>' +
-                '<span>' + esc(kinds || '-') + ' · ' + esc(categoryLabel(row)) + ' · ' + esc((row.endpoints || []).length ? ((row.endpoints || []).length + '개 접속점') : (primaryUrl(row) || '-')) + '</span></div>' +
+                '<span>' + esc(kinds || '-') + ' · ' + esc(categoryPath(row)) + ' · ' + esc((row.endpoints || []).length ? ((row.endpoints || []).length + '개 접속점') : (primaryUrl(row) || '-')) + '</span></div>' +
                 '<button type="button" class="action-chip action-danger" data-remove-selected="' + esc(row.id) + '">삭제</button>' +
                 '</div>';
         }).join('');
@@ -431,7 +810,7 @@
     function populateCategoryFilter() {
         var select = qs('request-category-filter');
         var previous = select.value || '';
-        var fixed = ['', '내부 서비스', '외부 서비스', '관리 콘솔', '기타'];
+        var fixed = ['', '시스템', '서비스', '컨테이너', '관리콘솔'];
         select.innerHTML = fixed.map(function (name) {
             return '<option value="' + esc(name) + '">' + esc(name || '전체') + '</option>';
         }).join('');
@@ -448,11 +827,47 @@
             qs('request-category-filter').value = state.category || '';
             syncSearchSelect(qs('request-category-filter'));
         }
+        syncCategoryDetailFilter();
+        syncSystemRequestPanel();
+    }
+    function syncCategoryDetailFilter() {
+        var wrap = qs('request-category-detail-wrap');
+        var select = qs('request-category-detail-filter');
+        var opWrap = qs('request-work-operation-wrap');
+        var opSelect = qs('request-work-operation-filter');
+        var isConsole = (state.category || '') === '관리콘솔';
+        if (wrap) wrap.hidden = !isConsole;
+        if (select) {
+            select.disabled = !isConsole;
+            if (!isConsole) {
+                state.categoryDetail = '';
+                select.value = '';
+            }
+            syncSearchSelect(select);
+        }
+        if (opWrap) opWrap.hidden = isConsole;
+        if (opSelect) {
+            opSelect.disabled = isConsole;
+            if (isConsole) {
+                state.workOperationCode = '';
+                opSelect.value = '';
+            }
+            syncSearchSelect(opSelect);
+        }
+    }
+    function populateWorkOperationFilter() {
+        var select = qs('request-work-operation-filter');
+        if (!select) return;
+        select.innerHTML = operationOptionsHtml();
+        select.value = state.workOperationCode || '';
+        syncSearchSelect(select);
     }
     function applyResourceFilters() {
         var keyword = (qs('request-resource-search').value || '').trim().toLowerCase();
         var kind = (qs('request-kind-filter').value || '').trim();
         var category = (state.category || qs('request-category-filter').value || '').trim();
+        var detail = state.categoryDetail || '';
+        var operation = state.workOperationCode || '';
         var status = (qs('request-status-filter').value || '').trim();
         var hideOwned = !!(qs('request-hide-owned') && qs('request-hide-owned').checked);
         state.filteredResources = state.resources.filter(function (row) {
@@ -462,12 +877,14 @@
             if (hideOwned && isDeleteRequestMode() && rowStatus.code !== 'available') return false;
             if (kind && kinds.indexOf(kind) < 0) return false;
             if (category && categoryLabel(row) !== category) return false;
+            if (category === '관리콘솔' && detail && categoryDetail(row) !== detail) return false;
+            if (category !== '관리콘솔' && operation && workOperationCode(row) !== operation) return false;
             if (status === 'selectable' && rowStatus.reason) return false;
             if (status && status !== 'selectable') {
                 if (!(isDeleteRequestMode() && status === 'accessible' && rowStatus.code === 'available') && rowStatus.code !== status) return false;
             }
             if (keyword) {
-                var hay = [row.resource_name, row.resource_url, row.primary_url, row.category_name, categoryLabel(row), row.description, row.host_address, row.protocol, row.port_number, row.login_account, row.tags, row.access_status].concat(kinds);
+                var hay = [row.resource_name, row.resource_url, row.primary_url, row.category_name, row.category_detail, row.work_operation_code, workOperationLabel(row), categoryPath(row), row.description, row.host_address, row.protocol, row.port_number, row.login_account, row.tags, row.access_status].concat(kinds);
                 (row.endpoints || []).forEach(function (ep) { hay.push(ep.url, ep.host, ep.protocol, ep.kind, ep.label, ep.port, ep.url_path); });
                 if (hay.join(' ').toLowerCase().indexOf(keyword) < 0) return false;
             }
@@ -486,11 +903,10 @@
         return (rows || []).filter(function (row) { return !disabledReason(row); });
     }
     function renderKindTags(row) {
-        var kinds = resourceKinds(row);
-        if (!kinds.length) return '<span class="ac-meta">-</span>';
-        return kinds.map(function (kind) {
-            kind = String(kind || '').toUpperCase();
-            return '<span class="endpoint-kind-tag kind-' + esc(kind) + '">' + esc(kind) + '</span>';
+        var pairs = protocolKindPairs(row);
+        if (!pairs.length) return '<span class="ac-meta">-</span>';
+        return pairs.map(function (label) {
+            return '<span class="request-protocol-kind-tag">' + esc(label) + '</span>';
         }).join(' ');
     }
     function selectRows(rows, label) {
@@ -562,7 +978,7 @@
         var pageSelectable = selectableRows(rows);
         var pageSelected = pageSelectable.filter(function (row) { return state.selectedIds.indexOf(Number(row.id)) >= 0; }).length;
         var headerCheck = qs('request-select-page-check');
-        qs('request-resource-page-info').textContent = total ? ((start + 1) + '-' + Math.min(total, start + rows.length) + ' / ' + total + '개') : '0개 항목';
+        qs('request-resource-page-info').textContent = total ? ((start + 1) + '-' + Math.min(total, start + rows.length) + ' / ' + total + '개 항목') : '0-0 / 0개 항목';
         qs('request-available-count').textContent = available + '개';
         qs('request-filtered-count').textContent = '필터 결과 ' + total + '개';
         qs('request-resource-prev').disabled = state.resourcePage <= 1;
@@ -573,7 +989,7 @@
             headerCheck.indeterminate = pageSelected > 0 && pageSelected < pageSelectable.length;
             headerCheck.disabled = !pageSelectable.length;
         }
-        if (!rows.length) { list.innerHTML = '<tr><td colspan="7"><div class="resource-picker-empty">검색 결과가 없습니다.</div></td></tr>'; return; }
+        if (!rows.length) { list.innerHTML = '<tr><td colspan="8"><div class="resource-picker-empty">검색 결과가 없습니다.</div></td></tr>'; return; }
         list.innerHTML = rows.map(function (row) {
             var selected = state.selectedIds.indexOf(Number(row.id)) >= 0;
             var status = resourceStatus(row);
@@ -584,10 +1000,10 @@
                 '<td class="resource-check-col"><input type="checkbox" class="request-resource-check" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + (disabled ? ' disabled' : '') + ' aria-label="' + esc(row.resource_name || '자원') + ' 선택"></td>' +
                 '<td class="resource-picker-main"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
                 '<td>' + renderKindTags(row) + '</td>' +
-                '<td>' + esc(categoryLabel(row)) + '</td>' +
+                '<td>' + esc(categoryPath(row)) + '</td>' +
+                '<td>' + esc(workOperationLabel(row) || '-') + '</td>' +
                 '<td>' + endpointSummary(row) + '</td>' +
-                '<td><span class="status-badge ' + esc(status.badge) + '">' + esc(status.label) + '</span></td>' +
-                '<td class="resource-reason-cell">' + esc(reason || '-') + '</td>' +
+                '<td class="request-resource-status-cell"><span class="request-resource-status ' + esc(status.badge) + '"><span class="request-resource-status-dot" aria-hidden="true"></span><span class="request-resource-status-text">' + esc(status.label) + '</span></span></td>' +
                 '</tr>';
         }).join('');
     }
@@ -601,8 +1017,11 @@
     }
     function setRequestType(type, clearSelection) {
         var nextType = requestTypeValue(type);
-        if (state.requestType === nextType && !clearSelection) return;
+        if (state.requestType === nextType && !clearSelection && state.actionLocked) return;
         state.requestType = nextType;
+        state.systemAction = '';
+        state.systemActionFlow = '';
+        state.actionLocked = true;
         if (clearSelection) {
             state.selectedIds = [];
             setResourceErrors([]);
@@ -614,6 +1033,8 @@
         renderResources();
         renderSelected();
         syncRequestTypeUI();
+        syncSystemRequestPanel();
+        setFormStep(1);
     }
     function seedSelectedFromNavigation() {
         if (state.seededFromNavigation) return;
@@ -648,31 +1069,102 @@
         return esc(kinds.join(' / '));
     }
     function resourceCategory(row) {
-        return categoryLabel(row);
+        return categoryPath(row);
     }
     function resourceTarget(row) {
         return primaryUrl(row) || row.resource_url || row.host_address || '-';
     }
-    function renderResourceStatusTable(items, canAct) {
+    function reasonMeta(item) {
+        var reason = String((item && item.reason) || '');
+        var idMatch = reason.match(/\[신청 ID\]\s*([^\n]+)/);
+        var typeMatch = reason.match(/\[신청 유형\]\s*([^\n]+)/);
+        var requestedId = idMatch ? idMatch[1].trim().replace(/\s+/g, '_') : '';
+        return {
+            requestedId: requestedId,
+            systemAction: typeMatch ? typeMatch[1].trim() : '',
+            cleanReason: reason
+                .replace(/\[신청 ID\]\s*[^\n]*\n?/g, '')
+                .replace(/\[신청 유형\]\s*[^\n]*\n?/g, '')
+                .trim()
+        };
+    }
+    function requestCategoryAndAction(item) {
+        var meta = reasonMeta(item);
+        var action = meta.systemAction || '';
+        var parts = action.split(/\s*-\s*/);
+        if (parts.length >= 2) {
+            return {
+                category: parts.shift().trim() || '-',
+                action: parts.join(' - ').trim() || '-'
+            };
+        }
+        return {
+            category: item.request_type_label || requestTypeLabel(item.request_type === '삭제' ? 'delete' : 'use'),
+            action: action || '-'
+        };
+    }
+    function isInternalRequestResource(row) {
+        return String((row && (row.resource_url || row.primary_url || row.host_address)) || '').trim() === '__internal_user_id_request__';
+    }
+    function detailResourceTarget(row, item) {
+        var meta = reasonMeta(item);
+        if (isInternalRequestResource(row)) return meta.requestedId || meta.systemAction || row.resource_name || '-';
+        return resourceTarget(row);
+    }
+    function timelineDate(value) {
+        return value ? String(value).replace('T', ' ').slice(0, 16) : '';
+    }
+    function renderApprovalTimeline(item, approvals) {
+        var steps = [{
+            role: '기안',
+            actor: item.requester_name || item.requester_emp_no || '신청자',
+            status: '기안',
+            time: timelineDate(item.submitted_at || item.created_at),
+            note: item.request_no || ''
+        }];
+        (approvals || []).forEach(function (row) {
+            var status = row.approval_status || '-';
+            var actedAt = timelineDate(row.acted_at || row.approved_at || row.rejected_at || row.updated_at);
+            steps.push({
+                role: row.phase_name || row.phase_code || '승인',
+                actor: row.approver_name || row.approver_emp_no || '승인자',
+                status: status,
+                time: actedAt || (status === '승인대기' || status === '승인 대기' ? '대기 중' : ''),
+                note: row.opinion || row.rejected_reason || ''
+            });
+        });
+        return '<div class="approval-stepper">' + steps.map(function (step, idx) {
+            var label = step.actor + ' ' + step.status;
+            if (step.role === '기안') label = step.actor + ' 기안';
+            return '' +
+                '<div class="approval-step approval-step-' + esc(statusStateClass(step.status)) + '">' +
+                    '<div class="approval-step-marker">' + esc(String(idx + 1)) + '</div>' +
+                    '<div class="approval-step-body">' +
+                        '<strong>' + esc(label) + '</strong>' +
+                        '<span>' + esc(step.role) + (step.time ? ' · ' + esc(step.time) : '') + '</span>' +
+                        (step.note ? '<p>' + esc(step.note) + '</p>' : '') +
+                    '</div>' +
+                '</div>' +
+                (idx < steps.length - 1 ? '<div class="approval-step-arrow" aria-hidden="true">→</div>' : '');
+        }).join('') + '</div>';
+    }
+    function renderResourceStatusTable(items, canAct, item) {
         if (!items.length) return '<div class="empty-state compact">자원 항목이 없습니다.</div>';
+        var hasCheck = canAct && items.some(function (row) { return row.item_status === '승인대기'; });
         return '<div class="request-item-table-wrap"><table class="request-item-table">' +
             '<thead><tr>' +
-                '<th class="request-item-check-cell" aria-label="선택"></th>' +
+                (hasCheck ? '<th class="request-item-check-cell" aria-label="선택"></th>' : '') +
                 '<th class="request-item-name-cell">자원</th>' +
-                '<th class="request-item-kind-cell">유형</th>' +
-                '<th class="request-item-category-cell">구분</th>' +
                 '<th class="request-item-target-cell">대상</th>' +
                 '<th class="request-item-status-cell">상태</th>' +
                 '<th class="request-item-reason-cell">반려 사유</th>' +
             '</tr></thead><tbody>' + items.map(function (row) {
                 var canCheck = canAct && row.item_status === '승인대기';
                 return '<tr data-item-id="' + esc(row.id) + '">' +
-                    '<td class="request-item-check-cell">' + (canCheck ? '<input type="checkbox" class="request-item-check" value="' + esc(row.id) + '" aria-label="' + esc(row.resource_name || '자원') + ' 선택">' : '') + '</td>' +
+                    (hasCheck ? '<td class="request-item-check-cell">' + (canCheck ? '<input type="checkbox" class="request-item-check" value="' + esc(row.id) + '" aria-label="' + esc(row.resource_name || '자원') + ' 선택">' : '') + '</td>' : '') +
                     '<td class="request-item-name-cell"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
-                    '<td class="request-item-kind-cell">' + renderResourceKindText(row) + '</td>' +
-                    '<td class="request-item-category-cell">' + esc(resourceCategory(row)) + '</td>' +
-                    '<td class="request-item-target-cell"><span class="request-item-target">' + esc(resourceTarget(row)) + '</span></td>' +
-                    '<td class="request-item-status-cell">' + formatStatus(row.item_status || '-') + '</td>' +
+                    '<td class="request-item-target-cell"><span class="request-item-target">' + esc(detailResourceTarget(row, item)) + '</span></td>' +
+                    '<td class="request-item-status-cell">' + formatStatusPlain(row.item_status || '-') + '</td>' +
                     '<td class="request-item-reason-cell">' + (row.reject_reason ? esc(row.reject_reason) : '<span class="request-item-empty">-</span>') + '</td>' +
                     '</tr>';
             }).join('') + '</tbody></table></div>';
@@ -687,7 +1179,9 @@
         var pendingItems = items.filter(function (row) { return row.item_status === '승인대기'; });
         var resourceCount = item.resource_count || items.length || 0;
         var approverText = esc(item.approver_name || item.approver_emp_no || '-');
+        var meta = reasonMeta(item);
         if (item.delegated) approverText += ' <span class="delegation-chip">대무 승인</span>';
+        var categoryAction = requestCategoryAndAction(item);
         return '' +
             '<div class="request-detail-summary">' +
                 '<div>' +
@@ -700,22 +1194,24 @@
             '<div class="detail-box detail-box-main">' +
                 '<div class="detail-box-title"><strong>기본 정보</strong><span>' + esc(resourceCount) + '개 자원</span></div>' +
                 '<div class="detail-kv-grid">' +
+                    '<div class="detail-kv"><span>신청 구분</span><strong>' + esc(categoryAction.category) + '</strong></div>' +
+                    '<div class="detail-kv"><span>신청 작업</span><strong>' + esc(categoryAction.action) + '</strong></div>' +
                     '<div class="detail-kv"><span>신청 유형</span><strong>' + esc(item.request_type_label || requestTypeLabel(item.request_type === '삭제' ? 'delete' : 'use')) + '</strong></div>' +
                     '<div class="detail-kv"><span>신청자</span><strong>' + esc(item.requester_name || '-') + '</strong></div>' +
                     '<div class="detail-kv"><span>승인자</span><strong>' + approverText + '</strong></div>' +
                     '<div class="detail-kv"><span>긴급 여부</span><strong>' + esc(Number(item.emergency_flag || 0) ? '긴급' : '일반') + '</strong></div>' +
                     '<div class="detail-kv"><span>제출일</span><strong>' + esc(item.submitted_at || item.created_at || '-') + '</strong></div>' +
+                    (meta.systemAction ? '<div class="detail-kv"><span>신청 작업</span><strong>' + esc(meta.systemAction) + '</strong></div>' : '') +
+                    (meta.requestedId ? '<div class="detail-kv"><span>신청 ID</span><strong>' + esc(meta.requestedId) + '</strong></div>' : '') +
                     (item.delegated ? '<div class="detail-kv"><span>원 승인자</span><strong>' + esc(item.delegated_from_name || '-') + '</strong></div>' : '') +
                 '</div>' +
-                '<div class="detail-reason"><span>신청 사유</span><p>' + esc(item.reason || '-') + '</p></div>' +
+                '<div class="detail-reason"><span>신청 사유</span><p>' + esc(meta.cleanReason || '-') + '</p></div>' +
             '</div>' +
             '<div class="detail-box"><div class="detail-box-title"><strong>자원별 상태</strong><span>' + esc(items.length) + '건</span></div>' +
-            renderResourceStatusTable(items, canAct) +
+            renderResourceStatusTable(items, canAct, item) +
             (canAct && pendingItems.length ? '<div class="detail-actions"><button type="button" class="action-chip action-primary" data-detail-action="approve-all" data-id="' + esc(item.id) + '">전체 승인</button><button type="button" class="action-chip action-danger" data-detail-action="reject-all" data-id="' + esc(item.id) + '">전체 반려</button><span class="detail-actions-divider"></span><button type="button" class="action-chip action-primary" data-detail-action="approve-selected" data-id="' + esc(item.id) + '">선택 승인</button><button type="button" class="action-chip action-danger" data-detail-action="reject-selected" data-id="' + esc(item.id) + '">선택 반려</button></div>' : '') +
             '</div>' +
-            '<div class="detail-box"><div class="detail-box-title"><strong>승인 타임라인</strong><span>' + esc(approvals.length) + '단계</span></div>' + (approvals.length ? approvals.map(function (row) {
-                return '<div class="approval-line"><div><strong>' + esc(row.phase_name || row.phase_code || '-') + '</strong><span>' + esc(row.approver_name || row.approver_emp_no || '-') + '</span></div>' + formatStatus(row.approval_status || '-') + '<p>' + esc(row.opinion || row.rejected_reason || '등록된 의견이 없습니다.') + '</p></div>';
-            }).join('') : '<div>승인 이력이 없습니다.</div>') + '</div>';
+            '<div class="detail-box"><div class="detail-box-title"><strong>승인 타임라인</strong><span>' + esc(approvals.length + 1) + '단계</span></div>' + renderApprovalTimeline(item, approvals) + '</div>';
     }
     function renderDetail(item) {
         var panel = qs('request-detail-panel');
@@ -754,7 +1250,7 @@
             return;
         }
         body.innerHTML = rows.map(function (row) {
-            var actions = ['<button class="action-chip action-muted" data-action="detail" data-id="' + row.id + '">상세</button>'];
+            var actions = ['<button class="action-chip action-muted request-detail-icon-button" data-action="detail" data-id="' + row.id + '" aria-label="상세" title="상세"><img src="/static/image/svg/free-icon-font-summary-check.svg" alt="" aria-hidden="true"></button>'];
             if (state.segment === 'mine' && (row.request_status === '승인대기' || row.request_status === '제출')) actions.push('<button class="action-chip action-danger" data-action="cancel" data-id="' + row.id + '">취소</button>');
             if (state.segment === 'mine' && (row.request_status === '반려' || row.request_status === '만료')) actions.push('<button class="action-chip action-primary" data-action="reapply" data-id="' + row.id + '">재신청</button>');
             if (canApproveRequest(row)) {
@@ -774,6 +1270,13 @@
                 '<td><span class="action-stack">' + actions.join(' ') + '</span></td>' +
                 '</tr>';
         }).join('');
+        Array.prototype.slice.call(body.querySelectorAll('tr')).forEach(function (tr, index) {
+            var categoryAction = requestCategoryAndAction(rows[index] || {});
+            if (tr.children[2]) tr.children[2].textContent = categoryAction.category;
+            var actionCell = document.createElement('td');
+            actionCell.textContent = categoryAction.action;
+            tr.insertBefore(actionCell, tr.children[3] || null);
+        });
         qs('request-table-state').hidden = true;
         qs('request-table').hidden = false;
         state.selectedRequest = null;
@@ -791,9 +1294,11 @@
         }).catch(function (err) { setTableState(err.message); });
     }
     function loadBaseData() {
-        return Promise.all([fetchJson('/api/access-control/resources'), fetchJson('/api/session/me')]).then(function (results) {
+        return Promise.all([fetchJson('/api/access-control/resources'), fetchJson('/api/session/me'), fetchJson('/api/work-operations')]).then(function (results) {
             state.resources = results[0].rows || [];
             state.sessionUser = (results[1].user || {});
+            state.workOperations = results[2].items || results[2].rows || [];
+            populateWorkOperationFilter();
             populateCategoryFilter();
             syncCategoryTabs();
             applyResourceFilters();
@@ -806,10 +1311,17 @@
     function validateForm() {
         var reason = qs('request-reason').value.trim();
         setResourceErrors([]);
-        if (!state.selectedIds.length) return '신청 대상 자원을 선택하세요.';
+        if (!actionReady()) return '신청 유형을 먼저 선택하세요.';
+        if (isUserIdRequestFlow()) {
+            var id = normalizeRequestedUserId(qs('request-user-id') && qs('request-user-id').value);
+            var idMessage = validateRequestedUserId(id);
+            if (idMessage) return idMessage;
+            if (!state.userIdAvailable || state.userIdChecked !== id) return '사용자 ID 중복 점검을 완료하세요.';
+        }
+        if (requiresResourceSelection() && !state.selectedIds.length) return '신청 대상 자원을 선택하세요.';
         if (!reason) return '신청 사유를 입력하세요.';
         if (reason.length < REASON_MIN_LENGTH) return (isDeleteRequestMode() ? '삭제 사유' : '신청 사유') + '는 10자 이상 입력하세요.';
-        if (isDeleteRequestMode()) return '';
+        if (!requiresPeriod()) return '';
         if (!qs('request-start-date').value) return '사용 시작일을 입력하세요.';
         if (!isPermanentMode() && !qs('request-end-date').value) return '사용 종료일을 입력하세요.';
         if (!isPermanentMode() && qs('request-start-date').value > qs('request-end-date').value) return '시작일은 종료일보다 늦을 수 없습니다.';
@@ -817,20 +1329,21 @@
     }
     function openConfirm(payload) {
         var isDelete = payload.request_type === 'delete';
-        var period = isDelete ? '삭제 승인 후 권한 회수' : formatPeriod(payload.request_start_date, payload.request_end_date);
+        var period = payload.request_period_type === 'user_id_request' ? '사용자 ID 중복 점검 후 처리' : (payload.request_period_type === 'system_action' ? '계정 작업 승인 후 처리' : (isDelete ? '삭제 승인 후 권한 회수' : formatPeriod(payload.request_start_date, payload.request_end_date)));
         var approver = qs('request-approver').value || '-알 수 없음-';
         var emergency = payload.emergency_flag ? '긴급' : '일반';
+        var displayLabel = requestDisplayLabel(payload);
         var reason = payload.reason || '-';
         if (reason.length > 120) reason = reason.slice(0, 120) + '...';
         state.pendingPayload = payload;
         qs('request-confirm-title').textContent = isDelete ? '접근 삭제 신청 확인' : '접근 사용 신청 확인';
         qs('request-confirm-body').innerHTML = '' +
             '<div class="confirm-summary-card">' +
-                '<div class="confirm-metric"><span>신청 자원</span><strong>' + esc(payload.resource_ids.length) + '개</strong></div>' +
-                '<div class="confirm-state"><span class="confirm-state-dot"></span>' + esc(requestTypeLabel(payload.request_type)) + ' 승인 대기 생성</div>' +
+                '<div class="confirm-metric"><span>' + esc(payload.resource_ids.length ? '신청 자원' : '신청 대상') + '</span><strong>' + esc(payload.resource_ids.length ? (payload.resource_ids.length + '개') : '내 사용자 ID') + '</strong></div>' +
+                '<div class="confirm-state"><span class="confirm-state-dot"></span>' + esc(displayLabel) + ' 승인 대기 생성</div>' +
             '</div>' +
             '<div class="confirm-detail-grid">' +
-                '<div class="confirm-row"><span>신청 유형</span><strong>' + esc(requestTypeLabel(payload.request_type)) + '</strong></div>' +
+                '<div class="confirm-row"><span>신청 유형</span><strong>' + esc(displayLabel) + '</strong></div>' +
                 '<div class="confirm-row"><span>사용 기간</span><strong>' + esc(period) + '</strong></div>' +
                 '<div class="confirm-row"><span>승인자</span><strong>' + esc(approver) + '</strong></div>' +
                 '<div class="confirm-row"><span>긴급 여부</span><strong>' + esc(emergency) + '</strong></div>' +
@@ -854,15 +1367,28 @@
         event.preventDefault();
         var message = validateForm();
         var today = formatDate(new Date());
+        var reason = qs('request-reason').value.trim();
+        var systemAction = isSystemRequestMode() ? (state.systemAction || '') : '';
+        var requestedUserId = isUserIdRequestFlow() ? normalizeRequestedUserId(qs('request-user-id') && qs('request-user-id').value) : '';
         if (message) { setMessage(message, 'error'); return; }
+        if (systemAction && reason.indexOf('[신청 유형]') !== 0) {
+            reason = '[신청 유형] ' + systemAction + '\n\n' + reason;
+        }
+        if (requestedUserId && reason.indexOf('[신청 ID]') < 0) {
+            reason = '[신청 ID] ' + requestedUserId + '\n' + reason;
+        }
+        var needsPeriod = requiresPeriod();
+        var needsResource = requiresResourceSelection();
         openConfirm({
             request_type: state.requestType,
-            resource_ids: state.selectedIds.slice(),
-            reason: qs('request-reason').value.trim(),
-            request_start_date: isDeleteRequestMode() ? today : qs('request-start-date').value,
-            request_end_date: isDeleteRequestMode() ? today : (isPermanentMode() ? PERMANENT_END_DATE : qs('request-end-date').value),
-            request_period_type: isDeleteRequestMode() ? 'delete' : (isPermanentMode() ? 'permanent' : 'range'),
-            permanent_access: (!isDeleteRequestMode() && isPermanentMode()) ? 1 : 0,
+            resource_ids: needsResource ? state.selectedIds.slice() : [],
+            reason: reason,
+            system_action: systemAction,
+            requested_user_id: requestedUserId,
+            request_start_date: needsPeriod ? qs('request-start-date').value : today,
+            request_end_date: needsPeriod ? (isPermanentMode() ? PERMANENT_END_DATE : qs('request-end-date').value) : today,
+            request_period_type: needsPeriod ? (isPermanentMode() ? 'permanent' : 'range') : (!needsResource ? 'user_id_request' : (isDeleteRequestMode() ? 'delete' : 'system_action')),
+            permanent_access: (needsPeriod && isPermanentMode()) ? 1 : 0,
             emergency_flag: qs('request-emergency-flag').value === '1' ? 1 : 0
         });
     }
@@ -872,12 +1398,13 @@
         var originalText = btn.textContent;
         btn.disabled = true;
         btn.textContent = '제출 중...';
-        var submittedLabel = requestTypeLabel(state.pendingPayload.request_type);
+        var submittedLabel = requestDisplayLabel(state.pendingPayload);
         postJson('/api/access-control/requests', state.pendingPayload)
             .then(function () {
                 closeConfirm();
                 state.selectedIds = [];
                 qs('request-reason').value = '';
+                setFormStep(1);
                 renderSelected();
                 renderResources();
                 switchSegment('mine');
@@ -953,6 +1480,54 @@
         });
         form.noValidate = true;
         form.addEventListener('submit', submitRequest);
+        Array.prototype.slice.call(document.querySelectorAll('.request-step')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                var target = Number(button.getAttribute('data-request-step')) || 1;
+                var current = state.currentStep || 1;
+                var message;
+                if (target > current) {
+                    message = validateStep(current);
+                    if (message) { setMessage(message, 'error'); return; }
+                    if (target > current + 1) {
+                        message = validateStep(current + 1);
+                        if (message) { setMessage(message, 'error'); return; }
+                    }
+                }
+                setFormStep(target);
+                setMessage('');
+            });
+        });
+        qs('request-step-next').addEventListener('click', function () {
+            var message = validateStep(state.currentStep || 1);
+            if (message) { setMessage(message, 'error'); return; }
+            setFormStep((state.currentStep || 1) + 1);
+            setMessage('');
+        });
+        qs('request-step-prev').addEventListener('click', function () {
+            setFormStep((state.currentStep || 1) - 1);
+            setMessage('');
+        });
+        Array.prototype.slice.call(document.querySelectorAll('.system-request-option')).forEach(function (button) {
+            button.addEventListener('click', function () {
+                setSystemAction(button.getAttribute('data-system-action'), button.getAttribute('data-request-type'), button.getAttribute('data-flow'));
+                setMessage('');
+            });
+        });
+        if (qs('request-user-id')) {
+            qs('request-user-id').addEventListener('input', function () {
+                state.requestedUserId = normalizeRequestedUserId(qs('request-user-id').value);
+                resetUserIdCheck();
+            });
+        }
+        if (qs('request-user-id-check')) {
+            qs('request-user-id-check').addEventListener('click', checkRequestedUserId);
+        }
+        if (qs('request-action-change')) {
+            qs('request-action-change').addEventListener('click', function () {
+                clearRequestAction();
+                setMessage('신청 유형을 다시 선택하세요.', 'success');
+            });
+        }
         qs('request-table-body').addEventListener('click', handleTableAction);
         qs('request-table-state').addEventListener('click', function (event) {
             var button = event.target.closest('button[data-switch-main-tab]');
@@ -960,18 +1535,42 @@
         });
         qs('request-resource-search').addEventListener('input', function () { applyResourceFilters(); renderResources(); });
         qs('request-kind-filter').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
-        qs('request-category-filter').addEventListener('change', function () { state.category = qs('request-category-filter').value || ''; syncCategoryTabs(); applyResourceFilters(); renderResources(); });
+        qs('request-category-filter').addEventListener('change', function () {
+            state.category = qs('request-category-filter').value || '';
+            if (state.category !== '관리콘솔') state.categoryDetail = '';
+            else state.workOperationCode = '';
+            syncCategoryTabs();
+            applyResourceFilters();
+            renderResources();
+        });
+        if (qs('request-category-detail-filter')) {
+            qs('request-category-detail-filter').addEventListener('change', function () {
+                state.categoryDetail = normalizeConsoleGroup(qs('request-category-detail-filter').value || '');
+                applyResourceFilters();
+                renderResources();
+            });
+        }
+        if (qs('request-work-operation-filter')) {
+            qs('request-work-operation-filter').addEventListener('change', function () {
+                state.workOperationCode = qs('request-work-operation-filter').value || '';
+                applyResourceFilters();
+                renderResources();
+            });
+        }
         qs('request-status-filter').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
         qs('request-hide-owned').addEventListener('change', function () { applyResourceFilters(); renderResources(); });
         Array.prototype.slice.call(document.querySelectorAll('input[name="requestType"]')).forEach(function (input) {
             input.addEventListener('change', function () {
                 setRequestType(input.value, true);
-                setMessage(requestTypeLabel() + ' 모드로 전환했습니다.', 'success');
+                setMessage('');
             });
         });
         Array.prototype.slice.call(document.querySelectorAll('.request-category-tabs .system-tab-btn[data-category]')).forEach(function (button) {
             button.addEventListener('click', function () {
                 state.category = button.getAttribute('data-category') || '';
+                if (state.category !== '관리콘솔') state.categoryDetail = '';
+                else state.workOperationCode = '';
+                clearRequestAction();
                 syncCategoryTabs();
                 applyResourceFilters();
                 renderResources();
@@ -992,7 +1591,10 @@
         qs('request-reset-filters').addEventListener('click', function () {
             qs('request-resource-search').value = '';
             qs('request-kind-filter').value = '';
-            state.category = '';
+            state.categoryDetail = '';
+            state.workOperationCode = '';
+            if (qs('request-category-detail-filter')) qs('request-category-detail-filter').value = '';
+            if (qs('request-work-operation-filter')) qs('request-work-operation-filter').value = '';
             syncCategoryTabs();
             qs('request-status-filter').value = '';
             syncSearchSelect(document);
@@ -1063,6 +1665,7 @@
         applyQuickPeriod(7);
         syncRequestTypeUI();
         syncPeriodMode();
+        setFormStep(1);
         loadBaseData().then(loadRequests).catch(function (err) { setTableState(err.message); });
     });
 })();

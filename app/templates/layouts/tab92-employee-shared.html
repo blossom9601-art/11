@@ -11,8 +11,8 @@
 
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
-    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=1.5">
-    <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.4"></script>
+    <link rel="stylesheet" href="/static/css/tab92-employee.css?v=2.2">
+    <script defer src="/static/js/_detail/tab92-employee-shared.js?v=1.9"></script>
 </head>
 <body class="page-tab92-employee-shared {{ tab92.body_class|default('page-workgroup-manager') }}" data-cat-detail-id="{{ cat_detail_id or '' }}" data-work-group-public-id="{{ work_group_public_id or '' }}">
     {% include 'layouts/_header.html' %}
@@ -44,27 +44,31 @@
 
             <div class="server-detail-content">
                 <div class="server-detail-pane active" id="basic">
-                    <div class="detail-header-actions" aria-label="담당자 상단 동작">
-                        <button class="add-btn-icon" id="mg-email-send-btn" title="사내메일 전송" type="button" aria-label="사내메일 전송">
-                            <img src="/static/image/svg/free-icon-font-envelope-bulk.svg" alt="사내메일 전송">
+
+                    <div class="detail-header-actions" aria-label="담당자 상단 동작" style="display: flex; gap: 8px; align-items: center;">
+                        <button class="add-btn-icon" id="mgr-role-manage-btn" title="역할 관리" type="button" aria-label="역할 관리">
+                            <img src="/static/image/svg/free-icon-font-badge-check.svg" alt="역할 관리">
                         </button>
-                        <div class="page-size-selector" id="hw-page-size-wrap" aria-label="보기 개수">
-                            <label for="hw-page-size" class="visually-hidden">보기 개수</label>
-                            <select id="hw-page-size" class="page-size-select" title="보기 개수">
-                                <option value="10">10개</option>
-                                <option value="20">20개</option>
-                                <option value="50">50개</option>
-                                <option value="100">100개</option>
-                            </select>
-                        </div>
                         <button class="add-btn-icon" id="hw-row-add" title="행 추가" type="button" aria-label="행 추가">
                             <img src="/static/image/svg/free-icon-add.svg" alt="행 추가">
+                        </button>
+                        <button class="add-btn-icon" id="mg-email-send-btn" title="사내메일 전송" type="button" aria-label="사내메일 전송" style="margin-left:auto;">
+                            <img src="/static/image/svg/free-icon-font-envelope-bulk.svg" alt="사내메일 전송">
                         </button>
                     </div>
 
                     <div class="detail-section">
                         <h3>
-                            {{ tab92.section_title|default('담당자 정보') }}
+                            <span>{{ tab92.section_title|default('담당자 정보') }}</span>
+                            <div class="page-size-selector toolbar-style" id="hw-page-size-wrap" aria-label="보기 개수">
+                                <label for="hw-page-size" class="visually-hidden">보기 개수</label>
+                                <select id="hw-page-size" class="page-size-select" title="보기 개수">
+                                    <option value="10">10개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
                         </h3>
 
                         <div class="table-wrap">
@@ -130,6 +134,36 @@
     </main>
 
     <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
+
+    <div id="mgr-role-modal" class="server-add-modal modal-overlay-full tab92-role-modal" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>역할 관리</h3>
+                    <p class="server-add-subtitle">담당자 역할을 추가합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="mgr-role-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="tab92-role-modal-body">
+                    <div class="tab92-role-modal-list" id="mgr-role-list" aria-label="역할 목록"></div>
+                    <div class="tab92-role-modal-add">
+                        <label for="mgr-role-name" class="visually-hidden">새 역할명</label>
+                        <input type="text" class="form-input" id="mgr-role-name" autocomplete="off" placeholder="새 역할명">
+                        <button type="button" class="btn-primary" id="mgr-role-add-confirm">추가</button>
+                    </div>
+                    <p class="tab92-role-status" id="mgr-role-status" role="status" aria-live="polite"></p>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-secondary" id="mgr-role-cancel">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="mgr-email-modal" class="server-add-modal modal-overlay-full tab92-email-modal" aria-hidden="true">
         <div class="server-add-content">

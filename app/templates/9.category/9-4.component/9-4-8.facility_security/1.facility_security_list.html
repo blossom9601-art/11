@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -9,38 +9,41 @@
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.7">
-    <link rel="stylesheet" href="/static/css/category2.css?v=20260514_facility_modal_gap2">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260604_category_modal1">
+    <link rel="stylesheet" href="/static/css/shared/management-page.css?v=20260517_facility_security_modalclear1">
+    <link rel="stylesheet" href="/static/css/shared/form-builder.css?v=20260517_modular1">
+    <link rel="stylesheet" href="/static/css/modules/facility-security.css?v=20260517_modular1">
 </head>
 <body>
     {% include 'layouts/_header.html' %}
     {% include 'layouts/_sidebar.html' %}
 
     {% set facility_groups = [
-        ('security', '보안설비', [
-            ('cat_facility_security_access', 'access', '출입관리'),
-            ('cat_facility_security_data_delete', 'data_delete', '데이터삭제'),
-            ('cat_facility_security_cctv', 'cctv', '영상감시')
+        ('security', '蹂댁븞?ㅻ퉬', [
+            ('cat_facility_security_access', 'access', '異쒖엯愿由?),
+            ('cat_facility_security_data_delete', 'data_delete', '?곗씠?곗궘??),
+            ('cat_facility_security_cctv', 'cctv', '?곸긽媛먯떆')
         ]),
-        ('power', '전력설비', [
-            ('cat_facility_security_transformer', 'transformer', '변압기'),
-            ('cat_facility_security_generator', 'generator', '발전기'),
-            ('cat_facility_security_ups', 'ups', '무정전전원장치'),
-            ('cat_facility_security_battery', 'battery', '배터리')
+        ('power', '?꾨젰?ㅻ퉬', [
+            ('cat_facility_security_transformer', 'transformer', '蹂?뺢린'),
+            ('cat_facility_security_generator', 'generator', '諛쒖쟾湲?),
+            ('cat_facility_security_ups', 'ups', '臾댁젙?꾩쟾?먯옣移?),
+            ('cat_facility_security_battery', 'battery', '諛고꽣由?)
         ]),
-        ('environment', '환경설비', [
-            ('cat_facility_security_hvac', 'hvac', '항온항습기'),
-            ('cat_facility_security_thermometer', 'thermometer', '온/습도계'),
-            ('cat_facility_security_leak_detector', 'leak_detector', '누수감지'),
+        ('environment', '?섍꼍?ㅻ퉬', [
+            ('cat_facility_security_hvac', 'hvac', '??삩??뒿湲?),
+            ('cat_facility_security_thermometer', 'thermometer', '???듬룄怨?),
+            ('cat_facility_security_leak_detector', 'leak_detector', '?꾩닔媛먯?'),
             ('cat_facility_security_rack', 'rack', 'RACK')
         ]),
-        ('safety', '안전설비', [
-            ('cat_facility_security_detection', 'detection', '감지설비'),
-            ('cat_facility_security_fire_extinguishing', 'fire_extinguishing', '소화설비'),
-            ('cat_facility_security_evacuation', 'evacuation', '대피설비')
+        ('safety', '?덉쟾?ㅻ퉬', [
+            ('cat_facility_security_detection', 'detection', '媛먯??ㅻ퉬'),
+            ('cat_facility_security_fire_extinguishing', 'fire_extinguishing', '?뚰솕?ㅻ퉬'),
+            ('cat_facility_security_evacuation', 'evacuation', '??쇱꽕鍮?)
         ])
     ] %}
     {% set manual_resources = ['transformer', 'generator', 'ups', 'battery', 'hvac', 'leak_detector', 'detection', 'fire_extinguishing', 'evacuation'] %}
-    {% set ns = namespace(resource='access', label='출입관리', group='security', group_label='보안설비', manual=false) %}
+    {% set ns = namespace(resource='access', label='異쒖엯愿由?, group='security', group_label='蹂댁븞?ㅻ퉬', manual=false) %}
     {% for group_key, group_label, group_tabs in facility_groups %}
         {% for tab_key, resource_key, tab_label in group_tabs %}
             {% if current_key == tab_key %}
@@ -57,15 +60,15 @@
         <div class="content-wrapper">
             <div class="page-header">
                 <div class="page-utility-right" data-info-key="category.component"></div>
-                <h1>시설·보안 관리</h1>
-                <p>시설·보안 유형 중 <strong>{{ ns.label }}</strong> 모델을 관리합니다.</p>
+                <h1>?쒖꽕쨌蹂댁븞 愿由?/h1>
+                <p>?쒖꽕쨌蹂댁븞 ?좏삎 以?<strong>{{ ns.label }}</strong> 紐⑤뜽??愿由ы빀?덈떎.</p>
             </div>
 
-            <nav class="system-tabs facility-security-group-tabs" aria-label="시설·보안 설비 그룹">
+            <nav class="system-tabs facility-security-group-tabs" aria-label="?쒖꽕쨌蹂댁븞 ?ㅻ퉬 洹몃９">
                 {% for group_key, group_label, group_tabs in facility_groups %}
                 <div class="facility-security-group{% if ns.group == group_key %} active{% endif %}">
                     <button type="button" class="system-tab-btn facility-security-group-btn{% if ns.group == group_key %} active{% endif %}" aria-haspopup="true" aria-expanded="false" aria-controls="facility-security-dropdown-{{ group_key }}">{{ group_label }}</button>
-                    <div class="facility-security-dropdown" id="facility-security-dropdown-{{ group_key }}" aria-label="{{ group_label }} 카테고리">
+                    <div class="facility-security-dropdown" id="facility-security-dropdown-{{ group_key }}" aria-label="{{ group_label }} 移댄뀒怨좊━">
                         {% for tab_key, resource_key, tab_label in group_tabs %}
                         <a class="facility-security-dropdown-item{% if current_key == tab_key %} active{% endif %}" href="{{ url_for('pages.blossom_hub', segment=tab_key) }}">{{ tab_label }}</a>
                         {% endfor %}
@@ -74,157 +77,28 @@
                 {% endfor %}
             </nav>
 
-            <div class="tab-content single-pane">
-                <div class="tab-pane active" id="facility-security-pane">
-                    <div class="tab-header">
-                        <div class="tab-header-left">
-                            <h2>{{ ns.label }} <span class="count-badge" id="system-count">0</span></h2>
-                        </div>
-                        <div class="tab-header-right">
-                            <div class="search-container" role="search">
-                                <div class="search-input-wrapper" id="system-search-wrapper">
-                                    <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
-                                    <input type="text" id="system-search" placeholder="검색" class="search-input" aria-label="{{ ns.label }} 검색" autocomplete="off">
-                                    <button type="button" class="search-clear-btn" id="system-search-clear" title="지우기" aria-label="검색어 지우기">
-                                        <img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
-                                    </button>
-                                    <div class="search-loader" id="system-search-loader" aria-hidden="true"></div>
-                                </div>
-                            </div>
-                            <div class="page-size-selector compact" id="page-size-wrapper">
-                                <select id="system-page-size" class="page-size-select" aria-controls="system-table" aria-label="페이지 당 행 수">
-                                    <option value="10" selected>10 개</option>
-                                    <option value="20">20 개</option>
-                                    <option value="50">50 개</option>
-                                    <option value="100">100 개</option>
-                                </select>
-                            </div>
-                            <button class="header-btn" id="system-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
-                                <img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
-                            </button>
-                            <button class="header-btn" id="system-bulk-btn" title="일괄변경" aria-label="선택 행 일괄변경">
-                                <img src="/static/image/svg/list/free-icon-bulk-edit.svg" alt="일괄변경" class="header-icon">
-                            </button>
-                            <button class="header-btn" id="system-stats-btn" title="통계" aria-label="현재 결과 통계 보기">
-                                <img src="/static/image/svg/list/free-icon-chart.svg" alt="통계" class="header-icon">
-                            </button>
-                            <button class="header-btn" id="system-download-btn" title="CSV 다운로드" aria-label="CSV 다운로드">
-                                <img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
-                            </button>
-                            <button class="header-btn" id="system-add-btn" title="추가" aria-label="추가">
-                                <img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon">
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="system-table-container server-table-container">
-                        <table class="system-data-table server-data-table" id="system-table">
-                            <thead>
-                                <tr>
-                                    <th><input type="checkbox" id="system-select-all" aria-label="전체 선택"></th>
-                                    <th data-col="model_name">모델명</th>
-                                    <th data-col="capacity">용량</th>
-                                    <th data-col="manufacturer_name">제조사</th>
-                                    <th data-col="part_number">부품번호</th>
-                                    <th data-col="remark">비고</th>
-                                    <th data-col="actions">관리</th>
-                                </tr>
-                            </thead>
-                            <tbody id="system-table-body"></tbody>
-                        </table>
-                    </div>
-
-                    <div id="system-empty" class="system-empty" hidden role="status" aria-live="polite">
-                        <div class="empty-illustration">
-                            <img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
-                        </div>
-                        <div class="empty-text">
-                            <h3 id="system-empty-title">{{ ns.label }} 내역이 없습니다.</h3>
-                            <p id="system-empty-desc">우측 상단 '추가' 버튼을 눌러 첫 항목을 등록하세요.</p>
-                        </div>
-                    </div>
-
-                    <div class="modern-pagination" id="system-pagination">
-                        <div class="pagination-info"><span id="system-pagination-info">0개 항목</span></div>
-                        <div class="pagination-controls">
-                            <button class="pagination-btn" id="system-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
-                            <button class="pagination-btn" id="system-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
-                            <div class="page-numbers" id="system-page-numbers"></div>
-                            <button class="pagination-btn" id="system-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
-                            <button class="pagination-btn" id="system-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div id="facility-security-management-root"></div>
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260515_facility_public1"></script>
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
     <script>
         window.__FACILITY_SECURITY_RESOURCE__ = "{{ ns.resource }}";
         window.__FACILITY_SECURITY_LABEL__ = "{{ ns.label }}";
         window.__FACILITY_SECURITY_MANUAL__ = {{ 'true' if ns.manual else 'false' }};
     </script>
-    <script src="/static/js/9.category/9-4.component/9-4-8.facility_security/1.facility_security_list.js?v=20260516_delete_common1"></script>
-
-    <div id="facility-security-add-modal" class="system-add-modal server-add-modal facility-security-entry-modal modal-overlay-full" aria-hidden="true">
-        <div class="server-add-content">
-            <div class="server-add-header">
-                <div class="server-add-title"><h3>{{ ns.label }} 등록</h3><p class="server-add-subtitle">{{ ns.label }} 모델 정보를 입력합니다.</p></div>
-                <button class="close-btn" type="button" id="facility-security-add-close" title="닫기" aria-label="닫기">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                </button>
-            </div>
-            <div class="server-add-body">
-                <form id="facility-security-add-form">
-                    <div class="form-section">
-                        <div class="section-header"><h4>시설·보안</h4></div>
-                        <div class="form-grid">
-                            <div class="form-row"><label>모델명<span class="required">*</span></label><input type="text" name="model_name" class="form-input" placeholder="필수" autocomplete="off" required></div>
-                            <div class="form-row"><label>용량</label><input type="text" name="capacity" class="form-input" autocomplete="off"></div>
-                            <div class="form-row"><label>제조사</label><select name="manufacturer_name" id="facility-security-add-manufacturer" class="form-input search-select" data-searchable="true" data-placeholder="선택"><option value="">선택</option></select></div>
-                            <div class="form-row"><label>부품번호</label><input type="text" name="part_number" class="form-input" autocomplete="off"></div>
-                        </div>
-                        <div class="form-row"><label>비고</label><textarea name="remark" class="form-input textarea-large" rows="6"></textarea></div>
-                    </div>
-                </form>
-            </div>
-            <div class="server-add-actions align-right">
-                <div class="action-buttons right"><button type="button" class="btn-primary" id="facility-security-add-save">등록</button></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="facility-security-edit-modal" class="system-edit-modal server-add-modal facility-security-entry-modal modal-overlay-full" aria-hidden="true">
-        <div class="server-add-content">
-            <div class="server-add-header">
-                <div class="server-add-title"><h3>{{ ns.label }} 수정</h3><p class="server-add-subtitle">선택한 인프라 유형 정보를 수정합니다.</p></div>
-                <button class="close-btn" type="button" id="facility-security-edit-close" title="닫기" aria-label="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
-            </div>
-            <div class="server-add-body">
-                <form id="facility-security-edit-form"></form>
-            </div>
-            <div class="server-add-actions align-right">
-                <div class="action-buttons right"><button type="button" class="btn-primary" id="facility-security-edit-save">저장</button></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="system-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
-        <div class="server-add-content">
-            <div class="server-add-header">
-                <div class="server-add-title dispose-title"><h3>삭제처리</h3><p class="server-add-subtitle" id="delete-subtitle">선택된 0개의 항목을 정말 삭제처리하시겠습니까?</p></div>
-                <button class="close-btn" type="button" id="system-delete-close" title="닫기" aria-label="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
-            </div>
-            <div class="server-add-body">
-                <div class="dispose-content">
-                    <div class="dispose-text"><p>삭제처리는 선택한 항목을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p></div>
-                    <div class="dispose-illust"><img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy"></div>
-                </div>
-            </div>
-            <div class="server-add-actions align-right"><div class="action-buttons right"><button type="button" class="btn-primary" id="system-delete-confirm">확인</button></div></div>
-        </div>
-    </div>
+    <script src="/static/js/common/api-client.js?v=20260517_modular1"></script>
+    <script src="/static/js/common/modal-utils.js?v=20260518_deletealert1"></script>
+    <script src="/static/js/shared/api/crud-api.js?v=20260517_modular1"></script>
+    <script src="/static/js/shared/components/data-table.js?v=20260523_row_select_sync1"></script>
+    <script src="/static/js/shared/components/form-builder.js?v=20260517_modular1"></script>
+    <script src="/static/js/shared/components/management-page.js?v=20260519_modal_fix1"></script>
+    <script src="/static/js/modules/facility-security/validation/facility-security.validation.js?v=20260517_modular1"></script>
+    <script src="/static/js/modules/facility-security/config/facility-security.config.js?v=20260517_modular1"></script>
+    <script src="/static/js/modules/facility-security/schemas/facility-security.schema.js?v=20260517_modular1"></script>
+    <script src="/static/js/modules/facility-security/api/facility-security.api.js?v=20260517_modular1"></script>
+    <script src="/static/js/modules/facility-security/hooks/use-facility-security.js?v=20260517_modular1"></script>
+    <script src="/static/js/modules/facility-security/pages/facility-security.page.js?v=20260517_facility_security_bootfix1"></script>
 
     {% include 'layouts/_message_modal.html' %}
     {% include 'layouts/_stats_modal.html' %}

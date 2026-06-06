@@ -160,6 +160,40 @@ document.addEventListener('DOMContentLoaded', () => {
 		return { ok: resp.ok, status: resp.status, data };
 	};
 
+	const setOverlayOpen = (modalEl, open) => {
+		if (!modalEl) return;
+		if (open) {
+			modalEl.classList.add('show');
+			modalEl.setAttribute('aria-hidden', 'false');
+			document.body.classList.add('modal-open');
+			return;
+		}
+		modalEl.classList.remove('show');
+		modalEl.setAttribute('aria-hidden', 'true');
+		const anyOpen = !!document.querySelector('.modal-overlay-full.show, .server-add-modal.show, .bls-alert-overlay.show');
+		if (!anyOpen) document.body.classList.remove('modal-open');
+	};
+
+	const showNotice = (message, title, type) => {
+		const kind = type || 'info';
+		const text = String(message || '');
+		const heading = title || (kind === 'success' ? '완료' : kind === 'error' ? '오류' : '알림');
+		if (window.BlossomModal && typeof window.BlossomModal.message === 'function') {
+			window.BlossomModal.message(text, { title: heading });
+			return;
+		}
+		const modal = document.getElementById('system-message-modal');
+		const titleEl = document.getElementById('message-title');
+		const contentEl = document.getElementById('message-content');
+		if (modal && titleEl && contentEl) {
+			titleEl.textContent = heading;
+			contentEl.textContent = text;
+			setOverlayOpen(modal, true);
+			return;
+		}
+		alert(text || heading);
+	};
+
 	const fetchMultipart = async (url, formData, opts) => {
 		const resp = await fetch(url, {
 			credentials: 'same-origin',
@@ -526,9 +560,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	const ctxViewEl = document.getElementById('blog-context-view');
 	const ctxEditEl = document.getElementById('blog-context-edit');
 	const ctxDeleteEl = document.getElementById('blog-context-delete');
+	const deleteModalEl = document.getElementById('insight-delete-modal');
+	const deleteModalCloseEl = document.getElementById('insight-delete-close');
+	const deleteModalCancelEl = document.getElementById('insight-delete-cancel');
+	const deleteModalConfirmEl = document.getElementById('insight-delete-confirm');
+	const deleteSubtitleEl = document.getElementById('insight-delete-subtitle');
 	let ctxTargetPostId = null;
 	let ctxTargetCardEl = null;
 	let ctxTargetAuthor = '';
+	let pendingDeletePostId = null;
+	let pendingDeleteCardEl = null;
 
 	let editingPostId = null;
 	let editingIsDb = false;
@@ -706,20 +747,27 @@ document.addEventListener('DOMContentLoaded', () => {
 		savePosts(next);
 	};
 
-	const deletePost = async (postId) => {
+	const deletePost = async (postId, cardEl) => {
 		if (!postId) return;
+		const targetCardEl = cardEl || ctxTargetCardEl;
 		// DB-backed
 		if (isNumericPostId(postId)) {
 			const res = await fetchJson(`${API_BASE}/${encodeURIComponent(postId)}`, { method: 'DELETE' });
-			if (!res.ok || !res.data?.success) return;
-			if (ctxTargetCardEl) ctxTargetCardEl.remove();
+			if (!res.ok || !res.data?.success) {
+				showNotice(res.data?.message || '삭제에 실패했습니다.', '삭제 실패', 'error');
+				return false;
+			}
+			if (targetCardEl) targetCardEl.remove();
 			syncEmptyState();
-			return;
+			showNotice('삭제되었습니다.', '삭제 완료', 'success');
+			return true;
 		}
 		// localStorage-backed
 		removeLocalPost(postId);
-		if (ctxTargetCardEl) ctxTargetCardEl.remove();
+		if (targetCardEl) targetCardEl.remove();
 		syncEmptyState();
+		showNotice('삭제되었습니다.', '삭제 완료', 'success');
+		return true;
 	};
 
 	if (gridEl) {
@@ -763,15 +811,12 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	if (ctxDeleteEl) {
-		ctxDeleteEl.addEventListener('click', async () => {
+		ctxDeleteEl.addEventListener('click', () => {
 			if (!ctxTargetPostId) return;
-			try {
-				await deletePost(ctxTargetPostId);
-			} catch (err) {
-				console.warn(err);
-			} finally {
-				hideContextMenu();
-			}
+			const postId = ctxTargetPostId;
+			const cardEl = ctxTargetCardEl;
+			hideContextMenu();
+			openDeleteConfirmModal(postId, cardEl);
 		});
 	}
 
@@ -782,7 +827,10 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 
 	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') hideContextMenu();
+		if (e.key === 'Escape') {
+			hideContextMenu();
+			if (deleteModalEl && deleteModalEl.classList.contains('show')) closeDeleteConfirmModal();
+		}
 	});
 
 	window.addEventListener('scroll', () => {
@@ -824,6 +872,39 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (editAttachmentsListEl) editAttachmentsListEl.innerHTML = '';
 		if (editAttachmentsWrapEl) editAttachmentsWrapEl.hidden = true;
 	};
+
+	const openDeleteConfirmModal = (postId, cardEl) => {
+		const pid = String(postId || '').trim();
+		if (!pid) return;
+		pendingDeletePostId = pid;
+		pendingDeleteCardEl = cardEl || null;
+		if (deleteSubtitleEl) deleteSubtitleEl.textContent = '선택한 게시글을 정말 삭제처리하시겠습니까?';
+		if (deleteModalEl) setOverlayOpen(deleteModalEl, true);
+	};
+
+	const closeDeleteConfirmModal = () => {
+		pendingDeletePostId = null;
+		pendingDeleteCardEl = null;
+		setOverlayOpen(deleteModalEl, false);
+	};
+
+	deleteModalCloseEl?.addEventListener('click', closeDeleteConfirmModal);
+	deleteModalCancelEl?.addEventListener('click', closeDeleteConfirmModal);
+	deleteModalEl?.addEventListener('click', (e) => {
+		if (e.target === deleteModalEl) closeDeleteConfirmModal();
+	});
+	deleteModalConfirmEl?.addEventListener('click', async () => {
+		const postId = pendingDeletePostId;
+		const cardEl = pendingDeleteCardEl;
+		closeDeleteConfirmModal();
+		if (!postId) return;
+		try {
+			await deletePost(postId, cardEl);
+		} catch (err) {
+			console.warn(err);
+			showNotice('삭제 중 오류가 발생했습니다.', '삭제 실패', 'error');
+		}
+	});
 
 	const clearForm = (opts) => {
 		const preserveEditState = !!opts?.preserveEditState;

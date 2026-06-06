@@ -1,0 +1,55 @@
+{% set settings_active_endpoint = settings_active_endpoint|default(request.endpoint) %}
+{% set settings_tab_groups = [
+    ('auth-access', '인증/접근', [
+        ('auth.admin_locked_users', '사용자'),
+        ('auth.admin_groups', '화면권한'),
+        ('auth.admin_settings', '인증관리'),
+        ('auth.admin_access_control_settings', '접근제어')
+    ]),
+    ('security', '보안', [
+        ('auth.admin_security_settings', '보안관리'),
+        ('auth.admin_security_control_settings', '보안통제'),
+        ('auth.admin_sessions_page', '세션관리'),
+        ('auth.admin_file_management_settings', '파일관리')
+    ]),
+    ('agent', '에이전트', [
+        ('auth.admin_agent_settings', '공통 정책'),
+        ('auth.admin_agent_linux_settings', 'Linux 정책'),
+        ('auth.admin_agent_windows_settings', 'Windows 정책'),
+        ('auth.admin_agent_log_policy', '로그 정책'),
+        ('auth.admin_agent_integrity_policy', '무결성 정책')
+    ]),
+    ('service-ui', '서비스/UI', [
+        ('auth.admin_mail_settings', '메일관리'),
+        ('auth.admin_chat_management_settings', '채팅관리'),
+        ('auth.admin_page_tab', '페이지관리'),
+        ('auth.admin_brand_settings', '브랜드관리'),
+        ('auth.admin_info_message', '문구관리'),
+        ('auth.admin_change_log', '통합로그')
+    ]),
+    ('dev-quality', '개발/품질', [
+        ('auth.admin_version', '버전관리'),
+        ('auth.admin_quality_type', '품질유형'),
+        ('auth.admin_language_settings', '언어/시간'),
+        ('auth.admin_ai_settings', 'AI')
+    ])
+] %}
+
+<nav class="system-tabs settings-group-tabs" role="tablist" aria-label="설정 관리">
+    {% for group_key, group_label, tabs in settings_tab_groups %}
+        {% set group_ns = namespace(active=false) %}
+        {% for endpoint, label in tabs %}
+            {% if settings_active_endpoint == endpoint %}
+                {% set group_ns.active = true %}
+            {% endif %}
+        {% endfor %}
+        <div class="settings-tab-group{% if group_ns.active %} active{% endif %}">
+            <button type="button" class="system-tab-btn settings-tab-group-btn{% if group_ns.active %} active{% endif %}" aria-haspopup="true" aria-expanded="false" aria-controls="settings-tab-dropdown-{{ group_key }}">{{ group_label }}</button>
+            <div class="settings-tab-dropdown" id="settings-tab-dropdown-{{ group_key }}" aria-label="{{ group_label }} 카테고리">
+                {% for endpoint, label in tabs %}
+                    <a class="settings-tab-dropdown-item{% if settings_active_endpoint == endpoint %} active{% endif %}" role="tab" aria-selected="{{ 'true' if settings_active_endpoint == endpoint else 'false' }}" href="{{ url_for(endpoint) }}">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</nav>

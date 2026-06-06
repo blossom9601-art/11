@@ -45,6 +45,27 @@ CHAT_POLICY_DEFAULTS = {
     'audit.file_upload_log': {'enabled': True},
     'audit.admin_view_permission': {'value': 'chat.system.admin'},
 }
+AI_POLICY_DEFAULTS = {
+    'ai.enabled': {'enabled': False},
+    'ai.provider_mode': {'value': 'internal_first'},
+    'ai.internal_enabled': {'enabled': True},
+    'ai.internal_base_url': {'value': ''},
+    'ai.internal_model': {'value': 'blossom-genai'},
+    'ai.external_enabled': {'enabled': False},
+    'ai.external_provider': {'value': 'openai_compatible'},
+    'ai.external_base_url': {'value': ''},
+    'ai.external_model': {'value': 'gpt-5.2'},
+    'ai.external_api_key': {'value': ''},
+    'ai.allow_user_select_provider': {'enabled': False},
+    'ai.allow_file_context': {'enabled': True},
+    'ai.allow_chat_context': {'enabled': True},
+    'ai.log_prompt': {'enabled': False},
+    'ai.log_response': {'enabled': False},
+    'ai.retention_days': {'value': 30},
+    'ai.max_tokens': {'value': 2048},
+    'ai.temperature': {'value': 0.3},
+    'ai.system_prompt': {'value': 'Blossom Chat 업무 지원 AI입니다. 사내 보안 정책을 준수하고, 민감정보는 필요한 경우에만 최소한으로 사용합니다.'},
+}
 
 
 def _parse_user_agent(ua):
@@ -2532,6 +2553,22 @@ def admin_security_settings():
     return render_template('authentication/11-3.admin/11-3-3.setting/3.security.html')
 
 
+@auth_bp.route('/admin/auth/security-control', methods=['GET'])
+def admin_security_control_settings():
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    template_context = {
+        'settings_active_endpoint': 'auth.admin_security_control_settings',
+        'settings_page_title': '보안통제',
+        'settings_page_description': '보안 정책과 접속 통제를 관리합니다.',
+    }
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_security', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/3.security.html', **template_context)
+
+
 # ── 보안정책 API ─────────────────────────────────────────────────────
 
 @auth_bp.route('/admin/auth/security-policy', methods=['GET'])
@@ -2999,6 +3036,91 @@ def admin_chat_policy_put():
 
 
 # ── 활성 세션 관리 ────────────────────────────────────────────────────
+@auth_bp.route('/admin/auth/ai', methods=['GET'])
+def admin_ai_settings():
+    """AI settings page."""
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_ai_settings', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/14.ai.html')
+
+
+@auth_bp.route('/admin/auth/ai-policy', methods=['GET'])
+def admin_ai_policy_get():
+    """Return AI policies stored in msg_chat_policy."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+    try:
+        rows = MsgChatPolicy.query.filter(MsgChatPolicy.policy_key.like('ai.%')).order_by(MsgChatPolicy.policy_key.asc()).all()
+        items = []
+        groups = {}
+        for row in rows:
+            try:
+                parsed = json.loads(row.value_json or '{}')
+            except Exception:
+                parsed = {'raw': row.value_json}
+            item = {
+                'id': row.id,
+                'policyKey': row.policy_key,
+                'policyGroup': row.policy_group,
+                'value': parsed,
+                'updatedAt': row.updated_at.isoformat() if row.updated_at else None,
+                'updatedBy': row.updated_by,
+            }
+            items.append(item)
+            groups.setdefault(row.policy_group, []).append(item)
+        return jsonify({'loaded': bool(items), 'defaults': AI_POLICY_DEFAULTS, 'groups': groups, 'items': items})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/admin/auth/ai-policy', methods=['PUT'])
+def admin_ai_policy_put():
+    """Save AI policies stored in msg_chat_policy."""
+    if not _ensure_admin_session():
+        return jsonify({'error': 'forbidden'}), 403
+    payload = request.get_json(silent=True) or {}
+    raw_policies = AI_POLICY_DEFAULTS if payload.get('restoreDefaults') else (payload.get('policies') or {})
+    if not isinstance(raw_policies, dict):
+        return jsonify({'success': False, 'message': 'policies must be an object'}), 400
+    try:
+        changed = []
+        for policy_key, policy_value in raw_policies.items():
+            if not isinstance(policy_key, str) or not policy_key.startswith('ai.'):
+                continue
+            row = MsgChatPolicy.query.filter_by(policy_key=policy_key).first()
+            new_json = json.dumps(policy_value, ensure_ascii=False)
+            old_json = row.value_json if row else ''
+            if row is None:
+                row = MsgChatPolicy(
+                    policy_key=policy_key,
+                    policy_group='ai',
+                    value_json=new_json,
+                    updated_by=session.get('user_id'),
+                    updated_at=datetime.utcnow(),
+                )
+                db.session.add(row)
+                changed.append(policy_key)
+                _settings_log('AI관리', policy_key, '', new_json)
+                continue
+            if old_json == new_json:
+                continue
+            row.policy_group = 'ai'
+            row.value_json = new_json
+            row.updated_by = session.get('user_id')
+            row.updated_at = datetime.utcnow()
+            changed.append(policy_key)
+            _settings_log('AI관리', policy_key, old_json, new_json)
+        db.session.commit()
+        return jsonify({'success': True, 'changedKeys': changed})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @auth_bp.route('/admin/auth/sessions', methods=['GET'])
 def admin_sessions_page():
     """활성 세션 관리 페이지를 렌더링한다."""
@@ -3235,6 +3357,18 @@ def admin_quality_type():
     return render_template('authentication/11-3.admin/11-3-3.setting/4.quality_type.html')
 
 
+@auth_bp.route('/admin/auth/language-settings', methods=['GET'])
+def admin_language_settings():
+    """언어/시간 설정 페이지를 렌더링한다."""
+    if not _ensure_admin_session():
+        flash('관리자만 접근 가능합니다.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key='admin_language_settings', menu_code=None)
+    return render_template('authentication/11-3.admin/11-3-3.setting/13.language_settings.html')
+
+
 @auth_bp.route('/admin/auth/change-log', methods=['GET'])
 def admin_change_log():
     """변경이력 통합 조회 페이지를 렌더링한다."""
@@ -3245,6 +3379,83 @@ def admin_change_log():
     if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
         return render_template('layouts/spa_shell.html', current_key='admin_change_log', menu_code=None)
     return render_template('authentication/11-3.admin/11-3-3.setting/5.change_log.html')
+
+
+@auth_bp.route('/admin/auth/agent', methods=['GET'])
+def admin_agent_settings():
+    return _render_agent_settings_page(
+        active_endpoint='auth.admin_agent_settings',
+        current_key='admin_agent_settings',
+        mode='common',
+        title='\uacf5\ud1b5 \uc815\ucc45',
+        description='Linux/Unix\uc640 Windows \uc5d0\uc774\uc804\ud2b8\uac00 \ud568\uaed8 \uc0ac\uc6a9\ud558\ub294 \uacc4\uc815 \uae30\uc900\uc744 \uad00\ub9ac\ud569\ub2c8\ub2e4.',
+    )
+
+
+@auth_bp.route('/admin/auth/agent/linux', methods=['GET'])
+def admin_agent_linux_settings():
+    return _render_agent_settings_page(
+        active_endpoint='auth.admin_agent_linux_settings',
+        current_key='admin_agent_linux_settings',
+        mode='linux',
+        title='Linux \uc815\ucc45',
+        description='Linux/Unix \uacc4\uc815\uc758 UID/GID\uc640 \ud648 \ub514\ub809\ud130\ub9ac \uc815\ucc45\uc744 \uad00\ub9ac\ud569\ub2c8\ub2e4.',
+    )
+
+
+@auth_bp.route('/admin/auth/agent/windows', methods=['GET'])
+def admin_agent_windows_settings():
+    return _render_agent_settings_page(
+        active_endpoint='auth.admin_agent_windows_settings',
+        current_key='admin_agent_windows_settings',
+        mode='windows',
+        title='Windows \uc815\ucc45',
+        description='Windows \uacc4\uc815\uc758 SID, \uadf8\ub8f9, Logon Rights, \uc11c\ube44\uc2a4 \ubc14\uc778\ub529 \uc815\ucc45\uc744 \uad00\ub9ac\ud569\ub2c8\ub2e4.',
+    )
+
+
+@auth_bp.route('/admin/auth/agent/log-policy', methods=['GET'])
+def admin_agent_log_policy():
+    return _render_agent_observe_policy_page(
+        active_endpoint='auth.admin_agent_log_policy',
+        current_key='admin_agent_log_policy',
+        template='authentication/11-3.admin/11-3-3.setting/16.agent_log_policy.html',
+    )
+
+
+@auth_bp.route('/admin/auth/agent/integrity-policy', methods=['GET'])
+def admin_agent_integrity_policy():
+    return _render_agent_observe_policy_page(
+        active_endpoint='auth.admin_agent_integrity_policy',
+        current_key='admin_agent_integrity_policy',
+        template='authentication/11-3.admin/11-3-3.setting/17.agent_integrity_policy.html',
+    )
+
+
+def _render_agent_observe_policy_page(active_endpoint, current_key, template):
+    if not _ensure_admin_session():
+        flash('\uad00\ub9ac\uc790\ub9cc \uc811\uadfc \uac00\ub2a5\ud569\ub2c8\ub2e4.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key=current_key, menu_code=None)
+    return render_template(template, settings_active_endpoint=active_endpoint)
+
+
+def _render_agent_settings_page(active_endpoint, current_key, mode, title, description):
+    if not _ensure_admin_session():
+        flash('\uad00\ub9ac\uc790\ub9cc \uc811\uadfc \uac00\ub2a5\ud569\ub2c8\ub2e4.', 'error')
+        return redirect(url_for('auth.login'))
+    _xhr = request.headers.get('X-Requested-With', '')
+    if _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+        return render_template('layouts/spa_shell.html', current_key=current_key, menu_code=None)
+    return render_template(
+        'authentication/11-3.admin/11-3-3.setting/account_policy.html',
+        settings_active_endpoint=active_endpoint,
+        settings_page_title=title,
+        settings_page_description=description,
+        account_policy_mode=mode,
+    )
 
 
 @auth_bp.route('/admin/auth/info-message', methods=['GET'])

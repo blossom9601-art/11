@@ -845,7 +845,7 @@
       pieEl.style.background = '';
       var pieWrap = pieEl.closest('.pie-wrap');
       if(pieWrap) pieWrap.style.display = 'none';
-      if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '상태 데이터가 없습니다.'); }catch(_e){} }
+      if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.'); }catch(_e){} }
       return;
     }
     if(emptyEl) emptyEl.hidden = true;

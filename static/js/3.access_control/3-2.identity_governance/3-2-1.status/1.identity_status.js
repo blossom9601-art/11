@@ -102,7 +102,7 @@
 		var last = clampPage(pageKey, total);
 		var start = total ? ((state[pageKey] - 1) * state.pageSize) + 1 : 0;
 		var end = total ? Math.min(total, state[pageKey] * state.pageSize) : 0;
-		info.textContent = total ? (start + '-' + end + ' / ' + total + '개') : '0개 항목';
+		info.textContent = total ? (start + '-' + end + ' / ' + total + '개 항목') : '0-0 / 0개 항목';
 		if (!total) {
 			numbers.innerHTML = '';
 			prev.disabled = true;

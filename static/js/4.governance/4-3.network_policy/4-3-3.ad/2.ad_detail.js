@@ -1027,7 +1027,7 @@
       if(totalEl) totalEl.textContent = String(total || 0);
       if(!total){
         statsWrap.style.display = 'none';
-        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, opts.emptyText || '상태 데이터가 없습니다.'); }catch(_e){} }
+        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, opts.emptyText || '할당 시스템 내역이 없습니다.'); }catch(_e){} }
         return;
       }
 
@@ -1067,7 +1067,7 @@
       })
       .catch(() => {
         statsWrap.style.display = 'none';
-        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, opts.emptyText || '상태 데이터가 없습니다.'); }catch(_e){} }
+        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, opts.emptyText || '할당 시스템 내역이 없습니다.'); }catch(_e){} }
         if(totalEl) totalEl.textContent = '0';
       });
   }
@@ -1079,7 +1079,7 @@
       legendId: 'ad-domain-legend',
       totalId: 'ad-domain-total',
       emptyId: 'ad-domain-empty',
-      emptyText: '도메인 상태 데이터가 없습니다.',
+      emptyText: '할당 시스템 내역이 없습니다.',
       fetchItems: () => fetchAdFqdnsForStats(adId),
     });
   }
@@ -1091,7 +1091,7 @@
       legendId: 'ad-account-legend',
       totalId: 'ad-account-total',
       emptyId: 'ad-account-empty',
-      emptyText: '계정 상태 데이터가 없습니다.',
+      emptyText: '할당 시스템 내역이 없습니다.',
       fetchItems: () => fetchAdAccountsForStats(adId),
     });
   }

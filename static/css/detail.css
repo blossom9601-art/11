@@ -746,12 +746,18 @@ body.modal-open .sidebar.collapsed {
 
 /* Tabs (identical to system list page .system-tabs) */
 .server-detail-tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin: 0 0 18px; overflow-x: auto; }
-.server-detail-tab-btn { background: none; border: none; padding: 12px 22px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s ease; white-space: nowrap; text-decoration: none; display: inline-block; flex-shrink: 0; }
+.server-detail-tab-btn { background: none; border: none; padding: 12px 22px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; transition: none; white-space: nowrap; text-decoration: none; display: inline-block; flex-shrink: 0; }
 .server-detail-tab-btn:hover { color: var(--accent, #6366f1); text-decoration: none; background: none; }
 .server-detail-tab-btn:focus { text-decoration: none; }
 .server-detail-tab-btn.active { color: var(--accent, #6366f1); border-bottom-color: var(--accent, #6366f1); text-decoration: none; background: none; }
 .server-detail-tab-btn:focus-visible { outline: 2px solid #cbd5e1; outline-offset: 2px; border-radius: 4px 4px 0 0; }
 .server-detail-tab-btn[href*="maintenance"] { display: none; }
+
+.server-detail-content.spa-fade-in,
+.tab-content.spa-fade-in,
+.main-content.spa-fade-in {
+  animation: none !important;
+}
 
 /* Content and pane */
 .server-detail-content { background: white; border-radius: 8px; border: 1px solid #e5e7eb; overflow: hidden; }

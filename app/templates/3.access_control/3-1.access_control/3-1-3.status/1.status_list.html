@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -6,12 +6,13 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
-	<link rel="stylesheet" href="/static/css/3.access_control/3-1.access_control/3-1-3.status/status_list.css?v=20260507ui2">
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-3.status/1.status_list.js?v=20260507ui1" defer></script>
+	<link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+	<link rel="stylesheet" href="/static/css/system.css?v=20260528_dispose_modal1">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260603_risk_access_only1">
+	<link rel="stylesheet" href="/static/css/3.access_control/3-1.access_control/3-1-3.status/status_list.css?v=20260602_risk_audit_link1">
+	<script src="/static/js/blossom.js?v=20260529_search_empty1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-3.status/1.status_list.js?v=20260603_risk_access_only1" defer></script>
+	<script src="/static/js/3.access_control/access-modal-tabs.js?v=20260528_access_tabs4" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -25,14 +26,93 @@
 			</div>
 
 			<div class="system-tabs" role="tablist" aria-label="자원 분류">
-				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
-				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="내부 서비스">내부 서비스</button>
-				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="외부 서비스">외부 서비스</button>
-				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리 콘솔">관리 콘솔</button>
-				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="기타">기타</button>
+				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="dashboard">대시보드</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="시스템">시스템</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="서비스">서비스</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="컨테이너">컨테이너</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리콘솔">관리콘솔</button>
 			</div>
 
-			<div class="tab-content single-pane">
+			<section class="access-enterprise-dashboard access-reference-dashboard" id="status-dashboard" aria-live="polite">
+				<a class="access-ref-card access-ref-card--hero" href="/b/access_control_status">
+					<div class="access-ref-card-head"><h2>총 자산 수</h2><span>i</span></div>
+					<strong id="dash-total-resources">0</strong>
+					<em id="dash-service-footprint">분류 기준 0개 영역</em>
+					<div class="access-ref-sparkline"></div>
+				</a>
+				<a class="access-ref-card access-ref-card--hero" href="/b/access_control_audit">
+					<div class="access-ref-card-head"><h2>오늘 접속 수</h2><span>i</span></div>
+					<strong id="dash-today-access">0</strong>
+					<em id="dash-today-access-note">오늘 접속 없음</em>
+					<div class="access-ref-sparkline access-ref-sparkline--up"></div>
+				</a>
+				<div class="access-ref-card access-ref-card--list">
+					<div class="access-ref-card-head"><h2>접속 방식</h2><span>i</span></div>
+					<div class="access-ref-methods" id="dash-method-legend"></div>
+				</div>
+
+				<div class="access-ref-card access-ref-card--ops-summary">
+					<div class="access-ops-metric access-ops-metric--grants">
+						<div class="access-ref-mini-title">활성 권한 수</div>
+						<strong id="dash-active-grants">0</strong>
+						<em id="dash-active-grants-note">현재 유효 권한</em>
+					</div>
+					<div class="access-ops-metric">
+						<div class="access-ref-mini-title">승인 대기</div>
+						<strong id="dash-pending-approvals">0</strong>
+						<em id="dash-pending-note">대기 없음</em>
+					</div>
+					<div class="access-ops-metric">
+						<div class="access-ref-mini-title">만료 예정</div>
+						<strong id="dash-expiring-grants">0</strong>
+						<em id="dash-expiring-note">30일 이내 만료</em>
+					</div>
+					<div class="access-ops-metric access-ops-metric--risk">
+						<div class="access-ref-mini-title">위험 접근</div>
+						<strong id="dash-risky-access">0</strong>
+						<em id="dash-risk-note">위험 없음</em>
+					</div>
+				</div>
+				<div class="access-ref-card access-ref-card--tasks">
+					<div class="access-ref-card-head"><h2>처리 업무</h2><span>i</span></div>
+					<div class="access-task-stack" id="dash-today-work"></div>
+				</div>
+
+				<div class="access-ref-card access-ref-card--systems access-ref-card--asset-split">
+					<div class="access-ref-card-head"><h2>자산 분포</h2><span>i</span></div>
+					<div class="access-ref-systems-grid">
+						<div class="access-donut" id="dash-asset-donut" role="button" tabindex="0" aria-label="자산 분포 범주 보기"><span id="dash-asset-donut-total">0</span></div>
+						<div class="access-donut-legend" id="dash-asset-legend"></div>
+					</div>
+				</div>
+				<div class="access-ref-card access-ref-card--approval-split">
+					<div class="access-ref-card-head"><h2>승인 현황</h2><span>i</span></div>
+					<div class="access-line-chart" id="dash-approval-trend"></div>
+					<div class="access-trend-legend">
+						<span class="is-requested">신청</span><span class="is-approved">승인</span><span class="is-rejected">반려</span><span class="is-revoked">회수</span>
+					</div>
+				</div>
+				<div class="access-ref-card access-ref-card--live">
+					<div class="access-ref-card-head"><h2>실시간 접속 모니터링</h2><span id="dash-live-sessions">실시간 접속 0</span></div>
+					<div class="access-live-monitor">
+						<div class="access-live-tabs" aria-label="조회 기간">
+							<button type="button" class="active">최근 24시간</button>
+							<button type="button">최근 7일</button>
+							<button type="button">최근 30일</button>
+						</div>
+						<div class="access-live-body">
+							<div class="access-live-chart" id="dash-live-chart" aria-label="실시간 접속 추이"></div>
+							<div class="access-live-summary" id="dash-live-summary"></div>
+						</div>
+					</div>
+					<div class="access-table-wrap" hidden><table class="access-dash-table"><thead><tr><th>시간</th><th>사용자</th><th>대상 자산</th><th>접속 유형</th><th>결과</th></tr></thead><tbody id="dash-realtime-table"></tbody></table></div>
+				</div>
+				<div id="dash-method-donut" hidden><span id="dash-method-donut-total">0</span></div>
+				<div id="dash-health-ring" hidden><strong id="dash-health-score">0</strong><em id="dash-health-label"></em></div>
+				<p id="dash-coverage-summary" hidden></p>
+			</section>
+
+			<div class="tab-content single-pane" id="status-list-content" hidden>
 				<div class="tab-pane active" id="status-list-pane">
 					<div class="tab-header">
 						<div class="tab-header-left">
@@ -56,22 +136,21 @@
 									<option value="100">100 개</option>
 								</select>
 							</div>
-							<select id="status-category-filter" class="status-filter-select" aria-label="분류 필터">
-								<option value="">분류 전체</option>
-								<option value="내부 서비스">내부 서비스</option>
-								<option value="외부 서비스">외부 서비스</option>
-								<option value="관리 콘솔">관리 콘솔</option>
-								<option value="기타">기타</option>
+							<select id="status-category-detail-filter" class="status-filter-select" aria-label="관리콘솔 장비군 필터" hidden disabled>
+								<option value="">장비군 전체</option>
+								<option value="서버">서버</option>
+								<option value="스토리지">스토리지</option>
+								<option value="SAN">SAN</option>
+								<option value="네트워크">네트워크</option>
+								<option value="보안장비">보안장비</option>
+							</select>
+							<select id="status-work-operation-filter" class="status-filter-select" aria-label="업무 운영 필터">
+								<option value="">운영 전체</option>
 							</select>
 							<select id="status-state-filter" class="status-filter-select" aria-label="상태 필터">
 								<option value="">상태 전체</option>
 								<option value="사용 가능">사용 가능</option>
 								<option value="차단">차단</option>
-							</select>
-							<select id="status-type-filter" class="status-filter-select" aria-label="유형 필터">
-								<option value="">유형 전체</option>
-								<option value="WEB">WEB</option>
-								<option value="SSH">SSH</option>
 							</select>
 							<button class="header-btn" id="status-delete-btn" title="삭제처리" aria-label="선택 행 삭제처리">
 								<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제처리" class="header-icon">
@@ -92,6 +171,7 @@
 									<th data-col="select" class="status-col-check"><input type="checkbox" id="status-select-all" aria-label="전체 선택"></th>
 									<th data-col="resource_name">자원명</th>
 									<th data-col="category">분류</th>
+									<th data-col="work_operation">업무 운영</th>
 									<th data-col="access_type">유형</th>
 									<th data-col="access_info">접속정보</th>
 									<th data-col="active_flag">상태</th>
@@ -114,7 +194,7 @@
 					</div>
 
 					<div class="modern-pagination" id="status-pagination">
-						<div class="pagination-info"><span id="status-pagination-info">0개 항목</span></div>
+						<div class="pagination-info"><span id="status-pagination-info">0-0 / 0개 항목</span></div>
 						<div class="pagination-controls">
 							<button class="pagination-btn" id="status-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"/></button>
 							<button class="pagination-btn" id="status-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"/></button>
@@ -149,17 +229,65 @@
 			<div class="server-add-body">
 				<form id="status-add-form" autocomplete="off">
 					<input type="hidden" name="id" id="form-id">
+					<input type="hidden" id="form-agent-id">
 
 					<div class="form-section">
 						<div class="section-header"><h4>기본 정보</h4></div>
 						<div class="form-grid">
-							<div class="form-row"><label>자원명<span class="required">*</span></label><input name="resource_name" id="form-resource-name" class="form-input" required maxlength="120" placeholder="예: HPE iLO DC1, NAVER"></div>
-							<div class="form-row"><label>분류</label>
+							<input type="hidden" name="resource_name" id="form-resource-name" required>
+							<div class="form-row" id="form-resource-name-standard-row">
+								<label for="form-resource-name-manual">자원명<span class="required">*</span></label>
+								<input id="form-resource-name-manual" class="form-input" maxlength="120" placeholder="예: HPE iLO DC1, NAVER">
+							</div>
+							<div class="form-row" id="form-business-name-row" hidden>
+								<label for="form-business-name">업무명<span class="required">*</span></label>
+								<input id="form-business-name" class="form-input" maxlength="120" placeholder="리소스 선택으로 자동 입력" readonly>
+							</div>
+							<div class="form-row" id="form-system-name-row" hidden>
+								<label for="form-system-name">시스템명<span class="required">*</span></label>
+								<div class="system-resource-picker">
+									<input id="form-system-name" class="form-input" maxlength="120" placeholder="리소스 선택으로 자동 입력" readonly>
+									<button type="button" class="resource-select-btn" id="form-resource-select-btn" title="리소스 선택" aria-label="리소스 선택">
+										<img src="/static/image/svg/free-icon-font-resources.svg" alt="" aria-hidden="true">
+									</button>
+								</div>
+								<div id="system-resource-panel" class="resource-picker-panel" hidden>
+									<div class="resource-picker-panel-head">
+										<strong>시스템 &gt; 서버 선택</strong>
+										<span id="system-resource-summary">업무명과 시스템명을 선택하세요.</span>
+									</div>
+									<div class="resource-picker-search">
+										<input type="text" id="system-resource-search-input" placeholder="업무명, 시스템명 검색" autocomplete="off">
+									</div>
+									<div id="system-resource-list" class="resource-picker-list"></div>
+									<div class="resource-picker-footer">
+										<button type="button" class="resource-picker-page-btn" id="system-resource-prev">이전</button>
+										<span id="system-resource-page-info">1 / 1</span>
+										<button type="button" class="resource-picker-page-btn" id="system-resource-next">다음</button>
+									</div>
+								</div>
+							</div>
+							<div class="form-row" id="form-category-row" hidden><label>1차 분류</label>
 								<select name="category" id="form-category" class="form-input search-select" data-searchable="true">
-									<option value="내부 서비스">내부 서비스</option>
-									<option value="외부 서비스">외부 서비스</option>
-									<option value="관리 콘솔">관리 콘솔</option>
-									<option value="기타" selected>기타</option>
+									<option value="시스템" selected>시스템</option>
+									<option value="서비스">서비스</option>
+									<option value="컨테이너">컨테이너</option>
+									<option value="관리콘솔">관리콘솔</option>
+								</select>
+							</div>
+							<div class="form-row" id="form-category-detail-row" hidden><label>장비군</label>
+								<select name="category_detail" id="form-category-detail" class="form-input search-select" data-searchable="true" disabled>
+									<option value="">장비군 선택</option>
+									<option value="서버">서버</option>
+									<option value="스토리지">스토리지</option>
+									<option value="SAN">SAN</option>
+									<option value="네트워크">네트워크</option>
+									<option value="보안장비">보안장비</option>
+								</select>
+							</div>
+							<div class="form-row" id="form-work-operation-row"><label>업무 운영</label>
+								<select name="work_operation_code" id="form-work-operation" class="form-input search-select" data-searchable="true">
+									<option value="">업무 운영 선택</option>
 								</select>
 							</div>
 							<div class="form-row"><label>태그</label><input name="tags" id="form-tags" class="form-input" maxlength="200" placeholder="쉼표로 구분 (예: 운영, 핵심, 외부)"></div>
@@ -201,15 +329,28 @@
 	<template id="endpoint-row-template">
 		<div class="endpoint-row" data-endpoint>
 			<div class="endpoint-row-head">
-				<input type="text" class="form-input endpoint-label" data-role="label" maxlength="50" placeholder="라벨 (예: 관리 콘솔, 원격 SSH)">
-				<select class="form-input endpoint-kind search-select" data-role="kind" data-placeholder="유형">
-					<option value="WEB">WEB</option>
-					<option value="SSH">SSH</option>
-				</select>
-				<select class="form-input endpoint-protocol search-select" data-role="protocol" data-placeholder="프로토콜"></select>
-				<button type="button" class="endpoint-remove-btn" data-role="remove" title="이 접속점 삭제">
-					<img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="endpoint-remove-icon">
-				</button>
+				<div class="endpoint-control endpoint-control-label">
+					<label class="endpoint-control-label-text">라벨</label>
+					<input type="text" class="form-input endpoint-label" data-role="label" maxlength="50" placeholder="예: 관리 콘솔, 원격 SSH">
+				</div>
+				<div class="endpoint-control endpoint-control-kind">
+					<label class="endpoint-control-label-text">유형</label>
+					<select class="form-input endpoint-kind search-select" data-role="kind" data-placeholder="유형">
+						<option value="HTTPS">HTTPS</option>
+						<option value="HTTP">HTTP</option>
+						<option value="SSH">SSH</option>
+						<option value="SFTP">SFTP</option>
+						<option value="RDP">RDP</option>
+						<option value="API">API</option>
+					</select>
+				</div>
+				<input type="hidden" data-role="protocol">
+				<div class="endpoint-control endpoint-control-action">
+					<label class="endpoint-control-label-text endpoint-control-label-placeholder">삭제</label>
+					<button type="button" class="endpoint-remove-btn" data-role="remove" title="이 접속점 삭제" aria-label="이 접속점 삭제">
+						<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="endpoint-remove-icon" aria-hidden="true">
+					</button>
+				</div>
 			</div>
 			<div class="endpoint-row-body">
 				<div class="endpoint-field">

@@ -420,16 +420,7 @@
 		var roles = normalizeRoleList(value);
 		if(!roles.length) return '<span class="muted-cell">-</span>';
 		var names = roles.map(function(role){ return role.name; });
-		var visible = roles.slice(0, 3);
-		var html = '<span class="tab92-role-tags" title="' + escapeHtml(names.join(', ')) + '">';
-		visible.forEach(function(role){
-			html += '<span class="tab92-role-tag">' + escapeHtml(role.name) + '</span>';
-		});
-		if(roles.length > visible.length){
-			html += '<span class="tab92-role-more" title="' + escapeHtml(names.slice(visible.length).join(', ')) + '">+' + (roles.length - visible.length) + '</span>';
-		}
-		html += '</span>';
-		return html;
+		return '<span class="tab92-role-tags">' + escapeHtml(names.join(', ')) + '</span>';
 	}
 	function buildRolePickerSummaryHtml(selectedRoles){
 		var roles = normalizeRoleList(selectedRoles);
@@ -473,20 +464,9 @@
 			html += '<div class="tab92-role-option" data-role-option="1" data-role-label="' + escapeHtml(name.toLowerCase()) + '">';
 			html += '<input type="checkbox" data-role-check="1" value="' + escapeHtml(id) + '"' + (checked ? ' checked' : '') + '>';
 			html += '<span>' + escapeHtml(name) + '</span>';
-			if(_workgroupRoleAdmin){
-				html += '<button type="button" class="tab92-role-edit" data-role-edit="1" data-role-id="' + escapeHtml(id) + '" data-role-name="' + escapeHtml(name) + '" title="역할명 수정" aria-label="역할명 수정">';
-				html += '<img src="/static/image/svg/list/free-icon-pencil.svg" alt="">';
-				html += '</button>';
-			}
 			html += '</div>';
 		});
 		html += '</div>';
-		if(_workgroupRoleAdmin){
-			html += '<div class="tab92-role-admin-tools">';
-			html += '<input type="text" data-role-new-name="1" placeholder="새 역할명" autocomplete="off">';
-			html += '<button type="button" data-role-add="1">추가</button>';
-			html += '</div>';
-		}
 		html += '</div></div>';
 		return html;
 	}
@@ -529,54 +509,6 @@
 				if(chk){ chk.checked = !chk.checked; updateRolePickerSummary(root); }
 			});
 		});
-		Array.from(root.querySelectorAll('[data-role-edit]')).forEach(function(btn){
-			btn.addEventListener('click', function(e){
-				e.preventDefault();
-				e.stopPropagation();
-				(async function(){
-					var roleId = coerceInt(btn.getAttribute('data-role-id'));
-					var currentName = String(btn.getAttribute('data-role-name') || '').trim();
-					var nextName = window.prompt('역할명을 입력하세요.', currentName);
-					if(nextName == null) return;
-					nextName = String(nextName || '').trim();
-					if(!nextName) return showMgModal('역할명을 입력하세요.', '알림');
-					var selectedIds = selectedRoleIdsFromPicker(root);
-					await apiRequestJson('/api/work-groups/manager-roles/' + encodeURIComponent(String(roleId)), {
-						method:'PUT',
-						headers:{ 'Content-Type':'application/json' },
-						body: JSON.stringify({ name: nextName })
-					});
-					if(wgLookups) await wgLookups.ensureRoles(true);
-					td.innerHTML = buildRolePickerHtml(selectedRolesFromIds(selectedIds));
-					wireRolePicker(td, wgLookups);
-					toast('역할명이 수정되었습니다.', 'success');
-				})().catch(function(err){ showMgModal(err && err.message ? err.message : '역할 수정 중 오류가 발생했습니다.', '오류'); });
-			});
-		});
-		var addBtn = root.querySelector('[data-role-add]');
-		if(addBtn){
-			addBtn.addEventListener('click', function(e){
-				e.preventDefault();
-				(async function(){
-					var input = root.querySelector('[data-role-new-name]');
-					var name = input ? String(input.value || '').trim() : '';
-					if(!name){ if(input) input.focus(); return; }
-					var selectedIds = selectedRoleIdsFromPicker(root);
-					var res = await apiRequestJson('/api/work-groups/manager-roles', {
-						method:'POST',
-						headers:{ 'Content-Type':'application/json' },
-						body: JSON.stringify({ name: name })
-					});
-					if(wgLookups) await wgLookups.ensureRoles(true);
-					var item = normalizeItem(res);
-					var newId = item && coerceInt(item.id);
-					if(newId && selectedIds.indexOf(newId) < 0) selectedIds.push(newId);
-					td.innerHTML = buildRolePickerHtml(selectedRolesFromIds(selectedIds));
-					wireRolePicker(td, wgLookups);
-					toast('역할이 추가되었습니다.', 'success');
-				})().catch(function(err){ showMgModal(err && err.message ? err.message : '역할 추가 중 오류가 발생했습니다.', '오류'); });
-			});
-		}
 	}
 	function readRoleIds(tr){
 		var picker = tr && tr.querySelector ? tr.querySelector('[data-role-picker]') : null;
@@ -685,6 +617,7 @@
 		var btnPrev = document.getElementById('hw-prev');
 		var btnNext = document.getElementById('hw-next');
 		var btnLast = document.getElementById('hw-last');
+		var roleManageBtn = document.getElementById('mgr-role-manage-btn');
 		var emailSendBtn = document.getElementById('mg-email-send-btn');
 
 		var state = { page: 1, 
@@ -979,6 +912,115 @@ pageSize: 10 };
 		})();
 
 		/* ── 사내메일 전송 버튼 ───────────────────────── */
+		function renderRoleManageList(){
+			var list = document.getElementById('mgr-role-list');
+			if(!list) return;
+			var roles = _workgroupRoleOptions || [];
+			if(!roles.length){
+				list.innerHTML = '<div class="tab92-role-modal-empty">등록된 역할이 없습니다.</div>';
+				return;
+			}
+			list.innerHTML = roles.map(function(role){
+				return '<div class="tab92-role-modal-item">' + escapeHtml(roleNameOf(role)) + '</div>';
+			}).join('');
+		}
+		function setRoleStatus(msg, isError){
+			var status = document.getElementById('mgr-role-status');
+			if(!status) return;
+			status.textContent = msg || '';
+			status.classList.toggle('is-error', !!isError);
+			status.classList.toggle('is-success', !!msg && !isError);
+		}
+		function refreshOpenRolePickers(){
+			Array.from(document.querySelectorAll('#hw-spec-table [data-role-picker]')).forEach(function(root){
+				var td = root.closest('[data-col="role"]');
+				if(!td) return;
+				var selectedIds = selectedRoleIdsFromPicker(root);
+				td.innerHTML = buildRolePickerHtml(selectedRolesFromIds(selectedIds));
+				wireRolePicker(td, wgLookups);
+			});
+		}
+		async function openRoleManageModal(){
+			var modal = document.getElementById('mgr-role-modal');
+			if(!modal) return;
+			setRoleStatus('', false);
+			try{
+				if(wgLookups) await wgLookups.ensureRoles(true);
+			}catch(_){ }
+			renderRoleManageList();
+			var input = document.getElementById('mgr-role-name');
+			if(input) input.value = '';
+			document.body.classList.add('modal-open');
+			modal.classList.add('show');
+			modal.setAttribute('aria-hidden','false');
+			setTimeout(function(){ try{ if(input) input.focus(); }catch(_e){} }, 0);
+		}
+		function closeRoleManageModal(){
+			var modal = document.getElementById('mgr-role-modal');
+			if(!modal) return;
+			modal.classList.remove('show');
+			modal.setAttribute('aria-hidden','true');
+			if(!document.querySelector('.modal-overlay-full.show')) document.body.classList.remove('modal-open');
+		}
+		(function _wireRoleManageModal(){
+			var modal = document.getElementById('mgr-role-modal');
+			if(!modal || modal.getAttribute('data-tab92-wired') === '1') return;
+			modal.setAttribute('data-tab92-wired','1');
+			var close = document.getElementById('mgr-role-close');
+			var cancel = document.getElementById('mgr-role-cancel');
+			var add = document.getElementById('mgr-role-add-confirm');
+			var input = document.getElementById('mgr-role-name');
+			function submit(){
+				(async function(){
+					var name = input ? String(input.value || '').trim() : '';
+					if(!name){
+						setRoleStatus('역할명을 입력하세요.', true);
+						if(input) input.focus();
+						return;
+					}
+					if(add) add.disabled = true;
+					setRoleStatus('', false);
+					await apiRequestJson('/api/work-groups/manager-roles', {
+						method:'POST',
+						headers:{ 'Content-Type':'application/json' },
+						body: JSON.stringify({ name: name })
+					});
+					if(wgLookups) await wgLookups.ensureRoles(true);
+					renderRoleManageList();
+					refreshOpenRolePickers();
+					if(input) input.value = '';
+					setRoleStatus('역할이 추가되었습니다.', false);
+					if(input) input.focus();
+				})().catch(function(err){
+					setRoleStatus(err && err.message ? err.message : '역할 추가 중 오류가 발생했습니다.', true);
+				}).finally(function(){
+					if(add) add.disabled = false;
+				});
+			}
+			if(close) close.addEventListener('click', closeRoleManageModal);
+			if(cancel) cancel.addEventListener('click', closeRoleManageModal);
+			if(add) add.addEventListener('click', submit);
+			if(input){
+				input.addEventListener('keydown', function(e){
+					if(e.key === 'Enter'){
+						e.preventDefault();
+						submit();
+					}
+				});
+			}
+			modal.addEventListener('click', function(e){ if(e.target === modal) closeRoleManageModal(); });
+			document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && modal.classList.contains('show')) closeRoleManageModal(); });
+		})();
+
+		if(roleManageBtn && cfg.kind === 'workgroup' && roleManageBtn.getAttribute('data-tab92-wired') !== '1'){
+			roleManageBtn.setAttribute('data-tab92-wired','1');
+			roleManageBtn.addEventListener('click', function(){
+				openRoleManageModal().catch(function(err){
+					showMgModal(err && err.message ? err.message : '역할 관리 화면을 열 수 없습니다.', '오류');
+				});
+			});
+		}
+
 		if(emailSendBtn && cfg.kind === 'workgroup' && emailSendBtn.getAttribute('data-tab92-wired') !== '1'){
 			emailSendBtn.setAttribute('data-tab92-wired','1');
 			emailSendBtn.addEventListener('click', function(){

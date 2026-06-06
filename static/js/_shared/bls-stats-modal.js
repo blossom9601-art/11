@@ -231,6 +231,10 @@
         }
 
         var itemsHTML = '';
+        var totalCount = 0;
+        for (k in dist) {
+            if (dist.hasOwnProperty(k)) totalCount += Number(dist[k]) || 0;
+        }
         if (Array.isArray(fixedOptions) && fixedOptions.length) {
             var visible = [];
             var hiddenZero = [];
@@ -260,7 +264,7 @@
         }
 
         var cardHTML = '<div class="stat-card">' +
-            '<div class="stat-title">' + _esc(title) + '</div>' +
+            '<div class="stat-card-head"><div class="stat-title">' + _esc(title) + '</div><div class="stat-total"><strong>' + totalCount + '</strong><span>건</span></div></div>' +
             '<div class="stat-items">' + itemsHTML + '</div></div>';
         el.insertAdjacentHTML('beforeend', cardHTML);
     };

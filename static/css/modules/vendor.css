@@ -1,0 +1,75 @@
+/* Vendor page overrides. Keep rules scoped to this module. */
+.vendor-page [data-col="logo"] {
+  width: 72px;
+  min-width: 72px;
+  text-align: center;
+}
+
+.vendor-page [data-col="vendor"] {
+  min-width: 160px;
+}
+
+.vendor-page [data-col="business_number"],
+.vendor-page [data-col="call_center"] {
+  min-width: 130px;
+}
+
+.vendor-page [data-col="hardware_qty"],
+.vendor-page [data-col="software_qty"],
+.vendor-page [data-col="component_qty"] {
+  width: 120px;
+  text-align: right;
+}
+
+.vendor-page .vendor-logo-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.vendor-page .vendor-logo-row {
+  align-items: flex-start;
+}
+
+.vendor-page .vendor-logo-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vendor-page .vendor-logo-preview {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.vendor-page .vendor-logo-preview img {
+  max-width: 40px;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+.vendor-page .vendor-logo-upload-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.vendor-page .vendor-logo-upload-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.vendor-page .vendor-logo-file-name {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}

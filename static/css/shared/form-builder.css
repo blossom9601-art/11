@@ -1,0 +1,80 @@
+/* Shared form builder styles. Keep page-specific overrides under static/css/modules. */
+.bls-management-page .form-section + .form-section,
+.bls-management-modal-root .form-section + .form-section {
+  margin-top: var(--spacing-lg, 24px);
+}
+
+.bls-management-page .form-grid,
+.bls-management-modal-root .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md, 16px);
+  align-items: start;
+}
+
+.bls-management-page .form-row,
+.bls-management-modal-root .form-row {
+  min-width: 0;
+}
+
+.bls-management-page .form-row.full,
+.bls-management-modal-root .form-row.full {
+  grid-column: 1 / -1;
+}
+
+.bls-management-page .form-row label,
+.bls-management-modal-root .form-row label {
+  display: block;
+  margin-bottom: var(--spacing-xs, 4px);
+}
+
+.bls-management-page .form-input,
+.bls-management-modal-root .form-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.bls-management-page input.form-input,
+.bls-management-page select.form-input,
+.bls-management-modal-root input.form-input,
+.bls-management-modal-root select.form-input {
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  line-height: 40px;
+}
+
+.bls-management-page textarea.form-input,
+.bls-management-modal-root textarea.form-input {
+  min-height: 120px;
+  height: 120px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.bls-management-page .searchable-select,
+.bls-management-modal-root .searchable-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.bls-management-page .searchable-select input,
+.bls-management-modal-root .searchable-select input {
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .bls-management-page .form-grid,
+  .bls-management-modal-root .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bls-management-page .form-row.full,
+  .bls-management-modal-root .form-row.full {
+    grid-column: auto;
+  }
+}

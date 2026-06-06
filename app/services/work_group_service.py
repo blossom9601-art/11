@@ -118,6 +118,10 @@ def _new_public_id() -> str:
     return PUBLIC_ID_PREFIX + secrets.token_urlsafe(9).replace('-', '').replace('_', '')[:12]
 
 
+def _new_service_public_id() -> str:
+    return 'svc_' + secrets.token_urlsafe(9).replace('-', '').replace('_', '')[:12]
+
+
 def _project_root(app) -> str:
     return os.path.abspath(os.path.join(app.root_path, os.pardir))
 
@@ -756,9 +760,11 @@ def init_work_group_table(app=None) -> None:
                 f"""
                 CREATE TABLE IF NOT EXISTS {SERVICE_TABLE_NAME} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    public_id TEXT UNIQUE,
                     group_id INTEGER NOT NULL,
 
                     service_name TEXT,
+                    service_category TEXT,
                     service_department TEXT,
                     service_system TEXT,
                     service_domain TEXT,
@@ -770,6 +776,7 @@ def init_work_group_table(app=None) -> None:
                     network_separation TEXT,
                     external_link TEXT,
                     bcp_target TEXT DEFAULT 'X',
+                    dr_built TEXT DEFAULT 'X',
                     impact_level TEXT,
 
                     remark TEXT,
@@ -796,6 +803,25 @@ def init_work_group_table(app=None) -> None:
                 if 'service_description' not in svc_cols:
                     conn.execute(f"ALTER TABLE {SERVICE_TABLE_NAME} ADD COLUMN service_description TEXT")
                     logger.info('Added service_description column to %s', SERVICE_TABLE_NAME)
+                if 'public_id' not in svc_cols:
+                    conn.execute(f"ALTER TABLE {SERVICE_TABLE_NAME} ADD COLUMN public_id TEXT")
+                    logger.info('Added public_id column to %s', SERVICE_TABLE_NAME)
+                if 'service_category' not in svc_cols:
+                    conn.execute(f"ALTER TABLE {SERVICE_TABLE_NAME} ADD COLUMN service_category TEXT")
+                    logger.info('Added service_category column to %s', SERVICE_TABLE_NAME)
+                if 'dr_built' not in svc_cols:
+                    conn.execute(f"ALTER TABLE {SERVICE_TABLE_NAME} ADD COLUMN dr_built TEXT DEFAULT 'X'")
+                    logger.info('Added dr_built column to %s', SERVICE_TABLE_NAME)
+                conn.execute(
+                    f"""
+                    UPDATE {SERVICE_TABLE_NAME}
+                    SET public_id = 'svc_' || id
+                    WHERE public_id IS NULL OR TRIM(public_id) = ''
+                    """
+                )
+                conn.execute(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{SERVICE_TABLE_NAME}_public_id ON {SERVICE_TABLE_NAME}(public_id)"
+                )
             except Exception as _svc_mig_err:
                 logger.warning('column migration skipped for %s: %s', SERVICE_TABLE_NAME, _svc_mig_err)
 
@@ -1962,7 +1988,7 @@ def list_work_group_departments(app=None) -> List[Dict[str, Any]]:
     app = app or current_app
     with _get_connection(app) as conn:
         by_code: Dict[str, Dict[str, Any]] = {}
-        for table_ref in ('org_department', 'aux_od.org_department'):
+        for source_rank, table_ref in enumerate(('org_department', 'aux_od.org_department')):
             if table_ref.startswith('aux_od') and not _attached_table_exists(conn, 'aux_od', 'org_department'):
                 continue
             if table_ref == 'org_department' and not _sqlite_table_exists(conn, 'org_department'):
@@ -1987,10 +2013,23 @@ def list_work_group_departments(app=None) -> List[Dict[str, Any]]:
                 if code.casefold() == 'default' or name.replace(' ', '') == '기본부서':
                     continue
                 key = code.lower()
-                item = {'dept_code': code, 'dept_name': name}
-                if key not in by_code or int(row['is_deleted'] or 0) == 0:
+                is_deleted = int(row['is_deleted'] or 0)
+                rank = (1 if is_deleted else 0, source_rank, name.casefold(), code.casefold())
+                item = {
+                    'rank': rank,
+                    'name_key': re.sub(r'\s+', '', name).casefold(),
+                    'item': {'dept_code': code, 'dept_name': name},
+                }
+                if key not in by_code or rank < by_code[key]['rank']:
                     by_code[key] = item
-        return sorted(by_code.values(), key=lambda r: (r['dept_name'], r['dept_code']))
+
+        by_name: Dict[str, Dict[str, Any]] = {}
+        for entry in by_code.values():
+            name_key = entry['name_key']
+            if name_key not in by_name or entry['rank'] < by_name[name_key]['rank']:
+                by_name[name_key] = entry
+
+        return sorted((entry['item'] for entry in by_name.values()), key=lambda r: (r['dept_name'], r['dept_code']))
 
 
 def _prepare_payload(data: Dict[str, Any], *, require_all: bool = False) -> Dict[str, Any]:
@@ -2336,10 +2375,10 @@ def soft_delete_work_groups(ids: Sequence[Any], actor: str, app=None) -> int:
 # ---------------------------------------------------------------------------
 
 _SERVICE_COLS = (
-    'service_name', 'service_description', 'service_department', 'service_system', 'service_domain',
+    'service_name', 'service_description', 'service_category', 'service_department', 'service_system', 'service_domain',
     'confidential', 'sensitive', 'open_level',
     'install_area', 'dmz', 'network_separation',
-    'external_link', 'bcp_target', 'impact_level', 'remark',
+    'external_link', 'bcp_target', 'dr_built', 'impact_level', 'remark',
 )
 
 
@@ -2353,9 +2392,11 @@ def _service_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
 
     return {
         'id': row['id'],
+        'public_id': _dash(row['public_id']),
         'group_id': row['group_id'],
         'service_name': _dash(row['service_name']),
         'service_description': _dash(row['service_description']),
+        'service_category': _dash(row['service_category']),
         'service_department': _dash(row['service_department']),
         'service_system': _dash(row['service_system']),
         'service_domain': _dash(row['service_domain']),
@@ -2367,6 +2408,7 @@ def _service_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         'network_separation': _dash(row['network_separation']),
         'external_link': _dash(row['external_link']),
         'bcp_target': _dash(row['bcp_target']),
+        'dr_built': _dash(row['dr_built']),
         'impact_level': _dash(row['impact_level']),
         'remark': _dash(row['remark']),
         'created_at': row['created_at'],
@@ -2379,11 +2421,11 @@ def _service_row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
 
 def _service_select_sql() -> str:
     return f"""
-        SELECT id, group_id,
-               service_name, service_description, service_department, service_system, service_domain,
+        SELECT id, public_id, group_id,
+               service_name, service_description, service_category, service_department, service_system, service_domain,
                confidential, sensitive, open_level,
                install_area, dmz, network_separation,
-               external_link, bcp_target, impact_level, remark,
+               external_link, bcp_target, dr_built, impact_level, remark,
                created_at, created_by_user_id, updated_at, updated_by_user_id, is_deleted
         FROM {SERVICE_TABLE_NAME}
     """
@@ -2470,6 +2512,10 @@ def create_work_group_service(
             ),
         )
         new_id = conn.execute('SELECT last_insert_rowid() AS id').fetchone()['id']
+        conn.execute(
+            f"UPDATE {SERVICE_TABLE_NAME} SET public_id = ? WHERE id = ?",
+            (_new_service_public_id(), new_id),
+        )
         row = conn.execute(
             _service_select_sql() + " WHERE id = ?",
             (new_id,),
@@ -2548,3 +2594,87 @@ def delete_work_group_service(
         )
         conn.commit()
         return cur.rowcount > 0
+
+
+def list_service_masters(app=None, *, include_deleted: bool = False) -> List[Dict[str, Any]]:
+    app = app or current_app
+    where = "" if include_deleted else "WHERE (s.is_deleted = 0 OR s.is_deleted IS NULL)"
+    with _get_connection(app) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT s.id, s.public_id, s.group_id,
+                   s.service_name, s.service_description, s.service_category, s.service_department, s.service_system, s.service_domain,
+                   s.confidential, s.sensitive, s.open_level,
+                   s.install_area, s.dmz, s.network_separation,
+                   s.external_link, s.bcp_target, s.dr_built, s.impact_level, s.remark,
+                   s.created_at, s.created_by_user_id, s.updated_at, s.updated_by_user_id, s.is_deleted
+            FROM {SERVICE_TABLE_NAME} s
+            {where}
+            ORDER BY s.id ASC
+            """
+        ).fetchall()
+        return [_service_row_to_dict(r) for r in rows]
+
+
+def get_service_master(service_id: int, app=None) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    sid = _coerce_positive_int(service_id)
+    if not sid:
+        return None
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            _service_select_sql() + " WHERE id = ? AND (is_deleted = 0 OR is_deleted IS NULL)",
+            (sid,),
+        ).fetchone()
+        return _service_row_to_dict(row) if row else None
+
+
+def get_service_master_by_public_id(public_id: str, app=None) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    pid = str(public_id or '').strip()
+    if not pid:
+        return None
+    with _get_connection(app) as conn:
+        row = conn.execute(
+            _service_select_sql() + " WHERE public_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)",
+            (pid,),
+        ).fetchone()
+        return _service_row_to_dict(row) if row else None
+
+
+def _default_service_group_id(app=None) -> Optional[int]:
+    app = app or current_app
+    groups = list_work_groups(app=app)
+    if not groups:
+        return None
+    for group in groups:
+        gid = _coerce_positive_int(group.get('id'))
+        if gid:
+            return gid
+    return None
+
+
+def create_service_master(payload: Dict[str, Any], actor_user_id: Optional[int], app=None) -> Dict[str, Any]:
+    app = app or current_app
+    gid = _coerce_positive_int(payload.get('group_id')) or _default_service_group_id(app)
+    if not gid:
+        raise ValueError('서비스를 연결할 업무 그룹이 없습니다. 먼저 업무 그룹을 등록해 주세요.')
+    return create_work_group_service(gid, payload, actor_user_id, app=app)
+
+
+def update_service_master(service_id: int, payload: Dict[str, Any], actor_user_id: Optional[int], app=None) -> Optional[Dict[str, Any]]:
+    app = app or current_app
+    existing = get_service_master(service_id, app=app)
+    if not existing:
+        return None
+    gid = _coerce_positive_int(payload.get('group_id')) or _coerce_positive_int(existing.get('group_id'))
+    return update_work_group_service(gid, service_id, payload, actor_user_id, app=app)
+
+
+def delete_service_master(service_id: int, actor_user_id: Optional[int], app=None) -> bool:
+    app = app or current_app
+    existing = get_service_master(service_id, app=app)
+    if not existing:
+        return False
+    gid = _coerce_positive_int(existing.get('group_id'))
+    return delete_work_group_service(gid, service_id, actor_user_id, app=app)

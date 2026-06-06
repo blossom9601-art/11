@@ -10,7 +10,7 @@
 	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
 	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
 	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/insight.css?v=20260413_7">
+	<link rel="stylesheet" href="/static/css/insight.css?v=20260518_deletealert1">
 </head>
 <body class="insight-page" data-current-user-name="{{ current_user_name or '' }}">
 	{% include 'layouts/_header.html' %}
@@ -108,8 +108,8 @@
 		</div>
 	</main>
 
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
-	<script src="/static/js/5.insight/5-1.insight/insight_list_common.js?v=20260413_4"></script>
+	<script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
+	<script src="/static/js/5.insight/5-1.insight/insight_list_common.js?v=20260524_pagination1"></script>
 	<script>
 		document.addEventListener('DOMContentLoaded', function(){
 			if(window.BlossomInsightList && typeof window.BlossomInsightList.initInsightListPage === 'function'){
@@ -118,17 +118,19 @@
 		});
 	</script>
 
-	{% include '5.insight/5-1.insight/_insight_editor_modal.html' %}
+	{% with insight_attachment_max_mb=100 %}
+		{% include '5.insight/5-1.insight/_insight_editor_modal.html' %}
+	{% endwith %}
 
-	<!-- 삭제처리 확인 모달 (hw_server_onpremise 스타일 재사용) -->
-	<div id="insight-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+	<!-- 삭제처리 확인 모달 (공통 삭제 모달) -->
+	<div id="insight-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="insight-delete-title">
 		<div class="server-add-content">
 			<div class="server-add-header">
 				<div class="server-add-title dispose-title">
-					<h3>삭제처리</h3>
+					<h3 id="insight-delete-title">삭제처리</h3>
 					<p class="server-add-subtitle" id="insight-delete-subtitle">선택된 0개의 항목을 정말 삭제처리하시겠습니까?</p>
 				</div>
-				<button class="close-btn" type="button" id="insight-delete-close" title="닫기" aria-label="닫기">
+				<button class="close-btn" type="button" id="insight-delete-close" data-modal-close title="닫기" aria-label="닫기">
 					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 				</button>
 			</div>
@@ -136,17 +138,18 @@
 				<div class="dispose-content">
 					<div class="dispose-text">
 						<p>삭제처리는 선택한 항목을 데이터에서 제거하기 위한 사전 확인 단계입니다.</p>
-						<p>확인 후에는 선택된 항목에 대해 삭제 프로세스를 진행합니다.</p>
-						<p>(실제 삭제 방식은 추후 설정에 따라 결정됩니다)</p>
+						<p>삭제 후에는 목록과 상세 화면에서 더 이상 표시되지 않습니다.</p>
+						<p data-common-delete="warn">삭제된 데이터는 복구할 수 없습니다.</p>
 					</div>
 					<div class="dispose-illust">
-						<img src="/static/image/svg/list/free-sticker-option.svg" alt="Option Illustration" loading="lazy" />
+						<img src="/static/image/svg/list/free-sticker-process.svg" alt="Delete Illustration" loading="lazy" />
 					</div>
 				</div>
 			</div>
 			<div class="server-add-actions align-right">
 				<div class="action-buttons right">
-					<button type="button" class="btn-primary" id="insight-delete-confirm">확인</button>
+					<button type="button" class="btn-secondary" id="insight-delete-cancel" data-modal-close>취소</button>
+					<button type="button" class="btn-danger" id="insight-delete-confirm">삭제</button>
 				</div>
 			</div>
 		</div>
@@ -172,6 +175,10 @@
 	{% set dlm_illustration_src = '/static/image/svg/list/free-sticker-programming.svg' %}
 	{% set dlm_illustration_alt = 'Programming Illustration' %}
 	{% include 'layouts/_download_modal_range.html' %}
+	{% set msgm_title = '삭제처리' %}
+	{% set msgm_content = '삭제처리할 행을 먼저 선택하세요.' %}
+	{% set msgm_illustration_src = '/static/image/svg/list/free-sticker-solution.svg' %}
+	{% set msgm_illustration_alt = '안내 일러스트' %}
+	{% include 'layouts/_message_modal.html' %}
 </body>
 </html>
-

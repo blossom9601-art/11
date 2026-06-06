@@ -1,0 +1,19 @@
+[Unit]
+Description=Lumina Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lumina
+Group=lumina
+ExecStart=/usr/bin/python3 /opt/lumina/linux/agent.py --conf /etc/lumina/lumina.conf
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+ProtectSystem=full
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -17,6 +17,8 @@ QA_동작테스트_계획서.md의 P2 시나리오를 자동화한 테스트.
   TC-SPA   : SPA 페이지 렌더링
 """
 import json
+import os
+import sqlite3
 from datetime import datetime, timedelta
 
 import pytest
@@ -34,6 +36,7 @@ from app.models import (
     WrkReport,
     db,
 )
+from app.services import vulnerability_guide_service as guide_service
 
 
 # ═══════════════════════════════════════════════════════════
@@ -257,6 +260,16 @@ class TestP2GovernanceBackupTargetPolicy:
 class TestP2GovernanceVulnerability:
     """TC-GOV-003: 취약점 가이드 등록 → 조회 → 수정 → 삭제"""
 
+    def test_vulnerability_guide_default_sqlite_path_uses_instance(self, app):
+        old_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dev_blossom.db'
+        try:
+            with app.app_context():
+                resolved = guide_service._resolve_sqlite_db_path()
+            assert resolved == os.path.abspath(os.path.join(app.instance_path, 'dev_blossom.db'))
+        finally:
+            app.config['SQLALCHEMY_DATABASE_URI'] = old_uri
+
     def test_vulnerability_guide_crud(self, app, authed_client):
         payload = {
             'check_category': '계정관리',
@@ -294,6 +307,38 @@ class TestP2GovernanceVulnerability:
             headers=XHR)
         assert resp.status_code == 200
         assert _json(resp)['success'] is True
+
+    def test_vulnerability_guide_recreate_after_delete(self, app, authed_client):
+        payload = {
+            'check_category': 'UNIX',
+            'check_topic': 'root 계정 원격 접속 제한',
+            'check_code': 'U-RECREATE',
+            'check_type': '1. 계정 관리',
+            'check_importance': '상',
+        }
+
+        resp = authed_client.post('/api/governance/vulnerability-guides', json=payload, headers=XHR)
+        assert resp.status_code == 201
+        guide_id = _json(resp)['item']['id']
+
+        resp = authed_client.delete(f'/api/governance/vulnerability-guides/{guide_id}', headers=XHR)
+        assert resp.status_code == 200
+
+        with app.app_context():
+            db_path = guide_service._resolve_sqlite_db_path()
+        with sqlite3.connect(db_path) as conn:
+            conn.execute('DROP INDEX IF EXISTS ux_gov_vg_active')
+            conn.execute(
+                'CREATE UNIQUE INDEX ux_gov_vg_active ON governance_vulnerability_guide('
+                'check_category, check_type, check_topic, check_code, check_importance)'
+            )
+            conn.commit()
+
+        resp = authed_client.post('/api/governance/vulnerability-guides', json=payload, headers=XHR)
+        assert resp.status_code == 201
+        data = _json(resp)
+        assert data['success'] is True
+        assert data['item']['id'] == guide_id
 
     def test_vulnerability_guide_list(self, app, authed_client):
         """목록 조회 → success + items"""

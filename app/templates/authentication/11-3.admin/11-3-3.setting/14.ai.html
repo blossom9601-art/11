@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=20260526_settings_gap1">
+	<link rel="stylesheet" href="/static/css/authentication/11-3.admin/11-3-3.setting/14.ai.css?v=20260604i">
+	<script src="/static/js/blossom.js?v=20260512_stat_empty_unified1" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/14.ai.js?v=20260604h" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper ai-settings-page">
+			<div class="page-header">
+				<div>
+					<h1>AI</h1>
+					<p>사내 생성형 AI와 회사 계약 외부 API를 Blossom Chat에서 사용할 수 있도록 정책과 연결 정보를 관리합니다.</p>
+				</div>
+			</div>
+
+			{% include 'authentication/11-3.admin/_settings_tabs.html' %}
+
+			<form id="ai-policy-form" class="setting-form" autocomplete="off">
+
+				<div class="settings-columns ai-settings-columns">
+					<section class="setting-card ai-main-card" aria-labelledby="ai-basic-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="ai-basic-title">AI 사용 정책</h2>
+								<p>Blossom Chat 사이드바의 AI 기능 노출과 공급자 선택 방식을 제어합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">Blossom Chat AI 사용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-provider-mode">공급자 사용 방식</label>
+								<select id="ai-provider-mode" class="form-input ai-select">
+									<option value="internal_first">사내 AI 우선, 실패 시 외부 API</option>
+									<option value="internal_only">사내 AI만 사용</option>
+									<option value="external_only">외부 API만 사용</option>
+									<option value="manual_select">사용자가 선택</option>
+								</select>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-allow-user-select-provider">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">사용자 공급자 선택 허용</span>
+								</label>
+							</div>
+						</div>
+						<div class="setting-card-actions ai-card-actions">
+							<button type="button" class="btn-save-sm" data-ai-save="policy">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="ai-internal-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="ai-internal-title">사내 생성형 AI</h2>
+								<p>사내에서 만든 AI API 엔드포인트와 기본 모델을 등록합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-internal-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">사내 AI 사용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-internal-base-url">API Base URL</label>
+								<input id="ai-internal-base-url" type="url" class="form-input" placeholder="https://ai.company.local/v1">
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-internal-model">기본 모델</label>
+								<input id="ai-internal-model" type="text" class="form-input" placeholder="blossom-genai">
+							</div>
+						</div>
+						<div class="setting-card-actions ai-card-actions">
+							<button type="button" class="btn-save-sm" data-ai-save="internal">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="ai-external-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="ai-external-title">외부 API</h2>
+								<p>사내 AI 사용이 어려운 경우 회사 계약 API를 등록합니다.</p>
+							</div>
+						</div>
+						<div class="ai-guide">
+							<strong>연동 방법</strong>
+							<p>외부 API 사용을 켠 뒤 Provider를 선택하고, 계약한 API의 Base URL, 모델명, API Key를 입력하세요. OpenAI compatible 방식은 일반적으로 <code>/v1/chat/completions</code> 또는 호환 엔드포인트를 사용합니다.</p>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-external-enabled">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">외부 API 사용</span>
+								</label>
+							</div>
+							<div class="form-row">
+								<label for="ai-external-provider">Provider</label>
+								<select id="ai-external-provider" class="form-input ai-select">
+									<option value="openai_compatible">OpenAI compatible</option>
+									<option value="google_gemini">Google Gemini</option>
+									<option value="xai_grok">Grok (xAI)</option>
+									<option value="azure_openai">Azure OpenAI</option>
+									<option value="anthropic_compatible">Anthropic compatible</option>
+									<option value="custom">Custom</option>
+								</select>
+							</div>
+							<div class="form-row">
+								<label for="ai-external-model">모델</label>
+								<input id="ai-external-model" type="text" class="form-input" placeholder="gpt-5.2">
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-external-base-url">API Base URL</label>
+								<input id="ai-external-base-url" type="url" class="form-input" placeholder="https://api.openai.com/v1">
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-external-api-key">API Key</label>
+								<input id="ai-external-api-key" type="password" class="form-input" placeholder="저장 후 마스킹됩니다.">
+							</div>
+						</div>
+						<div class="setting-card-actions ai-card-actions">
+							<button type="button" class="btn-save-sm" data-ai-save="external">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+						</div>
+					</section>
+
+					<section class="setting-card" aria-labelledby="ai-safety-title">
+						<div class="setting-card-header">
+							<div>
+								<h2 id="ai-safety-title">보안·품질 정책</h2>
+								<p>대화 문맥, 파일 문맥, 로그 보관 및 생성 파라미터를 제한합니다.</p>
+							</div>
+						</div>
+						<div class="cp-policy-grid">
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-allow-chat-context">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">채팅 문맥 사용 허용</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-allow-file-context">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">파일 문맥 사용 허용</span>
+								</label>
+							</div>
+							<div class="form-row">
+								<label for="ai-retention-days">AI 로그 보관(일)</label>
+								<input id="ai-retention-days" type="number" min="0" max="365" class="form-input">
+							</div>
+							<div class="form-row">
+								<label for="ai-max-tokens">최대 응답 토큰</label>
+								<input id="ai-max-tokens" type="number" min="256" max="32000" class="form-input">
+							</div>
+							<div class="form-row">
+								<label for="ai-temperature">Temperature</label>
+								<input id="ai-temperature" type="number" min="0" max="2" step="0.1" class="form-input">
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-log-prompt">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">프롬프트 원문 로그 저장</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label class="switch">
+									<input type="checkbox" id="ai-log-response">
+									<span class="switch-track" aria-hidden="true"></span>
+									<span class="switch-label">응답 원문 로그 저장</span>
+								</label>
+							</div>
+							<div class="form-row cp-full">
+								<label for="ai-system-prompt">시스템 프롬프트</label>
+								<textarea id="ai-system-prompt" class="form-input ai-textarea" rows="5"></textarea>
+							</div>
+						</div>
+						<div class="setting-card-actions ai-card-actions ai-safety-actions">
+							<button type="button" class="btn-save-sm" data-ai-save="safety">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								저장
+							</button>
+							<button type="button" class="btn-secondary btn-sm" id="ai-restore-defaults">기본값 복원</button>
+						</div>
+					</section>
+				</div>
+			</form>
+		</div>
+	</main>
+</body>
+</html>

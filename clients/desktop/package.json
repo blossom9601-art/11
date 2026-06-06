@@ -1,6 +1,6 @@
 {
   "name": "blossom-desktop",
-  "version": "0.5.51",
+  "version": "0.5.59",
   "private": true,
   "description": "Blossom 사내 메신저 데스크탑 앱 (Electron)",
   "main": "src/main/index.js",
@@ -28,7 +28,9 @@
       {
         "from": "resources/putty",
         "to": "putty",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {

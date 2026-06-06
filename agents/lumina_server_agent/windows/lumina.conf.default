@@ -17,11 +17,11 @@ protocol = https
 verify_ssl = true
 
 [agent]
-# Collection interval in seconds. Default: 3600 (1 hour)
-interval = 3600
+# Collection interval in seconds. Default: 60 (1 minute)
+interval = 60
 
 # JSON 출력 디렉터리 (서버 전송 실패 시 fallback 저장 경로)
 output_dir = C:\ProgramData\Lumina
 
-# 수집 항목 (comma-separated): interface, account, authority, firewalld, storage, package
-collectors = interface, account, authority, firewalld, storage, package
+# 수집 항목 (comma-separated): interface, account, authority, firewalld, storage, package, performance
+collectors = interface, account, authority, firewalld, storage, package, performance

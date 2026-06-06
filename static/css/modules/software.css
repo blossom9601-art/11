@@ -1,0 +1,34 @@
+/* Software page overrides. Rules stay scoped to the reusable software module. */
+.software-page [data-col="model"] {
+  min-width: 180px;
+}
+
+.software-page [data-col="vendor"],
+.software-page [data-col="hw_type"] {
+  min-width: 130px;
+}
+
+.software-page [data-col="release_date"],
+.software-page [data-col="eosl"] {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.software-page [data-col="qty"] {
+  width: 84px;
+  text-align: right;
+}
+
+.software-page .software-detail-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.software-page .software-detail-link:hover {
+  text-decoration: underline;
+}
+
+.software-page .bls-data-table td,
+.software-page .bls-data-table th {
+  vertical-align: middle;
+}

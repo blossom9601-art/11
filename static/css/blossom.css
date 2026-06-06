@@ -201,7 +201,7 @@ html.dl-header-pending #page-header-subtitle{
 main.main-content.spa-fade-in,
 .server-detail-content.spa-fade-in,
 .tab-content.spa-fade-in {
-    animation: spaFadeIn .25s ease-out both;
+    animation: none;
 }
 
 /* SPA skeleton placeholder */
@@ -274,6 +274,52 @@ html.spa-loading::before {
 .system-table-container,
 .table-container {
     min-height: 300px;
+}
+
+.system-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #e5e7eb;
+    margin: 0 0 18px;
+    overflow-x: auto;
+}
+
+.system-tabs .system-tab-btn,
+.system-tabs .system-tab-btn:link,
+.system-tabs .system-tab-btn:visited {
+    background: none;
+    border: none;
+    padding: 12px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: none;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.system-tabs .system-tab-btn:hover {
+    color: var(--accent, #6366f1);
+    text-decoration: none;
+}
+
+.system-tabs .system-tab-btn:focus {
+    text-decoration: none;
+}
+
+.system-tabs .system-tab-btn.active {
+    color: var(--accent, #6366f1);
+    border-bottom-color: var(--accent, #6366f1);
+    text-decoration: none;
+}
+
+.system-tabs .system-tab-btn:focus-visible {
+    outline: 2px solid #cbd5e1;
+    outline-offset: 2px;
+    border-radius: 4px 4px 0 0;
 }
 
 .system-table-container,
@@ -2128,46 +2174,49 @@ html.spa-loading::before {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    background-color: #6a5acd !important;
+    background-color: #6366f1 !important;
     color: white !important;
-    font-size: 0.85rem !important;
-    font-weight: 700 !important;
-    min-width: 36px !important;
-    height: 28px !important;
-    border-radius: 14px !important;
-    padding: 0 12px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    min-width: 44px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    padding: 0 14px !important;
     line-height: 1 !important;
     box-sizing: border-box !important;
     text-align: center !important;
     overflow: visible !important;
-    border: 2px solid #ffffff !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    border: 0 !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28) !important;
     white-space: nowrap !important;
-    transition: all 0.2s ease !important;
+    letter-spacing: .2px !important;
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: 'tnum' !important;
+    transition: box-shadow 0.2s ease !important;
 }
 
 .count-badge:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.28) !important;
 }
 
 /* 큰 숫자를 위한 특별 스타일 */
 .count-badge.large-number {
-    min-width: 48px !important;
-    height: 32px !important;
-    border-radius: 16px !important;
-    font-size: 0.9rem !important;
+    min-width: 56px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
     font-weight: 800 !important;
-    padding: 0 16px !important;
+    padding: 0 18px !important;
 }
 
 .count-badge.very-large-number {
-    min-width: 60px !important;
-    height: 36px !important;
-    border-radius: 18px !important;
-    font-size: 0.95rem !important;
+    min-width: 72px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    font-size: 12px !important;
     font-weight: 800 !important;
-    padding: 0 20px !important;
+    padding: 0 24px !important;
 }
 
 /* add-btn 스타일 - 하드웨어 CSS로 이동됨 */

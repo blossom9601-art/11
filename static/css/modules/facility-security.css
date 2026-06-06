@@ -1,0 +1,17 @@
+/* Facility-security page overrides. Always scope rules to avoid leaking into other menus. */
+.facility-security-page .facility-security-group-tabs {
+  margin-bottom: var(--spacing-md, 16px);
+}
+
+.facility-security-page [data-col="model_name"] {
+  min-width: 180px;
+}
+
+.facility-security-page [data-col="manufacturer_name"],
+.facility-security-page [data-col="part_number"] {
+  min-width: 140px;
+}
+
+.facility-security-page [data-col="remark"] {
+  max-width: 280px;
+}

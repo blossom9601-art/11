@@ -9,6 +9,8 @@ import json
 import re
 import traceback
 import sqlalchemy as sa
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from datetime import date, datetime, timezone, timedelta
 import time
@@ -114,9 +116,11 @@ from app.models import (
 
     UserMemoGroup,
     UserMemo,
+    MsgChatPolicy,
     TickerMessage,
     TickerConfig,
     SmtpConfig,
+    BrandSetting,
 )
 from sqlalchemy import text, or_, func, and_
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -174,6 +178,11 @@ from app.services.work_group_service import (
     update_work_group_service as svc_update_work_group_service,
     delete_work_group_service as svc_delete_work_group_service,
     get_work_group_service as svc_get_work_group_service,
+    list_service_masters as svc_list_service_masters,
+    create_service_master as svc_create_service_master,
+    update_service_master as svc_update_service_master,
+    delete_service_master as svc_delete_service_master,
+    get_service_master as svc_get_service_master,
 )
 from app.services.work_group_file_service import (
     list_work_group_files as svc_list_work_group_files,
@@ -209,6 +218,8 @@ from app.services.web_access_control_service import (
     get_access_activity as svc_get_web_access_activity,
     get_request as svc_get_web_access_request,
     get_resource as svc_get_web_access_resource,
+    create_risk_policy as svc_create_web_access_risk_policy,
+    delete_risk_policy as svc_delete_web_access_risk_policy,
     grant_is_active_on_date as svc_grant_is_active_on_date,
     has_active_grant as svc_has_web_access_grant,
     has_pending_request as svc_has_web_access_pending_request,
@@ -221,6 +232,8 @@ from app.services.web_access_control_service import (
     list_grants as svc_list_web_access_grants,
     list_notifications as svc_list_web_access_notifications,
     list_requests as svc_list_web_access_requests,
+    list_risk_audit_logs as svc_list_web_access_risk_audit_logs,
+    list_risk_policies as svc_list_web_access_risk_policies,
     list_resources as svc_list_web_access_resources,
     map_pc_agent_user as svc_map_pc_agent_user,
     pc_agent_exists as svc_pc_agent_exists,
@@ -232,6 +245,7 @@ from app.services.web_access_control_service import (
     run_expiry_notifications as svc_run_web_access_notifications,
     soft_delete_resource as svc_delete_web_access_resource,
     touch_access as svc_touch_web_access,
+    update_risk_policy as svc_update_web_access_risk_policy,
     update_audit_log_connect_account as svc_update_web_access_audit_connect_account,
     upsert_pc_agent as svc_upsert_pc_agent,
     web_access_calendar_today_iso as svc_web_access_calendar_today_iso,
@@ -589,7 +603,10 @@ from app.services.identity_governance_service import (
     update_access_review_result as svc_identity_update_access_review_result,
     update_integrated_account as svc_identity_update_integrated_account,
 )
-from app.services.agent_cli_service import list_all_agents as svc_agent_pending_list_all
+from app.services.agent_cli_service import (
+    list_all_agents as svc_agent_pending_list_all,
+    set_pending_command,
+)
 from app.services.network_ip_diagram_service import (
     list_network_ip_diagrams as svc_list_network_ip_diagrams,
     get_network_ip_diagram as svc_get_network_ip_diagram,
@@ -752,6 +769,9 @@ from app.services.vulnerability_guide_service import (
     get_vulnerability_guide as get_vuln_guide,
     list_vulnerability_guide_summary as list_vuln_guide_summary,
     list_vulnerability_guides as list_vuln_guides,
+    list_vulnerability_guide_check_results as list_vuln_guide_check_results,
+    queue_vulnerability_guide_agent_check as queue_vuln_guide_agent_check,
+    run_vulnerability_guide_script as run_vuln_guide_script,
     update_vulnerability_guide as update_vuln_guide,
     update_vulnerability_guide_detail as update_vuln_guide_detail,
 )
@@ -878,6 +898,34 @@ _INSIGHT_ATTACHMENT_TECHNICAL_MAX_MB = 100
 _BLOG_ATTACHMENT_MAX_MB = 100
 
 
+@api_bp.route('/api/agent-performance', methods=['GET'])
+def get_agent_performance():
+    from app.services.agent_service import (
+        list_agent_performance,
+        get_agent_collection_status,
+        resolve_performance_asset_id,
+    )
+
+    try:
+        asset_id = int(request.args.get('asset_id') or 0)
+    except (TypeError, ValueError):
+        asset_id = 0
+    system_key = request.args.get('system_key') or ''
+    if asset_id <= 0 and system_key:
+        asset_id = resolve_performance_asset_id(system_key, app=current_app)
+    items = list_agent_performance(
+        request.args.get('asset_scope') or '',
+        asset_id,
+        system_key=system_key,
+        start=request.args.get('start') or '',
+        end=request.args.get('end') or '',
+        limit=int(request.args.get('limit') or 300),
+        app=current_app,
+    )
+    status = get_agent_collection_status(asset_id, app=current_app)
+    return jsonify({'success': True, 'items': items, 'total': len(items), 'status': status})
+
+
 def _set_single_detail_session_ctx(bucket: str, context_key: str, value):
     session[bucket] = {context_key: value}
     session.modified = True
@@ -892,6 +940,73 @@ def get_server_time():
         'utc': now_utc.isoformat() + 'Z',
         'epoch_ms': int(now_utc.timestamp() * 1000),
     })
+
+
+def _language_settings_path() -> str:
+    return os.path.join(current_app.instance_path, 'language_settings.json')
+
+
+def _load_language_settings() -> Dict[str, Any]:
+    defaults = {
+        'default_language': 'ko-KR',
+        'fallback_mode': 'default',
+    }
+    try:
+        path = _language_settings_path()
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as fh:
+                data = json.load(fh) or {}
+            if isinstance(data, dict):
+                defaults.update({
+                    key: value
+                    for key, value in data.items()
+                    if key in defaults and value
+                })
+    except Exception:
+        pass
+    return defaults
+
+
+def _save_language_settings(settings: Dict[str, Any]) -> None:
+    os.makedirs(current_app.instance_path, exist_ok=True)
+    with open(_language_settings_path(), 'w', encoding='utf-8') as fh:
+        json.dump(settings, fh, ensure_ascii=False, indent=2)
+
+
+@api_bp.route('/api/admin/language-settings', methods=['GET', 'POST'])
+def admin_language_settings_api():
+    """Global UI language preference used by the language/time settings page."""
+    has_identity = bool(session.get('user_id') or session.get('emp_no') or session.get('user_profile_id'))
+    if not has_identity:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+    if request.method == 'POST' and (session.get('role') or '').upper() != 'ADMIN':
+        return jsonify({'success': False, 'message': '관리자 권한이 필요합니다.'}), 403
+
+    supported = {'ko-KR', 'en-US', 'ja-JP', 'zh-CN'}
+    if request.method == 'GET':
+        settings = _load_language_settings()
+        session['ui_language'] = settings.get('default_language') or 'ko-KR'
+        session.modified = True
+        return jsonify({'success': True, **settings})
+
+    payload = request.get_json(silent=True) or {}
+    default_language = str(payload.get('default_language') or payload.get('language') or '').strip()
+    fallback_mode = str(payload.get('fallback_mode') or 'default').strip() or 'default'
+    if default_language not in supported:
+        return jsonify({'success': False, 'message': '지원하지 않는 언어입니다.'}), 400
+    if fallback_mode not in {'default', 'key', 'blank'}:
+        fallback_mode = 'default'
+
+    settings = {
+        'default_language': default_language,
+        'fallback_mode': fallback_mode,
+        'updated_at': datetime.utcnow().isoformat() + 'Z',
+        'updated_by': session.get('emp_no') or session.get('user_id') or '',
+    }
+    _save_language_settings(settings)
+    session['ui_language'] = default_language
+    session.modified = True
+    return jsonify({'success': True, **settings})
 
 
 # ── 인증: 세션 체크 ──
@@ -2368,6 +2483,7 @@ def update_governance_vulnerability_guide_detail(guide_id: int):
             action_method=_s(payload, 'action_method') or _s(payload, 'actionMethod'),
             action_impact=_s(payload, 'action_impact') or _s(payload, 'actionImpact'),
             action_case=_s(payload, 'action_case') or _s(payload, 'actionCase'),
+            script_content=_s(payload, 'script_content') or _s(payload, 'scriptContent'),
         )
         return jsonify({'success': True, 'item': item})
     except ValueError as e:
@@ -2378,6 +2494,66 @@ def update_governance_vulnerability_guide_detail(guide_id: int):
     except Exception:
         logger.exception('Failed to update vulnerability guide detail')
         return jsonify({'success': False, 'message': '가이드 상세 저장 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/vulnerability-guides/<int:guide_id>/script/run', methods=['POST'])
+def run_governance_vulnerability_guide_script(guide_id: int):
+    auth = _require_login_for_write()
+    if auth is not None:
+        return auth
+
+    try:
+        result = run_vuln_guide_script(guide_id=guide_id, app=current_app)
+        _attach_linked_agent_info(result.get('items') or [])
+        return jsonify({'success': True, **result})
+    except ValueError as e:
+        msg = str(e)
+        if msg == 'not found':
+            return jsonify({'success': False, 'message': '??곸쓣 李얠쓣 ???놁뒿?덈떎.'}), 404
+        return jsonify({'success': False, 'message': msg}), 400
+    except Exception:
+        logger.exception('Failed to run vulnerability guide script')
+        return jsonify({'success': False, 'message': '스크립트 수행 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/vulnerability-guides/<int:guide_id>/results', methods=['GET'])
+def list_governance_vulnerability_guide_results(guide_id: int):
+    try:
+        items = list_vuln_guide_check_results(guide_id=guide_id, app=current_app)
+        return jsonify({'success': True, 'items': items, 'total': len(items)})
+    except ValueError as e:
+        msg = str(e)
+        if msg == 'not found':
+            return jsonify({'success': False, 'message': '??곸쓣 李얠쓣 ???놁뒿?덈떎.'}), 404
+        return jsonify({'success': False, 'message': msg}), 400
+    except Exception:
+        logger.exception('Failed to list vulnerability guide results')
+        return jsonify({'success': False, 'message': '점검 결과 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/vulnerability-guides/<int:guide_id>/results/<int:agent_pending_id>/run', methods=['POST'])
+def run_governance_vulnerability_guide_result(guide_id: int, agent_pending_id: int):
+    auth = _require_login_for_write()
+    if auth is not None:
+        return auth
+
+    try:
+        item = queue_vuln_guide_agent_check(
+            guide_id=guide_id,
+            agent_pending_id=agent_pending_id,
+            app=current_app,
+        )
+        return jsonify({'success': True, 'item': item})
+    except ValueError as e:
+        msg = str(e)
+        if msg == 'not found':
+            return jsonify({'success': False, 'message': '??곸쓣 李얠쓣 ???놁뒿?덈떎.'}), 404
+        if msg == 'linked agent not found':
+            return jsonify({'success': False, 'message': '연결된 에이전트를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': False, 'message': msg}), 400
+    except Exception:
+        logger.exception('Failed to queue vulnerability guide agent check')
+        return jsonify({'success': False, 'message': '점검 수행 요청 중 오류가 발생했습니다.'}), 500
 
 
 @api_bp.route('/api/governance/backup/storage-pools', methods=['GET'])
@@ -7676,9 +7852,13 @@ def _serialize_wrk_report_summary(row: WrkReport) -> Dict:
     # UI-friendly aliases (legacy task screens expect these keys)
     task_type = worktypes[0] if worktypes else None
     task_class = classifications[0] if classifications else None
+    public_id = _ensure_wrk_report_public_id(row)
+    detail_url = f'/b/{public_id}' if public_id else f'/b/2.task_detail.html?id={row.id}'
 
     return {
         'id': row.id,
+        'public_id': public_id,
+        'detail_url': detail_url,
         'doc_no': row.doc_no,
         'status': row.status,
         'task_title': row.task_title,
@@ -7713,6 +7893,26 @@ def _serialize_wrk_report_summary(row: WrkReport) -> Dict:
         'created_by_signature_image': _safe_attr(row, 'created_by', 'signature_image'),
         'owner_profile_image': _safe_attr(row, 'owner_user', 'profile_image'),
     }
+
+
+def _is_uuid_text(value: object) -> bool:
+    try:
+        uuid.UUID(str(value or '').strip())
+        return True
+    except Exception:
+        return False
+
+
+def _new_wrk_report_public_id() -> str:
+    return str(uuid.uuid4())
+
+
+def _ensure_wrk_report_public_id(row: WrkReport) -> str:
+    current = (getattr(row, 'public_id', None) or '').strip()
+    if current:
+        return current
+    row.public_id = _new_wrk_report_public_id()
+    return row.public_id
 
 
 def _safe_attr(row, rel_name, attr_name):
@@ -8145,6 +8345,9 @@ def list_wrk_reports_by_system():
         for row in rows:
             if _sync_wrk_report_status(row, now=now_dt):
                 changed = True
+            if not (getattr(row, 'public_id', None) or '').strip():
+                _ensure_wrk_report_public_id(row)
+                changed = True
         if changed:
             db.session.commit()
 
@@ -8427,7 +8630,14 @@ def create_wrk_report():
             except Exception:
                 pass
 
+        requested_public_id = str(payload.get('public_id') or payload.get('report_public_id') or '').strip()
+        if requested_public_id and not _is_uuid_text(requested_public_id):
+            return jsonify({'success': False, 'message': 'public_id must be UUID'}), 400
+        if requested_public_id and WrkReport.query.filter(WrkReport.public_id == requested_public_id).first():
+            return jsonify({'success': False, 'message': 'public_id already exists'}), 409
+
         row = WrkReport(
+            public_id=requested_public_id or _new_wrk_report_public_id(),
             task_title=task_title,
             project_name=(payload.get('project_name') or payload.get('project') or '').strip() or None,
             project_id=_coerce_positive_int(payload.get('project_id')),
@@ -8543,13 +8753,42 @@ def get_wrk_report(report_id: int):
         row = WrkReport.query.filter(WrkReport.id == report_id, WrkReport.is_deleted == 0).first()
         if not row:
             return jsonify({'success': False, 'message': '작업보고서를 찾을 수 없습니다.'}), 404
+        changed = False
         if _sync_wrk_report_status(row):
+            changed = True
+        if not (getattr(row, 'public_id', None) or '').strip():
+            _ensure_wrk_report_public_id(row)
+            changed = True
+        if changed:
             db.session.commit()
         return jsonify({'success': True, 'item': _serialize_wrk_report_detail(row)}), 200
     except Exception:
         db.session.rollback()
         logger.exception('Failed to get work report report_id=%s', report_id)
         return jsonify({'success': False, 'message': '작업보고서 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/wrk/reports/public/<public_id>', methods=['GET'])
+def get_wrk_report_by_public_id(public_id: str):
+    actor_user_id = _coerce_positive_int(_resolve_actor_user_id())
+    if not actor_user_id:
+        return jsonify({'success': False, 'message': '?ъ슜???몄뀡??留뚮즺?섏뿀?듬땲??'}), 401
+    if not _wrk_report_table_ready():
+        return jsonify({'success': False, 'message': 'DB 留덉씠洹몃젅?댁뀡???꾩슂?⑸땲?? (wrk_report)'}), 500
+    public_id = (public_id or '').strip()
+    if not _is_uuid_text(public_id):
+        return jsonify({'success': False, 'message': 'invalid public_id'}), 400
+    try:
+        row = WrkReport.query.filter(WrkReport.public_id == public_id, WrkReport.is_deleted == 0).first()
+        if not row:
+            return jsonify({'success': False, 'message': '?묒뾽蹂닿퀬?쒕? 李얠쓣 ???놁뒿?덈떎.'}), 404
+        if _sync_wrk_report_status(row):
+            db.session.commit()
+        return jsonify({'success': True, 'item': _serialize_wrk_report_detail(row)}), 200
+    except Exception:
+        db.session.rollback()
+        logger.exception('Failed to get work report public_id=%s', public_id)
+        return jsonify({'success': False, 'message': '?묒뾽蹂닿퀬??議고쉶 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.'}), 500
 
 
 @api_bp.route('/api/wrk/reports/<int:report_id>', methods=['PUT'])
@@ -15545,6 +15784,7 @@ def list_hardware_assets_by_category():
             asset_category=asset_category or None,
             asset_type=asset_type,
         )
+        _attach_linked_agent_info(result.get('items') or [])
         return jsonify({'success': True, **result})
     except Exception:
         logger.exception('Failed to fetch hardware assets asset_category=%s asset_type=%s', asset_category, asset_type)
@@ -15565,10 +15805,39 @@ def _hardware_asset_list_response(asset_type: Union[str, Sequence[str]], log_lab
             asset_category=asset_category,
             asset_type=asset_type,
         )
+        _attach_linked_agent_info(result.get('items') or [])
         return jsonify({'success': True, **result})
     except Exception:
         logger.exception('Failed to fetch %s hardware assets', log_label)
         return jsonify({'success': False, 'message': failure_message}), 500
+
+
+def _attach_linked_agent_info(items: Sequence[Dict[str, Any]]) -> None:
+    try:
+        from app.services.agent_service import get_linked_agent
+    except Exception:
+        return
+    for item in items or []:
+        try:
+            asset_id = int(item.get('id') or 0)
+        except (TypeError, ValueError):
+            asset_id = 0
+        linked = get_linked_agent(asset_id) if asset_id > 0 else None
+        if not linked:
+            item.setdefault('agent_synced', False)
+            item.setdefault('agent_status', '')
+            item.setdefault('agent_version', '')
+            item.setdefault('agent_registered_at', '')
+            item.setdefault('agent_last_received', '')
+            item.setdefault('agent_hostname', '')
+            continue
+        item['agent_synced'] = bool(linked.get('active'))
+        item['agent_status'] = '수집중' if linked.get('active') else '수집 지연'
+        item['agent_version'] = linked.get('agent_version') or ''
+        item['agent_registered_at'] = linked.get('linked_at') or ''
+        item['agent_last_received'] = linked.get('last_heartbeat') or linked.get('received_at') or ''
+        item['agent_hostname'] = linked.get('hostname') or ''
+        item['agent_ip_address'] = linked.get('ip_address') or ''
 
 
 def _hardware_asset_get_response(asset_id: int, asset_type: Union[str, Sequence[str]], log_label: str, failure_message: str, asset_category: str = 'SERVER'):
@@ -15586,6 +15855,7 @@ def _hardware_asset_get_response(asset_id: int, asset_type: Union[str, Sequence[
             record['agent_synced'] = is_agent_synced(asset_id)
         except Exception:
             record['agent_synced'] = False
+        _attach_linked_agent_info([record])
         return jsonify({'success': True, 'item': record})
     except Exception:
         logger.exception('Failed to fetch %s hardware asset', log_label)
@@ -17408,6 +17678,43 @@ def api_asset_accounts_delete(account_id: int):
     except Exception:
         logger.exception('Failed to delete asset account id=%s asset_scope=%s asset_id=%s system_key=%s', account_id, asset_scope, asset_id, system_key)
         return jsonify({'success': False, 'message': '계정을 삭제하지 못했습니다.'}), 500
+
+
+@api_bp.route('/api/asset-accounts/sync-agent', methods=['POST'])
+def api_asset_accounts_sync_agent():
+    blocked = _require_login_for_write()
+    if blocked is not None:
+        return blocked
+
+    data = request.get_json(silent=True) or {}
+    try:
+        asset_id = int(data.get('asset_id'))
+    except (TypeError, ValueError):
+        asset_id = None
+    if asset_id is None:
+        return jsonify({'success': False, 'message': 'asset_id is required'}), 400
+
+    try:
+        from app.services.agent_service import get_linked_agent
+
+        linked = get_linked_agent(asset_id)
+        if not linked:
+            return jsonify({'success': False, 'message': '연동된 에이전트가 없습니다.'}), 404
+        agent_id = int(linked.get('id') or 0)
+        if not agent_id:
+            return jsonify({'success': False, 'message': '연동된 에이전트 정보를 확인하지 못했습니다.'}), 404
+        ok = set_pending_command(agent_id, 'collect')
+        if not ok:
+            return jsonify({'success': False, 'message': '에이전트 수집 명령을 등록하지 못했습니다.'}), 404
+
+        _try_record_change(action_type='UPDATE', entity_type='hardware_asset',
+                           entity_id=asset_id,
+                           tab_name='계정관리',
+                           summary='에이전트 계정 즉시 수집 요청')
+        return jsonify({'success': True, 'message': '에이전트 계정 수집을 요청했습니다.'})
+    except Exception:
+        logger.exception('Failed to queue account agent sync asset_id=%s', asset_id)
+        return jsonify({'success': False, 'message': '에이전트 계정 수집 요청에 실패했습니다.'}), 500
 
 
 # -----------------------------------------------------------------------------
@@ -27001,6 +27308,112 @@ def delete_work_group_system(group_id: int, system_id: int):
 # Work Group – Services (tab47)
 # ---------------------------------------------------------------------------
 
+@api_bp.route('/api/governance/service-masters', methods=['GET'])
+def list_governance_service_masters():
+    include_deleted = request.args.get('include_deleted', '').lower() in ('1', 'true', 'yes')
+    try:
+        items = svc_list_service_masters(include_deleted=include_deleted)
+        return jsonify({'success': True, 'items': items})
+    except Exception:
+        logger.exception('Failed to fetch governance service masters')
+        return jsonify({'success': False, 'message': '서비스 목록 조회 실패'}), 500
+
+
+@api_bp.route('/api/governance/service-masters', methods=['POST'])
+def create_governance_service_master():
+    auth = _require_login_for_write()
+    if auth:
+        return auth
+
+    payload = request.get_json(silent=True) or {}
+    actor_user_id = _coerce_positive_int(
+        request.args.get('actor_user_id')
+        or payload.pop('actor_user_id', None)
+        or payload.pop('updated_by_user_id', None)
+    )
+    if not actor_user_id:
+        actor_user_id = _coerce_positive_int(_resolve_actor_user_id(None))
+    if not actor_user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+
+    try:
+        item = svc_create_service_master(payload, actor_user_id)
+        return jsonify({'success': True, 'item': item}), 201
+    except ValueError as ve:
+        return jsonify({'success': False, 'message': str(ve)}), 400
+    except Exception:
+        logger.exception('Failed to create governance service master')
+        return jsonify({'success': False, 'message': '서비스 생성 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/service-masters/<int:service_id>', methods=['GET'])
+def get_governance_service_master(service_id: int):
+    try:
+        item = svc_get_service_master(service_id)
+        if not item:
+            return jsonify({'success': False, 'message': '서비스를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except Exception:
+        logger.exception('Failed to fetch governance service master id=%s', service_id)
+        return jsonify({'success': False, 'message': '서비스 조회 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/service-masters/<int:service_id>', methods=['PUT'])
+def update_governance_service_master(service_id: int):
+    auth = _require_login_for_write()
+    if auth:
+        return auth
+
+    payload = request.get_json(silent=True) or {}
+    actor_user_id = _coerce_positive_int(
+        request.args.get('actor_user_id')
+        or payload.pop('actor_user_id', None)
+        or payload.pop('updated_by_user_id', None)
+    )
+    if not actor_user_id:
+        actor_user_id = _coerce_positive_int(_resolve_actor_user_id(None))
+    if not actor_user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+
+    try:
+        item = svc_update_service_master(service_id, payload, actor_user_id)
+        if not item:
+            return jsonify({'success': False, 'message': '서비스를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'item': item})
+    except ValueError as ve:
+        return jsonify({'success': False, 'message': str(ve)}), 400
+    except Exception:
+        logger.exception('Failed to update governance service master id=%s', service_id)
+        return jsonify({'success': False, 'message': '서비스 수정 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/governance/service-masters/<int:service_id>', methods=['DELETE'])
+def delete_governance_service_master(service_id: int):
+    auth = _require_login_for_write()
+    if auth:
+        return auth
+
+    actor_user_id = _coerce_positive_int(
+        request.args.get('actor_user_id') or _resolve_actor_user_id(None)
+    )
+    if not actor_user_id:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+
+    try:
+        ok = svc_delete_service_master(service_id, actor_user_id)
+        if not ok:
+            return jsonify({'success': False, 'message': '서비스를 찾을 수 없습니다.'}), 404
+        return jsonify({'success': True, 'deleted': [service_id]})
+    except Exception:
+        logger.exception('Failed to delete governance service master id=%s', service_id)
+        return jsonify({'success': False, 'message': '서비스 삭제 중 오류가 발생했습니다.'}), 500
+
+
+@api_bp.route('/api/settings/security-controls', methods=['GET'])
+def list_settings_security_controls():
+    return jsonify({'success': True, 'items': []})
+
+
 @api_bp.route('/api/work-groups/<int:group_id>/services', methods=['GET'])
 def list_work_group_services(group_id: int):
     include_deleted = request.args.get('include_deleted', '').lower() in ('1', 'true', 'yes')
@@ -33546,6 +33959,159 @@ def _memo_to_item(row: UserMemo) -> dict:
     }
 
 
+_FILE_POLICY_DEFAULTS = {
+    'max_file_size_mb': 20,
+    'allowed_extensions': 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,hwp,jpg,jpeg,png,gif,zip',
+    'blocked_extensions': 'exe,bat,cmd,com,scr,vbs,js,jar,dll',
+    'file_name_pattern': '',
+    'allow_duplicate_upload': False,
+    'block_executable_upload': True,
+    'validate_mime_type': True,
+    'validate_magic_bytes': False,
+    'detect_extension_spoofing': True,
+    'enable_virus_scan': False,
+    'inherit_record_permission': True,
+    'enable_download_log': True,
+    'allow_external_share': False,
+    'allow_admin_force_access': True,
+    'retention_days_after_closed': 365,
+    'archive_days_if_unaccessed': 180,
+    'exclude_important_from_retention': True,
+    'enable_expiry_notification': True,
+    'memo_enabled': True,
+    'memo_user_quota_mb': 10240,
+    'memo_max_item_kb': 10240,
+    'memo_warn_percent': 80,
+    'memo_allow_images': True,
+    'memo_history_days': 365,
+}
+
+
+def _file_policy_path() -> str:
+    try:
+        os.makedirs(current_app.instance_path, exist_ok=True)
+        return os.path.join(current_app.instance_path, 'file_policy.json')
+    except Exception:
+        return os.path.join(os.getcwd(), 'file_policy.json')
+
+
+def _coerce_file_policy(raw: Optional[dict] = None) -> dict:
+    item = dict(_FILE_POLICY_DEFAULTS)
+    if isinstance(raw, dict):
+        item.update(raw)
+    for key in (
+        'allow_duplicate_upload', 'block_executable_upload', 'validate_mime_type',
+        'validate_magic_bytes', 'detect_extension_spoofing', 'enable_virus_scan',
+        'inherit_record_permission', 'enable_download_log', 'allow_external_share',
+        'allow_admin_force_access', 'exclude_important_from_retention',
+        'enable_expiry_notification', 'memo_enabled', 'memo_allow_images',
+    ):
+        item[key] = bool(item.get(key))
+    for key, default, min_value, max_value in (
+        ('max_file_size_mb', 20, 1, 2048),
+        ('retention_days_after_closed', 365, 0, 3650),
+        ('archive_days_if_unaccessed', 180, 0, 3650),
+        ('memo_user_quota_mb', 10240, 1, 1048576),
+        ('memo_max_item_kb', 10240, 1, 102400),
+        ('memo_warn_percent', 80, 1, 100),
+        ('memo_history_days', 365, 0, 3650),
+    ):
+        try:
+            value = int(item.get(key, default))
+        except Exception:
+            value = int(default)
+        item[key] = max(min_value, min(max_value, value))
+    return item
+
+
+def _load_file_policy_item() -> dict:
+    try:
+        with open(_file_policy_path(), 'r', encoding='utf-8') as fp:
+            return _coerce_file_policy(json.load(fp))
+    except FileNotFoundError:
+        return _coerce_file_policy()
+    except Exception:
+        logger.exception('Failed to load file policy')
+        return _coerce_file_policy()
+
+
+def _save_file_policy_item(payload: dict) -> dict:
+    item = _coerce_file_policy(payload)
+    path = _file_policy_path()
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fp:
+        json.dump(item, fp, ensure_ascii=False, indent=2, sort_keys=True)
+    os.replace(tmp, path)
+    return item
+
+
+def _memo_size_bytes(title: str = '', body: str = '') -> int:
+    return len((str(title or '') + '\n' + str(body or '')).encode('utf-8'))
+
+
+def _memo_usage_bytes(owner_user_id: int, exclude_memo_id: Optional[int] = None) -> int:
+    q = (
+        UserMemo.query
+        .with_entities(UserMemo.id, UserMemo.title, UserMemo.body)
+        .filter(UserMemo.owner_user_id == int(owner_user_id))
+        .filter(UserMemo.is_deleted == 0)
+    )
+    if exclude_memo_id:
+        q = q.filter(UserMemo.id != int(exclude_memo_id))
+    return sum(_memo_size_bytes(row.title or '', row.body or '') for row in q.all())
+
+
+def _memo_usage_payload(owner_user_id: int) -> dict:
+    policy = _load_file_policy_item()
+    quota_bytes = int(policy.get('memo_user_quota_mb') or 10240) * 1024 * 1024
+    used_bytes = int(_memo_usage_bytes(owner_user_id))
+    return {
+        'success': True,
+        'enabled': bool(policy.get('memo_enabled', True)),
+        'allow_images': bool(policy.get('memo_allow_images', True)),
+        'quota_mb': int(policy.get('memo_user_quota_mb') or 10240),
+        'quota_bytes': quota_bytes,
+        'used_bytes': used_bytes,
+        'remaining_bytes': max(0, quota_bytes - used_bytes),
+        'max_item_kb': int(policy.get('memo_max_item_kb') or 10240),
+        'warn_percent': int(policy.get('memo_warn_percent') or 80),
+        'history_days': int(policy.get('memo_history_days') or 365),
+        'percent': round((used_bytes / quota_bytes) * 100, 2) if quota_bytes else 0,
+    }
+
+
+def _validate_memo_policy(owner_user_id: int, title: str, body: str, exclude_memo_id: Optional[int] = None):
+    policy = _load_file_policy_item()
+    if not bool(policy.get('memo_enabled', True)):
+        return jsonify({'success': False, 'message': 'Memo is disabled by policy.'}), 403
+    body_text = str(body or '')
+    if 'data:' in body_text and not bool(policy.get('memo_allow_images', True)):
+        return jsonify({'success': False, 'message': 'Memo image attachment is blocked by policy.'}), 400
+    item_bytes = _memo_size_bytes(title, body_text)
+    max_item_bytes = int(policy.get('memo_max_item_kb') or 10240) * 1024
+    if item_bytes > max_item_bytes:
+        return jsonify({'success': False, 'message': 'Memo item size limit exceeded.'}), 400
+    quota_bytes = int(policy.get('memo_user_quota_mb') or 10240) * 1024 * 1024
+    used_without_current = _memo_usage_bytes(owner_user_id, exclude_memo_id=exclude_memo_id)
+    if used_without_current + item_bytes > quota_bytes:
+        return jsonify({'success': False, 'message': 'Memo user quota exceeded.'}), 400
+    return None
+
+
+@api_bp.route('/api/memo/usage', methods=['GET'])
+def get_user_memo_usage():
+    if not _memo_tables_ready():
+        return jsonify({'success': False, 'message': 'DB migration is required. (user_memo_group/user_memo)'}), 500
+    uid, err = _memo_require_auth_user_id()
+    if err:
+        return err
+    try:
+        return jsonify(_memo_usage_payload(uid))
+    except Exception:
+        logger.exception('Failed to get memo usage')
+        return jsonify({'success': False, 'message': 'Failed to get memo usage.'}), 500
+
+
 @api_bp.route('/api/memo/groups', methods=['GET'])
 def list_user_memo_groups():
     if not _memo_tables_ready():
@@ -33848,12 +34414,9 @@ def create_user_memo(group_id: int):
         body = ''
     body = str(body)
 
-    # Policy: memo content must be <= 10MB (UTF-8 bytes)
-    try:
-        if len(body.encode('utf-8')) > (10 * 1024 * 1024):
-            return jsonify({'success': False, 'message': '메모는 10MB 이하만 저장할 수 있습니다.'}), 400
-    except Exception:
-        return jsonify({'success': False, 'message': '메모 내용을 확인할 수 없습니다.'}), 400
+    policy_error = _validate_memo_policy(uid, title, body)
+    if policy_error:
+        return policy_error
 
     # Policy: attachments must be images only (block non-image data URIs)
     if 'data:' in body and 'data:image/' not in body:
@@ -34123,12 +34686,9 @@ def update_user_memo(memo_id: int):
         if 'body' in payload:
             new_body = str(payload.get('body') or '')
 
-            # Policy: memo content must be <= 10MB (UTF-8 bytes)
-            try:
-                if len(new_body.encode('utf-8')) > (10 * 1024 * 1024):
-                    return jsonify({'success': False, 'message': '메모는 10MB 이하만 저장할 수 있습니다.'}), 400
-            except Exception:
-                return jsonify({'success': False, 'message': '메모 내용을 확인할 수 없습니다.'}), 400
+            policy_error = _validate_memo_policy(uid, row.title or '', new_body, exclude_memo_id=memo_id)
+            if policy_error:
+                return policy_error
 
             # Policy: attachments must be images only (block non-image data URIs)
             if 'data:' in new_body and 'data:image/' not in new_body:
@@ -37743,8 +38303,369 @@ def get_page_tab_image(tab_id):
 
 
 # ──────────────────────────────────────────────────────────────
+# Blossom Chat AI proxy
+# ──────────────────────────────────────────────────────────────
+AI_POLICY_DEFAULTS_API = {
+    'ai.enabled': {'enabled': False},
+    'ai.provider_mode': {'value': 'internal_first'},
+    'ai.internal_enabled': {'enabled': True},
+    'ai.internal_base_url': {'value': ''},
+    'ai.internal_model': {'value': 'blossom-genai'},
+    'ai.external_enabled': {'enabled': False},
+    'ai.external_provider': {'value': 'openai_compatible'},
+    'ai.external_base_url': {'value': ''},
+    'ai.external_model': {'value': 'gpt-5.2'},
+    'ai.external_api_key': {'value': ''},
+    'ai.max_tokens': {'value': 2048},
+    'ai.temperature': {'value': 0.3},
+    'ai.system_prompt': {'value': 'Blossom Chat 업무 지원 AI입니다. 사내 보안 정책을 준수하고, 민감정보는 필요한 경우에만 최소한으로 사용합니다.'},
+}
+
+
+def _ai_policy_map() -> Dict[str, Dict[str, Any]]:
+    policies = {k: dict(v) for k, v in AI_POLICY_DEFAULTS_API.items()}
+    try:
+        rows = MsgChatPolicy.query.filter(MsgChatPolicy.policy_key.like('ai.%')).all()
+        for row in rows:
+            try:
+                value = json.loads(row.value_json or '{}')
+            except Exception:
+                value = {}
+            if isinstance(value, dict):
+                policies[row.policy_key] = value
+    except Exception:
+        current_app.logger.exception('Failed to load AI policy')
+    return policies
+
+
+def _ai_bool(policies: Dict[str, Dict[str, Any]], key: str, fallback: bool = False) -> bool:
+    item = policies.get(key) or {}
+    if 'enabled' in item:
+        return bool(item.get('enabled'))
+    return bool(fallback)
+
+
+def _ai_value(policies: Dict[str, Dict[str, Any]], key: str, fallback: Any = '') -> Any:
+    item = policies.get(key) or {}
+    if 'value' in item:
+        return item.get('value')
+    return fallback
+
+
+def _ai_chat_url(base_url: str) -> str:
+    base = (base_url or '').strip().rstrip('/')
+    if not base:
+        return ''
+    if base.endswith('/chat/completions'):
+        return base
+    return base + '/chat/completions'
+
+
+def _ai_message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if isinstance(item.get('text'), str):
+                    parts.append(item.get('text'))
+                elif isinstance(item.get('content'), str):
+                    parts.append(item.get('content'))
+        return '\n'.join(parts).strip()
+    return ''
+
+
+def _ai_completion_content(data: Dict[str, Any]) -> str:
+    choices = data.get('choices') if isinstance(data, dict) else None
+    if isinstance(choices, list) and choices:
+        message = choices[0].get('message') if isinstance(choices[0], dict) else None
+        if isinstance(message, dict):
+            text = _ai_message_text(message.get('content'))
+            if text:
+                return text
+        text = choices[0].get('text') if isinstance(choices[0], dict) else None
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return ''
+
+
+@api_bp.route('/api/ai/chat', methods=['POST'])
+def api_ai_chat():
+    """Proxy Blossom Chat AI requests to the configured OpenAI-compatible API."""
+    has_identity = bool(
+        session.get('emp_no')
+        or session.get('user_id')
+        or session.get('user_profile_id')
+        or session.get('profile_user_id')
+        or session.get('employee_id')
+    )
+    if not has_identity:
+        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    prompt = (payload.get('prompt') or '').strip()
+    client_messages = payload.get('messages') or []
+    if not prompt and not client_messages:
+        return jsonify({'success': False, 'message': '요청 내용이 없습니다.'}), 400
+
+    policies = _ai_policy_map()
+    if not _ai_bool(policies, 'ai.enabled', False):
+        return jsonify({'success': False, 'message': 'AI 사용 정책이 비활성화되어 있습니다. 설정 > 개발/품질 > AI에서 AI 사용을 켜 주세요.'}), 400
+
+    provider_mode = str(_ai_value(policies, 'ai.provider_mode', 'internal_first') or 'internal_first')
+    external_enabled = _ai_bool(policies, 'ai.external_enabled', False)
+    internal_enabled = _ai_bool(policies, 'ai.internal_enabled', True)
+    external_provider = str(_ai_value(policies, 'ai.external_provider', 'openai_compatible') or 'openai_compatible').strip()
+    external_base_url = str(_ai_value(policies, 'ai.external_base_url', '') or '').strip()
+    external_api_key = str(_ai_value(policies, 'ai.external_api_key', '') or '').strip()
+    external_model = str(_ai_value(policies, 'ai.external_model', '') or '').strip()
+    internal_base_url = str(_ai_value(policies, 'ai.internal_base_url', '') or '').strip()
+    internal_model = str(_ai_value(policies, 'ai.internal_model', 'blossom-genai') or '').strip()
+
+    use_external = external_enabled and bool(external_base_url and external_api_key) and (
+        provider_mode in ('external_only', 'manual_select')
+        or not (internal_enabled and internal_base_url)
+        or payload.get('provider') == 'external'
+    )
+    if not use_external and external_enabled and external_base_url and external_api_key and not internal_base_url:
+        use_external = True
+
+    if not use_external:
+        missing_external = []
+        if not external_enabled:
+            missing_external.append('외부 API 사용')
+        if not external_base_url:
+            missing_external.append('API Base URL')
+        if not external_api_key:
+            missing_external.append('API Key')
+        if provider_mode == 'external_only' or payload.get('provider') == 'external':
+            detail = ', '.join(missing_external) if missing_external else '외부 API 설정'
+            return jsonify({'success': False, 'message': '외부 API 설정이 완료되지 않았습니다. 확인 항목: {0}'.format(detail)}), 400
+        return jsonify({'success': False, 'message': '현재 사내 AI 직접 호출은 아직 연결되지 않았습니다. 외부 API만 사용하려면 설정 > 개발/품질 > AI에서 공급자 사용 방식을 "외부 API만 사용"으로 저장해 주세요.'}), 400
+
+    if external_provider == 'google_gemini' and 'aistudio.google.com' in external_base_url:
+        return jsonify({'success': False, 'message': 'Google AI Studio 화면 주소가 아니라 Gemini API Base URL을 입력해야 합니다. 예: https://generativelanguage.googleapis.com/v1beta'}), 400
+
+    if external_provider == 'google_gemini':
+        model = external_model or 'gemini-2.5-flash'
+        external_base_url = external_base_url or 'https://generativelanguage.googleapis.com/v1beta'
+    elif external_provider == 'xai_grok':
+        model = external_model or 'grok-4'
+        external_base_url = external_base_url or 'https://api.x.ai/v1'
+    else:
+        model = external_model or 'gpt-5.2'
+    if model.lower() in ('blossom-genai', 'blossom_ai', 'blossom-ai'):
+        model = 'gpt-5.2'
+    endpoint = _ai_chat_url(external_base_url)
+    if external_provider == 'google_gemini':
+        gemini_base = external_base_url.strip().rstrip('/')
+        gemini_model = model if model.startswith('models/') else 'models/' + model
+        endpoint = gemini_base + '/' + gemini_model + ':generateContent'
+    parsed = urlparse(endpoint)
+    if parsed.scheme not in ('https', 'http') or not parsed.netloc:
+        return jsonify({'success': False, 'message': '외부 API Base URL이 올바르지 않습니다.'}), 400
+
+    max_tokens = int(_ai_value(policies, 'ai.max_tokens', 2048) or 2048)
+    temperature = float(_ai_value(policies, 'ai.temperature', 0.3) or 0.3)
+    system_prompt = str(_ai_value(policies, 'ai.system_prompt', '') or '').strip()
+
+    messages = []
+    if system_prompt:
+        messages.append({'role': 'system', 'content': system_prompt})
+    if isinstance(client_messages, list):
+        for msg in client_messages[-20:]:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get('role')
+            if role not in ('user', 'assistant', 'system', 'developer'):
+                continue
+            text = _ai_message_text(msg.get('content') if 'content' in msg else msg.get('text'))
+            if text:
+                messages.append({'role': role, 'content': text})
+    if prompt and (not messages or messages[-1].get('role') != 'user' or messages[-1].get('content') != prompt):
+        messages.append({'role': 'user', 'content': prompt})
+
+    body = {
+        'model': model,
+        'messages': messages,
+        'temperature': max(0, min(2, temperature)),
+        'max_tokens': max(1, min(32000, max_tokens)),
+    }
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + external_api_key,
+    }
+    if external_provider == 'google_gemini':
+        headers = {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': external_api_key,
+        }
+        gemini_contents = []
+        system_parts = []
+        for msg in messages:
+            role = msg.get('role')
+            text = msg.get('content') or ''
+            if not text:
+                continue
+            if role in ('system', 'developer'):
+                system_parts.append({'text': text})
+            else:
+                gemini_contents.append({
+                    'role': 'model' if role == 'assistant' else 'user',
+                    'parts': [{'text': text}],
+                })
+        body = {
+            'contents': gemini_contents or [{'role': 'user', 'parts': [{'text': prompt}]}],
+            'generationConfig': {
+                'temperature': max(0, min(2, temperature)),
+                'maxOutputTokens': max(1, min(32000, max_tokens)),
+            },
+        }
+        if system_parts:
+            body['systemInstruction'] = {'parts': system_parts}
+
+    def _ai_json_response(raw: str, context: str) -> Dict[str, Any]:
+        text_body = (raw or '').strip()
+        if not text_body:
+            raise ValueError('{0} 응답 본문이 비어 있습니다. API Base URL과 공급자 응답 형식을 확인해 주세요.'.format(context))
+        try:
+            parsed_body = json.loads(text_body)
+        except json.JSONDecodeError:
+            preview = text_body[:180].replace('\n', ' ').replace('\r', ' ')
+            raise ValueError('{0} 응답이 JSON 형식이 아닙니다. API Base URL이 OpenAI compatible 엔드포인트인지 확인해 주세요. 응답 미리보기: {1}'.format(context, preview))
+        if not isinstance(parsed_body, dict):
+            raise ValueError('{0} 응답 형식이 올바르지 않습니다.'.format(context))
+        return parsed_body
+
+    def _post_ai(body_obj):
+        req = urllib_request.Request(
+            endpoint,
+            data=json.dumps(body_obj, ensure_ascii=False).encode('utf-8'),
+            headers=headers,
+            method='POST',
+        )
+        with urllib_request.urlopen(req, timeout=60) as resp:
+            return _ai_json_response(resp.read().decode('utf-8', errors='replace'), '외부 AI API')
+
+    def _http_error_detail(err):
+        try:
+            raw = err.read().decode('utf-8', errors='replace')
+            parsed_error = _ai_json_response(raw, '외부 AI API 오류')
+            return ((parsed_error.get('error') or {}).get('message') if isinstance(parsed_error, dict) else '') or raw
+        except Exception:
+            return err.reason or ''
+
+    try:
+        data = _post_ai(body)
+    except HTTPError as e:
+        detail = _http_error_detail(e)
+        if e.code == 400 and ('max_tokens' in detail or 'temperature' in detail):
+            retry_body = dict(body)
+            retry_body['max_completion_tokens'] = retry_body.pop('max_tokens')
+            if 'temperature' in detail:
+                retry_body.pop('temperature', None)
+            try:
+                data = _post_ai(retry_body)
+            except HTTPError as e2:
+                detail2 = _http_error_detail(e2)
+                return jsonify({'success': False, 'message': '외부 AI API 호출 실패: HTTP {0} {1}'.format(e2.code, detail2)}), 502
+        else:
+            return jsonify({'success': False, 'message': '외부 AI API 호출 실패: HTTP {0} {1}'.format(e.code, detail)}), 502
+    except URLError as e:
+        return jsonify({'success': False, 'message': '외부 AI API 연결 실패: {0}'.format(getattr(e, 'reason', e))}), 502
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 502
+    except Exception as e:
+        current_app.logger.exception('AI proxy failed')
+        return jsonify({'success': False, 'message': 'AI 응답 생성 중 오류가 발생했습니다: {0}'.format(e)}), 500
+
+    answer = _ai_completion_content(data)
+    if external_provider == 'google_gemini':
+        candidates = data.get('candidates') if isinstance(data, dict) else None
+        if isinstance(candidates, list) and candidates:
+            content = candidates[0].get('content') if isinstance(candidates[0], dict) else None
+            parts = content.get('parts') if isinstance(content, dict) else None
+            if isinstance(parts, list):
+                answer = '\n'.join([part.get('text', '') for part in parts if isinstance(part, dict) and part.get('text')]).strip()
+    if not answer:
+        return jsonify({'success': False, 'message': '외부 AI API 응답에서 메시지 내용을 찾지 못했습니다.'}), 502
+    return jsonify({
+        'success': True,
+        'answer': answer,
+        'provider': 'external',
+        'model': data.get('model') or model,
+        'usage': data.get('usage') or {},
+    })
+
+
+# ──────────────────────────────────────────────────────────────
 # 브랜드 설정 API
 # ──────────────────────────────────────────────────────────────
+
+
+_ACCOUNT_POLICY_SETTING_KEY = 'security.account_policy.linux_unix'
+
+
+def _account_policy_load_restored() -> Dict[str, Any]:
+    row = BrandSetting.query.filter_by(key=_ACCOUNT_POLICY_SETTING_KEY, is_deleted=0).first()
+    if not row or not row.value:
+        return {}
+    try:
+        data = json.loads(row.value)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        logger.exception('Failed to parse account policy setting')
+        return {}
+
+
+def _account_policy_save_restored(policy: Dict[str, Any]) -> Dict[str, Any]:
+    clean = policy if isinstance(policy, dict) else {}
+    actor = str(session.get('emp_no') or session.get('user_id') or session.get('username') or '')
+    row = BrandSetting.query.filter_by(key=_ACCOUNT_POLICY_SETTING_KEY, is_deleted=0).first()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if row is None:
+        row = BrandSetting(
+            category='security',
+            key=_ACCOUNT_POLICY_SETTING_KEY,
+            value=json.dumps(clean, ensure_ascii=False),
+            value_type='json',
+            updated_by=actor,
+            updated_at=now,
+            is_deleted=0,
+        )
+        db.session.add(row)
+    else:
+        row.category = 'security'
+        row.value = json.dumps(clean, ensure_ascii=False)
+        row.value_type = 'json'
+        row.updated_by = actor
+        row.updated_at = now
+    db.session.commit()
+    return clean
+
+
+@api_bp.route('/api/security/account-policy', methods=['GET', 'PUT'])
+def api_security_account_policy():
+    if request.method == 'GET':
+        return jsonify({'success': True, 'item': _account_policy_load_restored()})
+    blocked = _require_login_for_write()
+    if blocked is not None:
+        return blocked
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = payload.get('item') if isinstance(payload.get('item'), dict) else payload
+        saved = _account_policy_save_restored(item)
+        try:
+            _settings_log_api('????', 'Linux/Unix ????', '', json.dumps(saved, ensure_ascii=False)[:200])
+        except Exception:
+            pass
+        return jsonify({'success': True, 'item': saved})
+    except Exception:
+        db.session.rollback()
+        logger.exception('Failed to save account policy')
+        return jsonify({'success': False, 'message': '????? ???? ?????.'}), 500
+
 from app.services.brand_setting_service import (
     get_all_brand_settings, get_brand_setting, get_brand_settings_by_category,
     upsert_brand_setting, delete_brand_setting, reset_brand_settings,
@@ -37941,31 +38862,7 @@ def api_brand_settings_reset():
 def get_file_policy():
     """파일 관리 정책을 반환한다."""
     try:
-        # 기본 정책 (DB나 설정파일에서 조회하지 않으면 기본값 반환)
-        policy = {
-            'success': True,
-            'item': {
-                'max_file_size_mb': 20,
-                'allowed_extensions': 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,hwp,jpg,jpeg,png,gif,zip',
-                'blocked_extensions': 'exe,bat,cmd,com,scr,vbs,js,jar,dll',
-                'file_name_pattern': '',
-                'allow_duplicate_upload': False,
-                'block_executable_upload': True,
-                'validate_mime_type': True,
-                'validate_magic_bytes': False,
-                'detect_extension_spoofing': True,
-                'enable_virus_scan': False,
-                'inherit_record_permission': True,
-                'enable_download_log': True,
-                'allow_external_share': False,
-                'allow_admin_force_access': True,
-                'retention_days_after_closed': 365,
-                'archive_days_if_unaccessed': 180,
-                'exclude_important_from_retention': True,
-                'enable_expiry_notification': True,
-            }
-        }
-        return jsonify(policy)
+        return jsonify({'success': True, 'item': _load_file_policy_item()})
     except Exception as e:
         logger.exception('file-policy get')
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -38015,11 +38912,12 @@ def update_file_policy():
             if new_val != old_val:
                 _settings_log_api('파일관리', label, 'OFF', 'ON' if new_val else 'OFF')
         
+        item = _save_file_policy_item(payload)
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'item': payload,
+            'item': item,
             'message': '파일 정책이 저장되었습니다.'
         })
     except Exception as e:
@@ -38519,14 +39417,103 @@ def api_access_control_audit_logs():
         'keyword': request.args.get('keyword') or '',
         'actor_name': request.args.get('actor_name') or '',
         'resource_name': request.args.get('resource_name') or '',
+        'category': request.args.get('category') or '',
+        'category_detail': request.args.get('category_detail') or '',
+        'work_operation_code': request.args.get('work_operation_code') or '',
         'action_type': request.args.get('action_type') or '',
         'from_date': request.args.get('from_date') or '',
         'to_date': request.args.get('to_date') or '',
     }
+    risk_only = (request.args.get('risk') or '').strip().lower() in ('1', 'true', 'yes')
+    if risk_only:
+        filters['risk_type'] = request.args.get('risk_type') or ''
     if export_all:
         filters['export_all'] = True
-    result = svc_list_web_access_audit_logs(filters, page=page, page_size=page_size)
+    if risk_only:
+        result = svc_list_web_access_risk_audit_logs(filters, page=page, page_size=page_size)
+    else:
+        result = svc_list_web_access_audit_logs(filters, page=page, page_size=page_size)
     return jsonify({'success': True, **result})
+
+
+@api_bp.route('/api/access-control/risk-policies', methods=['GET'])
+def api_access_control_risk_policies():
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 위험 접근 기준을 조회할 수 있습니다.'}), 403
+    policy_type = request.args.get('policy_type') or request.args.get('type') or ''
+    active_only = (request.args.get('active') or '').strip().lower() in ('1', 'true', 'yes')
+    rows = svc_list_web_access_risk_policies(policy_type=policy_type, active_only=active_only)
+    return jsonify({'success': True, 'rows': rows, 'total': len(rows)})
+
+
+@api_bp.route('/api/access-control/risk-policies', methods=['POST'])
+def api_access_control_create_risk_policy():
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 위험 접근 기준을 등록할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_create_web_access_risk_policy(payload, actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'item': item}), 201
+
+
+@api_bp.route('/api/access-control/risk-policies/<int:policy_id>', methods=['PUT'])
+def api_access_control_update_risk_policy(policy_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 위험 접근 기준을 수정할 수 있습니다.'}), 403
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = svc_update_web_access_risk_policy(policy_id, payload, actor)
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    if not item:
+        return jsonify({'success': False, 'message': '위험 접근 기준을 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True, 'item': item})
+
+
+@api_bp.route('/api/access-control/risk-policies/<int:policy_id>', methods=['DELETE'])
+def api_access_control_delete_risk_policy(policy_id: int):
+    return _delete_access_control_risk_policy(policy_id)
+
+
+@api_bp.route('/api/access-control/risk-policies/<int:policy_id>/delete', methods=['POST'])
+def api_access_control_delete_risk_policy_post(policy_id: int):
+    return _delete_access_control_risk_policy(policy_id)
+
+
+def _delete_access_control_risk_policy(policy_id: int):
+    gate = _require_login_for_write()
+    if gate:
+        return gate
+    actor, err = _web_access_current_actor()
+    if err:
+        body, code = err
+        return jsonify(body), code
+    if not _is_admin_actor(actor):
+        return jsonify({'success': False, 'message': '관리자만 위험 접근 기준을 삭제할 수 있습니다.'}), 403
+    ok = svc_delete_web_access_risk_policy(policy_id, actor)
+    if not ok:
+        return jsonify({'success': False, 'message': '위험 접근 기준을 찾을 수 없습니다.'}), 404
+    return jsonify({'success': True})
 
 
 @api_bp.route('/api/identity-governance/bootstrap', methods=['GET'])
@@ -39729,4 +40716,3 @@ def import_hw_san_zones(asset_id: int):
         db.session.rollback()
         logger.exception('Failed to import cfgshow zones')
         return jsonify({'success': False, 'error': 'cfgshow 가져오기 중 오류가 발생했습니다.'}), 500
-

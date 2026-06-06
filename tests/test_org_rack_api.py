@@ -65,6 +65,7 @@ def test_org_rack_crud_flow(client):
     assert created['success'] is True
     item = created['item']
     assert item['rack_code'] == 'RACK_FC_A01'
+    assert item['public_id'].startswith('rack_')
     assert item['rack_position'] == 'FC5F-A01'
     assert item['rack_model'] == 'DL360 Gen10'
     assert item['system_height_u'] == 4
@@ -102,3 +103,51 @@ def test_org_rack_crud_flow(client):
     deleted_payload = list_deleted.get_json()
     assert deleted_payload['total'] == 1
     assert deleted_payload['items'][0]['is_deleted'] == 1
+
+
+def test_org_rack_detail_uses_public_id_route(client):
+    create_resp = client.post('/api/org-racks', json={
+        'rack_code': 'RACK_ROUTE_A01',
+        'business_status_code': 'STAT_RUN',
+        'business_name': '라우팅 테스트 업무',
+        'manufacturer_code': 'VEN_HPE',
+        'rack_model': 'Standard RACK',
+        'serial_number': 'SN-ROUTE-A01',
+        'center_code': 'CTR_MAIN',
+        'rack_position': '5F-D-1',
+        'system_height_u': 42,
+        'system_dept_code': 'DEPT_INFRA',
+        'system_manager_id': 1001,
+        'service_dept_code': 'DEPT_SERVICE',
+        'service_manager_id': 2001,
+    })
+    assert create_resp.status_code == 201
+    public_id = create_resp.get_json()['item']['public_id']
+
+    legacy_resp = client.get('/p/dc_rack_detail_basic?rack_code=RACK_ROUTE_A01')
+    assert legacy_resp.status_code == 302
+    assert legacy_resp.headers['Location'].endswith(f'/b/{public_id}')
+
+    legacy_position_resp = client.get('/p/dc_rack_detail_basic?rack_code=5F_D_1')
+    assert legacy_position_resp.status_code == 302
+    assert legacy_position_resp.headers['Location'].endswith(f'/b/{public_id}')
+
+    detail_resp = client.get(
+        f'/b/{public_id}',
+        headers={'X-Requested-With': 'blossom-spa'},
+    )
+    assert detail_resp.status_code == 200
+    assert f'data-rack-public-id="{public_id}"'.encode() in detail_resp.data
+    assert b'dc_rack_detail_basic' in detail_resp.data
+    assert b'dc_rack_detail_log' in detail_resp.data
+
+    shell_resp = client.get(f'/b/{public_id}?tab=log')
+    assert shell_resp.status_code == 200
+    assert b'data-menu-code="datacenter.rack"' in shell_resp.data
+    assert b'dc_rack_detail_log' in shell_resp.data
+
+    log_resp = client.get(
+        f'/b/{public_id}?tab=log',
+        headers={'X-Requested-With': 'blossom-spa'},
+    )
+    assert log_resp.status_code == 200

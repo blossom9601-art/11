@@ -65,6 +65,7 @@
     // Use a page-specific storage key to avoid collisions with other pages
     const VISIBLE_COLS_KEY = 'onpremise_visible_cols';
     const OLD_VISIBLE_COLS_KEY = 'system_visible_cols';
+    const AGENT_VIEW_KEY = 'onpremise_agent_view_mode';
 
     // Add/Edit modal
     const ADD_MODAL_ID = 'system-add-modal';
@@ -138,8 +139,9 @@
     const BASE_VISIBLE_COLUMNS = [ // 기본 노출 요구: 업무 상태, 업무 그룹, 업무 이름, 시스템 이름, 시스템 IP, 관리 IP, 시스템 제조사, 시스템 모델명, 시스템 일련번호, 시스템 담당자
         'work_status','work_group','work_name','system_name','system_ip','manage_ip','vendor','model','serial','sys_owner'
     ];
+    const AGENT_VIEW_COLUMNS = ['work_status','work_group','work_name','system_name','agent_status','agent_version','agent_registered_at','agent_last_received'];
     const COLUMN_ORDER = [
-        'work_type','work_category','work_status','work_operation','work_group','work_name','system_name','system_ip','manage_ip','vendor','model','serial','virtualization','location_place','location_pos','slot','u_size','rack_face','sys_dept','sys_owner','svc_dept','svc_owner','confidentiality','integrity','availability','security_score','system_grade','core_flag','dr_built','svc_redundancy'
+        'work_type','work_category','work_status','work_operation','work_group','work_name','system_name','agent_status','agent_version','agent_registered_at','agent_last_received','system_ip','manage_ip','vendor','model','serial','virtualization','location_place','location_pos','slot','u_size','rack_face','sys_dept','sys_owner','svc_dept','svc_owner','confidentiality','integrity','availability','security_score','system_grade','core_flag','dr_built','svc_redundancy'
     ];
 
     // 컬럼 선택 모달 전용 사용자 정의 그룹/순서 (테이블 렌더 순서에는 영향 주지 않음)
@@ -159,6 +161,10 @@
         work_group:{label:'업무 그룹',group:'업무'},
         work_name:{label:'업무 이름',group:'업무'},
         system_name:{label:'시스템 이름',group:'시스템'},
+        agent_status:{label:'에이전트 상태',group:'에이전트'},
+        agent_version:{label:'에이전트 버전',group:'에이전트'},
+        agent_registered_at:{label:'등록 일자',group:'에이전트'},
+        agent_last_received:{label:'마지막 수신',group:'에이전트'},
         system_ip:{label:'시스템 IP',group:'시스템'},
         manage_ip:{label:'관리 IP',group:'시스템'},
         vendor:{label:'시스템 제조사',group:'시스템'},
@@ -1803,6 +1809,11 @@
             work_group_code: item.work_group_code || '',
             work_name: item.work_name || '',
             system_name: item.system_name || '',
+            agent_status: item.agent_status || '',
+            agent_version: item.agent_version || '',
+            agent_registered_at: item.agent_registered_at || '',
+            agent_last_received: item.agent_last_received || '',
+            agent_hostname: item.agent_hostname || '',
             system_ip: item.system_ip || '',
             manage_ip: item.mgmt_ip || '',
             mgmt_ip: item.mgmt_ip || '',
@@ -2210,6 +2221,14 @@
                     if(col === 'work_name' && displayVal !== '-'){
                         cellValue = `<a href="${DETAIL_URL}" class="work-name-link" data-id="${row.id??''}">${cellValue}</a>`;
                     }
+                    if(col === 'agent_status' && displayVal !== '-'){
+                        const active = String(row.agent_status || '').indexOf('수집중') >= 0;
+                        const dot = active ? '#22c55e' : '#f59e0b';
+                        const bg = active ? 'rgba(34,197,94,0.14)' : 'rgba(245,158,11,0.14)';
+                        const bd = active ? 'rgba(34,197,94,0.38)' : 'rgba(245,158,11,0.38)';
+                        const title = row.agent_hostname ? ` title="${escapeHTML(row.agent_hostname)}"` : '';
+                        cellValue = `<span class="status-pill colored"${title} style="--status-dot-color:${dot};--status-bg-color:${bg};--status-border-color:${bd}"><span class="status-dot" aria-hidden="true"></span><span class="status-text">${highlight(displayVal, col)}</span></span>`;
+                    }
                     // 업무 상태: 가동/유휴/대기 → 컬러 점 + 텍스트
                     if(col === 'work_status'){
                         const v = String(displayVal);
@@ -2450,6 +2469,39 @@
                 try { localStorage.setItem(VISIBLE_COLS_KEY, JSON.stringify([...state.visibleCols])); } catch(_e){}
             }
         } catch(e){}
+    }
+
+    let pendingAgentViewMode = 'default';
+    function getAgentViewMode(){
+        try {
+            return localStorage.getItem(AGENT_VIEW_KEY) === 'agent' ? 'agent' : 'default';
+        } catch(_e) {
+            return 'default';
+        }
+    }
+    function setAgentViewMode(mode, persist){
+        const next = mode === 'agent' ? 'agent' : 'default';
+        state.visibleCols = new Set(next === 'agent' ? AGENT_VIEW_COLUMNS : BASE_VISIBLE_COLUMNS);
+        if(persist){
+            try { localStorage.setItem(AGENT_VIEW_KEY, next); } catch(_e){}
+            saveColumnSelection();
+        }
+        const btn = document.getElementById('system-agent-view-btn');
+        if(btn){
+            btn.classList.toggle('active', next === 'agent');
+            btn.setAttribute('aria-pressed', next === 'agent' ? 'true' : 'false');
+        }
+        document.querySelectorAll('[data-agent-view]').forEach(function(el){
+            el.classList.toggle('active', el.getAttribute('data-agent-view') === next);
+        });
+        applyColumnVisibility();
+    }
+    function openAgentViewModal(){
+        pendingAgentViewMode = getAgentViewMode();
+        document.querySelectorAll('[data-agent-view]').forEach(function(el){
+            el.classList.toggle('active', el.getAttribute('data-agent-view') === pendingAgentViewMode);
+        });
+        openModal('system-agent-view-modal');
     }
 
     // ---- Sort persistence ----
@@ -3475,5 +3527,3 @@
 }
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
-
-

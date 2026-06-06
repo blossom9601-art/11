@@ -13,6 +13,7 @@ class User(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
     email = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(100), nullable=False)
@@ -4263,4 +4264,3 @@ class HwSanZoneMember(db.Model):
     created_at = db.Column(db.Text, nullable=False, server_default=db.text('CURRENT_TIMESTAMP'))
     updated_at = db.Column(db.Text)
     is_deleted = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
-

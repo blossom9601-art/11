@@ -97,6 +97,26 @@ document.addEventListener('DOMContentLoaded', () => {
 		return { ok: resp.ok, status: resp.status, data };
 	};
 
+	const showNotice = (message, title, type) => {
+		const kind = type || 'info';
+		const text = String(message || '');
+		const heading = title || (kind === 'success' ? '완료' : kind === 'error' ? '오류' : '알림');
+		if (window.BlossomModal && typeof window.BlossomModal.message === 'function') {
+			return window.BlossomModal.message(text, { title: heading });
+		}
+		const modal = document.getElementById('system-message-modal');
+		const titleEl = document.getElementById('message-title');
+		const contentEl = document.getElementById('message-content');
+		if (modal && titleEl && contentEl) {
+			titleEl.textContent = heading;
+			contentEl.textContent = text;
+			setOverlayOpen(modal, true);
+			return Promise.resolve('confirm');
+		}
+		alert(text || heading);
+		return Promise.resolve('confirm');
+	};
+
 	const setLikeUi = ({ liked, total }) => {
 		if (likeBtn) {
 			likeBtn.setAttribute('aria-pressed', liked ? 'true' : 'false');
@@ -967,6 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	const editModalConfirmEl = document.getElementById('blog-edit-confirm');
 	const deleteModalEl = document.getElementById('insight-delete-modal');
 	const deleteModalCloseEl = document.getElementById('insight-delete-close');
+	const deleteModalCancelEl = document.getElementById('insight-delete-cancel');
 	const deleteModalConfirmEl = document.getElementById('insight-delete-confirm');
 	const deleteSubtitleEl = document.getElementById('insight-delete-subtitle');
 	let pendingDeletePostId = null;
@@ -1002,20 +1023,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	const deletePost = async (pId) => {
 		if (!pId) return;
+		const goList = () => {
+			if (typeof blsSpaNavigate === 'function') {
+				blsSpaNavigate('/p/insight_blog_it');
+			} else {
+				window.location.href = '/p/insight_blog_it';
+			}
+		};
 		try {
 			// DB-backed
 			if (postIdNum) {
 				const res = await fetchJson(`${API_BASE}/${postIdNum}`, { method: 'DELETE' });
 				if (res.ok && res.data?.success) {
-					alert('삭제되었습니다.');
-					// Redirect to list
-					if (typeof blsSpaNavigate === 'function') {
-						blsSpaNavigate('/p/insight_blog_it');
-					} else {
-						window.location.href = '/p/insight_blog_it';
-					}
+					await showNotice('삭제되었습니다.', '삭제 완료', 'success');
+					goList();
 				} else {
-					alert(res.data?.message || '삭제에 실패했습니다.');
+					await showNotice(res.data?.message || '삭제에 실패했습니다.', '삭제 실패', 'error');
 				}
 				return;
 			}
@@ -1026,18 +1049,14 @@ document.addEventListener('DOMContentLoaded', () => {
 			if (idx >= 0) {
 				posts.splice(idx, 1);
 				savePosts(posts);
-				alert('삭제되었습니다.');
-				if (typeof blsSpaNavigate === 'function') {
-					blsSpaNavigate('/p/insight_blog_it');
-				} else {
-					window.location.href = '/p/insight_blog_it';
-				}
+				await showNotice('삭제되었습니다.', '삭제 완료', 'success');
+				goList();
 			} else {
-				alert('게시글을 찾을 수 없습니다.');
+				await showNotice('게시글을 찾을 수 없습니다.', '삭제 실패', 'error');
 			}
 		} catch (e) {
 			console.warn(e);
-			alert('삭제 중 오류가 발생했습니다.');
+			await showNotice('삭제 중 오류가 발생했습니다.', '삭제 실패', 'error');
 		}
 	};
 
@@ -1087,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	deleteModalCloseEl?.addEventListener('click', closeDeleteModal);
+	deleteModalCancelEl?.addEventListener('click', closeDeleteModal);
 	deleteModalEl?.addEventListener('click', (e) => {
 		if (e.target === deleteModalEl) closeDeleteModal();
 	});

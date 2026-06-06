@@ -492,12 +492,10 @@
         setMsg('err', '서버 응답 오류: HTTP ' + res.status);
         return false;
       } catch (e) {
-        const ms = Date.now() - t0;
-        const aborted = (e && (e.name === 'AbortError' || /aborted/i.test(e.message || '')));
-        const msg = aborted ? ('연결 실패: 8초 내 응답 없음 (' + ms + 'ms). 서버 주소·포트·방화벽·와이파이를 확인하세요.')
-                            : ('연결 실패: ' + (e && e.message ? e.message : '네트워크 오류'));
-        setMsg('err', msg);
-        return false;
+        const bubble = pending && pending.querySelector('.ai-bubble');
+        const failText = 'AI response failed: ' + (e && e.message || '');
+        if (bubble) bubble.textContent = failText;
+        updateLastAiAssistantMessage(failText);
       } finally {
         clearTimeout(timer);
       }
@@ -732,12 +730,13 @@
   function _setComposerVisible(_visible) { /* no-op (CSS 담당) */ }
   function setTab(name) {
     $$('.rail-btn[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-    const isFull = (name === 'calendar' || name === 'memo');
+    const isFull = (name === 'calendar' || name === 'memo' || name === 'ai');
     // 사이드바/메인페인 ↔ 풀페인 전환
     const sb = $('sidebar'); if (sb) sb.hidden = !!isFull;
     const mp = document.querySelector('section.main-pane'); if (mp) mp.hidden = !!isFull;
     const calP = $('calendarPane'); if (calP) calP.hidden = name !== 'calendar';
     const memoP = $('memoPane'); if (memoP) memoP.hidden = name !== 'memo';
+    const aiP = $('aiPane'); if (aiP) aiP.hidden = name !== 'ai';
     if (!isFull) {
       $$('.sidebar-pane').forEach((p) => { p.hidden = p.dataset.pane !== name; });
       if (sb) sb.dataset.tab = name;
@@ -760,8 +759,352 @@
       if (window.requestAnimationFrame) window.requestAnimationFrame(() => window.requestAnimationFrame(openCalendar));
     }
     if (name === 'memo') { try { MemoView.open(); } catch (e) { console.warn(e); } }
+    if (name === 'ai') { try { openAiPane(); } catch (e) { console.warn(e); } }
   }
   $$('.rail-btn[data-tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+  async function loadAiPolicy() {
+    try {
+      const data = await Api._fetch('/admin/auth/ai-policy');
+      const merged = Object.assign({}, data.defaults || {});
+      (data.items || []).forEach((item) => { if (item && item.policyKey) merged[item.policyKey] = item.value || {}; });
+      return merged;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function aiPolicyValue(policy, key, fallback) {
+    const item = policy && policy[key];
+    if (!item) return fallback;
+    if (Object.prototype.hasOwnProperty.call(item, 'enabled')) return !!item.enabled;
+    if (Object.prototype.hasOwnProperty.call(item, 'value')) return item.value;
+    return fallback;
+  }
+
+  const AI_HISTORY_KEY = 'blossom.desktop.ai.history.v1';
+
+  function readAiHistory() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(AI_HISTORY_KEY) || '[]');
+      return Array.isArray(rows) ? rows : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function writeAiHistory(rows) {
+    try { localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(sortAiHistory(rows || []).slice(0, 50))); } catch (_) {}
+  }
+
+  function sortAiHistory(rows) {
+    return (rows || []).slice().sort((a, b) => {
+      const pa = a && a.pinned ? 1 : 0;
+      const pb = b && b.pinned ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      return String((b && b.updatedAt) || '').localeCompare(String((a && a.updatedAt) || ''));
+    });
+  }
+
+  function updateAiConversationTitle(item) {
+    const title = $('aiConversationTitle');
+    if (title) title.textContent = (item && item.title) || '새 대화';
+  }
+
+  function ensureAiConversation(prompt) {
+    let rows = readAiHistory();
+    let current = rows.find((item) => item.id === state.aiActiveHistoryId);
+    if (!current) {
+      current = {
+        id: String(Date.now()) + '-' + Math.random().toString(16).slice(2),
+        title: (prompt || 'New chat').slice(0, 36),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      };
+      rows.unshift(current);
+      state.aiActiveHistoryId = current.id;
+      writeAiHistory(rows);
+    }
+    return current;
+  }
+
+  function saveAiConversationMessage(role, text) {
+    let rows = readAiHistory();
+    let current = rows.find((item) => item.id === state.aiActiveHistoryId);
+    if (!current) {
+      current = ensureAiConversation(text);
+      rows = readAiHistory();
+      current = rows.find((item) => item.id === state.aiActiveHistoryId) || current;
+    }
+    current.messages = Array.isArray(current.messages) ? current.messages : [];
+    current.messages.push({ role: role, text: text || '', at: new Date().toISOString() });
+    if (role === 'user' && (!current.title || current.title === 'New chat')) current.title = (text || 'New chat').slice(0, 36);
+    current.updatedAt = new Date().toISOString();
+    writeAiHistory(rows);
+    renderAiHistory();
+    updateAiConversationTitle(current);
+  }
+
+  function updateLastAiAssistantMessage(text) {
+    const rows = readAiHistory();
+    const current = rows.find((item) => item.id === state.aiActiveHistoryId);
+    if (!current || !Array.isArray(current.messages)) return;
+    for (let i = current.messages.length - 1; i >= 0; i -= 1) {
+      if (current.messages[i] && current.messages[i].role === 'assistant') {
+        current.messages[i].text = text || '';
+        current.messages[i].at = new Date().toISOString();
+        current.updatedAt = new Date().toISOString();
+        writeAiHistory(rows);
+        renderAiHistory();
+        updateAiConversationTitle(current);
+        return;
+      }
+    }
+  }
+
+  function hideAiHistoryMenu() {
+    const menu = $('aiHistoryMenu');
+    if (menu) {
+      menu.hidden = true;
+      delete menu.dataset.historyId;
+    }
+  }
+
+  function showAiHistoryMenu(event, item) {
+    const menu = $('aiHistoryMenu');
+    if (!menu || !item) return;
+    event.preventDefault();
+    menu.dataset.historyId = item.id;
+    const pin = menu.querySelector('[data-action="pin"]');
+    if (pin) pin.textContent = item.pinned ? '고정 해제하기' : '고정하기';
+    menu.hidden = false;
+    const width = menu.offsetWidth || 164;
+    const height = menu.offsetHeight || 112;
+    menu.style.left = Math.min(event.clientX, window.innerWidth - width - 8) + 'px';
+    menu.style.top = Math.min(event.clientY, window.innerHeight - height - 8) + 'px';
+  }
+
+  function renameAiConversation(id) {
+    const rows = readAiHistory();
+    const item = rows.find((row) => row.id === id);
+    if (!item) return;
+    const next = prompt('AI 대화 제목을 입력하세요.', item.title || '새 대화');
+    if (next == null) return;
+    const title = next.trim();
+    if (!title) return;
+    item.title = title.slice(0, 80);
+    item.updatedAt = new Date().toISOString();
+    writeAiHistory(rows);
+    renderAiHistory();
+    if (state.aiActiveHistoryId === id) updateAiConversationTitle(item);
+  }
+
+  function togglePinAiConversation(id) {
+    const rows = readAiHistory();
+    const item = rows.find((row) => row.id === id);
+    if (!item) return;
+    item.pinned = !item.pinned;
+    item.updatedAt = new Date().toISOString();
+    writeAiHistory(rows);
+    renderAiHistory();
+  }
+
+  function deleteAiConversation(id) {
+    const rows = readAiHistory();
+    const item = rows.find((row) => row.id === id);
+    if (!item) return;
+    if (!confirm('이 AI 대화 히스토리를 삭제할까요?')) return;
+    const nextRows = rows.filter((row) => row.id !== id);
+    writeAiHistory(nextRows);
+    if (state.aiActiveHistoryId === id) {
+      state.aiActiveHistoryId = nextRows[0] ? nextRows[0].id : null;
+      const current = nextRows[0] || null;
+      renderAiConversation(current);
+      updateAiConversationTitle(current);
+    }
+    renderAiHistory();
+  }
+
+  function renderAiHistory() {
+    const list = $('aiHistoryList');
+    if (!list) return;
+    const rows = sortAiHistory(readAiHistory());
+    list.innerHTML = '';
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ai-history-empty';
+      empty.textContent = '\uD788\uC2A4\uD1A0\uB9AC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.';
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach((item) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ai-history-item' + (item.id === state.aiActiveHistoryId ? ' active' : '');
+      if (item.pinned) btn.classList.add('is-pinned');
+      const title = document.createElement('span');
+      title.className = 'ai-history-title';
+      title.textContent = item.title || 'New chat';
+      const time = document.createElement('span');
+      time.className = 'ai-history-time';
+      time.textContent = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '';
+      btn.appendChild(title);
+      btn.appendChild(time);
+      btn.addEventListener('click', () => {
+        state.aiActiveHistoryId = item.id;
+        renderAiConversation(item);
+        renderAiHistory();
+      });
+      btn.addEventListener('contextmenu', (event) => showAiHistoryMenu(event, item));
+      list.appendChild(btn);
+    });
+  }
+
+  function renderAiConversation(item) {
+    const thread = $('aiThread');
+    if (!thread) return;
+    thread.innerHTML = '';
+    ((item && item.messages) || []).forEach((message) => appendAiMessage(message.role, message.text, { skipSave: true }));
+    updateAiConversationTitle(item);
+  }
+
+  function startNewAiConversation() {
+    state.aiActiveHistoryId = null;
+    const thread = $('aiThread');
+    if (thread) thread.innerHTML = '';
+    updateAiConversationTitle(null);
+    renderAiHistory();
+    const input = $('aiInput');
+    if (input) input.focus();
+  }
+
+  async function openAiPane() {
+    const input = $('aiInput');
+    if (input) setTimeout(() => input.focus(), 30);
+    const pill = $('aiStatusPill');
+    const policy = await loadAiPolicy();
+    state.aiPolicy = policy;
+    const enabled = aiPolicyValue(policy, 'ai.enabled', false);
+    const mode = aiPolicyValue(policy, 'ai.provider_mode', 'internal_first');
+    if (pill) {
+      pill.textContent = enabled ? ({ internal_first: '사내 AI 우선', internal_only: '사내 AI', external_only: '외부 API', manual_select: '사용자 선택' }[mode] || 'AI 사용') : 'AI 비활성화';
+      pill.classList.toggle('is-ready', !!enabled);
+      pill.classList.toggle('is-disabled', !enabled);
+    }
+    renderAiHistory();
+    const rows = sortAiHistory(readAiHistory());
+    if (!state.aiActiveHistoryId && rows.length) state.aiActiveHistoryId = rows[0].id;
+    const current = rows.find((item) => item.id === state.aiActiveHistoryId);
+    if (current) renderAiConversation(current);
+    else updateAiConversationTitle(null);
+  }
+
+  function appendAiMessage(role, text, options) {
+    const thread = $('aiThread');
+    if (!thread) return null;
+    const row = document.createElement('div');
+    row.className = 'ai-message ai-message-' + (role === 'user' ? 'user' : 'assistant');
+    const avatar = document.createElement('div');
+    avatar.className = 'ai-avatar';
+    avatar.textContent = role === 'user' ? 'ME' : 'AI';
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-bubble';
+    bubble.textContent = text || '';
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+    if (!options || !options.skipSave) saveAiConversationMessage(role, text);
+    return row;
+  }
+
+  async function generateAiReply(prompt) {
+    const policy = state.aiPolicy || await loadAiPolicy();
+    state.aiPolicy = policy;
+    if (!aiPolicyValue(policy, 'ai.enabled', false)) {
+      return '관리자가 아직 Blossom Chat AI 사용을 활성화하지 않았습니다. 설정 > 개발/품질 > AI에서 사용 정책과 API 정보를 저장해 주세요.';
+    }
+    const rows = readAiHistory();
+    const current = rows.find((item) => item.id === state.aiActiveHistoryId);
+    const messages = ((current && current.messages) || [])
+      .filter((message) => message && (message.role === 'user' || message.role === 'assistant') && message.text)
+      .slice(-20)
+      .map((message) => ({ role: message.role, content: message.text }));
+    try {
+      const data = await Api.aiChat({ prompt: prompt, messages: messages, provider: 'external' });
+      if (data && data.answer) return data.answer;
+      return 'AI 응답 내용이 비어 있습니다.';
+    } catch (e) {
+      const msg = (e && e.payload && (e.payload.message || e.payload.error)) || (e && e.message) || '';
+      return 'AI 응답 생성 실패: ' + msg;
+    }
+  }
+
+  const aiComposer = $('aiComposer');
+  if (aiComposer) {
+    aiComposer.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const input = $('aiInput');
+      const send = $('aiSendBtn');
+      const prompt = input ? input.value.trim() : '';
+      if (!prompt) return;
+      ensureAiConversation(prompt);
+      appendAiMessage('user', prompt);
+      if (input) {
+        input.value = '';
+        input.style.height = '';
+      }
+      if (send) send.disabled = true;
+      const pending = appendAiMessage('assistant', '생각하는 중...');
+      try {
+        const reply = await generateAiReply(prompt);
+        const bubble = pending && pending.querySelector('.ai-bubble');
+        if (bubble) bubble.textContent = reply;
+        updateLastAiAssistantMessage(reply);
+      } catch (e) {
+        const bubble = pending && pending.querySelector('.ai-bubble');
+        if (bubble) bubble.textContent = 'AI 응답 생성 실패: ' + (e && e.message || '');
+      } finally {
+        if (send) send.disabled = false;
+        if (input) input.focus();
+      }
+    });
+  }
+  const aiNewChatBtn = $('aiNewChatBtn');
+  if (aiNewChatBtn) aiNewChatBtn.addEventListener('click', startNewAiConversation);
+
+  const aiHistoryMenu = $('aiHistoryMenu');
+  if (aiHistoryMenu) {
+    aiHistoryMenu.addEventListener('click', (event) => {
+      const btn = event.target && event.target.closest ? event.target.closest('button[data-action]') : null;
+      if (!btn) return;
+      const id = aiHistoryMenu.dataset.historyId;
+      hideAiHistoryMenu();
+      if (!id) return;
+      if (btn.dataset.action === 'rename') renameAiConversation(id);
+      if (btn.dataset.action === 'pin') togglePinAiConversation(id);
+      if (btn.dataset.action === 'delete') deleteAiConversation(id);
+    });
+    document.addEventListener('click', (event) => {
+      if (!aiHistoryMenu.hidden && !aiHistoryMenu.contains(event.target)) hideAiHistoryMenu();
+    });
+    window.addEventListener('blur', hideAiHistoryMenu);
+  }
+
+  const aiInput = $('aiInput');
+  if (aiInput) {
+    aiInput.addEventListener('input', () => {
+      aiInput.style.height = 'auto';
+      aiInput.style.height = Math.min(aiInput.scrollHeight, 180) + 'px';
+    });
+    aiInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        if (aiComposer) aiComposer.requestSubmit();
+      }
+    });
+  }
 
   // ── 방 목록 ──
   async function loadRooms() {
@@ -7709,6 +8052,56 @@ window.MemoView = (function () {
     try { localStorage.setItem(LOCAL_MEMO_KEY, JSON.stringify(store)); } catch (_) {}
   }
 
+  function formatMemoBytes(bytes) {
+    const n = Math.max(0, Number(bytes || 0));
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = n;
+    let idx = 0;
+    while (value >= 1024 && idx < units.length - 1) {
+      value /= 1024;
+      idx += 1;
+    }
+    return (idx === 0 ? String(Math.round(value)) : value.toFixed(value >= 10 ? 1 : 2)) + ' ' + units[idx];
+  }
+
+  function localMemoUsagePayload() {
+    const store = loadLocalMemoStore();
+    const used = (store.memos || []).filter((m) => !m.is_deleted).reduce((sum, memo) => {
+      return sum + new Blob([String(memo.title || '') + '\n' + String(memo.body || '')]).size;
+    }, 0);
+    const quota = 10 * 1024 * 1024 * 1024;
+    return { success: true, enabled: true, used_bytes: used, quota_bytes: quota, quota_mb: 10240, warn_percent: 80, percent: (used / quota) * 100 };
+  }
+
+  function renderMemoUsage(usage) {
+    const wrap = $('memoQuota');
+    const bar = $('memoQuotaBar');
+    const text = $('memoQuotaText');
+    if (!wrap || !bar || !text) return;
+    const quota = Number((usage && usage.quota_bytes) || (10 * 1024 * 1024 * 1024));
+    const used = Number((usage && usage.used_bytes) || 0);
+    const pct = quota > 0 ? Math.max(0, Math.min(100, (used / quota) * 100)) : 0;
+    const warn = Number((usage && usage.warn_percent) || 80);
+    bar.style.width = pct.toFixed(2) + '%';
+    text.textContent = formatMemoBytes(used) + ' / ' + formatMemoBytes(quota);
+    wrap.classList.toggle('is-warning', pct >= warn && pct < 95);
+    wrap.classList.toggle('is-danger', pct >= 95);
+    wrap.title = '메모 용량 ' + pct.toFixed(1) + '% 사용';
+  }
+
+  async function refreshMemoUsage() {
+    try {
+      if (state.memoLocalMode || !Api.getMemoUsage) {
+        renderMemoUsage(localMemoUsagePayload());
+        return;
+      }
+      const usage = await Api.getMemoUsage();
+      renderMemoUsage(usage || localMemoUsagePayload());
+    } catch (e) {
+      renderMemoUsage(localMemoUsagePayload());
+    }
+  }
+
   function touchLocalMemo(item) {
     item.updated_at = new Date().toISOString();
     if (!item.created_at) item.created_at = item.updated_at;
@@ -7848,6 +8241,7 @@ window.MemoView = (function () {
     if (!initialized) bind();
     initialized = true;
     await loadGroups();
+    await refreshMemoUsage();
   }
 
   async function loadGroups() {
@@ -7856,6 +8250,7 @@ window.MemoView = (function () {
       renderGroups();
       renderList();
       renderEditor();
+      refreshMemoUsage();
       return;
     }
     try {
@@ -7868,6 +8263,7 @@ window.MemoView = (function () {
       renderGroups();
       renderList();
       renderEditor();
+      refreshMemoUsage();
       return;
     }
     if (!state.activeGroupId && state.groups.length) state.activeGroupId = state.groups[0].id;
@@ -7899,6 +8295,7 @@ window.MemoView = (function () {
     }
     renderList();
     renderEditor();
+    refreshMemoUsage();
   }
 
   function renderGroups() {
@@ -8619,6 +9016,7 @@ window.MemoView = (function () {
           renderEditor();
         }
         const st = $('memoStatus'); if (st) st.textContent = '저장됨 · ' + new Date(row.updated_at).toLocaleString();
+        refreshMemoUsage();
       }
       return;
     }
@@ -8633,6 +9031,7 @@ window.MemoView = (function () {
           renderEditor();
         }
         const st = $('memoStatus'); if (st) st.textContent = '저장됨 · ' + new Date(it.updated_at || Date.now()).toLocaleString();
+        refreshMemoUsage();
       }
     } catch (e) {
       const st = $('memoStatus'); if (st) st.textContent = '저장 실패: ' + (e && e.message || '');
@@ -8650,6 +9049,7 @@ window.MemoView = (function () {
       saveLocalMemoStore(store);
       state.activeMemoId = id;
       await loadMemos();
+      refreshMemoUsage();
       state.memoEditing = true;
       renderEditor();
       const t = $('memoTitle'); if (t) { t.focus(); t.select(); }
@@ -8660,6 +9060,7 @@ window.MemoView = (function () {
       if (resp && resp.item) {
         state.activeMemoId = resp.item.id;
         await loadMemos();
+      refreshMemoUsage();
         state.memoEditing = true;
         renderEditor();
         const t = $('memoTitle'); if (t) { t.focus(); t.select(); }
@@ -8684,12 +9085,14 @@ window.MemoView = (function () {
       saveLocalMemoStore(store);
       state.activeMemoId = null;
       await loadMemos();
+      refreshMemoUsage();
       return;
     }
     try {
       await Api.deleteMemo(mm.id);
       state.activeMemoId = null;
       await loadMemos();
+      refreshMemoUsage();
     } catch (e) { alert('삭제 실패: ' + (e && e.message || '')); }
   }
 

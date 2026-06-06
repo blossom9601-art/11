@@ -1,0 +1,34 @@
+###############################################################################
+# lumina-account-worker.service
+# Root 전용 계정 작업 데몬 (UDS). 네트워크 미사용.
+# 설치: /usr/lib/systemd/system/lumina-account-worker.service
+###############################################################################
+
+[Unit]
+Description=Lumina Account Root Worker (UDS, no network)
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+RuntimeDirectory=lumina
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/python3 /opt/lumina/linux/root_worker/main.py --conf /etc/lumina/lumina.conf --foreground
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumina-account-worker
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/etc /home /var/log/lumina-account
+RestrictAddressFamilies=AF_UNIX
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

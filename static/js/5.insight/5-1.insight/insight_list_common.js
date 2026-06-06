@@ -58,6 +58,34 @@
     setModalOpen(el, false);
   }
 
+  function showNotice(message, title, type){
+    const kind = type || 'info';
+    const text = String(message || '');
+    const heading = title || (kind === 'success' ? '완료' : kind === 'error' ? '오류' : '알림');
+    if(window.BlossomModal && typeof window.BlossomModal.message === 'function'){
+      window.BlossomModal.message(text, { title: heading });
+      return;
+    }
+    const modal = document.getElementById('system-message-modal');
+    const titleEl = document.getElementById('message-title');
+    const contentEl = document.getElementById('message-content');
+    if(modal && titleEl && contentEl){
+      titleEl.textContent = heading;
+      contentEl.textContent = text;
+      setModalOpen(modal, true);
+      return;
+    }
+    alert(text || heading);
+  }
+
+  function showDeleteSelectionRequired(){
+    if(window.BlossomModal && typeof window.BlossomModal.deleteSelectionRequired === 'function'){
+      window.BlossomModal.deleteSelectionRequired();
+      return;
+    }
+    showNotice('삭제처리할 행을 먼저 선택하세요.', '삭제처리', 'info');
+  }
+
   async function apiJson(url, options){
     const res = await fetch(url, options);
     let data = null;
@@ -343,6 +371,7 @@
     const deleteModalEl = document.getElementById('insight-delete-modal');
     const deleteSubtitleEl = document.getElementById('insight-delete-subtitle');
     const deleteClose = document.getElementById('insight-delete-close');
+    const deleteCancel = document.getElementById('insight-delete-cancel');
     const deleteConfirm = document.getElementById('insight-delete-confirm');
 
     const downloadModalEl = document.getElementById('insight-download-modal');
@@ -1073,15 +1102,21 @@
     }
 
     function renderPagination(){
+      const pages = totalPages();
+      if(state.page > pages) state.page = pages;
+      if(state.page < 1) state.page = 1;
+
       if(infoEl){
-        const start = state.total ? (state.page - 1) * state.pageSize + 1 : 0;
-        const end = Math.min(state.total, state.page * state.pageSize);
-        infoEl.textContent = `${start}-${end} / ${state.total}개 항목`;
+        infoEl.textContent = `${state.total || 0}개 항목`;
       }
       if(pageNumbersEl){
-        const pages = totalPages();
+        const windowSize = 7;
+        let start = Math.max(1, state.page - Math.floor(windowSize / 2));
+        let end = Math.min(pages, start + windowSize - 1);
+        start = Math.max(1, end - windowSize + 1);
+
         pageNumbersEl.innerHTML = '';
-        for(let p=1; p<=pages && p<=50; p++){
+        for(let p=start; p<=end; p++){
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'page-btn' + (p === state.page ? ' active' : '');
@@ -1136,7 +1171,7 @@
       const hasRows = Array.isArray(state.items) && state.items.length > 0;
       setEmptyVisible(!hasRows);
       setTableVisible(hasRows);
-      setPaginationVisible(hasRows);
+      setPaginationVisible(true);
     }
 
     function getSelectedIds(){
@@ -1235,7 +1270,7 @@
         const hasAny = Array.isArray(state.items) && state.items.length > 0;
         setEmptyVisible(!hasAny);
         setTableVisible(hasAny);
-        setPaginationVisible(hasAny);
+        setPaginationVisible(true);
       }catch(err){
         state.isLoading = false;
         updateCount(0);
@@ -1258,13 +1293,13 @@
       if(!id) return;
       try{
         await apiJson(`/api/insight/items/${id}`, { method:'DELETE', headers:{'Accept':'application/json'} });
-        try{ if(typeof showToast === 'function') showToast('삭제되었습니다.', 'success'); }catch(_e){}
+        showNotice('삭제되었습니다.', '삭제 완료', 'success');
         // If last item on page was deleted, go back a page when appropriate.
         const totalPages = Math.max(1, Math.ceil(Math.max(0, state.total - 1) / state.pageSize));
         if(state.page > totalPages) state.page = totalPages;
         await load();
       }catch(err){
-        try{ if(typeof showToast === 'function') showToast(err.message || '삭제 중 오류', 'error'); }catch(_e){ alert(err.message || '삭제 중 오류'); }
+        showNotice(err.message || '삭제 중 오류', '삭제 실패', 'error');
       }
     }
 
@@ -1272,7 +1307,7 @@
       const list = Array.isArray(ids) ? ids : [];
       const count = list.length;
       if(count === 0){
-        try{ if(typeof showToast === 'function') showToast('삭제처리할 행을 먼저 선택하세요.', 'info'); }catch(_e){ alert('삭제처리할 행을 먼저 선택하세요.'); }
+        showDeleteSelectionRequired();
         return;
       }
 
@@ -1286,7 +1321,7 @@
         }
       }
 
-      try{ if(typeof showToast === 'function') showToast(`${ok}개 항목이 삭제처리되었습니다.`, 'success'); }catch(_e){}
+      showNotice(`${ok}개 항목이 삭제처리되었습니다.`, '삭제 완료', 'success');
       if(selectAll){ selectAll.checked = false; selectAll.indeterminate = false; }
       await load();
     }
@@ -1445,7 +1480,7 @@
       const ids = getSelectedIds();
       const count = ids.length;
       if(count === 0){
-        try{ if(typeof showToast === 'function') showToast('삭제처리할 행을 먼저 선택하세요.', 'info'); }catch(_e){ alert('삭제처리할 행을 먼저 선택하세요.'); }
+        showDeleteSelectionRequired();
         return;
       }
       state.pendingDeleteIds = ids;
@@ -1665,6 +1700,7 @@
     }
 
     if(deleteClose) deleteClose.addEventListener('click', ()=> closeModal('insight-delete-modal'));
+    if(deleteCancel) deleteCancel.addEventListener('click', ()=> closeModal('insight-delete-modal'));
     if(deleteModalEl){
       deleteModalEl.addEventListener('click', (e)=>{
         if(e.target === deleteModalEl) closeModal('insight-delete-modal');

@@ -1,67 +1,49 @@
 #!/usr/bin/env bash
-#
-# Lumina Agent — RPM 빌드 스크립트
-#
-# 사용법 (RHEL / Rocky / CentOS / Fedora):
-#   chmod +x build_rpm.sh
-#   ./build_rpm.sh
-#
-# 의존성: rpm-build, rpmdevtools
-#   sudo dnf install rpm-build rpmdevtools   # RHEL 8+
-#   sudo yum install rpm-build rpmdevtools   # RHEL 7
-#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SPEC="$SCRIPT_DIR/blossom-agent.spec"
+VERSION="1.2.1"
 
-VERSION="1.2.0"
-
-# ── rpmbuild 디렉터리 구성 ──────────────────────────────
 TOPDIR="$AGENT_ROOT/rpmbuild"
 rm -rf "$TOPDIR"
 mkdir -p "$TOPDIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# ── SOURCES 디렉터리에 에이전트 소스 복사 ────────────────
 SRC="$TOPDIR/SOURCES"
 
-# common
 mkdir -p "$SRC/common"
-cp "$AGENT_ROOT/common/__init__.py"   "$SRC/common/" 2>/dev/null || touch "$SRC/common/__init__.py"
-cp "$AGENT_ROOT/common/config.py"     "$SRC/common/"
-cp "$AGENT_ROOT/common/collector.py"  "$SRC/common/"
+cp "$AGENT_ROOT/common/__init__.py" "$SRC/common/" 2>/dev/null || touch "$SRC/common/__init__.py"
+cp "$AGENT_ROOT/common/config.py" "$SRC/common/"
+cp "$AGENT_ROOT/common/collector.py" "$SRC/common/"
 cp "$AGENT_ROOT/common/account_worker_protocol.py" "$SRC/common/"
 cp "$AGENT_ROOT/common/account_policy.py" "$SRC/common/"
 
-# linux
 mkdir -p "$SRC/linux/collectors" "$SRC/linux/root_worker"
-cp "$AGENT_ROOT/linux/__init__.py"               "$SRC/linux/" 2>/dev/null || touch "$SRC/linux/__init__.py"
-cp "$AGENT_ROOT/linux/agent.py"                  "$SRC/linux/"
+cp "$AGENT_ROOT/linux/__init__.py" "$SRC/linux/" 2>/dev/null || touch "$SRC/linux/__init__.py"
+cp "$AGENT_ROOT/linux/agent.py" "$SRC/linux/"
 cp "$AGENT_ROOT/linux/account_worker_client.py" "$SRC/linux/"
-cp "$AGENT_ROOT/linux/account_dispatch.py"    "$SRC/linux/"
+cp "$AGENT_ROOT/linux/account_dispatch.py" "$SRC/linux/"
 cp "$AGENT_ROOT/linux/root_worker/__init__.py" "$SRC/linux/root_worker/"
 cp "$AGENT_ROOT/linux/root_worker/executor.py" "$SRC/linux/root_worker/"
-cp "$AGENT_ROOT/linux/root_worker/main.py"   "$SRC/linux/root_worker/"
-cp "$AGENT_ROOT/linux/blossom-agent.service"     "$SRC/linux/"  # lumina.service로 RPM에서 복사됨
+cp "$AGENT_ROOT/linux/root_worker/main.py" "$SRC/linux/root_worker/"
+cp "$AGENT_ROOT/linux/blossom-agent.service" "$SRC/linux/"
 cp "$AGENT_ROOT/linux/lumina-account-worker.service" "$SRC/linux/"
-cp "$AGENT_ROOT/linux/collectors/__init__.py"    "$SRC/linux/collectors/" 2>/dev/null || touch "$SRC/linux/collectors/__init__.py"
-cp "$AGENT_ROOT/linux/collectors/interface.py"   "$SRC/linux/collectors/"
-cp "$AGENT_ROOT/linux/collectors/account.py"     "$SRC/linux/collectors/"
-cp "$AGENT_ROOT/linux/collectors/authority.py"   "$SRC/linux/collectors/"
-cp "$AGENT_ROOT/linux/collectors/firewalld.py"   "$SRC/linux/collectors/"
-cp "$AGENT_ROOT/linux/collectors/storage.py"     "$SRC/linux/collectors/"
-cp "$AGENT_ROOT/linux/collectors/package.py"     "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/lumina-agent" "$SRC/linux/"
+cp "$AGENT_ROOT/linux/collectors/__init__.py" "$SRC/linux/collectors/" 2>/dev/null || touch "$SRC/linux/collectors/__init__.py"
+cp "$AGENT_ROOT/linux/collectors/interface.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/account.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/authority.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/firewalld.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/storage.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/package.py" "$SRC/linux/collectors/"
+cp "$AGENT_ROOT/linux/collectors/performance.py" "$SRC/linux/collectors/"
 
-# 기본 설정 파일
 cp "$SCRIPT_DIR/agent.conf.default" "$SRC/"
 
-# ── rpmbuild 실행 ────────────────────────────────────────
-echo "===== RPM 빌드 시작 (v${VERSION}) ====="
-
+echo "===== RPM build start (v${VERSION}) ====="
 rpmbuild --define "_topdir $TOPDIR" -bb "$SPEC"
 
 echo ""
-echo "===== RPM 빌드 완료 ====="
-echo "결과물 위치:"
-find "$TOPDIR/RPMS" -name "*.rpm" -exec echo "  → {}" \;
+echo "===== RPM build complete ====="
+find "$TOPDIR/RPMS" -name "*.rpm" -exec echo "  -> {}" \;

@@ -2715,7 +2715,7 @@
       if(totalEl) totalEl.textContent = String(total || 0);
       if(!total){
         statsWrap.style.display = 'none';
-        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '상태 데이터가 없습니다.'); }catch(_e){} }
+        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.'); }catch(_e){} }
         return;
       }
 
@@ -2760,7 +2760,7 @@
       })
       .catch(() => {
         statsWrap.style.display = 'none';
-        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '상태 데이터가 없습니다.'); }catch(_e){} }
+        if(emptyEl){ emptyEl.hidden = false; try{ showNoDataImage(emptyEl, '할당 시스템 내역이 없습니다.'); }catch(_e){} }
         if(totalEl) totalEl.textContent = '0';
       });
   }

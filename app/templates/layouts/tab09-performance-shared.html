@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    {% include 'layouts/_detail_no_fouc.html' %}
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+    <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
+    <link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
+    <link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
+    <style>
+        .tab09-performance-root .detail-section { overflow: visible; }
+        .tab09-performance-root .detail-section h3 {
+            display: flex;
+            align-items: center;
+            min-height: 58px;
+            margin: 0;
+            padding: 0 20px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            background: #6366F1;
+            border-radius: 8px 8px 0 0;
+        }
+        .tab09-performance-root .perf-body {
+            padding: 16px 18px 22px;
+            border: 1px solid #e5e7eb;
+            border-top: 0;
+            border-radius: 0 0 8px 8px;
+            background: #fff;
+        }
+        .tab09-performance-root .perf-filter {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            margin: 0 0 12px;
+        }
+        .tab09-performance-root .perf-filter label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .tab09-performance-root .perf-date-input {
+            width: 212px;
+            height: 36px;
+            border: 1px solid #d9e1ee;
+            border-radius: 6px;
+            padding: 0 38px 0 10px;
+            background: #fff url("/static/image/svg/free-icon-calendar.svg") right 12px center/15px 15px no-repeat;
+            color: #0f172a;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.4;
+            letter-spacing: 0;
+            cursor: pointer;
+        }
+        .tab09-performance-root .perf-date-input::placeholder { color: #94a3b8; opacity: 1; }
+        .tab09-performance-root .perf-search-btn,
+        .tab09-performance-root .perf-reset-btn {
+            height: 36px;
+            border-radius: 6px;
+            border: 1px solid #d9e1ee;
+            background: #fff;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 0 14px;
+            cursor: pointer;
+        }
+        .tab09-performance-root .perf-search-btn {
+            border-color: #6366F1;
+            background: #6366F1;
+            color: #fff;
+        }
+        .tab09-performance-root .perf-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 0 0 14px;
+        }
+        .tab09-performance-root .perf-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: 16px;
+        }
+        .tab09-performance-root .perf-card-title {
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .tab09-performance-root .perf-card-value {
+            margin-top: 10px;
+            color: #0f172a;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .tab09-performance-root .perf-bar {
+            height: 8px;
+            margin-top: 12px;
+            border-radius: 999px;
+            background: #eef2ff;
+            overflow: hidden;
+        }
+        .tab09-performance-root .perf-bar span {
+            display: block;
+            height: 100%;
+            width: 0;
+            border-radius: inherit;
+            background: #6366F1;
+        }
+        .tab09-performance-root .perf-meta {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        .tab09-performance-root .perf-range {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: auto;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .tab09-performance-root .perf-range-select {
+            width: 112px;
+            height: 32px;
+            border: 1px solid #d9e1ee;
+            border-radius: 6px;
+            background: #fff;
+            color: #0f172a;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 400;
+            padding: 0 28px 0 10px;
+        }
+        .tab09-performance-root .perf-filesystem-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .tab09-performance-root .perf-filesystem-row {
+            display: grid;
+            grid-template-columns: minmax(72px, 120px) 1fr auto;
+            align-items: center;
+            gap: 8px;
+            color: #334155;
+            font-size: 12px;
+        }
+        .tab09-performance-root .perf-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 32px;
+            padding: 0 10px;
+            border: 1px solid #d9e1ee;
+            border-radius: 6px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 600;
+            background: #fff;
+        }
+        .tab09-performance-root .perf-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #94a3b8;
+        }
+        .tab09-performance-root .perf-chart {
+            width: 100%;
+            height: 96px;
+            margin-top: 12px;
+            display: block;
+        }
+        .tab09-performance-root .usage-cell {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 110px;
+        }
+        .tab09-performance-root .usage-mini {
+            width: 64px;
+            height: 6px;
+            background: #eef2ff;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .tab09-performance-root .usage-mini span {
+            display: block;
+            height: 100%;
+            background: #6366F1;
+        }
+        .flatpickr-calendar.language-time-picker {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 20px 48px rgba(15,23,42,.18);
+            overflow: hidden;
+            font-family: inherit;
+        }
+        .flatpickr-calendar.language-time-picker .flatpickr-day.today {
+            border-color: #6366F1;
+            color: #6366F1;
+        }
+        .flatpickr-calendar.language-time-picker .flatpickr-day.selected,
+        .flatpickr-calendar.language-time-picker .flatpickr-day.startRange,
+        .flatpickr-calendar.language-time-picker .flatpickr-day.endRange,
+        .flatpickr-calendar.language-time-picker .flatpickr-day.selected:hover,
+        .flatpickr-calendar.language-time-picker .flatpickr-day.today.selected,
+        .flatpickr-calendar.language-time-picker .flatpickr-day.today.selected:hover {
+            border-color: #6366F1 !important;
+            background: #6366F1 !important;
+            color: #fff !important;
+        }
+        .flatpickr-calendar.language-time-picker .fp-today-btn {
+            width: calc(100% - 20px);
+            height: 34px;
+            margin: 8px 10px 10px;
+            border: 0;
+            border-radius: 8px;
+            background: #6366F1;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        @media (max-width: 960px) {
+            .tab09-performance-root .perf-summary { grid-template-columns: 1fr; }
+            .tab09-performance-root .perf-filter { justify-content: flex-start; flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body class="page-server-performance-tab">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set _qs = request.query_string.decode('utf-8', 'replace') %}
+
+    <main class="main-content tab09-performance-root"
+          data-storage-prefix="{{ storage_prefix or '' }}"
+          data-api-base="{{ tab09_api_base or '/api/agent-performance' }}"
+          data-asset-id="{{ hw_asset_id or '' }}"
+          data-asset-scope="{{ hw_asset_scope or '' }}">
+        <div class="content-wrapper">
+            {% if back_key %}
+            <a href="{{ url_for('pages.blossom_hub', segment=back_key) }}" class="back-btn">
+                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
+                {{ back_label or '목록으로 돌아가기' }}
+            </a>
+            {% endif %}
+
+            <div class="page-header">
+                <h1 id="page-title">{{ title or '-' }}</h1>
+                <p id="page-subtitle">{{ subtitle if subtitle and subtitle != '-' else '-' }}</p>
+            </div>
+
+            {% if tabs %}
+            <div class="server-detail-tabs">
+                {% for t in tabs %}
+                <a href="{{ t.href if t.href is defined and t.href else (url_for('pages.blossom_hub', segment=t.key) ~ ('?' ~ _qs if _qs else '')) }}"
+                   data-spa="{{ 'false' if disable_detail_tab_spa else 'true' }}"
+                   class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="server-detail-content">
+                <div class="server-detail-pane active" id="performance">
+                    <div class="detail-section">
+                        <h3 style="display:flex;align-items:center;min-height:58px;margin:0;padding:0 20px;color:#fff;font-size:18px;font-weight:700;background:#6366F1;border-radius:8px 8px 0 0;">성능관리</h3>
+                        <div class="perf-body" style="padding:16px 18px 22px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px;background:#fff;">
+                            <div class="perf-filter" aria-label="기간 검색" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 12px;flex-wrap:wrap;">
+                                <div class="perf-range" style="display:inline-flex;align-items:center;gap:8px;margin-right:auto;color:#334155;font-size:13px;font-weight:600;">
+                                    <label for="perf-range-select">범위</label>
+                                    <select class="perf-range-select" id="perf-range-select" style="width:112px;height:32px;border:1px solid #d9e1ee;border-radius:6px;background:#fff;color:#0f172a;font-family:inherit;font-size:13px;font-weight:400;padding:0 28px 0 10px;">
+                                        <option value="1">1시간</option>
+                                        <option value="2">2시간</option>
+                                        <option value="3">3시간</option>
+                                        <option value="6">6시간</option>
+                                        <option value="12">12시간</option>
+                                        <option value="24" selected>24시간</option>
+                                    </select>
+                                </div>
+                                <div class="perf-status" id="perf-status" style="display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid #d9e1ee;border-radius:6px;color:#475569;font-size:12px;font-weight:600;background:#fff;">
+                                    <span class="perf-status-dot" id="perf-status-dot" style="width:8px;height:8px;border-radius:999px;background:#94a3b8;"></span>
+                                    <span id="perf-status-text">수집 상태 확인 중</span>
+                                </div>
+                                <label style="display:inline-flex;align-items:center;gap:6px;color:#334155;font-size:13px;font-weight:600;">시작 <input type="text" id="perf-start" class="perf-date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off" style="width:212px;height:36px;border:1px solid #d9e1ee;border-radius:6px;padding:0 38px 0 10px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:400;line-height:1.4;letter-spacing:0;background-color:#fff;box-sizing:border-box;"></label>
+                                <label style="display:inline-flex;align-items:center;gap:6px;color:#334155;font-size:13px;font-weight:600;">종료 <input type="text" id="perf-end" class="perf-date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off" style="width:212px;height:36px;border:1px solid #d9e1ee;border-radius:6px;padding:0 38px 0 10px;color:#0f172a;font-family:inherit;font-size:13px;font-weight:400;line-height:1.4;letter-spacing:0;background-color:#fff;box-sizing:border-box;"></label>
+                                <button class="perf-search-btn" id="perf-search" type="button" style="height:36px;border-radius:6px;border:1px solid #6366F1;background:#6366F1;color:#fff;font-size:13px;font-weight:600;padding:0 14px;cursor:pointer;">검색</button>
+                                <button class="perf-reset-btn" id="perf-reset" type="button" style="height:36px;border-radius:6px;border:1px solid #d9e1ee;background:#fff;color:#334155;font-size:13px;font-weight:600;padding:0 14px;cursor:pointer;">초기화</button>
+                            </div>
+
+                            <div class="perf-summary" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 14px;">
+                                <div class="perf-card" style="border:1px solid #e5e7eb;border-radius:8px;background:#fff;padding:16px;box-sizing:border-box;">
+                                    <div class="perf-card-title" style="color:#475569;font-size:13px;font-weight:600;">CPU 사용률</div>
+                                    <div class="perf-card-value" id="perf-cpu-value" style="margin-top:10px;color:#0f172a;font-size:28px;font-weight:700;">-</div>
+                                    <div class="perf-bar" style="height:8px;margin-top:12px;border-radius:999px;background:#eef2ff;overflow:hidden;"><span id="perf-cpu-bar" style="display:block;height:100%;border-radius:inherit;background:#6366F1;"></span></div>
+                                    <canvas class="perf-chart" id="perf-cpu-chart" width="460" height="118" style="width:100%;height:118px;margin-top:12px;display:block;"></canvas>
+                                    <div class="perf-meta" id="perf-cpu-meta" style="margin-top:8px;color:#64748b;font-size:12px;">-</div>
+                                </div>
+                                <div class="perf-card" style="border:1px solid #e5e7eb;border-radius:8px;background:#fff;padding:16px;box-sizing:border-box;">
+                                    <div class="perf-card-title" style="color:#475569;font-size:13px;font-weight:600;">메모리 사용률</div>
+                                    <div class="perf-card-value" id="perf-memory-value" style="margin-top:10px;color:#0f172a;font-size:28px;font-weight:700;">-</div>
+                                    <div class="perf-bar" style="height:8px;margin-top:12px;border-radius:999px;background:#eef2ff;overflow:hidden;"><span id="perf-memory-bar" style="display:block;height:100%;border-radius:inherit;background:#6366F1;"></span></div>
+                                    <canvas class="perf-chart" id="perf-memory-chart" width="460" height="118" style="width:100%;height:118px;margin-top:12px;display:block;"></canvas>
+                                    <div class="perf-meta" id="perf-memory-meta" style="margin-top:8px;color:#64748b;font-size:12px;">-</div>
+                                </div>
+                                <div class="perf-card" style="border:1px solid #e5e7eb;border-radius:8px;background:#fff;padding:16px;box-sizing:border-box;">
+                                    <div class="perf-card-title" style="color:#475569;font-size:13px;font-weight:600;">파일시스템 사용률</div>
+                                    <div class="perf-card-value" id="perf-filesystem-value" style="margin-top:10px;color:#0f172a;font-size:28px;font-weight:700;">-</div>
+                                    <div class="perf-bar" style="height:8px;margin-top:12px;border-radius:999px;background:#eef2ff;overflow:hidden;"><span id="perf-filesystem-bar" style="display:block;height:100%;border-radius:inherit;background:#6366F1;"></span></div>
+                                    <div class="perf-meta" id="perf-filesystem-meta" style="margin-top:8px;color:#64748b;font-size:12px;">-</div>
+                                    <div class="perf-filesystem-list" id="perf-filesystem-list" style="display:grid;gap:8px;margin-top:12px;"></div>
+                                </div>
+                            </div>
+
+                            <div class="table-wrap" hidden style="display:none;">
+                                <table class="hw-table" id="perf-table">
+                                    <thead>
+                                        <tr>
+                                            <th>수집 일시</th>
+                                            <th>구분</th>
+                                            <th>대상</th>
+                                            <th>사용률</th>
+                                            <th>사용량</th>
+                                            <th>전체</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+
+                            <div id="perf-empty" class="system-empty" role="status" aria-live="polite" hidden style="display:none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260529_search_empty1"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script src="/static/js/_detail/_hardware_detail.js?v=1.3.0"></script>
+    <script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js"></script>
+    <script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js"></script>
+    <script>
+    (function(){
+        'use strict';
+        var root = document.querySelector('.tab09-performance-root');
+        var table = document.getElementById('perf-table');
+        var tbody = table ? table.querySelector('tbody') : null;
+        var empty = document.getElementById('perf-empty');
+
+        function norm(v){ var s = String(v == null ? '' : v).trim(); return (!s || s === '-') ? '' : s; }
+        function pct(v){ var n = Number(v); return isFinite(n) ? Math.max(0, Math.min(100, n)) : null; }
+        function fmtPct(v){ var n = pct(v); return n == null ? '-' : (n.toFixed(n % 1 ? 1 : 0) + '%'); }
+        function pad(n){ return String(n).padStart(2, '0'); }
+        function formatDateTime(d) {
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+        function fmtBytes(v){
+            var n = Number(v);
+            if (!isFinite(n) || n <= 0) return '-';
+            var units = ['B','KB','MB','GB','TB'];
+            var i = 0;
+            while (n >= 1024 && i < units.length - 1) { n = n / 1024; i++; }
+            return (n >= 10 || i === 0 ? n.toFixed(0) : n.toFixed(1)) + units[i];
+        }
+        function metricLabel(v){
+            if (v === 'cpu') return 'CPU';
+            if (v === 'memory') return '메모리';
+            if (v === 'filesystem') return '파일시스템';
+            return v || '-';
+        }
+        function setStyles(el, styles) {
+            if (!el) return;
+            Object.keys(styles).forEach(function (key) {
+                el.style[key] = styles[key];
+            });
+        }
+        function applyPerformanceStyles() {
+            setStyles(document.querySelector('.tab09-performance-root .detail-section'), {
+                overflow: 'visible',
+                borderRadius: '8px',
+                background: '#fff'
+            });
+            setStyles(document.querySelector('.tab09-performance-root .detail-section h3'), {
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: '58px',
+                margin: '0',
+                padding: '0 20px',
+                color: '#fff',
+                fontSize: '18px',
+                fontWeight: '700',
+                background: '#6366F1',
+                borderRadius: '8px 8px 0 0'
+            });
+            setStyles(document.querySelector('.tab09-performance-root .perf-body'), {
+                padding: '16px 18px 22px',
+                border: '1px solid #e5e7eb',
+                borderTop: '0',
+                borderRadius: '0 0 8px 8px',
+                background: '#fff'
+            });
+            setStyles(document.querySelector('.tab09-performance-root .perf-filter'), {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                margin: '0 0 12px',
+                flexWrap: 'wrap'
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-filter label').forEach(function (el) {
+                setStyles(el, {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#334155',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-date-input').forEach(function (el) {
+                setStyles(el, {
+                    width: '212px',
+                    height: '36px',
+                    border: '1px solid #d9e1ee',
+                    borderRadius: '6px',
+                    padding: '0 38px 0 10px',
+                    color: '#0f172a',
+                    fontFamily: 'inherit',
+                    fontSize: '13px',
+                    fontWeight: '400',
+                    lineHeight: '1.4',
+                    letterSpacing: '0',
+                    backgroundColor: '#fff',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box'
+                });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-search-btn, .tab09-performance-root .perf-reset-btn').forEach(function (el) {
+                setStyles(el, {
+                    height: '36px',
+                    borderRadius: '6px',
+                    border: '1px solid #d9e1ee',
+                    background: '#fff',
+                    color: '#334155',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    padding: '0 14px',
+                    cursor: 'pointer'
+                });
+            });
+            setStyles(document.getElementById('perf-search'), {
+                borderColor: '#6366F1',
+                background: '#6366F1',
+                color: '#fff'
+            });
+            setStyles(document.querySelector('.tab09-performance-root .perf-summary'), {
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '12px',
+                margin: '0 0 14px'
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-card').forEach(function (el) {
+                setStyles(el, {
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    background: '#fff',
+                    padding: '16px',
+                    boxSizing: 'border-box'
+                });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-card-title').forEach(function (el) {
+                setStyles(el, { color: '#475569', fontSize: '13px', fontWeight: '600' });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-card-value').forEach(function (el) {
+                setStyles(el, { marginTop: '10px', color: '#0f172a', fontSize: '28px', fontWeight: '700' });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-bar').forEach(function (el) {
+                setStyles(el, {
+                    height: '8px',
+                    marginTop: '12px',
+                    borderRadius: '999px',
+                    background: '#eef2ff',
+                    overflow: 'hidden'
+                });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-bar span').forEach(function (el) {
+                setStyles(el, { display: 'block', height: '100%', borderRadius: 'inherit', background: '#6366F1' });
+            });
+            document.querySelectorAll('.tab09-performance-root .perf-meta').forEach(function (el) {
+                setStyles(el, { marginTop: '8px', color: '#64748b', fontSize: '12px' });
+            });
+            setStyles(document.querySelector('.tab09-performance-root .perf-range'), {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginRight: 'auto',
+                color: '#334155',
+                fontSize: '13px',
+                fontWeight: '600'
+            });
+            setStyles(document.querySelector('.tab09-performance-root .perf-range-select'), {
+                width: '112px',
+                height: '32px',
+                border: '1px solid #d9e1ee',
+                borderRadius: '6px',
+                background: '#fff',
+                color: '#0f172a',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                fontWeight: '400',
+                padding: '0 28px 0 10px'
+            });
+        }
+        function ensureTodayButton(fp) {
+            var cal = fp && fp.calendarContainer;
+            if (!cal || cal.querySelector('.fp-today-btn')) return;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'fp-today-btn';
+            btn.textContent = '오늘';
+            btn.addEventListener('click', function () {
+                fp.setDate(new Date(), true);
+                fp.close();
+            });
+            cal.appendChild(btn);
+        }
+        function initDatePicker(input) {
+            if (!input || !window.flatpickr) return null;
+            var locale = (window.flatpickr.l10ns && window.flatpickr.l10ns.ko) || 'ko';
+            var picker = window.flatpickr(input, {
+                enableTime: true,
+                time_24hr: true,
+                dateFormat: 'Y-m-d H:i',
+                allowInput: true,
+                disableMobile: true,
+                appendTo: document.body,
+                locale: locale,
+                onReady: function (_selected, _dateStr, inst) {
+                    if (inst && inst.calendarContainer) inst.calendarContainer.classList.add('language-time-picker');
+                    ensureTodayButton(inst);
+                },
+                onOpen: function (_selected, _dateStr, inst) {
+                    if (inst && inst.calendarContainer) inst.calendarContainer.classList.add('language-time-picker');
+                    ensureTodayButton(inst);
+                }
+            });
+            if (picker && picker.calendarContainer) picker.calendarContainer.classList.add('language-time-picker');
+            return picker;
+        }
+        function normalizeDateParam(value, endOfMinute) {
+            var s = String(value || '').trim();
+            if (!s) return '';
+            s = s.replace('T', ' ');
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + (endOfMinute ? ' 23:59:59' : ' 00:00:00');
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) return s + (endOfMinute ? ':59' : ':00');
+            return s;
+        }
+        function inferSystemKey(){
+            var subtitle = norm(document.getElementById('page-subtitle') && document.getElementById('page-subtitle').textContent);
+            if (subtitle) return subtitle;
+            var title = norm(document.getElementById('page-title') && document.getElementById('page-title').textContent);
+            if (title) return title;
+            var prefix = root ? norm(root.dataset.storagePrefix) : '';
+            if (prefix) {
+                try {
+                    var row = JSON.parse(sessionStorage.getItem(prefix + ':selected:row') || localStorage.getItem(prefix + ':selected:row') || '{}');
+                    return norm(row.system_name || row.systemName || row.system || row.subTitle || row.subtitle);
+                } catch (_) {}
+            }
+            return '';
+        }
+        function buildUrl(){
+            var api = (root && root.dataset.apiBase) || '/api/agent-performance';
+            var qs = new URLSearchParams();
+            qs.set('asset_scope', (root && root.dataset.assetScope) || '');
+            qs.set('asset_id', (root && root.dataset.assetId) || '');
+            var systemKey = inferSystemKey();
+            var start = normalizeDateParam(document.getElementById('perf-start').value, false);
+            var end = normalizeDateParam(document.getElementById('perf-end').value, true);
+            if (systemKey) qs.set('system_key', systemKey);
+            if (start) qs.set('start', start);
+            if (end) qs.set('end', end);
+            return api + '?' + qs.toString();
+        }
+        function updateCard(type, item){
+            var value = document.getElementById('perf-' + type + '-value');
+            var bar = document.getElementById('perf-' + type + '-bar');
+            var meta = document.getElementById('perf-' + type + '-meta');
+            var val = item ? pct(item.usage_pct) : null;
+            if (value) value.textContent = val == null ? '-' : fmtPct(val);
+            if (bar) bar.style.width = (val == null ? 0 : val) + '%';
+            if (meta) meta.textContent = item ? ((item.target || 'system') + ' · ' + (item.sampled_at || '-')) : '-';
+        }
+        function latestByTarget(items) {
+            var map = {};
+            items.forEach(function (item) {
+                var target = item.target || '-';
+                if (!map[target] || String(item.sampled_at || '') > String(map[target].sampled_at || '')) {
+                    map[target] = item;
+                }
+            });
+            return Object.keys(map).sort().map(function (key) { return map[key]; });
+        }
+        function updateStatus(status) {
+            status = status || {};
+            var dot = document.getElementById('perf-status-dot');
+            var text = document.getElementById('perf-status-text');
+            if (!text || !dot) return;
+            if (!status.linked) {
+                dot.style.background = '#ef4444';
+                text.textContent = '수집 상태 확인 필요';
+                return;
+            }
+            if (status.collecting) {
+                dot.style.background = '#22c55e';
+                text.textContent = '수집 중 · ' + (status.hostname || '-');
+                return;
+            }
+            dot.style.background = '#f59e0b';
+            text.textContent = '수집 지연 · ' + (status.hostname || '-');
+        }
+        function drawSeries(canvasId, rows) {
+            var canvas = document.getElementById(canvasId);
+            if (!canvas || !canvas.getContext) return;
+            var ctx = canvas.getContext('2d');
+            var w = canvas.width;
+            var h = canvas.height;
+            var left = 8;
+            var right = 8;
+            var top = 8;
+            var bottom = 28;
+            var plotW = w - left - right;
+            var plotH = h - top - bottom;
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            [0, 25, 50, 75, 100].forEach(function (v) {
+                var y = top + (100 - v) / 100 * plotH;
+                ctx.beginPath();
+                ctx.moveTo(left, y);
+                ctx.lineTo(w - right, y);
+                ctx.stroke();
+            });
+            rows = (rows || []).filter(function (r) { return pct(r.usage_pct) != null; }).sort(function (a, b) {
+                return String(a.sampled_at || '').localeCompare(String(b.sampled_at || ''));
+            });
+            if (!rows.length) {
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('수집 데이터 없음', left, top + plotH / 2);
+                return;
+            }
+            function xAt(idx) {
+                return rows.length === 1 ? w - right : left + idx * (plotW / (rows.length - 1));
+            }
+            function labelTime(value) {
+                var text = String(value || '');
+                return text.length >= 16 ? text.slice(11, 16) : text;
+            }
+            ctx.fillStyle = '#64748b';
+            ctx.font = '11px sans-serif';
+            ctx.textBaseline = 'top';
+            var tickIndexes = rows.length === 1 ? [0] : [0, Math.floor((rows.length - 1) / 2), rows.length - 1];
+            tickIndexes = tickIndexes.filter(function (idx, pos, arr) { return arr.indexOf(idx) === pos; });
+            tickIndexes.forEach(function (idx, pos) {
+                var x = xAt(idx);
+                var label = labelTime(rows[idx].sampled_at);
+                ctx.textAlign = pos === 0 ? 'left' : (pos === tickIndexes.length - 1 ? 'right' : 'center');
+                ctx.fillText(label, x, top + plotH + 8);
+            });
+            ctx.strokeStyle = '#6366F1';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            rows.forEach(function (r, idx) {
+                var x = xAt(idx);
+                var y = top + (100 - pct(r.usage_pct)) / 100 * plotH;
+                if (idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.fillStyle = '#6366F1';
+            rows.forEach(function (r, idx) {
+                var x = xAt(idx);
+                var y = top + (100 - pct(r.usage_pct)) / 100 * plotH;
+                ctx.beginPath();
+                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        function renderFilesystems(filesystems) {
+            var box = document.getElementById('perf-filesystem-list');
+            if (!box) return;
+            var rows = latestByTarget(filesystems || []);
+            box.innerHTML = '';
+            if (!rows.length) {
+                box.innerHTML = '<div class="perf-meta" style="color:#64748b;font-size:12px;">마운트된 파일시스템 수집 데이터가 없습니다.</div>';
+                return;
+            }
+            rows.forEach(function (item) {
+                var usage = pct(item.usage_pct);
+                var row = document.createElement('div');
+                row.className = 'perf-filesystem-row';
+                row.style.cssText = 'display:grid;grid-template-columns:minmax(72px,120px) 1fr auto;align-items:center;gap:8px;color:#334155;font-size:12px;';
+                row.innerHTML =
+                    '<span title="' + (item.target || '-') + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (item.target || '-') + '</span>' +
+                    '<span class="usage-mini" style="width:100%;height:6px;background:#eef2ff;border-radius:999px;overflow:hidden;"><span style="display:block;height:100%;width:' + (usage == null ? 0 : usage) + '%;background:#6366F1;"></span></span>' +
+                    '<strong style="font-weight:700;color:#0f172a;">' + fmtPct(usage) + '</strong>';
+                box.appendChild(row);
+            });
+        }
+        function render(items){
+            items = Array.isArray(items) ? items : [];
+            var latest = {};
+            items.forEach(function(it){
+                if (!latest[it.metric_type]) latest[it.metric_type] = it;
+                if (it.metric_type === 'filesystem') {
+                    if (!latest.filesystem || Number(it.usage_pct || 0) > Number(latest.filesystem.usage_pct || 0)) latest.filesystem = it;
+                }
+            });
+            updateCard('cpu', latest.cpu);
+            updateCard('memory', latest.memory);
+            updateCard('filesystem', latest.filesystem);
+            drawSeries('perf-cpu-chart', items.filter(function (item) { return item.metric_type === 'cpu'; }));
+            drawSeries('perf-memory-chart', items.filter(function (item) { return item.metric_type === 'memory'; }));
+            renderFilesystems(items.filter(function (item) { return item.metric_type === 'filesystem'; }));
+
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            items.forEach(function(item){
+                var tr = document.createElement('tr');
+                var usage = pct(item.usage_pct);
+                tr.innerHTML =
+                    '<td>' + (item.sampled_at || '-') + '</td>' +
+                    '<td>' + metricLabel(item.metric_type) + '</td>' +
+                    '<td>' + (item.target || '-') + '</td>' +
+                    '<td><span class="usage-cell">' + fmtPct(usage) + '<span class="usage-mini"><span style="width:' + (usage == null ? 0 : usage) + '%"></span></span></span></td>' +
+                    '<td>' + fmtBytes(item.used_bytes) + '</td>' +
+                    '<td>' + fmtBytes(item.total_bytes) + '</td>';
+                tbody.appendChild(tr);
+            });
+            if (empty) empty.style.display = 'none';
+            if (table) table.style.display = items.length > 0 ? '' : 'none';
+        }
+        function load(){
+            fetch(buildUrl(), { credentials: 'same-origin' })
+                .then(function(r){ return r.json(); })
+                .then(function(resp){
+                    updateStatus(resp && resp.status);
+                    render(resp && resp.success ? resp.items : []);
+                })
+                .catch(function(){
+                    updateStatus(null);
+                    render([]);
+                });
+        }
+        function setActiveRange(hours) {
+            var select = document.getElementById('perf-range-select');
+            if (select) select.value = String(hours || 24);
+        }
+        function setRangeHours(hours, shouldLoad) {
+            var end = new Date();
+            var start = new Date(end.getTime() - (Number(hours || 24) * 60 * 60 * 1000));
+            document.getElementById('perf-start').value = formatDateTime(start);
+            document.getElementById('perf-end').value = formatDateTime(end);
+            setActiveRange(hours || 24);
+            if (shouldLoad) load();
+        }
+        document.getElementById('perf-search').addEventListener('click', load);
+        document.getElementById('perf-reset').addEventListener('click', function(){
+            setRangeHours(24, true);
+        });
+        var rangeSelect = document.getElementById('perf-range-select');
+        if (rangeSelect) {
+            rangeSelect.addEventListener('change', function () {
+                setRangeHours(rangeSelect.value || 24, true);
+            });
+        }
+        initDatePicker(document.getElementById('perf-start'));
+        initDatePicker(document.getElementById('perf-end'));
+        applyPerformanceStyles();
+        setRangeHours(24, false);
+        if (empty) empty.style.display = 'none';
+        load();
+    })();
+    </script>
+</body>
+</html>

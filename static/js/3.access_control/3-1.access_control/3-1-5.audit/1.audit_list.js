@@ -12,6 +12,7 @@
 		agentPage: 1,
 		agentPageSize: 10,
 		agentLoaded: false,
+		workOperations: [],
 		selectedAgent: null,
 		selectedUser: null,
 		userResults: [],
@@ -19,14 +20,46 @@
 		lastAgentExportRows: [],
 		exportAgentRowsAll: [],
 		agentSortKey: '',
-		agentSortDir: 'asc'
+		agentSortDir: 'asc',
+		payments: [],
+		paymentRows: [],
+		paymentTotal: 0,
+		paymentPage: 1,
+		paymentPageSize: 10,
+		paymentLoaded: false,
+		assets: [],
+		assetRows: [],
+		assetTotal: 0,
+		assetPage: 1,
+		assetPageSize: 10,
+		assetLoaded: false,
+		riskType: '',
+		riskIpBlocklist: [],
+		riskPolicyTab: 'overseas',
+		riskPolicies: {},
+		riskPolicyRows: []
 	};
 	var PAGE_SIZE_LIMIT = 200;
 	var searchTimer = null;
 	var agentSearchTimer = null;
+	var paymentSearchTimer = null;
+	var assetSearchTimer = null;
 	var userSearchTimer = null;
 	var agentMappingSelectSyncTimer = null;
 	var DEFAULT_ACTOR_AVATAR = '/static/image/svg/profil/free-icon-bussiness-man.svg';
+	var CATEGORY_ALIASES = {
+		'시스템': '시스템', system: '시스템', os: '시스템', linux: '시스템', windows: '시스템', unix: '시스템', vm: '시스템', '서버': '시스템', server: '시스템', ssh: '시스템', db: '시스템', '기타': '시스템', etc: '시스템',
+		'서비스': '서비스', service: '서비스', webservice: '서비스', '웹서비스': '서비스', '내부서비스': '서비스', '외부서비스': '서비스', internal: '서비스', external: '서비스', '웹': '서비스', web: '서비스',
+		'컨테이너': '컨테이너', container: '컨테이너', kubernetes: '컨테이너', k8s: '컨테이너', '쿠버네티스': '컨테이너', openshift: '컨테이너', rancher: '컨테이너', portainer: '컨테이너',
+		'관리콘솔': '관리콘솔', adminconsole: '관리콘솔', managementconsole: '관리콘솔', console: '관리콘솔'
+	};
+	var CONSOLE_GROUP_ALIASES = {
+		'서버': '서버', server: '서버', ilo: '서버', idrac: '서버', cimc: '서버', imm: '서버',
+		'스토리지': '스토리지', storage: '스토리지', netapp: '스토리지', emc: '스토리지', hpestorage: '스토리지',
+		san: 'SAN', brocade: 'SAN', ciscosan: 'SAN',
+		'네트워크': '네트워크', network: '네트워크', cisco: '네트워크', juniper: '네트워크', arista: '네트워크', l4l7: '네트워크',
+		'보안장비': '보안장비', security: '보안장비', firewall: '보안장비', vpn: '보안장비', waf: '보안장비', ips: '보안장비'
+	};
 
 	function qs(id) { return document.getElementById(id); }
 	function syncSearchSelect(el) {
@@ -46,6 +79,81 @@
 		var meta = document.querySelector('meta[name="csrf-token"]');
 		var token = meta ? meta.getAttribute('content') : '';
 		return token ? { 'X-CSRFToken': token } : {};
+	}
+	function categoryKey(value) { return String(value || '').replace(/[\s\/_-]+/g, '').toLowerCase(); }
+	function categoryLabel(row) { return CATEGORY_ALIASES[categoryKey(row && (row.category_name || row.category_label || row.category))] || (String(row && (row.category_name || row.category_label || row.category) || '').trim() || '시스템'); }
+	function categoryDetail(row) { return categoryLabel(row) === '관리콘솔' ? (CONSOLE_GROUP_ALIASES[categoryKey(row && (row.category_detail || row.console_group))] || '') : ''; }
+	function categoryPath(row) {
+		var category = categoryLabel(row);
+		var detail = categoryDetail(row);
+		return category === '관리콘솔' && detail ? category + ' / ' + detail : category;
+	}
+	function workOperationNameByCode(code) {
+		code = String(code || '').trim();
+		if (!code) return '';
+		var found = (state.workOperations || []).find(function (item) {
+			return String(item.operation_code || item.code || item.value || '').trim() === code;
+		});
+		if (found) return String(found.wc_name || found.operation_name || found.name || found.label || '').trim();
+		return /^OPERATION_\d+$/i.test(code) ? '' : code;
+	}
+	function workOperationLabel(row) {
+		if (categoryLabel(row) === '관리콘솔') return '';
+		var direct = String(row && (row.work_operation_name || row.work_operation) || '').trim();
+		if (direct && !/^OPERATION_\d+$/i.test(direct)) return direct;
+		return workOperationNameByCode(row && (row.work_operation_code || direct));
+	}
+	function riskReasonLabel(row) {
+		var label = String(row && (row.risk_label || row.risk_type) || '').trim();
+		if (!label) label = '위험 기준 매칭';
+		return label;
+	}
+	function operationOptionsHtml() {
+		var html = '<option value="">운영 전체</option>';
+		state.workOperations.forEach(function (item) {
+			var code = item.operation_code || '';
+			var name = item.wc_name || item.operation_name || code;
+			if (code) html += '<option value="' + esc(code) + '">' + esc(name) + '</option>';
+		});
+		return html;
+	}
+	function syncAuditCategoryDetailFilter() {
+		var category = qs('audit-category-filter');
+		var detail = qs('audit-category-detail-filter');
+		var wrapper = qs('audit-category-detail-wrapper');
+		var op = qs('audit-work-operation-filter');
+		var opWrapper = qs('audit-work-operation-wrapper');
+		var isConsole = !!category && category.value === '관리콘솔';
+		var canUseOperation = state.scope !== 'risk' && !!category && category.value !== '관리콘솔';
+		if (wrapper) wrapper.hidden = !isConsole;
+		if (detail) {
+			detail.disabled = !isConsole;
+			if (!isConsole) detail.value = '';
+			syncSearchSelect(detail);
+		}
+		if (opWrapper) opWrapper.hidden = !canUseOperation;
+		if (op) {
+			op.disabled = !canUseOperation;
+			if (!canUseOperation) op.value = '';
+			syncSearchSelect(op);
+		}
+	}
+	function populateAuditWorkOperations() {
+		var select = qs('audit-work-operation-filter');
+		if (!select) return;
+		select.innerHTML = operationOptionsHtml();
+		syncSearchSelect(select);
+	}
+	function loadWorkOperations() {
+		return fetchJson('/api/work-operations', { errorDefault: '업무 운영 목록을 불러오지 못했습니다.' })
+			.then(function (data) {
+				state.workOperations = data.items || data.rows || [];
+				populateAuditWorkOperations();
+			})
+			.catch(function () {
+				state.workOperations = [];
+				populateAuditWorkOperations();
+			});
 	}
 	function fetchJson(url, options) {
 		var opts = options || {};
@@ -84,6 +192,7 @@
 		return !!(document.querySelector('#system-message-modal.show') ||
 			document.querySelector('#system-delete-modal.show') ||
 			document.querySelector('#audit-activity-modal.show') ||
+			document.querySelector('#audit-risk-policy-modal.show') ||
 			document.querySelector('#agent-map-modal.show') ||
 			document.querySelector('#agent-pc-download-modal.show'));
 	}
@@ -129,6 +238,465 @@
 	}
 	function accessInfo(row) {
 		return row.access_info || row.primary_access_info || row.resource_url || row.host_address || '-';
+	}
+	function auditDate(row) {
+		var value = row && (row.occurred_at || row.created_at || row.accessed_at || row.started_at || row.event_time || row.updated_at);
+		var date = value ? new Date(value) : null;
+		return date && !isNaN(date.getTime()) ? date : null;
+	}
+	function loadRiskIpBlocklist() { return []; }
+	function saveRiskIpBlocklist() {}
+	function groupRiskPolicies(rows) {
+		var grouped = { overseas: [], night: [], blocked: [], privilege: [], unauthorized: [], blacklist: [] };
+		(rows || []).forEach(function (row) {
+			var type = row.policy_type || row.type || '';
+			if (!grouped[type]) grouped[type] = [];
+			grouped[type].push(row);
+		});
+		return grouped;
+	}
+	function loadRiskPolicies() {
+		return fetchJson('/api/access-control/risk-policies')
+			.then(function (data) {
+				state.riskPolicyRows = data.rows || [];
+				state.riskPolicies = groupRiskPolicies(state.riskPolicyRows);
+				state.riskIpBlocklist = (state.riskPolicies.blacklist || []).map(function (row) { return row.match_value || ''; }).filter(Boolean);
+				return state.riskPolicies;
+			});
+	}
+	function createRiskPolicy(payload) {
+		return fetchJson('/api/access-control/risk-policies', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload || {})
+		});
+	}
+	function updateRiskPolicy(id, payload) {
+		return fetchJson('/api/access-control/risk-policies/' + encodeURIComponent(id), {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload || {})
+		});
+	}
+	function deleteRiskPolicy(id) {
+		return fetchJson('/api/access-control/risk-policies/' + encodeURIComponent(id) + '/delete', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: '{}'
+		});
+	}
+	function ipMatchesPolicy(ip, policy) {
+		ip = String(ip || '').trim();
+		policy = String(policy || '').trim();
+		if (!ip || !policy) return false;
+		if (policy.indexOf('*') >= 0) return ip.indexOf(policy.replace(/\*/g, '')) === 0;
+		if (policy.indexOf('/') >= 0) return ip.indexOf(policy.split('/')[0].replace(/\.\d+$/, '.')) === 0;
+		return ip === policy;
+	}
+	function riskInfo(row) {
+		if (row && (row.risk_type || row.risk_label)) {
+			return { type: row.risk_type || '', label: row.risk_label || '' };
+		}
+		var text = [
+			row && row.risk_reason,
+			row && row.reason,
+			row && row.description,
+			row && row.details,
+			row && row.note,
+			row && row.ip_address,
+			row && row.country
+		].join(' ').toLowerCase();
+		var result = String(row && (row.action_result || row.result || row.connection_result || row.outcome || row.status) || '').toLowerCase();
+		var hourDate = auditDate(row);
+		var hour = hourDate ? hourDate.getHours() : -1;
+		var ip = String(row && row.ip_address || '').trim();
+		var matchedPolicy = (state.riskIpBlocklist || []).some(function (policy) { return ipMatchesPolicy(ip, policy); });
+		var policies = state.riskPolicies || loadRiskPolicies();
+		function hasPolicy(type) {
+			return (policies[type] || []).some(function (item) {
+				item = String(item || '').trim().toLowerCase();
+				return item && text.indexOf(item) >= 0;
+			});
+		}
+		if (matchedPolicy) return { type: 'blacklist', label: '차단 IP' };
+		if (hasPolicy('overseas') || text.indexOf('foreign') >= 0 || text.indexOf('oversea') >= 0 || text.indexOf('국외') >= 0 || text.indexOf('해외') >= 0) return { type: 'overseas', label: '해외 접속' };
+		if (hasPolicy('night') || (hour >= 0 && hour < 6)) return { type: 'night', label: '새벽 접속' };
+		if (hasPolicy('blocked') || result.indexOf('fail') >= 0 || result.indexOf('block') >= 0 || result.indexOf('deny') >= 0 || result.indexOf('실패') >= 0 || result.indexOf('차단') >= 0) return { type: 'blocked', label: '차단/실패' };
+		if (hasPolicy('privilege') || text.indexOf('privilege') >= 0 || text.indexOf('admin') >= 0 || text.indexOf('권한') >= 0 || text.indexOf('관리자') >= 0) return { type: 'privilege', label: '관리자/권한 상승' };
+		if (hasPolicy('unauthorized') || text.indexOf('unauthorized') >= 0 || text.indexOf('비인가') >= 0) return { type: 'unauthorized', label: '비인가 접근' };
+		return null;
+	}
+	function riskFilteredRows(rows) {
+		return (rows || []).map(function (row) {
+			var info = riskInfo(row);
+			return info ? Object.assign({}, row, { _risk_type: info.type, _risk_label: info.label }) : null;
+		}).filter(function (row) {
+			return row && (!state.riskType || row._risk_type === state.riskType);
+		});
+	}
+	function renderRiskIpList() {
+		var box = qs('audit-risk-ip-list');
+		if (!box) return;
+		if (!state.riskIpBlocklist.length) {
+			box.innerHTML = '<span class="audit-risk-ip-empty">등록된 차단 IP가 없습니다.</span>';
+			return;
+		}
+		box.innerHTML = state.riskIpBlocklist.map(function (ip) {
+			return '<button type="button" class="audit-risk-ip-chip" data-risk-ip="' + esc(ip) + '">' + esc(ip) + '<span aria-hidden="true">×</span></button>';
+		}).join('');
+	}
+	function riskPolicyLabel(type) {
+		return ({
+			overseas: '해외 접속',
+			night: '새벽 접속',
+			blocked: '차단/실패',
+			privilege: '관리자/권한 상승',
+			unauthorized: '비인가 접근',
+			blacklist: '차단 IP'
+		})[type] || '해외 접속';
+	}
+	function riskPolicyPlaceholder(type) {
+		return ({
+			overseas: '국가 코드 또는 국가명 입력',
+			night: '예: 00:00-06:00',
+			blocked: '차단/실패 판단 키워드 입력',
+			privilege: '관리자/권한 상승 키워드 입력',
+			unauthorized: '비인가 접근 키워드 입력',
+			blacklist: 'IP 또는 CIDR 대역 입력'
+		})[type] || '기준 입력';
+	}
+	function riskPolicyGuide(type) {
+		return ({
+			overseas: '국가 코드 2자리(CN, RU 등) 또는 국가명을 등록합니다. 감사 로그의 국가/국가코드 필드와 매칭됩니다.',
+			night: '00:00-06:00 형식으로 등록합니다. 감사 로그 발생 시간 기준으로 탐지합니다.',
+			blocked: '실패, 차단, 거부 등 2자 이상 키워드를 등록합니다. 결과/사유/메모 텍스트와 매칭됩니다.',
+			privilege: '관리자, root, sudo 등 2자 이상 키워드를 등록합니다. 사용자/사유/메모 텍스트와 매칭됩니다.',
+			unauthorized: '비인가, 미승인, 권한 없음 등 2자 이상 키워드를 등록합니다.',
+			blacklist: 'IP 또는 CIDR 형식으로 등록합니다. 예: 192.0.2.10, 192.0.2.0/24'
+		})[type] || '탭 유형에 맞는 기준 값을 등록합니다.';
+	}
+	function riskPolicyMatchMode(type) {
+		return ({
+			overseas: 'country',
+			night: 'time_range',
+			blacklist: 'ip_cidr'
+		})[type] || 'keyword';
+	}
+	function validateRiskPolicyValue(type, value) {
+		value = String(value || '').trim();
+		if (!value) return { ok: false, message: '기준 값을 입력하세요.' };
+		if (type === 'overseas') {
+			if (/^[A-Za-z]{2}$/.test(value)) return { ok: true, value: value.toUpperCase() };
+			if (/^[A-Za-z가-힣][A-Za-z가-힣 ._-]{1,49}$/.test(value)) return { ok: true, value: value };
+			return { ok: false, message: '해외 접속 기준은 CN, RU 같은 국가 코드 2자리 또는 국가명을 입력하세요.' };
+		}
+		if (type === 'night') {
+			if (/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]|24):[0-5]\d$/.test(value)) return { ok: true, value: value };
+			return { ok: false, message: '새벽 접속 기준은 00:00-06:00 형식으로 입력하세요.' };
+		}
+		if (type === 'blacklist') {
+			var ip = '(25[0-5]|2[0-4]\\d|1?\\d?\\d)';
+			var cidr = new RegExp('^' + ip + '\\.' + ip + '\\.' + ip + '\\.' + ip + '(\\/(3[0-2]|[12]?\\d))?$');
+			if (cidr.test(value)) return { ok: true, value: value };
+			return { ok: false, message: '차단 IP는 192.0.2.10 또는 192.0.2.0/24 형식으로 입력하세요.' };
+		}
+		if (value.length < 2) return { ok: false, message: '키워드는 2자 이상 입력하세요.' };
+		if (value.length > 100) return { ok: false, message: '기준 값은 100자 이하로 입력하세요.' };
+		return { ok: true, value: value };
+	}
+	function setRiskPolicyHelp(message, isError) {
+		var form = document.querySelector('.audit-risk-policy-form');
+		if (!form) return;
+		var help = qs('audit-risk-policy-help');
+		if (!help) {
+			help = document.createElement('div');
+			help.id = 'audit-risk-policy-help';
+			help.className = 'audit-risk-policy-help';
+			form.insertAdjacentElement('afterend', help);
+		}
+		help.textContent = message || '';
+		help.classList.toggle('is-error', !!isError);
+	}
+	function riskPolicyEditorHtml(type) {
+		var addButton = '<button type="button" id="audit-risk-policy-add" class="header-btn audit-risk-policy-add" title="등록" aria-label="등록" onclick="window.__accessAuditRiskAddPolicyItem && window.__accessAuditRiskAddPolicyItem()"><img src="/static/image/svg/list/free-icon-plus.svg" alt="" class="header-icon" aria-hidden="true"></button>';
+		if (type === 'night') {
+			return '<select id="audit-risk-policy-input" class="audit-risk-policy-select audit-risk-policy-time-select" aria-label="새벽 접속 시간 범위 선택">' +
+				'<option value="00:00-06:00">00:00 - 06:00</option>' +
+				'<option value="22:00-06:00">22:00 - 06:00</option>' +
+				'<option value="23:00-05:00">23:00 - 05:00</option>' +
+				'<option value="01:00-05:00">01:00 - 05:00</option>' +
+				'<option value="02:00-06:00">02:00 - 06:00</option>' +
+			'</select>' + addButton;
+		}
+		if (type === 'overseas') {
+			return '<select id="audit-risk-policy-input" class="audit-risk-policy-select" aria-label="해외 접속 국가 선택">' +
+				'<option value="CN">중국 (CN)</option>' +
+				'<option value="RU">러시아 (RU)</option>' +
+				'<option value="KP">북한 (KP)</option>' +
+				'<option value="IR">이란 (IR)</option>' +
+				'<option value="VN">베트남 (VN)</option>' +
+				'<option value="US">미국 (US)</option>' +
+				'<option value="JP">일본 (JP)</option>' +
+			'</select>' + addButton;
+		}
+		if (type === 'blocked') {
+			return '<select id="audit-risk-policy-input" class="audit-risk-policy-select" aria-label="차단 실패 기준 선택">' +
+				'<option value="실패">실패</option>' +
+				'<option value="차단">차단</option>' +
+				'<option value="거부">거부</option>' +
+				'<option value="접속 실패">접속 실패</option>' +
+				'<option value="정책 차단">정책 차단</option>' +
+			'</select>' + addButton;
+		}
+		if (type === 'privilege') {
+			return '<select id="audit-risk-policy-input" class="audit-risk-policy-select" aria-label="관리자 권한 상승 기준 선택">' +
+				'<option value="관리자">관리자</option>' +
+				'<option value="권한 상승">권한 상승</option>' +
+				'<option value="root">root</option>' +
+				'<option value="sudo">sudo</option>' +
+				'<option value="admin">admin</option>' +
+			'</select>' + addButton;
+		}
+		if (type === 'unauthorized') {
+			return '<select id="audit-risk-policy-input" class="audit-risk-policy-select" aria-label="비인가 접근 기준 선택">' +
+				'<option value="비인가">비인가</option>' +
+				'<option value="미승인">미승인</option>' +
+				'<option value="권한 없음">권한 없음</option>' +
+				'<option value="비인가 자산">비인가 자산</option>' +
+				'<option value="unauthorized">unauthorized</option>' +
+			'</select>' + addButton;
+		}
+		return '<input type="text" id="audit-risk-policy-input" autocomplete="off" placeholder="예: 192.0.2.10 또는 192.0.2.0/24">' + addButton;
+	}
+	function riskPolicyEditorValue(type) {
+		var input = qs('audit-risk-policy-input');
+		return input ? String(input.value || '').trim() : '';
+	}
+	function riskMatchModeLabel(mode) {
+		return ({
+			keyword: '키워드',
+			country: '국가',
+			time_range: '시간 범위',
+			ip_cidr: 'IP/CIDR',
+			exact: '정확 일치'
+		})[mode] || '키워드';
+	}
+	function listRiskPolicyLoading() {
+		var list = qs('audit-risk-policy-items');
+		if (list) list.innerHTML = '<div class="audit-risk-policy-loading">기준 목록을 불러오는 중입니다.</div>';
+	}
+	function renderRiskPolicyModal() {
+		var modal = qs('audit-risk-policy-modal');
+		var tabs = qs('audit-risk-policy-tabs');
+		var list = qs('audit-risk-policy-items');
+		var input = qs('audit-risk-policy-input');
+		var types = ['night', 'blacklist'];
+		var tab = types.indexOf(state.riskPolicyTab) >= 0 ? state.riskPolicyTab : 'night';
+		state.riskPolicyTab = tab;
+		if (!modal || !tabs || !list || !input) return;
+		tabs.innerHTML = types.map(function (type) {
+			return '<button type="button" class="' + (type === tab ? 'active' : '') + '" data-risk-policy-tab="' + type + '">' + riskPolicyLabel(type) + '</button>';
+		}).join('');
+		input.placeholder = riskPolicyPlaceholder(tab);
+		var items = (state.riskPolicies && state.riskPolicies[tab]) || [];
+		list.innerHTML =
+			'<table class="audit-risk-policy-table">' +
+				'<thead><tr><th>유형</th><th>기준 값</th><th>판정 방식</th><th>상태</th><th></th></tr></thead>' +
+				'<tbody>' +
+					(items.length ? items.map(function (item) {
+						return '<tr>' +
+							'<td>' + esc(item.policy_label || riskPolicyLabel(item.policy_type || tab)) + '</td>' +
+							'<td><span class="audit-risk-policy-value">' + esc(item.match_value || '') + '</span></td>' +
+							'<td>' + esc(riskMatchModeLabel(item.match_mode || 'keyword')) + '</td>' +
+							'<td><span class="audit-risk-policy-state ' + (item.active ? 'active' : '') + '">' + (item.active ? '사용' : '중지') + '</span></td>' +
+							'<td><button type="button" class="audit-risk-policy-delete" data-risk-policy-id="' + esc(item.id || '') + '">삭제</button></td>' +
+						'</tr>';
+					}).join('') : '<tr><td colspan="5" class="audit-risk-policy-empty">등록된 기준이 없습니다.</td></tr>') +
+				'</tbody>' +
+			'</table>';
+	}
+	function renderRiskPolicyModal() {
+		var modal = qs('audit-risk-policy-modal');
+		var tabs = qs('audit-risk-policy-tabs');
+		var list = qs('audit-risk-policy-items');
+		var input = qs('audit-risk-policy-input');
+		var types = ['night', 'blacklist'];
+		var tab = types.indexOf(state.riskPolicyTab) >= 0 ? state.riskPolicyTab : 'night';
+		state.riskPolicyTab = tab;
+		if (!modal || !tabs || !list || !input) return;
+		tabs.innerHTML = types.map(function (type) {
+			return '<button type="button" class="' + (type === tab ? 'active' : '') + '" data-risk-policy-tab="' + type + '">' + riskPolicyLabel(type) + '</button>';
+		}).join('');
+		input.placeholder = riskPolicyPlaceholder(tab);
+		var items = (state.riskPolicies && state.riskPolicies[tab]) || [];
+		list.innerHTML =
+			'<table class="audit-risk-policy-table">' +
+				'<thead><tr>' +
+					'<th class="audit-risk-policy-check"><input type="checkbox" id="audit-risk-policy-check-all" aria-label="전체 선택"></th>' +
+					'<th>유형</th><th>기준 값</th><th>판정 방식</th><th>상태</th><th></th>' +
+				'</tr></thead>' +
+				'<tbody>' +
+					(items.length ? items.map(function (item) {
+						var active = item.active !== false;
+						return '<tr>' +
+							'<td class="audit-risk-policy-check"><input type="checkbox" class="audit-risk-policy-row-check" data-risk-policy-check="' + esc(item.id || '') + '" aria-label="기준 선택"></td>' +
+							'<td>' + esc(item.policy_label || riskPolicyLabel(item.policy_type || tab)) + '</td>' +
+							'<td><span class="audit-risk-policy-value">' + esc(item.match_value || '') + '</span></td>' +
+							'<td>' + esc(riskMatchModeLabel(item.match_mode || 'keyword')) + '</td>' +
+							'<td><button type="button" class="audit-risk-policy-state ' + (active ? 'active' : '') + '" data-risk-policy-toggle="' + esc(item.id || '') + '" data-risk-policy-active="' + (active ? '1' : '0') + '" aria-label="상태 변경"><span class="audit-risk-policy-state-dot"></span><span>' + (active ? '사용' : '중지') + '</span></button></td>' +
+							'<td><button type="button" class="audit-risk-policy-delete" data-risk-policy-id="' + esc(item.id || '') + '" aria-label="삭제"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 8v7h2v-7h-2Zm4 0v7h2v-7h-2ZM7 9h10l-.7 11H7.7L7 9Z"/></svg></button></td>' +
+						'</tr>';
+					}).join('') : '<tr><td colspan="6" class="audit-risk-policy-empty">등록된 기준이 없습니다.</td></tr>') +
+				'</tbody>' +
+			'</table>';
+	}
+	function renderRiskPolicyModal() {
+		var modal = qs('audit-risk-policy-modal');
+		var tabs = qs('audit-risk-policy-tabs');
+		var list = qs('audit-risk-policy-items');
+		var form = document.querySelector('.audit-risk-policy-form');
+		var types = ['night', 'blacklist'];
+		var tab = types.indexOf(state.riskPolicyTab) >= 0 ? state.riskPolicyTab : 'night';
+		state.riskPolicyTab = tab;
+		if (!modal || !tabs || !list || !form) return;
+		tabs.innerHTML = types.map(function (type) {
+			return '<button type="button" class="' + (type === tab ? 'active' : '') + '" data-risk-policy-tab="' + type + '">' + riskPolicyLabel(type) + '</button>';
+		}).join('');
+		form.innerHTML = riskPolicyEditorHtml(tab);
+		setRiskPolicyHelp(riskPolicyGuide(tab), false);
+		var items = (state.riskPolicies && state.riskPolicies[tab]) || [];
+		list.innerHTML =
+			'<table class="audit-risk-policy-table">' +
+				'<thead><tr>' +
+					'<th class="audit-risk-policy-check"><input type="checkbox" id="audit-risk-policy-check-all" aria-label="전체 선택"></th>' +
+					'<th>유형</th><th>기준 값</th><th>판정 방식</th><th>상태</th><th></th>' +
+				'</tr></thead>' +
+				'<tbody>' +
+					(items.length ? items.map(function (item) {
+						var active = item.active !== false;
+						return '<tr>' +
+							'<td class="audit-risk-policy-check"><input type="checkbox" class="audit-risk-policy-row-check" data-risk-policy-check="' + esc(item.id || '') + '" aria-label="기준 선택"></td>' +
+							'<td>' + esc(item.policy_label || riskPolicyLabel(item.policy_type || tab)) + '</td>' +
+							'<td><span class="audit-risk-policy-value">' + esc(item.match_value || '') + '</span></td>' +
+							'<td>' + esc(riskMatchModeLabel(item.match_mode || 'keyword')) + '</td>' +
+							'<td><button type="button" class="audit-risk-policy-state status-pill" data-risk-policy-toggle="' + esc(item.id || '') + '" data-risk-policy-active="' + (active ? '1' : '0') + '" aria-label="상태 변경"><span class="status-dot ' + (active ? 'ws-run' : 'ws-wait') + '" aria-hidden="true"></span><span class="status-text">' + (active ? '사용' : '중지') + '</span></button></td>' +
+							'<td><button type="button" class="action-btn audit-risk-policy-delete" data-action="delete" data-risk-policy-id="' + esc(item.id || '') + '" title="삭제" aria-label="삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="action-icon" aria-hidden="true"></button></td>' +
+						'</tr>';
+					}).join('') : '<tr><td colspan="6" class="audit-risk-policy-empty">등록된 기준이 없습니다.</td></tr>') +
+				'</tbody>' +
+			'</table>';
+	}
+	function openRiskPolicyModal() {
+		var modal = qs('audit-risk-policy-modal');
+		if (!modal) return;
+		document.body.classList.add('modal-open');
+		modal.classList.add('show');
+		modal.setAttribute('aria-hidden', 'false');
+		listRiskPolicyLoading();
+		loadRiskPolicies().then(function () {
+			renderRiskPolicyModal();
+		}).catch(function (err) {
+			showAuditMessage(err.message || '위험 접근 기준을 불러오지 못했습니다.', '안내');
+		});
+	}
+	function closeRiskPolicyModal() {
+		var modal = qs('audit-risk-policy-modal');
+		if (!modal) return;
+		modal.classList.remove('show');
+		modal.setAttribute('aria-hidden', 'true');
+		if (!auditModalsPreventBodyUnlock()) document.body.classList.remove('modal-open');
+	}
+	function addRiskPolicyItem() {
+		var tab = state.riskPolicyTab || 'overseas';
+		var input = qs('audit-risk-policy-input') || qs('audit-risk-policy-start-time');
+		var value = riskPolicyEditorValue(tab);
+		var checked = validateRiskPolicyValue(tab, value);
+		if (!checked.ok) {
+			if (input) input.classList.add('is-invalid');
+			setRiskPolicyHelp(checked.message, true);
+			return;
+		}
+		if (input) input.classList.remove('is-invalid');
+		createRiskPolicy({ policy_type: tab, match_value: checked.value, match_mode: riskPolicyMatchMode(tab) }).then(function () {
+			if (tab === 'blacklist' && qs('audit-risk-policy-input')) qs('audit-risk-policy-input').value = '';
+			return loadRiskPolicies();
+		}).then(function () {
+			renderRiskPolicyModal();
+			if (state.scope === 'risk') loadRows(true);
+		}).catch(function (err) {
+			if (input) input.classList.add('is-invalid');
+			setRiskPolicyHelp(err.message || '위험 접근 기준을 등록하지 못했습니다.', true);
+		});
+	}
+	window.__accessAuditRiskAddPolicyItem = addRiskPolicyItem;
+	function addRiskIpPolicy() {
+		var input = qs('audit-risk-ip-input');
+		var value = input ? String(input.value || '').trim() : '';
+		if (!value) return;
+		if (state.riskIpBlocklist.indexOf(value) < 0) state.riskIpBlocklist.push(value);
+		if (input) input.value = '';
+		saveRiskIpBlocklist();
+		renderRiskIpList();
+		if (state.scope === 'risk') loadRows(true);
+	}
+	window.__accessAuditRiskAddIp = addRiskIpPolicy;
+	function ensureRiskAuditUi() {
+		var tabs = document.querySelector('.audit-tabs');
+		var agentTab = qs('audit-tab-agent');
+		if (tabs && !qs('audit-tab-risk')) {
+			var riskTab = document.createElement('button');
+			riskTab.type = 'button';
+			riskTab.className = 'system-tab-btn';
+			riskTab.setAttribute('role', 'tab');
+			riskTab.setAttribute('aria-selected', 'false');
+			riskTab.id = 'audit-tab-risk';
+			riskTab.setAttribute('data-audit-scope', 'risk');
+			riskTab.setAttribute('aria-controls', 'audit-list-pane');
+			riskTab.textContent = '위험 접근';
+			tabs.insertBefore(riskTab, agentTab || null);
+		}
+		var pane = qs('audit-list-pane');
+		var tableWrap = qs('audit-table-wrap');
+		if (pane && tableWrap && !qs('audit-risk-policy')) {
+			var policy = document.createElement('div');
+			policy.className = 'audit-risk-policy';
+			policy.id = 'audit-risk-policy';
+			policy.hidden = true;
+			policy.innerHTML =
+				'<button type="button" class="audit-risk-policy-open" id="audit-risk-policy-open">위험 접근 기준</button>';
+			pane.insertBefore(policy, tableWrap);
+		}
+		var toolbar = document.querySelector('.audit-toolbar');
+		var resetBtn = qs('audit-reset-btn');
+		if (toolbar && !qs('audit-risk-policy-toolbar-open')) {
+			var policyBtn = document.createElement('button');
+			policyBtn.type = 'button';
+			policyBtn.className = 'header-btn audit-risk-policy-toolbar-open';
+			policyBtn.id = 'audit-risk-policy-toolbar-open';
+			policyBtn.hidden = state.scope !== 'risk';
+			policyBtn.title = '위험 접근 기준';
+			policyBtn.setAttribute('aria-label', '위험 접근 기준');
+			policyBtn.innerHTML = '<img src="/static/image/svg/free-icon-font-insurance.svg" alt="" class="header-icon" aria-hidden="true">';
+			toolbar.insertBefore(policyBtn, resetBtn || null);
+		}
+		if (!qs('audit-risk-policy-modal')) {
+			var modal = document.createElement('div');
+			modal.className = 'modal-overlay-full audit-risk-policy-modal';
+			modal.id = 'audit-risk-policy-modal';
+			modal.setAttribute('aria-hidden', 'true');
+			modal.setAttribute('role', 'dialog');
+			modal.setAttribute('aria-modal', 'true');
+			modal.innerHTML =
+				'<div class="audit-risk-policy-dialog" role="document">' +
+					'<div class="audit-risk-policy-header"><div><h2>위험 접근 기준</h2><p>유형별 탐지 기준과 차단 IP를 등록합니다.</p></div><button type="button" id="audit-risk-policy-close" aria-label="닫기">×</button></div>' +
+					'<div class="audit-risk-policy-tabs" id="audit-risk-policy-tabs"></div>' +
+					'<div class="audit-risk-policy-form"><input type="text" id="audit-risk-policy-input" autocomplete="off"><button type="button" id="audit-risk-policy-add" onclick="window.__accessAuditRiskAddPolicyItem && window.__accessAuditRiskAddPolicyItem()">등록</button></div>' +
+					'<div class="audit-risk-policy-items" id="audit-risk-policy-items"></div>' +
+				'</div>';
+			document.body.appendChild(modal);
+		}
+		state.riskPolicies = {};
+		state.riskIpBlocklist = [];
 	}
 	function actorDeptText(row) {
 		var d = (row && row.actor_department != null ? String(row.actor_department) : '').trim();
@@ -194,30 +762,46 @@
 	}
 	function buildQuery() {
 		var params = new URLSearchParams();
-		[
-			['audit_scope', 'access'],
+		var baseFilters = [
 			['keyword', qs('audit-keyword-filter').value],
+			['category', qs('audit-category-filter') ? qs('audit-category-filter').value : ''],
+			['category_detail', qs('audit-category-detail-filter') ? qs('audit-category-detail-filter').value : ''],
+			['work_operation_code', state.scope === 'risk' ? '' : (qs('audit-work-operation-filter') ? qs('audit-work-operation-filter').value : '')],
 			['from_date', qs('audit-from-date').value],
 			['to_date', qs('audit-to-date').value]
-		].forEach(function (pair) {
+		];
+		if (state.scope !== 'risk') baseFilters.unshift(['audit_scope', 'access']);
+		baseFilters.forEach(function (pair) {
 			var value = String(pair[1] || '').trim();
 			if (value) params.set(pair[0], value);
 		});
 		params.set('page', String(state.page));
 		params.set('page_size', String(state.pageSize));
+		if (state.scope === 'risk') {
+			params.set('risk', '1');
+			if (state.riskType) params.set('risk_type', state.riskType);
+		}
 		return params.toString();
 	}
 	function buildExportQuery() {
 		var params = new URLSearchParams();
-		[
-			['audit_scope', 'access'],
+		var baseFilters = [
 			['keyword', qs('audit-keyword-filter').value],
+			['category', qs('audit-category-filter') ? qs('audit-category-filter').value : ''],
+			['category_detail', qs('audit-category-detail-filter') ? qs('audit-category-detail-filter').value : ''],
+			['work_operation_code', state.scope === 'risk' ? '' : (qs('audit-work-operation-filter') ? qs('audit-work-operation-filter').value : '')],
 			['from_date', qs('audit-from-date').value],
 			['to_date', qs('audit-to-date').value]
-		].forEach(function (pair) {
+		];
+		if (state.scope !== 'risk') baseFilters.unshift(['audit_scope', 'access']);
+		baseFilters.forEach(function (pair) {
 			var value = String(pair[1] || '').trim();
 			if (value) params.set(pair[0], value);
 		});
+		if (state.scope === 'risk') {
+			params.set('risk', '1');
+			if (state.riskType) params.set('risk_type', state.riskType);
+		}
 		params.set('export', '1');
 		params.set('page', '1');
 		params.set('page_size', '5000');
@@ -261,7 +845,7 @@
 				var s = String(v).replace(/"/g, '""');
 				return /[",\r\n]/.test(s) ? '"' + s + '"' : s;
 			}
-			var headers = ['접속 일시', '종료 일시', '유형', '작업', '결과', '실패 사유', '부서', '사번', '사용자', '자원 이름', '접속 계정', '행위 이력', '접속 URL/IP', '접속 IP'];
+			var headers = ['접속 일시', '종료 일시', '유형', '분류', '업무 운영', '작업', '결과', '실패 사유', '부서', '사번', '사용자', '자원 이름', '접속 계정', '행위 이력', '접속 URL/IP', '접속 IP'];
 			var lines = [headers.join(',')];
 			rows.forEach(function (row) {
 				var resource = row.resource_name || (row.target_resource_id ? ('자원 #' + row.target_resource_id) : '-');
@@ -269,6 +853,8 @@
 					formatDateTime(row.occurred_at),
 					formatDateTime(row.session_ended_at),
 					normalizeKind(row) || '',
+					categoryPath(row),
+					workOperationLabel(row),
 					row.action_type || '',
 					row.action_result || '',
 					row.note || '',
@@ -310,7 +896,7 @@
 		var titleEl = qs('audit-current-title');
 		var next = state.total || 0;
 		var prev;
-		if (titleEl) titleEl.textContent = scopeTitle(state.scope);
+		if (titleEl) titleEl.textContent = state.scope === 'risk' ? '위험 접근' : scopeTitle(state.scope);
 		if (!countEl) return;
 		prev = parseInt(countEl.getAttribute('data-count') || countEl.textContent || '0', 10) || 0;
 		countEl.textContent = String(next);
@@ -352,7 +938,7 @@
 	}
 	function renderPagination() {
 		var pages = totalPages();
-		if (!state.total) qs('audit-page-info').textContent = '0개 항목';
+		if (!state.total) qs('audit-page-info').textContent = '0-0 / 0개 항목';
 		else {
 			var start = (state.page - 1) * state.pageSize + 1;
 			var end = Math.min(state.total, state.page * state.pageSize);
@@ -368,6 +954,8 @@
 		var body = qs('audit-table-body');
 		var tableWrap = qs('audit-table-wrap');
 		var empty = qs('audit-empty');
+		var table = qs('audit-table');
+		if (table) table.classList.toggle('audit-table-risk-mode', state.scope === 'risk');
 		setCount();
 		if (!state.rows.length) {
 			body.innerHTML = '';
@@ -386,6 +974,9 @@
 				'<td class="audit-col-access-start">' + esc(formatDateTime(row.occurred_at)) + '</td>' +
 				'<td class="audit-col-session-end">' + esc(formatDateTime(row.session_ended_at)) + '</td>' +
 				'<td class="audit-col-kind">' + kindCell(row) + '</td>' +
+				'<td class="audit-col-category"><span class="audit-cell-ellipsis">' + esc(categoryPath(row)) + '</span></td>' +
+				'<td class="audit-col-operation"><span class="audit-cell-ellipsis">' + esc(workOperationLabel(row) || '-') + '</span></td>' +
+				'<td class="audit-col-risk-reason"><span class="audit-risk-reason">' + esc(riskReasonLabel(row)) + '</span></td>' +
 				'<td class="audit-col-action"><span class="audit-dot-label ' + actionClass(row.action_type) + '">' + esc(row.action_type || '-') + '</span></td>' +
 				'<td class="audit-col-result"><span class="audit-dot-label ' + resultClass(row.action_result) + '">' + esc(row.action_result || '-') + '</span></td>' +
 				'<td class="audit-col-fail-reason"><span class="audit-cell-ellipsis" title="' + esc(row.note || '') + '">' + esc(row.note || '-') + '</span></td>' +
@@ -433,10 +1024,17 @@
 		setLoading('감사 기록을 불러오는 중입니다.');
 		setSearchLoading(true);
 		return fetchJson('/api/access-control/audit-logs' + (query ? '?' + query : '')).then(function (data) {
-			state.rows = data.rows || [];
-			state.total = data.total || 0;
-			state.page = data.page || state.page;
-			state.pageSize = safePageSize(data.page_size || state.pageSize);
+			var rows = data.rows || [];
+			if (state.scope === 'risk') {
+				state.rows = rows;
+				state.total = data.total || 0;
+				state.page = data.page || state.page;
+			} else {
+				state.rows = rows;
+				state.total = data.total || 0;
+				state.page = data.page || state.page;
+			}
+			if (state.scope !== 'risk') state.pageSize = safePageSize(data.page_size || state.pageSize);
 			if (qs('audit-page-size')) qs('audit-page-size').value = String(state.pageSize);
 			setSearchLoading(false);
 			renderRows();
@@ -713,7 +1311,7 @@
 		var pages = agentTotalPages();
 		var info = qs('agent-page-info');
 		if (info) {
-			if (!state.agentTotal) info.textContent = '0개 항목';
+			if (!state.agentTotal) info.textContent = '0-0 / 0개 항목';
 			else {
 				var start = (state.agentPage - 1) * state.agentPageSize + 1;
 				var end = Math.min(state.agentTotal, state.agentPage * state.agentPageSize);
@@ -1202,7 +1800,7 @@
 		if (!mapWrap.classList.contains('agent-filter-selector')) return;
 		pgWrap.style.width = '';
 		mapWrap.style.flex = '0 0 auto';
-		var w = pgWrap.offsetWidth;
+		var w = Math.max(pgWrap.offsetWidth || 0, 112);
 		if (!w) {
 			scheduleAgentMappingSelectWidthSync();
 			return;
@@ -1220,35 +1818,453 @@
 		setAgentSearchClearVisible();
 		loadAgents(true);
 	}
+	function requestMeta(item) {
+		var reason = String((item && item.reason) || '');
+		var idMatch = reason.match(/\[신청 ID\]\s*([^\n]+)/);
+		var typeMatch = reason.match(/\[신청 유형\]\s*([^\n]+)/);
+		return {
+			requestedId: idMatch ? idMatch[1].trim().replace(/\s+/g, '_') : '',
+			systemAction: typeMatch ? typeMatch[1].trim() : ''
+		};
+	}
+	function paymentCategoryAndAction(item) {
+		var meta = requestMeta(item);
+		var action = meta.systemAction || '';
+		var parts = action.split(/\s*-\s*/);
+		if (parts.length >= 2) {
+			return {
+				category: parts.shift().trim() || '-',
+				action: parts.join(' - ').trim() || '-'
+			};
+		}
+		return {
+			category: item.request_type_label || (item.request_type === '삭제' ? '삭제 신청' : '사용 신청'),
+			action: action || '-'
+		};
+	}
+	function paymentStageText(row) {
+		var phase = row.current_approval_phase || {};
+		return phase.phase_name || row.current_approval_phase_name || row.approval_status || '-';
+	}
+	function paymentSearchText(row) {
+		var ca = paymentCategoryAndAction(row);
+		return [
+			row.request_no,
+			row.request_status,
+			row.approval_status,
+			row.requester_name,
+			row.requester_emp_no,
+			row.approver_name,
+			row.approver_emp_no,
+			ca.category,
+			ca.action,
+			(row.items || []).map(function (item) { return item.resource_name || item.resource_url || ''; }).join(' ')
+		].join(' ').toLowerCase();
+	}
+	function paymentFilteredRows() {
+		var keyword = String((qs('payment-keyword-filter') || {}).value || '').trim().toLowerCase();
+		var status = String((qs('payment-status-filter') || {}).value || '').trim();
+		var from = String((qs('payment-from-date') || {}).value || '').trim();
+		var to = String((qs('payment-to-date') || {}).value || '').trim();
+		return (state.payments || []).filter(function (row) {
+			var date = String(row.submitted_at || row.created_at || '').slice(0, 10);
+			if (keyword && paymentSearchText(row).indexOf(keyword) < 0) return false;
+			if (status && row.request_status !== status && row.approval_status !== status) return false;
+			if (from && date && date < from) return false;
+			if (to && date && date > to) return false;
+			return true;
+		});
+	}
+	function paymentTotalPages() {
+		return Math.max(1, Math.ceil((state.paymentTotal || 0) / state.paymentPageSize));
+	}
+	function renderPaymentPagination() {
+		var pages = paymentTotalPages();
+		var info = qs('payment-page-info');
+		var box = qs('payment-page-numbers');
+		if (info) {
+			if (!state.paymentTotal) info.textContent = '0-0 / 0개 항목';
+			else {
+				var start = (state.paymentPage - 1) * state.paymentPageSize + 1;
+				var end = Math.min(state.paymentTotal, state.paymentPage * state.paymentPageSize);
+				info.textContent = start + '-' + end + ' / ' + state.paymentTotal + '개 항목';
+			}
+		}
+		if (box) {
+			box.innerHTML = pageNumberList(pages, state.paymentPage).map(function (page) {
+				if (page === '...') return '<span class="page-ellipsis" aria-hidden="true">...</span>';
+				return '<button type="button" class="page-btn' + (page === state.paymentPage ? ' active' : '') + '" data-page="' + page + '">' + page + '</button>';
+			}).join('');
+		}
+		if (qs('payment-first')) qs('payment-first').disabled = state.paymentPage <= 1;
+		if (qs('payment-prev')) qs('payment-prev').disabled = state.paymentPage <= 1;
+		if (qs('payment-next')) qs('payment-next').disabled = state.paymentPage >= pages;
+		if (qs('payment-last')) qs('payment-last').disabled = state.paymentPage >= pages;
+	}
+	function paymentStatusCell(value) {
+		var status = value || '-';
+		var cls = 'payment-status-neutral';
+		if (status === '승인' || status === '부분 승인') cls = 'payment-status-approved';
+		else if (status === '승인대기' || status === '제출') cls = 'payment-status-pending';
+		else if (status === '반려' || status === '취소') cls = 'payment-status-rejected';
+		return '<span class="payment-status ' + cls + '"><span></span>' + esc(status) + '</span>';
+	}
+	function renderPaymentRows() {
+		var body = qs('payment-table-body');
+		var wrap = qs('payment-table-wrap');
+		var empty = qs('payment-empty');
+		var count = qs('payment-count');
+		var rows = paymentFilteredRows();
+		state.paymentRows = rows;
+		state.paymentTotal = rows.length;
+		if (state.paymentPage > paymentTotalPages()) state.paymentPage = paymentTotalPages();
+		if (count) count.textContent = formatNumber(state.paymentTotal);
+		if (!body) return;
+		if (!rows.length) {
+			body.innerHTML = '';
+			if (wrap) wrap.hidden = true;
+			if (empty) empty.hidden = false;
+			renderPaymentPagination();
+			return;
+		}
+		if (wrap) wrap.hidden = false;
+		if (empty) empty.hidden = true;
+		var start = (state.paymentPage - 1) * state.paymentPageSize;
+		body.innerHTML = rows.slice(start, start + state.paymentPageSize).map(function (row) {
+			var ca = paymentCategoryAndAction(row);
+			var resourceCount = row.resource_count || (row.items || []).length || 0;
+			return '<tr>' +
+				'<td class="payment-col-date">' + esc(formatDateTime(row.submitted_at || row.created_at)) + '</td>' +
+				'<td class="payment-col-no"><strong>' + esc(row.request_no || '-') + '</strong><span class="ac-meta">' + esc((row.request_start_date || '-') + ' ~ ' + (row.request_end_date || '-')) + '</span></td>' +
+				'<td class="payment-col-category">' + esc(ca.category) + '</td>' +
+				'<td class="payment-col-action"><span class="audit-cell-ellipsis">' + esc(ca.action) + '</span></td>' +
+				'<td class="payment-col-resource"><strong>' + esc(resourceCount) + '개</strong></td>' +
+				'<td class="payment-col-status">' + paymentStatusCell(row.request_status || row.approval_status || '-') + '</td>' +
+				'<td class="payment-col-stage"><strong>' + esc(paymentStageText(row)) + '</strong></td>' +
+				'<td class="payment-col-requester">' + esc(row.requester_name || '-') + '<span class="ac-meta">' + esc(row.requester_emp_no || '-') + '</span></td>' +
+				'<td class="payment-col-approver">' + esc(row.approver_name || '-') + '<span class="ac-meta">' + esc(row.approver_emp_no || '-') + '</span></td>' +
+				'<td class="payment-col-emergency">' + esc(Number(row.emergency_flag || 0) ? '긴급' : '일반') + '</td>' +
+			'</tr>';
+		}).join('');
+		renderPaymentPagination();
+	}
+	function setPaymentSearchClearVisible() {
+		var input = qs('payment-keyword-filter');
+		var clear = qs('payment-search-clear');
+		if (!input || !clear) return;
+		clear.classList.toggle('visible', !!String(input.value || '').trim());
+	}
+	function loadPayments(resetPage) {
+		if (resetPage) state.paymentPage = 1;
+		var body = qs('payment-table-body');
+		if (body) body.innerHTML = '';
+		if (qs('payment-table-wrap')) qs('payment-table-wrap').hidden = true;
+		if (qs('payment-empty')) qs('payment-empty').hidden = false;
+		if (qs('payment-empty-title')) qs('payment-empty-title').textContent = '결제 기록을 불러오는 중입니다.';
+		return fetchJson('/api/access-control/requests?scope=all', { errorDefault: '결제 기록을 불러오지 못했습니다.' })
+			.then(function (data) {
+				state.payments = data.rows || [];
+				state.paymentLoaded = true;
+				renderPaymentRows();
+			})
+			.catch(function (err) {
+				state.payments = [];
+				state.paymentLoaded = true;
+				if (qs('payment-empty-title')) qs('payment-empty-title').textContent = err.message || '결제 기록을 불러오지 못했습니다.';
+				renderPaymentRows();
+			});
+	}
+	function loadPaymentsDebounced() {
+		if (paymentSearchTimer) window.clearTimeout(paymentSearchTimer);
+		paymentSearchTimer = window.setTimeout(function () {
+			state.paymentPage = 1;
+			renderPaymentRows();
+		}, 180);
+	}
+	function resetPaymentFilters() {
+		if (qs('payment-keyword-filter')) qs('payment-keyword-filter').value = '';
+		if (qs('payment-status-filter')) qs('payment-status-filter').value = '';
+		clearDateField(qs('payment-from-date'));
+		clearDateField(qs('payment-to-date'));
+		setPaymentSearchClearVisible();
+		syncSearchSelect(document);
+		state.paymentPage = 1;
+		renderPaymentRows();
+	}
+	function downloadPaymentCsv() {
+		var rows = state.paymentRows && state.paymentRows.length ? state.paymentRows : paymentFilteredRows();
+		if (!rows.length) {
+			showAuditMessage('내려받을 결제 기록이 없습니다.', '안내');
+			return;
+		}
+		var headers = ['신청일', '신청번호', '신청 구분', '신청 작업', '자원 개수', '상태', '승인 단계', '신청자', '신청자 사번', '승인자', '승인자 사번', '긴급'];
+		var lines = [headers.map(csvCell).join(',')];
+		rows.forEach(function (row) {
+			var ca = paymentCategoryAndAction(row);
+			lines.push([
+				formatDateTime(row.submitted_at || row.created_at),
+				row.request_no || '',
+				ca.category,
+				ca.action,
+				row.resource_count || (row.items || []).length || 0,
+				row.request_status || row.approval_status || '',
+				paymentStageText(row),
+				row.requester_name || '',
+				row.requester_emp_no || '',
+				row.approver_name || '',
+				row.approver_emp_no || '',
+				Number(row.emergency_flag || 0) ? '긴급' : '일반'
+			].map(csvCell).join(','));
+		});
+		var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+		var url = URL.createObjectURL(blob);
+		var a = document.createElement('a');
+		var ts = new Date();
+		function pad(n) { return String(n).padStart(2, '0'); }
+		a.href = url;
+		a.download = 'access_control_payment_' + ts.getFullYear() + pad(ts.getMonth() + 1) + pad(ts.getDate()) + '_' + pad(ts.getHours()) + pad(ts.getMinutes()) + '.csv';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
+	function assetAccessInfo(row) {
+		return row.access_info || row.primary_access_info || row.resource_url || row.host_address || row.primary_url || '-';
+	}
+	function assetCategoryPath(row) {
+		return row.category_path || categoryPath(row);
+	}
+	function assetOperationText(row) {
+		if ((row.category_name || row.category_label || row.category) === '관리콘솔') return row.category_detail || row.console_group || '-';
+		return row.work_operation_name || row.work_operation || row.work_operation_code || '-';
+	}
+	function assetStatusText(row) {
+		return Number(row.active_flag || 0) ? '사용' : '차단';
+	}
+	function assetSearchText(row) {
+		return [
+			row.resource_name,
+			row.resource_url,
+			row.host_address,
+			row.resource_type,
+			assetCategoryPath(row),
+			assetOperationText(row),
+			assetStatusText(row),
+			row.created_by,
+			row.description
+		].join(' ').toLowerCase();
+	}
+	function assetFilteredRows() {
+		var keyword = String((qs('asset-keyword-filter') || {}).value || '').trim().toLowerCase();
+		var category = String((qs('asset-category-filter') || {}).value || '').trim();
+		var status = String((qs('asset-status-filter') || {}).value || '').trim();
+		return (state.assets || []).filter(function (row) {
+			var active = Number(row.active_flag || 0) ? 'active' : 'blocked';
+			if (keyword && assetSearchText(row).indexOf(keyword) < 0) return false;
+			if (category && (row.category_name || row.category_label || row.category) !== category) return false;
+			if (status && active !== status) return false;
+			return true;
+		});
+	}
+	function assetTotalPages() {
+		return Math.max(1, Math.ceil((state.assetTotal || 0) / state.assetPageSize));
+	}
+	function renderAssetPagination() {
+		var pages = assetTotalPages();
+		var info = qs('asset-page-info');
+		var box = qs('asset-page-numbers');
+		if (info) {
+			if (!state.assetTotal) info.textContent = '0-0 / 0개 항목';
+			else {
+				var start = (state.assetPage - 1) * state.assetPageSize + 1;
+				var end = Math.min(state.assetTotal, state.assetPage * state.assetPageSize);
+				info.textContent = start + '-' + end + ' / ' + state.assetTotal + '개 항목';
+			}
+		}
+		if (box) {
+			box.innerHTML = pageNumberList(pages, state.assetPage).map(function (page) {
+				if (page === '...') return '<span class="page-ellipsis" aria-hidden="true">...</span>';
+				return '<button type="button" class="page-btn' + (page === state.assetPage ? ' active' : '') + '" data-page="' + page + '">' + page + '</button>';
+			}).join('');
+		}
+		if (qs('asset-first')) qs('asset-first').disabled = state.assetPage <= 1;
+		if (qs('asset-prev')) qs('asset-prev').disabled = state.assetPage <= 1;
+		if (qs('asset-next')) qs('asset-next').disabled = state.assetPage >= pages;
+		if (qs('asset-last')) qs('asset-last').disabled = state.assetPage >= pages;
+	}
+	function renderAssetRows() {
+		var body = qs('asset-table-body');
+		var wrap = qs('asset-table-wrap');
+		var empty = qs('asset-empty');
+		var count = qs('asset-count');
+		var rows = assetFilteredRows();
+		state.assetRows = rows;
+		state.assetTotal = rows.length;
+		if (state.assetPage > assetTotalPages()) state.assetPage = assetTotalPages();
+		if (count) count.textContent = formatNumber(state.assetTotal);
+		if (!body) return;
+		if (!rows.length) {
+			body.innerHTML = '';
+			if (wrap) wrap.hidden = true;
+			if (empty) empty.hidden = false;
+			renderAssetPagination();
+			return;
+		}
+		if (wrap) wrap.hidden = false;
+		if (empty) empty.hidden = true;
+		var start = (state.assetPage - 1) * state.assetPageSize;
+		body.innerHTML = rows.slice(start, start + state.assetPageSize).map(function (row) {
+			return '<tr>' +
+				'<td class="asset-col-date">' + esc(formatDateTime(row.created_at)) + '</td>' +
+				'<td class="asset-col-category">' + esc(assetCategoryPath(row)) + '</td>' +
+				'<td class="asset-col-kind">' + kindCell(row) + '</td>' +
+				'<td class="asset-col-name"><strong>' + esc(row.resource_name || '-') + '</strong></td>' +
+				'<td class="asset-col-operation"><span class="audit-cell-ellipsis">' + esc(assetOperationText(row)) + '</span></td>' +
+				'<td class="asset-col-access"><span class="audit-access-info">' + esc(assetAccessInfo(row)) + '</span></td>' +
+				'<td class="asset-col-status">' + paymentStatusCell(assetStatusText(row)) + '</td>' +
+				'<td class="asset-col-period">' + esc(row.default_period_days || '-') + '일</td>' +
+				'<td class="asset-col-approval">' + esc(Number(row.approval_required || 0) ? '필요' : '불필요') + '</td>' +
+				'<td class="asset-col-owner">' + esc(row.created_by || '-') + '</td>' +
+			'</tr>';
+		}).join('');
+		renderAssetPagination();
+	}
+	function setAssetSearchClearVisible() {
+		var input = qs('asset-keyword-filter');
+		var clear = qs('asset-search-clear');
+		if (!input || !clear) return;
+		clear.classList.toggle('visible', !!String(input.value || '').trim());
+	}
+	function loadAssets(resetPage) {
+		if (resetPage) state.assetPage = 1;
+		var body = qs('asset-table-body');
+		if (body) body.innerHTML = '';
+		if (qs('asset-table-wrap')) qs('asset-table-wrap').hidden = true;
+		if (qs('asset-empty')) qs('asset-empty').hidden = false;
+		if (qs('asset-empty-title')) qs('asset-empty-title').textContent = '자산 기록을 불러오는 중입니다.';
+		return fetchJson('/api/access-control/resources', { errorDefault: '자산 기록을 불러오지 못했습니다.' })
+			.then(function (data) {
+				state.assets = data.rows || [];
+				state.assetLoaded = true;
+				renderAssetRows();
+			})
+			.catch(function (err) {
+				state.assets = [];
+				state.assetLoaded = true;
+				if (qs('asset-empty-title')) qs('asset-empty-title').textContent = err.message || '자산 기록을 불러오지 못했습니다.';
+				renderAssetRows();
+			});
+	}
+	function loadAssetsDebounced() {
+		if (assetSearchTimer) window.clearTimeout(assetSearchTimer);
+		assetSearchTimer = window.setTimeout(function () {
+			state.assetPage = 1;
+			renderAssetRows();
+		}, 180);
+	}
+	function resetAssetFilters() {
+		if (qs('asset-keyword-filter')) qs('asset-keyword-filter').value = '';
+		if (qs('asset-category-filter')) qs('asset-category-filter').value = '';
+		if (qs('asset-status-filter')) qs('asset-status-filter').value = '';
+		setAssetSearchClearVisible();
+		syncSearchSelect(document);
+		state.assetPage = 1;
+		renderAssetRows();
+	}
+	function downloadAssetCsv() {
+		var rows = state.assetRows && state.assetRows.length ? state.assetRows : assetFilteredRows();
+		if (!rows.length) {
+			showAuditMessage('내려받을 자산 기록이 없습니다.', '안내');
+			return;
+		}
+		var headers = ['등록일', '분류', '유형', '자원명', '업무 운영/장비군', '접속정보', '상태', '기본 기간', '승인', '등록자'];
+		var lines = [headers.map(csvCell).join(',')];
+		rows.forEach(function (row) {
+			lines.push([
+				formatDateTime(row.created_at),
+				assetCategoryPath(row),
+				normalizeKind(row) || row.resource_type || '',
+				row.resource_name || '',
+				assetOperationText(row),
+				assetAccessInfo(row),
+				assetStatusText(row),
+				(row.default_period_days || '') + '일',
+				Number(row.approval_required || 0) ? '필요' : '불필요',
+				row.created_by || ''
+			].map(csvCell).join(','));
+		});
+		var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+		var url = URL.createObjectURL(blob);
+		var a = document.createElement('a');
+		var ts = new Date();
+		function pad(n) { return String(n).padStart(2, '0'); }
+		a.href = url;
+		a.download = 'access_control_asset_' + ts.getFullYear() + pad(ts.getMonth() + 1) + pad(ts.getDate()) + '_' + pad(ts.getHours()) + pad(ts.getMinutes()) + '.csv';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	}
 	function showScope(scope) {
-		var nextScope = scope === 'agent' ? 'agent' : 'access';
+		var nextScope = scope === 'agent' ? 'agent' : (scope === 'payment' ? 'payment' : (scope === 'asset' ? 'asset' : (scope === 'risk' ? 'risk' : 'access')));
 		var accessPane = qs('audit-list-pane');
 		var agentPane = qs('agent-list-pane');
+		var paymentPane = qs('payment-list-pane');
+		var assetPane = qs('asset-list-pane');
+		var opWrapper = qs('audit-work-operation-wrapper');
 		if (nextScope === state.scope) return;
 		state.scope = nextScope;
+		var riskPolicy = qs('audit-risk-policy');
+		if (riskPolicy) riskPolicy.hidden = true;
+		var riskPolicyToolbar = qs('audit-risk-policy-toolbar-open');
+		if (riskPolicyToolbar) riskPolicyToolbar.hidden = state.scope !== 'risk';
 		Array.prototype.forEach.call(document.querySelectorAll('.audit-tabs [data-audit-scope]'), function (tab) {
 			var active = tab.getAttribute('data-audit-scope') === state.scope;
 			tab.classList.toggle('active', active);
 			tab.setAttribute('aria-selected', active ? 'true' : 'false');
 		});
-		if (accessPane) accessPane.hidden = state.scope !== 'access';
+		if (accessPane) accessPane.hidden = !(state.scope === 'access' || state.scope === 'risk');
 		if (agentPane) agentPane.hidden = state.scope !== 'agent';
+		if (paymentPane) paymentPane.hidden = state.scope !== 'payment';
+		if (assetPane) assetPane.hidden = state.scope !== 'asset';
+		syncAuditCategoryDetailFilter();
+		if (opWrapper && state.scope === 'risk') opWrapper.hidden = true;
 		if (state.scope === 'agent') {
 			if (!state.agentLoaded) loadAgents(true);
 			else renderAgentRows();
 			window.requestAnimationFrame(function () {
 				window.requestAnimationFrame(syncAgentMappingFilterToPageSizeSelect);
 			});
+		} else if (state.scope === 'payment') {
+			resetAgentMappingFilterSelectWidth();
+			if (!state.paymentLoaded) loadPayments(true);
+			else renderPaymentRows();
+		} else if (state.scope === 'asset') {
+			resetAgentMappingFilterSelectWidth();
+			if (!state.assetLoaded) loadAssets(true);
+			else renderAssetRows();
+		} else if (state.scope === 'risk') {
+			resetAgentMappingFilterSelectWidth();
+			var riskPolicy = qs('audit-risk-policy');
+			if (riskPolicy) riskPolicy.hidden = true;
+			loadRows(true);
 		} else {
 			resetAgentMappingFilterSelectWidth();
+			var accessRiskPolicy = qs('audit-risk-policy');
+			if (accessRiskPolicy) accessRiskPolicy.hidden = true;
+			syncAuditCategoryDetailFilter();
 			setCount();
 		}
 	}
 	function syncDateConstraints() {
 		var start = qs('audit-from-date');
 		var end = qs('audit-to-date');
+		var paymentStart = qs('payment-from-date');
+		var paymentEnd = qs('payment-to-date');
 		if (start && start._flatpickr) start._flatpickr.set('maxDate', (end && end.value) || null);
 		if (end && end._flatpickr) end._flatpickr.set('minDate', (start && start.value) || null);
+		if (paymentStart && paymentStart._flatpickr) paymentStart._flatpickr.set('maxDate', (paymentEnd && paymentEnd.value) || null);
+		if (paymentEnd && paymentEnd._flatpickr) paymentEnd._flatpickr.set('minDate', (paymentStart && paymentStart.value) || null);
 	}
 	function clearDateField(input) {
 		if (!input) return;
@@ -1291,25 +2307,61 @@
 		};
 		window.flatpickr(start, opts);
 		window.flatpickr(end, opts);
+		if (qs('payment-from-date') && qs('payment-to-date')) {
+			window.flatpickr(qs('payment-from-date'), Object.assign({}, opts, {
+				onChange: function () {
+					syncDateConstraints();
+					state.paymentPage = 1;
+					renderPaymentRows();
+				}
+			}));
+			window.flatpickr(qs('payment-to-date'), Object.assign({}, opts, {
+				onChange: function () {
+					syncDateConstraints();
+					state.paymentPage = 1;
+					renderPaymentRows();
+				}
+			}));
+		}
 	}
 	function resetFilters() {
 		qs('audit-keyword-filter').value = '';
 		setSearchClearVisible();
+		if (qs('audit-category-filter')) qs('audit-category-filter').value = '';
+		if (qs('audit-category-detail-filter')) qs('audit-category-detail-filter').value = '';
+		if (qs('audit-work-operation-filter')) qs('audit-work-operation-filter').value = '';
+		syncAuditCategoryDetailFilter();
+		syncSearchSelect(document);
 		clearDateField(qs('audit-from-date'));
 		clearDateField(qs('audit-to-date'));
 		loadRows(true);
 	}
 	function bindEvents() {
+		ensureRiskAuditUi();
 		var pageSize = qs('audit-page-size');
 		var selectAll = qs('audit-select-all');
 		var keyword = qs('audit-keyword-filter');
 		var clear = qs('audit-search-clear');
+		var auditCategory = qs('audit-category-filter');
+		var auditCategoryDetail = qs('audit-category-detail-filter');
+		var auditWorkOperation = qs('audit-work-operation-filter');
 		var agentPageSize = qs('agent-page-size');
 		var agentKeyword = qs('agent-keyword-filter');
 		var agentClear = qs('agent-search-clear');
 		var agentMapping = qs('agent-mapping-filter');
 		var agentReset = qs('agent-reset-btn');
 		var agentBody = qs('agent-table-body');
+		var paymentKeyword = qs('payment-keyword-filter');
+		var paymentClear = qs('payment-search-clear');
+		var paymentStatus = qs('payment-status-filter');
+		var paymentPageSize = qs('payment-page-size');
+		var paymentReset = qs('payment-reset-btn');
+		var assetKeyword = qs('asset-keyword-filter');
+		var assetClear = qs('asset-search-clear');
+		var assetCategory = qs('asset-category-filter');
+		var assetStatus = qs('asset-status-filter');
+		var assetPageSize = qs('asset-page-size');
+		var assetReset = qs('asset-reset-btn');
 		var modal = qs('agent-map-modal');
 		var userSearch = qs('agent-user-search');
 		var userResults = qs('agent-user-results');
@@ -1351,6 +2403,126 @@
 				loadRows(true);
 			});
 		}
+		if (auditCategory) {
+			auditCategory.addEventListener('change', function () {
+				syncAuditCategoryDetailFilter();
+				loadRows(true);
+			});
+		}
+		if (auditCategoryDetail) {
+			auditCategoryDetail.addEventListener('change', function () { loadRows(true); });
+		}
+		if (auditWorkOperation) {
+			auditWorkOperation.addEventListener('change', function () { loadRows(true); });
+		}
+		if (qs('audit-risk-policy-open')) qs('audit-risk-policy-open').addEventListener('click', openRiskPolicyModal);
+		if (qs('audit-risk-policy-toolbar-open')) qs('audit-risk-policy-toolbar-open').addEventListener('click', openRiskPolicyModal);
+		if (qs('audit-risk-policy-close')) qs('audit-risk-policy-close').addEventListener('click', closeRiskPolicyModal);
+		if (qs('audit-risk-policy-add')) qs('audit-risk-policy-add').addEventListener('click', addRiskPolicyItem);
+		if (qs('audit-risk-policy-input')) {
+			qs('audit-risk-policy-input').addEventListener('keydown', function (event) {
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					addRiskPolicyItem();
+				}
+			});
+		}
+		if (qs('audit-risk-policy-tabs')) {
+			qs('audit-risk-policy-tabs').addEventListener('click', function (event) {
+				var tab = event.target.closest('[data-risk-policy-tab]');
+				if (!tab) return;
+				state.riskPolicyTab = tab.getAttribute('data-risk-policy-tab') || 'overseas';
+				renderRiskPolicyModal();
+			});
+		}
+		if (qs('audit-risk-policy-items')) {
+			qs('audit-risk-policy-items').addEventListener('click', function (event) {
+				var button = event.target.closest('[data-risk-policy-id]');
+				var id = button ? button.getAttribute('data-risk-policy-id') : '';
+				if (!button || !id) return;
+				deleteRiskPolicy(id).then(loadRiskPolicies).then(function () {
+					renderRiskPolicyModal();
+					if (state.scope === 'risk') loadRows(true);
+				}).catch(function (err) {
+					showAuditMessage(err.message || '위험 접근 기준을 삭제하지 못했습니다.', '안내');
+				});
+			});
+		}
+		if (qs('audit-risk-policy-items')) {
+			qs('audit-risk-policy-items').addEventListener('click', function (event) {
+				var toggle = event.target.closest('[data-risk-policy-toggle]');
+				if (!toggle) return;
+				var id = toggle.getAttribute('data-risk-policy-toggle') || '';
+				var nextActive = toggle.getAttribute('data-risk-policy-active') !== '1';
+				if (!id) return;
+				toggle.disabled = true;
+				updateRiskPolicy(id, { active: nextActive }).then(loadRiskPolicies).then(function () {
+					renderRiskPolicyModal();
+					if (state.scope === 'risk') loadRows(true);
+				}).catch(function (err) {
+					showAuditMessage(err.message || '위험 접근 기준 상태를 변경하지 못했습니다.', '안내');
+				});
+			});
+			qs('audit-risk-policy-items').addEventListener('change', function (event) {
+				var all = event.target.closest('#audit-risk-policy-check-all');
+				if (!all) return;
+				Array.prototype.forEach.call(document.querySelectorAll('.audit-risk-policy-row-check'), function (checkbox) {
+					checkbox.checked = all.checked;
+					var row = checkbox.closest('tr');
+					if (row) row.classList.toggle('selected', checkbox.checked);
+				});
+			});
+			qs('audit-risk-policy-items').addEventListener('change', function (event) {
+				var checkbox = event.target.closest('.audit-risk-policy-row-check');
+				if (!checkbox) return;
+				var row = checkbox.closest('tr');
+				if (row) row.classList.toggle('selected', checkbox.checked);
+				var checks = Array.prototype.slice.call(document.querySelectorAll('.audit-risk-policy-row-check'));
+				var all = qs('audit-risk-policy-check-all');
+				if (all && checks.length) all.checked = checks.every(function (item) { return item.checked; });
+			});
+			qs('audit-risk-policy-items').addEventListener('click', function (event) {
+				if (event.target.closest('button, input, select, label, a')) return;
+				var row = event.target.closest('.audit-risk-policy-table tbody tr');
+				if (!row) return;
+				var checkbox = row.querySelector('.audit-risk-policy-row-check');
+				if (!checkbox) return;
+				checkbox.checked = !checkbox.checked;
+				row.classList.toggle('selected', checkbox.checked);
+				var checks = Array.prototype.slice.call(document.querySelectorAll('.audit-risk-policy-row-check'));
+				var all = qs('audit-risk-policy-check-all');
+				if (all && checks.length) all.checked = checks.every(function (item) { return item.checked; });
+			});
+		}
+		if (qs('audit-risk-type-filter')) {
+			qs('audit-risk-type-filter').addEventListener('change', function () {
+				state.riskType = qs('audit-risk-type-filter').value || '';
+				if (state.scope === 'risk') loadRows(true);
+			});
+		}
+		if (qs('audit-risk-ip-add')) {
+			qs('audit-risk-ip-add').addEventListener('click', function () {
+				var input = qs('audit-risk-ip-input');
+				var value = input ? String(input.value || '').trim() : '';
+				if (!value) return;
+				if (state.riskIpBlocklist.indexOf(value) < 0) state.riskIpBlocklist.push(value);
+				if (input) input.value = '';
+				saveRiskIpBlocklist();
+				renderRiskIpList();
+				if (state.scope === 'risk') loadRows(true);
+			});
+		}
+		if (qs('audit-risk-ip-list')) {
+			qs('audit-risk-ip-list').addEventListener('click', function (event) {
+				var chip = event.target.closest('[data-risk-ip]');
+				if (!chip) return;
+				var value = chip.getAttribute('data-risk-ip') || '';
+				state.riskIpBlocklist = state.riskIpBlocklist.filter(function (item) { return item !== value; });
+				saveRiskIpBlocklist();
+				renderRiskIpList();
+				if (state.scope === 'risk') loadRows(true);
+			});
+		}
 		Array.prototype.forEach.call(document.querySelectorAll('.audit-tabs [data-audit-scope]'), function (button) {
 			button.addEventListener('click', function () {
 				var nextScope = button.getAttribute('data-audit-scope') || 'access';
@@ -1378,6 +2550,115 @@
 			});
 		}
 		if (agentMapping) agentMapping.addEventListener('change', function () { loadAgents(true); });
+		if (paymentKeyword) {
+			paymentKeyword.addEventListener('input', function () {
+				setPaymentSearchClearVisible();
+				loadPaymentsDebounced();
+			});
+			paymentKeyword.addEventListener('keydown', function (event) {
+				if (event.key === 'Escape') {
+					paymentKeyword.value = '';
+					setPaymentSearchClearVisible();
+					state.paymentPage = 1;
+					renderPaymentRows();
+				}
+			});
+		}
+		if (paymentClear) {
+			paymentClear.addEventListener('click', function () {
+				if (paymentKeyword) paymentKeyword.value = '';
+				setPaymentSearchClearVisible();
+				state.paymentPage = 1;
+				renderPaymentRows();
+			});
+		}
+		if (paymentStatus) paymentStatus.addEventListener('change', function () { state.paymentPage = 1; renderPaymentRows(); });
+		if (paymentReset) paymentReset.addEventListener('click', resetPaymentFilters);
+		if (qs('payment-download-btn')) qs('payment-download-btn').addEventListener('click', downloadPaymentCsv);
+		if (paymentPageSize) {
+			paymentPageSize.addEventListener('change', function () {
+				state.paymentPageSize = safePageSize(paymentPageSize.value);
+				state.paymentPage = 1;
+				renderPaymentRows();
+			});
+		}
+		if (assetKeyword) {
+			assetKeyword.addEventListener('input', function () {
+				setAssetSearchClearVisible();
+				loadAssetsDebounced();
+			});
+			assetKeyword.addEventListener('keydown', function (event) {
+				if (event.key === 'Escape') {
+					assetKeyword.value = '';
+					setAssetSearchClearVisible();
+					state.assetPage = 1;
+					renderAssetRows();
+				}
+			});
+		}
+		if (assetClear) {
+			assetClear.addEventListener('click', function () {
+				if (assetKeyword) assetKeyword.value = '';
+				setAssetSearchClearVisible();
+				state.assetPage = 1;
+				renderAssetRows();
+			});
+		}
+		if (assetCategory) assetCategory.addEventListener('change', function () { state.assetPage = 1; renderAssetRows(); });
+		if (assetStatus) assetStatus.addEventListener('change', function () { state.assetPage = 1; renderAssetRows(); });
+		if (assetReset) assetReset.addEventListener('click', resetAssetFilters);
+		if (qs('asset-download-btn')) qs('asset-download-btn').addEventListener('click', downloadAssetCsv);
+		if (assetPageSize) {
+			assetPageSize.addEventListener('change', function () {
+				state.assetPageSize = safePageSize(assetPageSize.value);
+				state.assetPage = 1;
+				renderAssetRows();
+			});
+		}
+		if (qs('asset-first')) qs('asset-first').addEventListener('click', function () {
+			if (state.assetPage > 1) { state.assetPage = 1; renderAssetRows(); }
+		});
+		if (qs('asset-prev')) qs('asset-prev').addEventListener('click', function () {
+			if (state.assetPage > 1) { state.assetPage--; renderAssetRows(); }
+		});
+		if (qs('asset-next')) qs('asset-next').addEventListener('click', function () {
+			if (state.assetPage < assetTotalPages()) { state.assetPage++; renderAssetRows(); }
+		});
+		if (qs('asset-last')) qs('asset-last').addEventListener('click', function () {
+			var pages = assetTotalPages();
+			if (state.assetPage < pages) { state.assetPage = pages; renderAssetRows(); }
+		});
+		if (qs('asset-page-numbers')) {
+			qs('asset-page-numbers').addEventListener('click', function (event) {
+				var button = event.target.closest('.page-btn[data-page]');
+				var page;
+				if (!button) return;
+				page = parseInt(button.getAttribute('data-page'), 10);
+				if (page && page !== state.assetPage) { state.assetPage = page; renderAssetRows(); }
+			});
+		}
+		if (qs('payment-first')) qs('payment-first').addEventListener('click', function () {
+			if (state.paymentPage > 1) { state.paymentPage = 1; renderPaymentRows(); }
+		});
+		if (qs('payment-prev')) qs('payment-prev').addEventListener('click', function () {
+			if (state.paymentPage > 1) { state.paymentPage--; renderPaymentRows(); }
+		});
+		if (qs('payment-next')) qs('payment-next').addEventListener('click', function () {
+			if (state.paymentPage < paymentTotalPages()) { state.paymentPage++; renderPaymentRows(); }
+		});
+		if (qs('payment-last')) qs('payment-last').addEventListener('click', function () {
+			var pages = paymentTotalPages();
+			if (state.paymentPage < pages) { state.paymentPage = pages; renderPaymentRows(); }
+		});
+		if (qs('payment-page-numbers')) {
+			qs('payment-page-numbers').addEventListener('click', function (event) {
+				var button = event.target.closest('.page-btn[data-page]');
+				var page;
+				if (!button) return;
+				page = parseInt(button.getAttribute('data-page'), 10);
+				if (page && page !== state.paymentPage) { state.paymentPage = page; renderPaymentRows(); }
+			});
+		}
 		if (agentPageSize) {
 			agentPageSize.addEventListener('change', function () {
 				state.agentPageSize = safePageSize(agentPageSize.value);
@@ -1582,6 +2863,31 @@
 			});
 		}
 		document.body.addEventListener('click', function (event) {
+			if (event.target && event.target.closest && event.target.closest('#audit-risk-policy-toolbar-open')) {
+				event.preventDefault();
+				openRiskPolicyModal();
+				return;
+			}
+			if (event.target && event.target.closest && event.target.closest('#audit-risk-ip-add')) {
+				var input = qs('audit-risk-ip-input');
+				var value = input ? String(input.value || '').trim() : '';
+				if (!value) return;
+				if (state.riskIpBlocklist.indexOf(value) < 0) state.riskIpBlocklist.push(value);
+				if (input) input.value = '';
+				saveRiskIpBlocklist();
+				renderRiskIpList();
+				if (state.scope === 'risk') loadRows(true);
+				return;
+			}
+			if (event.target && event.target.closest && event.target.closest('[data-risk-ip]')) {
+				var chip = event.target.closest('[data-risk-ip]');
+				var ipValue = chip ? chip.getAttribute('data-risk-ip') : '';
+				state.riskIpBlocklist = state.riskIpBlocklist.filter(function (item) { return item !== ipValue; });
+				saveRiskIpBlocklist();
+				renderRiskIpList();
+				if (state.scope === 'risk') loadRows(true);
+				return;
+			}
 			var pane = qs('agent-list-pane');
 			if (!pane || pane.hidden) return;
 			var tgt = event.target;
@@ -1608,6 +2914,14 @@
 	document.addEventListener('DOMContentLoaded', function () {
 		initAuditDatePickers();
 		bindEvents();
-		loadRows(true);
+		syncAuditCategoryDetailFilter();
+		loadWorkOperations().then(function () {
+			var params = new URLSearchParams(window.location.search || '');
+			if (params.get('scope') === 'risk' || params.get('risk') === '1') {
+				showScope('risk');
+				return null;
+			}
+			return loadRows(true);
+		});
 	});
 })();

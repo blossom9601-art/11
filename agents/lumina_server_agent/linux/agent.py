@@ -13,7 +13,9 @@ import logging
 import logging.handlers
 import os
 import signal
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import urllib.error
@@ -35,6 +37,7 @@ try:
     from linux.collectors.firewalld import FirewalldCollector
     from linux.collectors.storage import StorageCollector
     from linux.collectors.package import PackageCollector
+    from linux.collectors.performance import PerformanceCollector
 except ImportError:
     from collectors.interface import InterfaceCollector
     from collectors.account import AccountCollector
@@ -42,6 +45,7 @@ except ImportError:
     from collectors.firewalld import FirewalldCollector
     from collectors.storage import StorageCollector
     from collectors.package import PackageCollector
+    from collectors.performance import PerformanceCollector
 
 try:
     from linux.account_dispatch import dispatch_from_json_file, dispatch_to_worker
@@ -193,6 +197,8 @@ def run_once(config):
         collectors.append(StorageCollector())
     if "package" in config.collectors:
         collectors.append(PackageCollector())
+    if "performance" in config.collectors:
+        collectors.append(PerformanceCollector())
 
     logger.info("Collection started (hostname=%s, collectors=%s)", config.hostname, [c.name for c in collectors])
     payload = build_payload(collectors)
@@ -288,11 +294,125 @@ def _run_server_account_jobs(config, jobs):
         _report_account_job_result(config, hn, result)
 
 
+def _post_json(config, path, body, timeout=None):
+    if not config.server_host:
+        return None
+    url = "%s://%s:%s%s" % (config.server_protocol, config.server_host, config.server_port, path)
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=_auth_headers(config), method="POST")
+    ctx = _build_ssl_context(config)
+    opener = _build_opener(config, ssl_context=ctx)
+    resp = opener.open(req, timeout=timeout or config.read_timeout)
+    try:
+        raw = resp.read().decode("utf-8", errors="replace")
+    finally:
+        resp.close()
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_lumina_result(stdout):
+    for line in str(stdout or "").splitlines():
+        line = line.strip()
+        if line.startswith("LUMINA_RESULT="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+def _run_vulnerability_script(script, guide_id, check_code):
+    fd, path = tempfile.mkstemp(prefix="lumina-vuln-", suffix=".sh")
+    os.close(fd)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\n")
+            f.write(str(script or ""))
+            if not str(script or "").endswith("\n"):
+                f.write("\n")
+        os.chmod(path, 0o700)
+        env = dict(os.environ)
+        env["LUMINA_GUIDE_ID"] = str(guide_id)
+        env["LUMINA_CHECK_CODE"] = str(check_code or "")
+        proc = subprocess.run(
+            ["/bin/sh", path],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=env,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "exit_code": int(proc.returncode),
+            "stdout": (proc.stdout or "")[-8000:],
+            "stderr": (proc.stderr or "")[-4000:],
+            "result": _extract_lumina_result(proc.stdout),
+            "message": "completed" if proc.returncode == 0 else "exit_code=%s" % proc.returncode,
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "ok": False,
+            "exit_code": 124,
+            "stdout": (exc.stdout or "")[-8000:] if isinstance(exc.stdout, str) else "",
+            "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+            "result": "need",
+            "message": "timeout",
+        }
+    except Exception as exc:
+        return {"ok": False, "exit_code": -1, "stdout": "", "stderr": str(exc), "result": "need", "message": str(exc)}
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def _run_vulnerability_commands(config, commands):
+    if not commands:
+        return
+    import socket as _sock
+    hostname = (config.hostname or _sock.gethostname()).strip()
+    for command in commands:
+        raw = str(command or "").strip()
+        if not raw.startswith("vulnerability_check:"):
+            continue
+        try:
+            guide_id = int(raw.split(":", 1)[1].strip())
+        except Exception:
+            continue
+        try:
+            data = _post_json(
+                config,
+                "/api/agent/vulnerability-guides/%s/script" % guide_id,
+                {"hostname": hostname},
+                timeout=config.read_timeout,
+            ) or {}
+            if not data.get("success"):
+                logger.warning("vulnerability script fetch failed guide_id=%s error=%s", guide_id, data.get("error"))
+                continue
+            item = data.get("item") or {}
+            result = _run_vulnerability_script(
+                item.get("script_content") or "",
+                guide_id,
+                item.get("check_code") or "",
+            )
+            result["hostname"] = hostname
+            _post_json(
+                config,
+                "/api/agent/vulnerability-guides/%s/result" % guide_id,
+                result,
+                timeout=config.read_timeout,
+            )
+            logger.info("vulnerability check reported guide_id=%s result=%s", guide_id, result.get("result") or result.get("ok"))
+        except Exception:
+            logger.exception("vulnerability command failed guide_id=%s", guide_id)
+
+
 def _send_heartbeat(config):
-    # type: (AgentConfig) -> None
+    # type: (AgentConfig) -> list
     """서버에 heartbeat 전송; 응답에 account_jobs 가 있으면 실행·보고."""
     if not config.server_host:
-        return
+        return []
     import ssl as _ssl
     import socket as _sock
     try:
@@ -313,12 +433,16 @@ def _send_heartbeat(config):
         try:
             data = json.loads(raw)
         except (TypeError, ValueError):
-            return
+            return []
         if isinstance(data, dict) and data.get("success"):
+            commands = data.get("commands") or []
+            _run_vulnerability_commands(config, commands)
             jobs = data.get("account_jobs") or []
             _run_server_account_jobs(config, jobs)
+            return commands
     except Exception:
         pass
+    return []
 
 
 def _interactive_setup(config):
@@ -405,19 +529,26 @@ def main():
     while _running:
         try:
             run_once(config)
-            _send_heartbeat(config)
+            commands = _send_heartbeat(config)
+            if "collect" in commands:
+                logger.info("Immediate collect command received")
+                run_once(config)
         except Exception:
             logger.exception("Unexpected error during collection cycle")
 
-        # interval 동안 60초 간격으로 heartbeat 전송
+        # interval 동안 짧은 간격으로 heartbeat 전송해 수집 명령을 빠르게 반영
         elapsed = 0
-        hb_interval = min(60, config.interval)
+        hb_interval = min(5, config.interval)
         while _running and elapsed < config.interval:
             time.sleep(hb_interval)
             elapsed += hb_interval
             if _running and elapsed < config.interval:
                 try:
-                    _send_heartbeat(config)
+                    commands = _send_heartbeat(config)
+                    if "collect" in commands:
+                        logger.info("Immediate collect command received")
+                        run_once(config)
+                        break
                 except Exception:
                     pass
 

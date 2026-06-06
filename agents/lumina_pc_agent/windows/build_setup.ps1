@@ -25,6 +25,17 @@ foreach ($need in @("putty.exe", "BlossomSshLaunch.exe")) {
 }
 $PuttyDstAbs = [System.IO.Path]::GetFullPath($PuttyDst)
 
+# FileZilla bundle for SFTP endpoints (gitignored staging under filezilla_bundle/)
+$FileZillaSrc = if ($env:LUMINA_FILEZILLA_DIR) { $env:LUMINA_FILEZILLA_DIR } else { Join-Path $RepoRoot "clients\desktop\resources\filezilla" }
+if (-not (Test-Path $FileZillaSrc)) {
+  throw "FileZilla bundle not found at $FileZillaSrc.`nProvide clients/desktop/resources/filezilla/FileZilla.exe or set LUMINA_FILEZILLA_DIR."
+}
+$FileZillaDst = Join-Path $ScriptDir "filezilla_bundle"
+if (Test-Path $FileZillaDst) { Remove-Item $FileZillaDst -Recurse -Force }
+Copy-Item -LiteralPath $FileZillaSrc -Destination $FileZillaDst -Recurse
+if (-not (Test-Path (Join-Path $FileZillaDst "FileZilla.exe"))) { throw "Missing FileZilla.exe after copying FileZilla bundle" }
+$FileZillaDstAbs = [System.IO.Path]::GetFullPath($FileZillaDst)
+
 $verLine = Select-String -Path $AgentPy -Pattern '^\s*VERSION\s*=\s*"([^"]+)"' | Select-Object -First 1
 if (-not $verLine) { throw "Could not parse VERSION from LuminaGateAgent.py" }
 $rawVer = $verLine.Matches.Groups[1].Value
@@ -45,6 +56,7 @@ pyinstaller `
   --workpath $BuildDir `
   --add-data "$GateAssetsDir;gate_assets" `
   --add-data "$PuttyDstAbs;putty" `
+  --add-data "$FileZillaDstAbs;filezilla" `
   --hidden-import lumina_windivert_guard `
   --hidden-import tkinter `
   --hidden-import tkinter.scrolledtext `

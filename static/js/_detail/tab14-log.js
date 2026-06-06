@@ -316,12 +316,14 @@
 		function renderPagination() {
 			var start = state.total ? (state.page - 1) * state.size + 1 : 0;
 			var end   = Math.min(state.total, state.page * state.size);
-			if (infoEl) infoEl.textContent = start + '-' + end + ' / ' + state.total + '개 항목';
+			var totalPages = Math.max(1, parseInt(state.totalPages, 10) || 1);
+			if (infoEl) infoEl.textContent = start + '-' + end + ' / ' + state.total + '? ??';
 
 			if (numWrap) {
 				numWrap.innerHTML = '';
-				for (var p = 1; p <= state.totalPages && p <= 50; p++) {
+				for (var p = 1; p <= totalPages && p <= 50; p++) {
 					var b = document.createElement('button');
+					b.type = 'button';
 					b.className = 'page-btn' + (p === state.page ? ' active' : '');
 					b.textContent = String(p);
 					b.dataset.page = String(p);
@@ -330,8 +332,8 @@
 			}
 			if (btnFirst) btnFirst.disabled = (state.page <= 1);
 			if (btnPrev)  btnPrev.disabled  = (state.page <= 1);
-			if (btnNext)  btnNext.disabled  = (state.page >= state.totalPages);
-			if (btnLast)  btnLast.disabled  = (state.page >= state.totalPages);
+			if (btnNext)  btnNext.disabled  = (state.page >= totalPages);
+			if (btnLast)  btnLast.disabled  = (state.page >= totalPages);
 		}
 
 		function goPage(p) {

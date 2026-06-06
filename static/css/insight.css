@@ -254,11 +254,19 @@ body.insight-page .toast{
 .insight-page .system-delete-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:15px; line-height:1.75; }
 .insight-page .system-download-modal .dispose-illust img{ width:220px; max-width:100%; height:auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,.08)); }
 .insight-page .system-delete-modal .dispose-illust img{ width:176px; height:auto; display:block; filter:drop-shadow(0 8px 18px rgba(0,0,0,.08)); }
+.insight-page .system-message-modal .server-add-content{ max-width:640px; }
+.insight-page .system-message-modal .server-add-body{ padding:20px 0 24px 0; min-height:180px; }
+.insight-page .system-message-modal .dispose-content{ margin:0 32px; display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+.insight-page .system-message-modal .dispose-text{ flex:1 1 auto; color:#475569; font-size:15px; line-height:1.75; }
+.insight-page .system-message-modal .message-illust{ flex:0 0 auto; }
+.insight-page .system-message-modal .message-illust img{ width:160px; max-width:100%; height:auto; display:block; filter:drop-shadow(0 2px 6px rgba(0,0,0,.08)); }
 @media (max-width:720px){
 	.insight-page .system-download-modal .dispose-content,
-	.insight-page .system-delete-modal .dispose-content{ flex-direction:column; align-items:flex-start; margin:0 24px; gap:16px; }
+	.insight-page .system-delete-modal .dispose-content,
+	.insight-page .system-message-modal .dispose-content{ flex-direction:column; align-items:flex-start; margin:0 24px; gap:16px; }
 	.insight-page .system-download-modal .dispose-illust img{ width:160px; }
 	.insight-page .system-delete-modal .dispose-illust img{ width:140px; }
+	.insight-page .system-message-modal .message-illust img{ width:120px; }
 }
 
 /* =============================================================

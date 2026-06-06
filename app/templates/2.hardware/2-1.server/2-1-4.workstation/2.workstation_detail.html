@@ -44,6 +44,7 @@
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_authority') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_authority' else '' }}">권한관리</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_activate') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_activate' else '' }}">기동절차</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_firewalld') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_firewalld' else '' }}">방화벽</a>
+                <a href="{{ url_for('pages.blossom_hub_token', segment='hw_server_workstation_detail', token=hardware_detail_token, tab='performance') if hardware_detail_token else url_for('pages.blossom_hub', segment='hw_server_workstation_performance') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_performance' else '' }}">성능관리</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_storage') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_storage' else '' }}">스토리지</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_task') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_task' else '' }}">작업이력</a>
                 <a href="{{ url_for('pages.blossom_hub', segment='hw_server_workstation_vulnerability') }}" class="server-detail-tab-btn {{ 'active' if current_key == 'hw_server_workstation_vulnerability' else '' }}">취약점</a>
@@ -227,7 +228,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+    <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
     <!-- 시스템 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true">
         <div class="server-edit-content">

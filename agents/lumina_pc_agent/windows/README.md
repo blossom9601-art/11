@@ -21,8 +21,10 @@ Install actions:
 
 - Copies the executable to `C:\Program Files\LuminaGateAgent\LuminaGateAgent.exe`
 - Deploys PuTTY+BlossomSshLaunch helpers (bundled via `clients/desktop/resources/putty`) to **`C:\Program Files\LuminaGateAgent\putty\`**
+- Deploys FileZilla helpers (bundled via `clients/desktop/resources/filezilla` or `LUMINA_FILEZILLA_DIR`) to **`C:\Program Files\LuminaGateAgent\filezilla\`** for SFTP endpoints.
   (same payloads as Blossom Chat; Lumina 빌드가 PC에서 해당 폴더를 사용할 수 있어야 함)
 - Registers **`blossom-ssh://`** URL handler for **HKCU (로그온 사용자)** pointing at `...\putty\BlossomSshLaunch.exe`:
+- Registers **`blossom-sftp://`** URL handler for **HKCU (로그온 사용자)** pointing at the same launcher; the launcher opens bundled FileZilla.
   installers run elevated so HKCU reflects the elevated account; 로그온 사용자에 맞추려면 **트레이**가 시작될 때도 동일 레지스트리를 다시 적습니다.
 - Creates `C:\ProgramData\LuminaGateAgent\config.yaml`
 - Creates `C:\ProgramData\LuminaGateAgent\logs\` and `queue\`
@@ -92,4 +94,3 @@ cd ..\agents\lumina_pc_agent\windows
 ```
 
 프로토콜이 로그온 사용자에 안 잡히면 해당 사용자 세션에서 **트레이**를 한 번 실행합니다(설치 프로그램만 관리자로 돌린 경우 HKCU 대상이 다를 수 있음).
-

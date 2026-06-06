@@ -4521,7 +4521,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var __spaNavPrefetch = {};        // href -> Promise  (hover prefetch)
     var SPA_CACHE_TTL = 5 * 60 * 1000; // 5분
     /** 값을 올리면 SPA HTML 스냅샷 캐시 전부 무효화(오래된 <script>?v= 잔류 방지). */
-    var SPA_HTML_CACHE_REVISION = '20260512_no_data_component_fix';
+    var SPA_HTML_CACHE_REVISION = '20260524_tabs_no_fouc2';
     function __spaNavCacheKey(href) {
         return String(href || '') + '\u0001' + SPA_HTML_CACHE_REVISION;
     }
@@ -4624,6 +4624,35 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_e) {}
     }
 
+    function __spaEnsurePageStyles(parsedDoc) {
+        if (!parsedDoc) return;
+        try {
+            var wantLinks = Array.from(parsedDoc.querySelectorAll('head link[rel="stylesheet"][href]'));
+            var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
+            var haveBases = new Set(haveLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
+            var refNode = haveLinks.find(function (el) { return (el.getAttribute('href') || '').indexOf('/static/css/blossom.css') >= 0; }) || haveLinks[haveLinks.length - 1] || null;
+            wantLinks.forEach(function (wl) {
+                var href = wl.getAttribute('href') || '';
+                var base = href.split('?')[0];
+                if (!href || haveBases.has(base)) return;
+                var nl = document.createElement('link');
+                nl.rel = 'stylesheet';
+                nl.href = href;
+                if (wl.media) nl.media = wl.media;
+                if (wl.integrity) nl.integrity = wl.integrity;
+                if (wl.crossorigin) nl.crossOrigin = wl.crossorigin;
+                if (refNode && refNode.parentNode) {
+                    refNode.parentNode.insertBefore(nl, refNode.nextSibling);
+                    refNode = nl;
+                } else {
+                    document.head.appendChild(nl);
+                }
+                haveBases.add(base);
+            });
+        } catch (_e) {}
+    }
+    try { window.__spaEnsurePageStyles = __spaEnsurePageStyles; } catch (_e) {}
+
     function __spaSwapMain(html, href) {
         var parser = new DOMParser();
         var doc = parser.parseFromString(html, 'text/html');
@@ -4646,6 +4675,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 Array.from(trigs[0].querySelectorAll('#info-popover')).slice(1).forEach(function (n) { try { n.remove(); } catch (_e) {} });
             }
         } catch (_e) {}
+
+        __spaEnsurePageStyles(doc);
 
         try { if (window.BlossomReady) window.BlossomReady.markMounting(newMain); } catch (_readyError) {}
         currentMain.replaceWith(newMain);
@@ -4698,12 +4729,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             var wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
             var wantHrefs = new Set(wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+            var wantBases = new Set(wantLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
             var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
             var haveHrefs = new Set(haveLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+            var haveBases = new Set(haveLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
             var coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
             haveLinks.forEach(function (el) {
                 var eh = el.getAttribute('href') || '';
-                if (!eh || wantHrefs.has(eh) || coreCssPat.test(eh)) return;
+                var ehBase = eh.split('?')[0];
+                if (!eh || wantHrefs.has(eh) || wantBases.has(ehBase) || coreCssPat.test(eh)) return;
                 try { el.remove(); } catch (_e) {}
             });
             var refNode = null;
@@ -4713,7 +4747,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (_e) {}
             wantLinks.forEach(function (wl) {
                 var wh = wl.getAttribute('href') || '';
-                if (!wh || haveHrefs.has(wh)) return;
+                var whBase = wh.split('?')[0];
+                if (!wh || haveHrefs.has(wh) || haveBases.has(whBase)) return;
                 // blossom.css는 이미 있으므로 스킵
                 if (wh.indexOf('blossom.css') >= 0) return;
                 var nl = document.createElement('link');
@@ -4726,6 +4761,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.head.appendChild(nl);
                 }
                 haveHrefs.add(wh);
+                haveBases.add(whBase);
             });
         } catch (_e) {}
 
@@ -4987,6 +5023,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.documentElement.classList.remove('spa-loading');
                 });
             } else {
+                __spaEnsurePageStyles(doc);
                 try { if (window.BlossomReady) window.BlossomReady.markMounting(newTabContent); } catch (_readyError) {}
                 currentTabContent.replaceWith(newTabContent);
                 newTabContent.classList.add('spa-fade-in');
@@ -5049,20 +5086,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 var _coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
                 var _wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
                 var _wantHrefs = new Set(_wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                var _wantBases = new Set(_wantLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
                 var _haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
                 _haveLinks.forEach(function (el) {
                     var h = el.getAttribute('href') || '';
-                    if (!h || _wantHrefs.has(h) || _coreCssPat.test(h)) return;
+                    var hBase = h.split('?')[0];
+                    if (!h || _wantHrefs.has(h) || _wantBases.has(hBase) || _coreCssPat.test(h)) return;
                     el.remove();
                 });
                 var _freshHrefs = new Set(Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]')).map(function (el) { return el.getAttribute('href') || ''; }));
+                var _freshBases = new Set(Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]')).map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
                 _wantLinks.forEach(function (wl) {
                     var wh = wl.getAttribute('href') || '';
-                    if (!wh || _freshHrefs.has(wh)) return;
+                    var whBase = wh.split('?')[0];
+                    if (!wh || _freshHrefs.has(wh) || _freshBases.has(whBase)) return;
                     var nl = document.createElement('link');
                     nl.rel = 'stylesheet';
                     nl.href = wh;
                     document.head.appendChild(nl);
+                    _freshBases.add(whBase);
                 });
             } catch (_e) {}
 
@@ -5223,29 +5265,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 var _coreCssPat = /\/static\/css\/(blossom|system|authentication)\.css|sidebar|header/i;
                 var wantLinks = Array.from(doc.querySelectorAll('head link[rel="stylesheet"][href]'));
                 var wantHrefs = new Set(wantLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                var wantBases = new Set(wantLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
                 var haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
                 var haveHrefs = new Set(haveLinks.map(function (el) { return el.getAttribute('href') || ''; }));
+                var haveBases = new Set(haveLinks.map(function (el) { return (el.getAttribute('href') || '').split('?')[0]; }));
                 // 이전 페이지 전용 CSS 제거 (공통 CSS는 유지)
                 haveLinks.forEach(function (el) {
                     var h = el.getAttribute('href') || '';
-                    if (!h || wantHrefs.has(h) || _coreCssPat.test(h)) return;
+                    var hBase = h.split('?')[0];
+                    if (!h || wantHrefs.has(h) || wantBases.has(hBase) || _coreCssPat.test(h)) return;
                     el.remove();
                 });
                 // 새 탭 전용 CSS 추가
                 wantLinks.forEach(function (wl) {
                     var wh = wl.getAttribute('href') || '';
-                    if (!wh || haveHrefs.has(wh) || wh.indexOf('blossom.css') >= 0) return;
-                    // 동일 base path의 다른 버전이 이미 있으면 제거
                     var wBase = wh.split('?')[0];
-                    haveLinks = Array.from(document.querySelectorAll('head link[rel="stylesheet"][href]'));
-                    haveLinks.forEach(function (el) {
-                        var eh = (el.getAttribute('href') || '').split('?')[0];
-                        if (eh === wBase) el.remove();
-                    });
+                    if (!wh || haveHrefs.has(wh) || haveBases.has(wBase) || wh.indexOf('blossom.css') >= 0) return;
+                    // 동일 base path의 다른 버전이 이미 있으면 제거
                     var nl = document.createElement('link');
                     nl.rel = 'stylesheet';
                     nl.href = wh;
                     document.head.appendChild(nl);
+                    haveBases.add(wBase);
                 });
             } catch (_e) {}
 
@@ -6243,6 +6284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const curMain = document.querySelector('main.main-content');
         const nextMain = nextDoc ? nextDoc.querySelector('main.main-content') : null;
         if (!curMain || !nextMain) throw new Error('main-content missing');
+        try { if (window.__spaEnsurePageStyles) window.__spaEnsurePageStyles(nextDoc); } catch (_e) {}
         try { if (window.BlossomReady) window.BlossomReady.markMounting(nextMain); } catch (_readyError) {}
         curMain.replaceWith(nextMain);
 

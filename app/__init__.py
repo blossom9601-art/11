@@ -3,6 +3,7 @@ from sqlalchemy import text
 from datetime import datetime
 import time
 import traceback
+import uuid
 
 from config import config
 from app.models import db
@@ -2303,6 +2304,42 @@ def create_app(config_name='default'):
                 db.session.rollback()
         except Exception:
             pass  # 이미 존재하면 무시
+
+    # wrk_report public URL UUIDs
+    try:
+        with app.app_context():
+            db.session.execute(db.text("ALTER TABLE wrk_report ADD COLUMN public_id VARCHAR(36)"))
+            db.session.commit()
+            print('[wrk-report] added public_id column', flush=True)
+    except Exception:
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except Exception:
+            pass
+    try:
+        with app.app_context():
+            rows = db.session.execute(db.text(
+                "SELECT id FROM wrk_report WHERE public_id IS NULL OR trim(public_id) = ''"
+            )).fetchall()
+            for row in rows:
+                db.session.execute(
+                    db.text("UPDATE wrk_report SET public_id = :public_id WHERE id = :id"),
+                    {'public_id': str(uuid.uuid4()), 'id': row[0]},
+                )
+            db.session.execute(db.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_wrk_report_public_id ON wrk_report(public_id)"
+            ))
+            db.session.commit()
+            if rows:
+                print(f'[wrk-report] backfilled public_id: {len(rows)}', flush=True)
+    except Exception as e:
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except Exception:
+            pass
+        print('[wrk-report] public_id migration error:', e, flush=True)
 
     # ── wrk_report_user_clear 테이블 생성 (per-user 비우기) ──
     try:

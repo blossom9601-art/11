@@ -488,6 +488,32 @@
 .system-dispose-modal .server-add-content,
 .system-duplicate-modal .server-add-content,
 .system-download-modal .server-add-content { max-width:800px; }
+
+/* Settings module tabs */
+.settings-group-tabs { position:relative; z-index:6000; align-items:flex-end; gap:0; overflow:visible; margin-bottom:8px; isolation:isolate; }
+.settings-tab-group { position:relative; display:inline-flex; flex:0 0 auto; z-index:6002; }
+.settings-tab-group::after { content:""; position:absolute; left:0; right:0; top:100%; height:10px; }
+.settings-tab-group-btn { display:inline-flex !important; align-items:center; gap:7px; white-space:nowrap; background:none; border:0; cursor:pointer; }
+.settings-tab-group-btn::after { content:""; width:6px; height:6px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg) translateY(-2px); opacity:.65; transition:transform .18s ease, opacity .18s ease; }
+.settings-tab-group.open .settings-tab-group-btn::after,
+.settings-tab-group:hover .settings-tab-group-btn::after,
+.settings-tab-group:focus-within .settings-tab-group-btn::after { transform:rotate(225deg) translateY(-1px); opacity:1; }
+.settings-tab-dropdown { position:absolute; left:0; top:calc(100% + 8px); min-width:156px; padding:8px; display:flex; flex-direction:column; gap:2px; background:#fff; background-color:#fff; background-clip:padding-box; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 18px 42px -24px rgba(15,23,42,.42), 0 10px 18px -14px rgba(15,23,42,.28); opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-4px); transition:opacity .16s ease, transform .16s ease, visibility .16s ease; z-index:6003; overflow:hidden; isolation:isolate; }
+.settings-tab-dropdown::before { content:""; position:absolute; inset:0; z-index:-1; background:#fff; border-radius:inherit; }
+.settings-tab-group.open .settings-tab-dropdown,
+.settings-tab-group:hover .settings-tab-dropdown,
+.settings-tab-group:focus-within .settings-tab-dropdown { opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0); }
+.settings-tab-dropdown-item,
+.settings-tab-dropdown-item:link,
+.settings-tab-dropdown-item:visited { display:block; padding:9px 12px; border-radius:6px; color:#64748b; font-size:13px; font-weight:600; line-height:1.35; text-decoration:none; white-space:nowrap; background:#fff; }
+.settings-tab-dropdown-item:hover,
+.settings-tab-dropdown-item:focus { color:var(--accent); background:#f8fafc; text-decoration:none; }
+.settings-tab-dropdown-item.active { color:var(--accent); background:#eef2ff; font-weight:700; }
+.settings-tab-group:last-child .settings-tab-dropdown { left:auto; right:0; }
+@media (max-width:900px){
+	.settings-group-tabs { flex-wrap:wrap; row-gap:0; }
+	.settings-tab-dropdown { min-width:144px; }
+}
 .system-delete-modal .server-add-content{ max-width:640px; }
 /* === Dispose/Delete modal detailed layout (ported from system.css) === */
 .system-dispose-modal .server-add-header, .system-delete-modal .server-add-header{ padding:20px 32px 16px; }

@@ -275,6 +275,21 @@ def _ensure_tables(conn: sqlite3.Connection) -> None:
             linked_asset_id INTEGER,
             linked_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS agent_performance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_scope TEXT NOT NULL,
+            asset_id INTEGER NOT NULL,
+            system_key TEXT NOT NULL DEFAULT '',
+            metric_type TEXT NOT NULL,
+            target TEXT NOT NULL DEFAULT '',
+            usage_pct REAL,
+            used_bytes INTEGER,
+            total_bytes INTEGER,
+            sampled_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_perf_asset_time
+            ON agent_performance(asset_scope, asset_id, sampled_at);
     """)
 
 
@@ -327,6 +342,58 @@ def _find_asset_by_hostname(conn: sqlite3.Connection, hostname: str) -> Optional
         except Exception:
             continue
     return None
+
+
+def _asset_by_id(conn: sqlite3.Connection, asset_id: int) -> Optional[Dict[str, Any]]:
+    for table in ("hardware", "hardware_asset"):
+        try:
+            row = conn.execute(
+                f"""
+                SELECT id, asset_category, asset_type, system_name, asset_name
+                FROM {table}
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (asset_id,),
+            ).fetchone()
+            if row:
+                return {
+                    "id": row["id"],
+                    "asset_category": row["asset_category"],
+                    "asset_type": row["asset_type"],
+                    "system_name": row["system_name"],
+                    "asset_name": row["asset_name"],
+                }
+        except Exception:
+            continue
+    return None
+
+
+def _find_linked_asset_by_hostname(conn: sqlite3.Connection, hostname: str) -> Optional[Dict[str, Any]]:
+    host = (hostname or "").strip()
+    if not host:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT linked_asset_id
+            FROM agent_pending
+            WHERE LOWER(TRIM(hostname)) = LOWER(?)
+              AND is_linked = 1
+              AND linked_asset_id IS NOT NULL
+            ORDER BY linked_at DESC, id DESC
+            LIMIT 1
+            """,
+            (host,),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return None
+    try:
+        return _asset_by_id(conn, int(row["linked_asset_id"]))
+    except Exception:
+        return None
 
 
 def _scope_from_category(asset_category: str) -> str:
@@ -726,14 +793,79 @@ def _upsert_packages(
     return stats
 
 
+def _insert_performance(
+    conn: sqlite3.Connection,
+    asset_id: int,
+    scope: str,
+    system_key: str,
+    items: List[Dict[str, Any]],
+    sampled_at: str,
+) -> Dict[str, int]:
+    now = _now()
+    stats = {"inserted": 0}
+    valid_types = {"cpu", "memory", "filesystem"}
+
+    def _num(value, default=None):
+        if value in (None, ""):
+            return default
+        try:
+            if isinstance(value, str):
+                value = value.strip().rstrip("%").strip()
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    for item in items:
+        metric_type = str(item.get("metric_type") or "").strip().lower()
+        if metric_type not in valid_types:
+            continue
+        usage = _num(item.get("usage_pct"))
+        if usage is not None:
+            usage = max(0.0, min(100.0, usage))
+        used = _num(item.get("used_bytes"))
+        total = _num(item.get("total_bytes"))
+        conn.execute(
+            """
+            INSERT INTO agent_performance (
+                asset_scope, asset_id, system_key, metric_type, target,
+                usage_pct, used_bytes, total_bytes, sampled_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                scope,
+                asset_id,
+                system_key,
+                metric_type,
+                str(item.get("target") or "system").strip() or "system",
+                usage,
+                int(used) if used is not None else None,
+                int(total) if total is not None else None,
+                sampled_at,
+                now,
+            ),
+        )
+        stats["inserted"] += 1
+
+    try:
+        conn.execute(
+            "DELETE FROM agent_performance WHERE created_at < ?",
+            ((datetime.now(_KST) - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S"),),
+        )
+    except Exception:
+        pass
+    return stats
+
+
 def _summarize_payload(payload: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
     interfaces = payload.get("interfaces") or []
     accounts = payload.get("accounts") or []
     packages = payload.get("packages") or []
+    performance = payload.get("performance") or []
     return {
         "interfaces": {"captured": len(interfaces), "synced": 0},
         "accounts": {"captured": len(accounts), "synced": 0},
         "packages": {"captured": len(packages), "synced": 0},
+        "performance": {"captured": len(performance), "synced": 0},
     }
 
 
@@ -772,7 +904,7 @@ def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=N
             (now_hb, hostname),
         )
 
-        asset = _find_asset_by_hostname(conn, hostname)
+        asset = _find_linked_asset_by_hostname(conn, hostname) or _find_asset_by_hostname(conn, hostname)
         if not asset:
             # 미매칭 → agent_pending 에 upsert (같은 hostname은 최신으로 갱신)
             ip_addr = remote_ip or _extract_ip(payload)
@@ -825,22 +957,42 @@ def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=N
         iface_items = payload.get("interfaces") or []
         acct_items = payload.get("accounts") or []
         pkg_items = payload.get("packages") or []
+        perf_items = payload.get("performance") or []
+        sampled_at = str(payload.get("collected_at") or now_hb).replace("T", " ")[:19]
+        try:
+            sampled_dt = datetime.strptime(sampled_at, "%Y-%m-%d %H:%M:%S")
+            now_dt = datetime.strptime(now_hb, "%Y-%m-%d %H:%M:%S")
+            if abs((now_dt - sampled_dt).total_seconds()) > 3600:
+                sampled_at = now_hb
+        except Exception:
+            sampled_at = now_hb
 
         iface_stats = _upsert_interfaces(conn, asset_id, page_prefix, system_name, iface_items) if iface_items else {"inserted": 0, "deleted": 0}
         acct_stats = _upsert_accounts(conn, asset_id, scope, acct_items, system_key=page_prefix) if acct_items else {"inserted": 0, "updated": 0}
         pkg_stats = _upsert_packages(conn, asset_id, scope, pkg_items) if pkg_items else {"inserted": 0, "updated": 0}
+        perf_stats = _insert_performance(conn, asset_id, scope, system_name, perf_items, sampled_at) if perf_items else {"inserted": 0}
 
         results = {
             "interfaces": iface_stats,
             "accounts": acct_stats,
             "packages": pkg_stats,
+            "performance": perf_stats,
         }
 
         # 연동된 에이전트의 received_at도 갱신 (active 판정에 사용)
         conn.execute(
             "UPDATE agent_pending SET received_at = ?, last_heartbeat = ? "
-            "WHERE hostname = ? AND is_linked = 1",
+            "WHERE LOWER(TRIM(hostname)) = LOWER(?) AND is_linked = 1",
             (now_hb, now_hb, hostname),
+        )
+
+        conn.execute(
+            """
+            UPDATE agent_pending
+            SET is_linked = 1, linked_asset_id = ?, linked_at = COALESCE(linked_at, ?)
+            WHERE LOWER(TRIM(hostname)) = LOWER(?) AND is_linked = 0
+            """,
+            (asset_id, now_hb, hostname),
         )
 
         conn.commit()
@@ -853,7 +1005,164 @@ def process_agent_payload(payload: Dict[str, Any], *, remote_ip: str = "", app=N
     }
 
 
+def list_agent_performance(
+    asset_scope: str,
+    asset_id: int,
+    *,
+    system_key: str = "",
+    start: str = "",
+    end: str = "",
+    limit: int = 300,
+    app=None,
+) -> List[Dict[str, Any]]:
+    app = app or current_app
+    try:
+        asset_id = int(asset_id)
+    except (TypeError, ValueError):
+        asset_id = 0
+    if asset_id <= 0 and system_key:
+        asset_id = resolve_performance_asset_id(system_key, app=app)
+    if asset_id <= 0:
+        return []
+    limit = max(1, min(int(limit or 300), 1000))
+    with _get_connection(app) as conn:
+        _ensure_tables(conn)
+        where = ["asset_id = ?"]
+        params: List[Any] = [asset_id]
+        scope = (asset_scope or "").strip()
+        if scope:
+            where.append("asset_scope = ?")
+            params.append(scope)
+        if start:
+            where.append("sampled_at >= ?")
+            params.append(start[:19])
+        else:
+            where.append("sampled_at >= ?")
+            params.append((datetime.now(_KST) - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S"))
+        if end:
+            where.append("sampled_at <= ?")
+            params.append(end[:19])
+        params.append(limit)
+        rows = conn.execute(
+            """
+            SELECT metric_type, target, usage_pct, used_bytes, total_bytes, sampled_at
+            FROM agent_performance
+            WHERE """ + " AND ".join(where) + """
+            ORDER BY sampled_at DESC, id DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+        return [
+            {
+                "metric_type": r["metric_type"],
+                "target": r["target"],
+                "usage_pct": r["usage_pct"],
+                "used_bytes": r["used_bytes"],
+                "total_bytes": r["total_bytes"],
+                "sampled_at": r["sampled_at"],
+            }
+            for r in rows
+        ]
+
+
+def get_agent_collection_status(asset_id: int, *, app=None) -> Dict[str, Any]:
+    app = app or current_app
+    try:
+        asset_id = int(asset_id)
+    except (TypeError, ValueError):
+        asset_id = 0
+    if asset_id <= 0:
+        return {"linked": False, "collecting": False}
+    with _get_connection(app) as conn:
+        _ensure_tables(conn)
+        row = conn.execute(
+            """
+            SELECT hostname, received_at, last_heartbeat, linked_at
+            FROM agent_pending
+            WHERE linked_asset_id = ? AND is_linked = 1
+            ORDER BY COALESCE(last_heartbeat, received_at, linked_at) DESC, id DESC
+            LIMIT 1
+            """,
+            (asset_id,),
+        ).fetchone()
+        if not row:
+            return {"linked": False, "collecting": False}
+        last = row["last_heartbeat"] or row["received_at"] or row["linked_at"] or ""
+        age_sec = None
+        collecting = False
+        try:
+            dt = datetime.strptime(str(last)[:19], "%Y-%m-%d %H:%M:%S")
+            age_sec = int((datetime.now(_KST).replace(tzinfo=None) - dt).total_seconds())
+            collecting = age_sec <= 180
+        except Exception:
+            pass
+        perf = conn.execute(
+            """
+            SELECT sampled_at
+            FROM agent_performance
+            WHERE asset_id = ?
+            ORDER BY sampled_at DESC, id DESC
+            LIMIT 1
+            """,
+            (asset_id,),
+        ).fetchone()
+        return {
+            "linked": True,
+            "collecting": bool(collecting),
+            "hostname": row["hostname"],
+            "last_heartbeat": row["last_heartbeat"],
+            "last_received": row["received_at"],
+            "last_performance_at": perf["sampled_at"] if perf else "",
+            "age_sec": age_sec,
+        }
+
+
 # ── 에이전트 연동 상태 조회 ───────────────────────────────
+
+def resolve_performance_asset_id(system_key: str, *, app=None) -> int:
+    app = app or current_app
+    key = (system_key or "").strip()
+    if not key:
+        return 0
+    with _get_connection(app) as conn:
+        _ensure_tables(conn)
+        for table in ("hardware", "hardware_asset"):
+            try:
+                row = conn.execute(
+                    f"""
+                    SELECT id
+                    FROM {table}
+                    WHERE LOWER(TRIM(system_name)) = LOWER(?)
+                       OR LOWER(TRIM(asset_name)) = LOWER(?)
+                    ORDER BY id ASC
+                    LIMIT 1
+                    """,
+                    (key, key),
+                ).fetchone()
+                if row:
+                    return int(row["id"])
+            except Exception:
+                continue
+        try:
+            row = conn.execute(
+                """
+                SELECT linked_asset_id
+                FROM agent_pending
+                WHERE LOWER(TRIM(hostname)) = LOWER(?)
+                  AND is_linked = 1
+                  AND linked_asset_id IS NOT NULL
+                ORDER BY linked_at DESC, id DESC
+                LIMIT 1
+                """,
+                (key,),
+            ).fetchone()
+            if row:
+                return int(row["linked_asset_id"])
+        except Exception:
+            pass
+    return 0
+
 
 def is_agent_synced(asset_id: int, *, app=None) -> bool:
     """자산에 연동된 에이전트가 존재하고, 수신시각이 1시간 이내이면 True"""
@@ -1076,7 +1385,7 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
 
             if has_os_ver:
                 row = conn.execute(
-                    """SELECT id, hostname, ip_address, os_type, os_version,
+                    """SELECT id, hostname, ip_address, os_type, os_version, payload,
                               received_at, last_heartbeat, linked_at
                        FROM agent_pending
                        WHERE linked_asset_id = ? AND is_linked = 1
@@ -1085,7 +1394,7 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
                 ).fetchone()
             else:
                 row = conn.execute(
-                    """SELECT id, hostname, ip_address, os_type,
+                    """SELECT id, hostname, ip_address, os_type, payload,
                               received_at, last_heartbeat, linked_at
                        FROM agent_pending
                        WHERE linked_asset_id = ? AND is_linked = 1
@@ -1112,13 +1421,22 @@ def get_linked_agent(asset_id: int, *, app=None) -> Optional[Dict[str, Any]]:
             # received_at과 last_heartbeat 중 최신 값 기준으로 active 판정
             latest = max(filter(None, [recv_dt, hb_dt]), default=None)
             is_active = latest is not None and (datetime.now(_KST).replace(tzinfo=None) - latest).total_seconds() <= 3600
+            agent_version = ""
+            try:
+                payload = json.loads(row["payload"] or "{}") if "payload" in row.keys() else {}
+                if isinstance(payload, dict):
+                    agent_version = str(payload.get("agent_version") or payload.get("agentVersion") or payload.get("version") or "").strip()
+            except Exception:
+                agent_version = ""
             return {
                 "id": row["id"],
                 "hostname": row["hostname"],
                 "ip_address": row["ip_address"] or "",
                 "os_type": row["os_type"] or "",
                 "os_version": (row["os_version"] if has_os_ver else "") or "",
+                "agent_version": agent_version,
                 "received_at": row["received_at"],
+                "last_heartbeat": row["last_heartbeat"],
                 "linked_at": row["linked_at"],
                 "active": is_active,
             }

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -6,15 +6,16 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<link rel="stylesheet" href="/static/css/system.css?v=20260528_dispose_modal1">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260603_risk_access_only1">
+	<script src="/static/js/blossom.js?v=20260529_search_empty1" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260507ui1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-5.audit/1.audit_list.js?v=20260603_risk_access_only1" defer></script>
+	<script src="/static/js/3.access_control/access-modal-tabs.js?v=20260528_access_tabs4" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -29,6 +30,8 @@
 			<div class="system-tabs audit-tabs" role="tablist" aria-label="접근제어 감사 탭">
 				<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" id="audit-tab-access" data-audit-scope="access" aria-controls="audit-list-pane">접속 기록</button>
 				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" id="audit-tab-agent" data-audit-scope="agent" aria-controls="agent-list-pane">PC 에이전트</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" id="audit-tab-payment" data-audit-scope="payment" aria-controls="payment-list-pane">결제 기록</button>
+				<button type="button" class="system-tab-btn" role="tab" aria-selected="false" id="audit-tab-asset" data-audit-scope="asset" aria-controls="asset-list-pane">자산 기록</button>
 			</div>
 
 			<div class="tab-content single-pane audit-tab-content">
@@ -52,6 +55,30 @@
 								<input id="audit-from-date" class="request-date-input audit-date-input" name="from_date" type="text" placeholder="시작일" autocomplete="off" readonly aria-label="시작일">
 								<span aria-hidden="true">~</span>
 								<input id="audit-to-date" class="request-date-input audit-date-input" name="to_date" type="text" placeholder="종료일" autocomplete="off" readonly aria-label="종료일">
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector audit-category-selector">
+								<select id="audit-category-filter" class="page-size-select" aria-label="자원 분류 필터">
+									<option value="">분류 전체</option>
+									<option value="시스템">시스템</option>
+									<option value="서비스">서비스</option>
+									<option value="컨테이너">컨테이너</option>
+									<option value="관리콘솔">관리콘솔</option>
+								</select>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector audit-category-selector" id="audit-category-detail-wrapper" hidden>
+								<select id="audit-category-detail-filter" class="page-size-select" aria-label="관리콘솔 장비군 필터" disabled>
+									<option value="">장비군 전체</option>
+									<option value="서버">서버</option>
+									<option value="스토리지">스토리지</option>
+									<option value="SAN">SAN</option>
+									<option value="네트워크">네트워크</option>
+									<option value="보안장비">보안장비</option>
+								</select>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector audit-category-selector" id="audit-work-operation-wrapper">
+								<select id="audit-work-operation-filter" class="page-size-select" aria-label="업무 운영 필터">
+									<option value="">운영 전체</option>
+								</select>
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector" id="audit-page-size-wrapper">
 								<select id="audit-page-size" class="page-size-select" aria-controls="audit-table" aria-label="페이지 당 감사 기록 수">
@@ -80,6 +107,9 @@
 									<th class="audit-col-access-start" data-col="occurred_at">접속 일시</th>
 									<th class="audit-col-session-end" data-col="session_ended_at">종료 일시</th>
 									<th class="audit-col-kind" data-col="endpoint_kind">유형</th>
+									<th class="audit-col-category" data-col="category_name">분류</th>
+									<th class="audit-col-operation" data-col="work_operation_code">업무 운영</th>
+									<th class="audit-col-risk-reason" data-col="risk_label">위험 사유</th>
 									<th class="audit-col-action" data-col="action_type">작업</th>
 									<th class="audit-col-result" data-col="action_result">결과</th>
 									<th class="audit-col-fail-reason" data-col="note">실패 사유</th>
@@ -106,7 +136,7 @@
 						</div>
 					</div>
 					<div class="modern-pagination audit-pagination" id="audit-pagination">
-						<div class="pagination-info"><span id="audit-page-info">0개 항목</span></div>
+						<div class="pagination-info"><span id="audit-page-info">0-0 / 0개 항목</span></div>
 						<div class="pagination-controls">
 							<button type="button" class="pagination-btn" id="audit-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
 							<button type="button" class="pagination-btn" id="audit-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
@@ -134,8 +164,8 @@
 								</div>
 							</div>
 							<div class="page-size-selector compact audit-page-size-selector agent-filter-selector">
-								<select id="agent-mapping-filter" class="page-size-select ac-dropdown-input search-select" aria-label="연동 상태 필터" data-searchable-scope="page" data-placeholder="연동 상태">
-									<option value="">전체</option>
+								<select id="agent-mapping-filter" class="page-size-select" aria-label="연동 상태 필터">
+									<option value="">상태 전체</option>
 									<option value="mapped">연결</option>
 									<option value="unmapped">대기</option>
 								</select>
@@ -196,13 +226,193 @@
 						</div>
 					</div>
 					<div class="modern-pagination audit-pagination" id="agent-pagination">
-						<div class="pagination-info"><span id="agent-page-info">0개 항목</span></div>
+						<div class="pagination-info"><span id="agent-page-info">0-0 / 0개 항목</span></div>
 						<div class="pagination-controls">
 							<button type="button" class="pagination-btn" id="agent-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
 							<button type="button" class="pagination-btn" id="agent-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
 							<div class="page-numbers" id="agent-page-numbers"></div>
 							<button type="button" class="pagination-btn" id="agent-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
 							<button type="button" class="pagination-btn" id="agent-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
+						</div>
+					</div>
+				</div>
+
+				<div class="tab-pane payment-tab-pane" id="payment-list-pane" hidden>
+					<div class="tab-header audit-tab-header payment-tab-header">
+						<div class="tab-header-left">
+							<h2>결제 기록 <span class="count-badge" id="payment-count">0</span></h2>
+						</div>
+						<div class="tab-header-right audit-toolbar payment-toolbar">
+							<div class="search-container audit-search" role="search">
+								<div class="search-input-wrapper" id="payment-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="payment-keyword-filter" class="search-input" aria-label="결제 기록 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="payment-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+									<div class="search-loader" id="payment-search-loader" aria-hidden="true"></div>
+								</div>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector payment-filter-selector">
+								<select id="payment-status-filter" class="page-size-select" aria-label="결제 상태 필터">
+									<option value="">상태 전체</option>
+									<option value="승인대기">승인대기</option>
+									<option value="승인">승인</option>
+									<option value="부분 승인">부분 승인</option>
+									<option value="반려">반려</option>
+									<option value="취소">취소</option>
+									<option value="만료">만료</option>
+								</select>
+							</div>
+							<div class="audit-date-tools" aria-label="결제 기록 기간 필터">
+								<input id="payment-from-date" class="request-date-input audit-date-input" name="payment_from_date" type="text" placeholder="시작일" autocomplete="off" readonly aria-label="결제 시작일">
+								<span aria-hidden="true">~</span>
+								<input id="payment-to-date" class="request-date-input audit-date-input" name="payment_to_date" type="text" placeholder="종료일" autocomplete="off" readonly aria-label="결제 종료일">
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector">
+								<select id="payment-page-size" class="page-size-select" aria-controls="payment-table" aria-label="페이지 당 결제 기록 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="30">30 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<button type="button" class="header-btn" id="payment-download-btn" title="CSV 다운로드" aria-label="결제 기록 CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
+							<button type="button" class="header-btn" id="payment-reset-btn" title="초기화" aria-label="결제 기록 필터 초기화">
+								<img src="/static/image/svg/free-icon-font-message-circle-refresh1.svg" alt="초기화" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<div class="system-table-container audit-table-container payment-table-container" id="payment-table-wrap">
+						<table class="system-data-table audit-table payment-table" id="payment-table">
+							<thead>
+								<tr>
+									<th class="payment-col-date">신청일</th>
+									<th class="payment-col-no">신청번호</th>
+									<th class="payment-col-category">신청 구분</th>
+									<th class="payment-col-action">신청 작업</th>
+									<th class="payment-col-resource">자원 개수</th>
+									<th class="payment-col-status">상태</th>
+									<th class="payment-col-stage">승인 단계</th>
+									<th class="payment-col-requester">신청자</th>
+									<th class="payment-col-approver">승인자</th>
+									<th class="payment-col-emergency">긴급</th>
+								</tr>
+							</thead>
+							<tbody id="payment-table-body"></tbody>
+						</table>
+					</div>
+					<div id="payment-empty" class="system-empty audit-empty" hidden role="status" aria-live="polite">
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3 id="payment-empty-title">결제 기록이 없습니다.</h3>
+							<p id="payment-empty-desc">조건을 변경해 다시 조회하세요.</p>
+						</div>
+					</div>
+					<div class="modern-pagination audit-pagination" id="payment-pagination">
+						<div class="pagination-info"><span id="payment-page-info">0-0 / 0개 항목</span></div>
+						<div class="pagination-controls">
+							<button type="button" class="pagination-btn" id="payment-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
+							<button type="button" class="pagination-btn" id="payment-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
+							<div class="page-numbers" id="payment-page-numbers"></div>
+							<button type="button" class="pagination-btn" id="payment-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
+							<button type="button" class="pagination-btn" id="payment-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
+						</div>
+					</div>
+				</div>
+
+				<div class="tab-pane asset-tab-pane" id="asset-list-pane" hidden>
+					<div class="tab-header audit-tab-header asset-tab-header">
+						<div class="tab-header-left">
+							<h2>자산 기록 <span class="count-badge" id="asset-count">0</span></h2>
+						</div>
+						<div class="tab-header-right audit-toolbar asset-toolbar">
+							<div class="search-container audit-search" role="search">
+								<div class="search-input-wrapper" id="asset-search-wrapper">
+									<img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+									<input type="text" id="asset-keyword-filter" class="search-input" aria-label="자산 기록 검색" autocomplete="off">
+									<button type="button" class="search-clear-btn" id="asset-search-clear" title="지우기" aria-label="검색어 지우기">
+										<img src="/static/image/svg/list/free-icon-trash.svg" alt="" class="search-clear-icon" aria-hidden="true">
+									</button>
+									<div class="search-loader" id="asset-search-loader" aria-hidden="true"></div>
+								</div>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector asset-filter-selector">
+								<select id="asset-category-filter" class="page-size-select" aria-label="자산 분류 필터">
+									<option value="">분류 전체</option>
+									<option value="시스템">시스템</option>
+									<option value="서비스">서비스</option>
+									<option value="컨테이너">컨테이너</option>
+									<option value="관리콘솔">관리콘솔</option>
+								</select>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector asset-filter-selector">
+								<select id="asset-status-filter" class="page-size-select" aria-label="자산 상태 필터">
+									<option value="">상태 전체</option>
+									<option value="active">사용</option>
+									<option value="blocked">차단</option>
+								</select>
+							</div>
+							<div class="page-size-selector compact audit-page-size-selector">
+								<select id="asset-page-size" class="page-size-select" aria-controls="asset-table" aria-label="페이지 당 자산 기록 수">
+									<option value="10" selected>10 개</option>
+									<option value="20">20 개</option>
+									<option value="30">30 개</option>
+									<option value="50">50 개</option>
+									<option value="100">100 개</option>
+								</select>
+							</div>
+							<button type="button" class="header-btn" id="asset-download-btn" title="CSV 다운로드" aria-label="자산 기록 CSV 다운로드">
+								<img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon">
+							</button>
+							<button type="button" class="header-btn" id="asset-reset-btn" title="초기화" aria-label="자산 기록 필터 초기화">
+								<img src="/static/image/svg/free-icon-font-message-circle-refresh1.svg" alt="초기화" class="header-icon">
+							</button>
+						</div>
+					</div>
+
+					<div class="system-table-container audit-table-container asset-table-container" id="asset-table-wrap">
+						<table class="system-data-table audit-table asset-table" id="asset-table">
+							<thead>
+								<tr>
+									<th class="asset-col-date">등록일</th>
+									<th class="asset-col-category">분류</th>
+									<th class="asset-col-kind">유형</th>
+									<th class="asset-col-name">자원명</th>
+									<th class="asset-col-operation">업무 운영/장비군</th>
+									<th class="asset-col-access">접속정보</th>
+									<th class="asset-col-status">상태</th>
+									<th class="asset-col-period">기본 기간</th>
+									<th class="asset-col-approval">승인</th>
+									<th class="asset-col-owner">등록자</th>
+								</tr>
+							</thead>
+							<tbody id="asset-table-body"></tbody>
+						</table>
+					</div>
+					<div id="asset-empty" class="system-empty audit-empty" hidden role="status" aria-live="polite">
+						<div class="empty-illustration">
+							<img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img" loading="lazy">
+						</div>
+						<div class="empty-text">
+							<h3 id="asset-empty-title">자산 기록이 없습니다.</h3>
+							<p id="asset-empty-desc">조건을 변경해 다시 조회하세요.</p>
+						</div>
+					</div>
+					<div class="modern-pagination audit-pagination" id="asset-pagination">
+						<div class="pagination-info"><span id="asset-page-info">0-0 / 0개 항목</span></div>
+						<div class="pagination-controls">
+							<button type="button" class="pagination-btn" id="asset-first" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button>
+							<button type="button" class="pagination-btn" id="asset-prev" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button>
+							<div class="page-numbers" id="asset-page-numbers"></div>
+							<button type="button" class="pagination-btn" id="asset-next" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button>
+							<button type="button" class="pagination-btn" id="asset-last" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button>
 						</div>
 					</div>
 				</div>

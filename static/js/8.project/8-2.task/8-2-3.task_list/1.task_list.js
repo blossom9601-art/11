@@ -534,7 +534,8 @@
                         // 작업 이름: 링크로 표시, 클릭 시 작업보고서 팝업. 긴 이름은 생략(ellipsis).
                         const raw = r[c];
                         const rendered = renderCell(c, raw);
-                        return `<td data-col="task_name" class="task-name-cell"><a class="work-name-link task-name-ellipsis" href="2.task_detail.html?id=${encodeURIComponent(r.id)}" data-action="detail" data-id="${encodeURIComponent(r.id)}" title="${escapeHTML(raw)}">${rendered}</a></td>`;
+                        const detailHref = r.detail_url || (r.public_id ? `/b/${encodeURIComponent(r.public_id)}` : `/b/2.task_detail.html?id=${encodeURIComponent(r.id)}`);
+                        return `<td data-col="task_name" class="task-name-cell"><a class="work-name-link task-name-ellipsis" href="${detailHref}" data-action="detail" data-id="${encodeURIComponent(r.id)}" title="${escapeHTML(raw)}">${rendered}</a></td>`;
                     }
                     if(c === 'project_name') {
                         // Wrap 프로젝트 이름 with link to 프로젝트 상세 페이지 (consistent navigation)
@@ -992,7 +993,7 @@
                     e.preventDefault();
                     const rid = link.getAttribute('data-id');
                     try{
-                        const url = link.getAttribute('href') || `2.task_detail.html?id=${encodeURIComponent(rid)}`;
+                        const url = link.getAttribute('href') || `/b/2.task_detail.html?id=${encodeURIComponent(rid)}`;
                         const w = 1100;
                         const h = 900;
                         const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
@@ -1135,7 +1136,7 @@
         document.getElementById(ADD_BTN_ID)?.addEventListener('click', (e)=> {
             e && e.preventDefault && e.preventDefault();
             try{
-                const url = '2.task_detail.html';
+                const url = `/b/${(window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; const v = c === 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); })}`;
                 const w = 1100;
                 const h = 900;
                 const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
@@ -1163,7 +1164,7 @@
 				}
             }catch(_e){
                 // fallback: same-tab navigation
-                blsSpaNavigate('2.task_detail.html');
+                blsSpaNavigate(`/b/${(window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; const v = c === 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); })}`);
             }
         });
         document.getElementById(ADD_CLOSE_ID)?.addEventListener('click', ()=> closeModal(ADD_MODAL_ID));
@@ -1434,7 +1435,7 @@
                 if(newId){
                     showMessage('보고서가 재활용되었습니다. 새 초안을 엽니다.', '완료');
                     setTimeout(()=>{
-                        const url = `2.task_detail.html?id=${encodeURIComponent(newId)}`;
+                        const url = (json && json.item && json.item.detail_url) ? json.item.detail_url : `/b/2.task_detail.html?id=${encodeURIComponent(newId)}`;
                         const w = 1100, h = 900;
                         const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
                         const top = Math.max(0, Math.floor((window.screen.height - h) / 2));

@@ -8,8 +8,8 @@
     <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
     <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-    <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260606_count1">
+    <link rel="stylesheet" href="/static/css/system.css?v=4.33">
     <link rel="stylesheet" href="/static/css/detail.css?v=4.35">
 </head>
 <body>
@@ -86,6 +86,7 @@
                                 </button>
                                 <button class="header-btn" id="system-download-btn" title="CSV 다운로드"><img src="/static/image/svg/list/free-icon-download.svg" alt="CSV" class="header-icon"></button>
                                 <button class="header-btn" id="system-column-btn" title="컬럼 선택"><img src="/static/image/svg/list/free-icon-settings.svg" alt="컬럼" class="header-icon"></button>
+                                <button class="header-btn agent-view-btn" id="system-agent-view-btn" style="background:#6366F1;border-color:#6366F1;color:#fff" title="에이전트 뷰" aria-label="에이전트 뷰" data-agent-view-supported="true"><img src="/static/image/svg/agent/free-icon-font-coffee.svg" alt="에이전트 뷰" class="header-icon"></button>
                                 <button class="header-btn" id="system-add-btn" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
                             </div>
                         </div>
@@ -101,6 +102,10 @@
                                         <th data-col="work_group">업무 그룹</th>
                                         <th data-col="work_name">업무 이름</th>
                                         <th data-col="system_name">시스템 이름</th>
+                                        <th data-col="agent_status" class="col-hidden">에이전트 상태</th>
+                                        <th data-col="agent_version" class="col-hidden">에이전트 버전</th>
+                                        <th data-col="agent_registered_at" class="col-hidden">등록 일자</th>
+                                        <th data-col="agent_last_received" class="col-hidden">마지막 수신</th>
                                         <th data-col="system_ip">시스템 IP</th>
                                         <th data-col="manage_ip">관리 IP</th>
                                         <th data-col="vendor">시스템 제조사</th>
@@ -155,11 +160,11 @@
             </div>
         </main>
 
-        <script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix"></script>
+        <script src="/static/js/blossom.js?v=20260512_stat_empty_unified1"></script>
         <script>
             window.__HW_ONPREM_DETAIL_URL = "{{ url_for('pages.blossom_hub', segment='hw_server_onpremise_detail') }}";
         </script>
-        <script src="/static/js/2.hardware/2-1.server/2-1-1.onpremise/1.onpremise_list.js?v=rackfix20260510f"></script>
+        <script src="/static/js/2.hardware/2-1.server/2-1-1.onpremise/1.onpremise_list.js?v=agentviewrestore20260530a"></script>
 
         <!-- 시스템 추가 모달 -->
         <div id="system-add-modal" class="system-add-modal server-add-modal modal-overlay-full" aria-hidden="true">
@@ -467,4 +472,3 @@
         <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
 </body>
 </html>
-

@@ -63,7 +63,7 @@
 		var last = clampPage();
 		var start = total ? ((page - 1) * pageSize) + 1 : 0;
 		var end = total ? Math.min(total, page * pageSize) : 0;
-		info.textContent = total ? (start + '-' + end + ' / ' + total + '개') : '0개 항목';
+		info.textContent = total ? (start + '-' + end + ' / ' + total + '개 항목') : '0-0 / 0개 항목';
 		if (!total) {
 			numbers.innerHTML = '';
 			prev.disabled = true;

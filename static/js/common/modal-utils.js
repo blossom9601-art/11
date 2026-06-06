@@ -158,6 +158,69 @@
     });
   }
 
+  function message(messageText, opts) {
+    opts = opts || {};
+    var modalId = opts.modalId || 'system-message-modal';
+    var modal = getModal(modalId);
+    var titleText = opts.title || '알림';
+    var text = messageText || '';
+
+    if (!modal) {
+      alert(text || titleText);
+      return Promise.resolve('confirm');
+    }
+
+    var titleEl = document.getElementById(opts.titleId || 'message-title') || modal.querySelector('.bls-download-modal__title, h3');
+    var contentEl = document.getElementById(opts.contentId || 'message-content') || modal.querySelector('.bls-download-modal__primary, .dispose-text p');
+    var okBtn = document.getElementById(opts.okId || 'system-message-ok') || modal.querySelector('.btn-primary, [data-action="confirm"]');
+    var closeBtn = document.getElementById(opts.closeId || 'system-message-close') || modal.querySelector('.close-btn');
+    var illust = modal.querySelector('.message-illust img, .bls-download-modal__illust img');
+
+    if (titleEl) titleEl.textContent = titleText;
+    if (contentEl) contentEl.textContent = text;
+    if (opts.illustrationSrc && illust) illust.src = opts.illustrationSrc;
+    if (opts.illustrationAlt && illust) illust.alt = opts.illustrationAlt;
+
+    return new Promise(function (resolve) {
+      var done = false;
+
+      function cleanup(result) {
+        if (done) return;
+        done = true;
+        if (okBtn) okBtn.removeEventListener('click', onOk);
+        if (closeBtn) closeBtn.removeEventListener('click', onCancel);
+        modal.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onKey);
+        close(modal);
+        resolve(result || 'confirm');
+      }
+
+      function onOk() { cleanup('confirm'); }
+      function onCancel() { cleanup('cancel'); }
+      function onBackdrop(event) { if (event.target === modal) cleanup('cancel'); }
+      function onKey(event) {
+        if (event.key === 'Escape') cleanup('cancel');
+        if (event.key === 'Enter') cleanup('confirm');
+      }
+
+      if (okBtn) okBtn.addEventListener('click', onOk);
+      if (closeBtn) closeBtn.addEventListener('click', onCancel);
+      modal.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onKey);
+
+      open(modal);
+      if (okBtn) requestAnimationFrame(function () { okBtn.focus(); });
+    });
+  }
+
+  function deleteSelectionRequired(opts) {
+    opts = opts || {};
+    opts.title = opts.title || '삭제처리';
+    opts.illustrationSrc = opts.illustrationSrc || '/static/image/svg/list/free-sticker-solution.svg';
+    opts.illustrationAlt = opts.illustrationAlt || '안내 일러스트';
+    return message('삭제처리할 행을 먼저 선택하세요.', opts);
+  }
+
   /* ── XSS 방지 ── */
   function _escapeHtml(str) {
     if (!str) return '';
@@ -217,6 +280,8 @@
     open: open,
     close: close,
     confirm: confirm,
+    message: message,
+    deleteSelectionRequired: deleteSelectionRequired,
     /** 현재 활성 모달 목록 (읽기 전용) */
     get active() { return activeModals.slice(); }
   };

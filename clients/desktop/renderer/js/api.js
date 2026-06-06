@@ -89,6 +89,9 @@
       return fetch(this.serverUrl + '/logout', { credentials: 'include' }).catch(() => null);
     },
     sessionCheck() { return this._fetch('/api/auth/session-check'); },
+    aiChat(payload) {
+      return this._fetch('/api/ai/chat', { method: 'POST', body: payload || {} });
+    },
 
     // ── 내 프로필 ────────────────────────────────────────
     myProfile() { return this._fetch('/api/me/profile'); },
@@ -374,6 +377,9 @@
     },
     reorderMemos(groupId, payload) {
       return this._fetch('/api/memo/groups/' + groupId + '/memos/reorder', { method: 'POST', body: payload });
+    },
+    getMemoUsage() {
+      return this._fetch('/api/memo/usage');
     },
 
     registerDevice() { return Promise.resolve(null); },

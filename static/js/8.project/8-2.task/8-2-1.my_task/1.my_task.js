@@ -214,7 +214,7 @@
                 const rid = parseInt(String(reportId||''), 10);
                 if(!Number.isFinite(rid) || rid <= 0) return;
                 try{
-                    const url = href || `/p/2.task_detail.html?id=${encodeURIComponent(rid)}`;
+                    const url = href || `/b/2.task_detail.html?id=${encodeURIComponent(rid)}`;
                     const w = 1100;
                     const h = 900;
                     const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
@@ -238,7 +238,7 @@
                         }, 700);
                     }
                 }catch(_e){
-                    blsSpaNavigate(`/p/2.task_detail.html?id=${encodeURIComponent(rid)}`);
+                    blsSpaNavigate(`/b/2.task_detail.html?id=${encodeURIComponent(rid)}`);
                 }
             }
 
@@ -441,14 +441,15 @@
                                                         const isSelected = SELECTED.has(it.id);
                                                         // 상태별 액션 버튼 (승인 버튼은 팀장/승인권자만)
                                                         let extraActions = '';
-                                                        const editBtn = (status==='검토' && !_canApprove) ? `<button class="action-btn" data-action="edit" data-id="${it.id}" data-href="/p/2.task_detail.html?id=${it.id}&mode=edit" title="수정" aria-label="수정"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정" class="action-icon"/></button>` : '';
+                                                        const detailHref = it.detail_url || (it.public_id ? `/b/${encodeURIComponent(it.public_id)}` : `/b/2.task_detail.html?id=${encodeURIComponent(it.id)}`);
+                                                        const editBtn = (status==='검토' && !_canApprove) ? `<button class="action-btn" data-action="edit" data-id="${it.id}" data-href="${detailHref}?mode=edit" title="수정" aria-label="수정"><img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정" class="action-icon"/></button>` : '';
                                                         const recallBtn = (status==='검토' && !_canApprove) ? `<button class="btn-action btn-action-recall" data-id="${it.id}" data-action="recall" title="회수" aria-label="회수"><img src="/static/image/svg/admin/free-icon-undo.svg" alt="회수" class="icon-action"/></button>` : '';
                                                         if(_canApprove && status==='검토') extraActions = `<button class="btn-action btn-action-reject" data-id="${it.id}" data-action="reject" title="반려" aria-label="반려"><img src="/static/image/svg/free-icon-circle-xmark.svg" alt="반려" class="icon-action"/></button><button class="btn-action btn-action-approve" data-id="${it.id}" data-action="approve-init" title="승인" aria-label="승인"><img src="/static/image/svg/free-icon-font-octagon-check.svg" alt="승인" class="icon-action"/></button>`;
                                                         else if(status==='수행') extraActions = `<button class="btn-action btn-action-submit" data-id="${it.id}" data-action="submit-result" title="결과등록" aria-label="결과등록"><img src="/static/image/svg/free-icon-font-registration-paper.svg" alt="결과등록" class="icon-action"/></button>`;
                                                         else if(_canApprove && status==='완료대기') extraActions = `<button class="btn-action btn-action-approve" data-id="${it.id}" data-action="approve-final" title="승인" aria-label="승인"><img src="/static/image/svg/free-icon-font-octagon-check.svg" alt="승인" class="icon-action"/></button>`;
                                                                                                                 return `<tr data-id="${it.id}" class="${isSelected?'selected':''}">
                                                                                         <td class="col-check"><input type="checkbox" class="chk-row system-row-select" aria-label="선택" data-id="${it.id}" ${isSelected?'checked':''}></td>
-                                                                                        <td class="col-name" data-col="task_name" title="${name}"><a href="/p/2.task_detail.html?id=${it.id}" class="task-name-link task-detail-link" data-id="${it.id}">${name}</a></td>
+                                                                                        <td class="col-name" data-col="task_name" title="${name}"><a href="${detailHref}" class="task-name-link task-detail-link" data-id="${it.id}">${name}</a></td>
                                                                                         <td class="col-start" data-col="start_datetime" title="${sdt}">${sdt}</td>
                                                                                         <td class="col-end" data-col="end_datetime" title="${edt}">${edt}</td>
                                                                                                                         <td class="col-impact" data-col="impact">${impact}</td>
@@ -493,7 +494,7 @@
 
             function openNewReportPopup(){
                 try{
-                    const url = '/p/2.task_detail.html';
+                    const url = `/b/${(window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; const v = c === 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); })}`;
                     const w = 1100;
                     const h = 900;
                     const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
@@ -513,7 +514,7 @@
                         }, 700);
                     }
                 }catch(_e){
-                    blsSpaNavigate('/p/2.task_detail.html');
+                    blsSpaNavigate(`/b/${(window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; const v = c === 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); })}`);
                 }
             }
             function initAddReportBtn(){

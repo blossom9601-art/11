@@ -69,6 +69,7 @@ STATE_PATH = PROGRAM_DATA_DIR / "state.json"
 POLICY_CACHE_PATH = PROGRAM_DATA_DIR / "policy-cache.json"
 SERVICE_EXE = PROGRAM_FILES_DIR / "LuminaGateAgent.exe"
 PUTTY_PROGFILES_DIR = PROGRAM_FILES_DIR / "putty"
+FILEZILLA_PROGFILES_DIR = PROGRAM_FILES_DIR / "filezilla"
 TRAY_MUTEX_NAME = "Global\\LuminaGateAgentTrayMutex"
 TRAY_REG_VALUE = "LuminaGateAgentTray"
 ASSET_ICO = "lumina-gate-reference.ico"
@@ -332,6 +333,14 @@ def bundled_putty_dir() -> Path:
     return Path(__file__).resolve().parent / "putty_bundle"
 
 
+def bundled_filezilla_dir() -> Path:
+    """FileZilla beside the agent bundle (frozen: _MEIPASS/filezilla; dev: filezilla_bundle/)."""
+
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "filezilla"
+    return Path(__file__).resolve().parent / "filezilla_bundle"
+
+
 def deploy_bundled_putty_to_program_files() -> bool:
     """Stage PuTTY helpers under Program Files\\LuminaGateAgent\\putty (installer / repair; requires admin).
 
@@ -355,6 +364,28 @@ def deploy_bundled_putty_to_program_files() -> bool:
         return True
     except OSError as exc:
         logging.warning("Failed to deploy PuTTY sidecar to %s: %s", dst, exc)
+        return False
+
+
+def deploy_bundled_filezilla_to_program_files() -> bool:
+    """Stage FileZilla under Program Files\\LuminaGateAgent\\filezilla for SFTP endpoints."""
+
+    src = bundled_filezilla_dir()
+    dst = FILEZILLA_PROGFILES_DIR
+    if not src.is_dir() or not (src / "FileZilla.exe").is_file():
+        logging.warning("FileZilla bundle missing or incomplete (%s); skip Program Files staging", src)
+        return False
+    try:
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+        try:
+            (dst / ".lumina_filezilla_bundle_rev").write_text(VERSION + "\n", encoding="utf-8")
+        except OSError:
+            pass
+        return True
+    except OSError as exc:
+        logging.warning("Failed to deploy FileZilla sidecar to %s: %s", dst, exc)
         return False
 
 
@@ -383,6 +414,33 @@ def register_blossom_ssh_protocol_hkcu_for_putty_bundle() -> None:
             winreg.SetValueEx(k_cmd, "", 0, winreg.REG_SZ, open_cmd_value)
     except OSError:
         logging.exception("Failed to register HKCU blossom-ssh protocol")
+
+
+def register_blossom_sftp_protocol_hkcu_for_filezilla_bundle() -> None:
+    """Map blossom-sftp:// to the same local launcher, which opens bundled FileZilla."""
+
+    if os.name != "nt":
+        return
+    launcher = PUTTY_PROGFILES_DIR / "BlossomSshLaunch.exe"
+    filezilla = FILEZILLA_PROGFILES_DIR / "FileZilla.exe"
+    if not launcher.is_file() or not filezilla.is_file():
+        return
+    try:
+        import winreg
+    except ImportError:
+        return
+
+    open_cmd_value = "\"" + str(launcher.resolve()) + "\"" + " \"%1\""
+    hk = winreg.HKEY_CURRENT_USER
+
+    try:
+        with winreg.CreateKey(hk, r"Software\Classes\blossom-sftp") as k_cls:
+            winreg.SetValueEx(k_cls, "", 0, winreg.REG_SZ, "URL:blossom-sftp protocol")
+            winreg.SetValueEx(k_cls, "URL Protocol", 0, winreg.REG_SZ, "")
+        with winreg.CreateKey(hk, r"Software\Classes\blossom-sftp\shell\open\command") as k_cmd:
+            winreg.SetValueEx(k_cmd, "", 0, winreg.REG_SZ, open_cmd_value)
+    except OSError:
+        logging.exception("Failed to register HKCU blossom-sftp protocol")
 
 
 def unregister_blossom_ssh_protocol_if_lumina_managed() -> None:
@@ -414,6 +472,47 @@ def unregister_blossom_ssh_protocol_if_lumina_managed() -> None:
             r"Software\Classes\blossom-ssh\shell\open",
             r"Software\Classes\blossom-ssh\shell",
             r"Software\Classes\blossom-ssh",
+        )
+        for p in paths:
+            try:
+                winreg.DeleteKey(hk, p)
+            except FileNotFoundError:
+                continue
+            except OSError:
+                continue
+    except OSError:
+        pass
+
+
+def unregister_blossom_sftp_protocol_if_lumina_managed() -> None:
+    """Remove HKCU blossom-sftp only when it points into our Program Files launcher."""
+
+    if os.name != "nt":
+        return
+    tail_cmd = r"Software\Classes\blossom-sftp\shell\open\command"
+
+    try:
+        import winreg
+
+        hk = winreg.HKEY_CURRENT_USER
+
+        try:
+            with winreg.OpenKey(hk, tail_cmd) as k_cmd:
+                cmd, _typ = winreg.QueryValueEx(k_cmd, "")
+        except FileNotFoundError:
+            return
+        lowered = cmd.replace("/", "\\").casefold()
+        try:
+            ours = str((PUTTY_PROGFILES_DIR / "BlossomSshLaunch.exe").resolve()).replace("/", "\\").casefold()
+        except OSError:
+            return
+        if ours not in lowered and rf"luminagateagent\putty\blossomsshlaunch.exe" not in lowered:
+            return
+        paths = (
+            r"Software\Classes\blossom-sftp\shell\open\command",
+            r"Software\Classes\blossom-sftp\shell\open",
+            r"Software\Classes\blossom-sftp\shell",
+            r"Software\Classes\blossom-sftp",
         )
         for p in paths:
             try:
@@ -1540,6 +1639,7 @@ def run_tray() -> None:
     ensure_dirs()
     install_assets_to_programdata()
     register_blossom_ssh_protocol_hkcu_for_putty_bundle()
+    register_blossom_sftp_protocol_hkcu_for_filezilla_bundle()
     config = load_config()
     lang = str(config.get("language") or "ko")
     if lang not in I18N:
@@ -2129,6 +2229,8 @@ class GateClient:
             "agent_id": self.agent_id,
             "hostname": info["hostname"],
             "current_user": info["username"],
+            "ip_address": info.get("ip_address") or "",
+            "mac_address": info.get("mac_address") or "",
             "agent_version": VERSION,
             "policy_version": policy_version,
             "service_status": "RUNNING",
@@ -2484,7 +2586,9 @@ def install_service_impl(lang: str) -> None:
             raise
     install_assets_to_programdata()
     deploy_bundled_putty_to_program_files()
+    deploy_bundled_filezilla_to_program_files()
     register_blossom_ssh_protocol_hkcu_for_putty_bundle()
+    register_blossom_sftp_protocol_hkcu_for_filezilla_bundle()
     config = load_config()
     config["language"] = lang
     save_config(config)
@@ -2508,6 +2612,7 @@ def uninstall_service(purge: bool = False) -> None:
         raise SystemExit("Run as administrator to uninstall LuminaGateAgent.")
     unregister_tray_autostart()
     unregister_blossom_ssh_protocol_if_lumina_managed()
+    unregister_blossom_sftp_protocol_if_lumina_managed()
     run_cmd(["sc.exe", "stop", SERVICE_NAME])
     run_cmd(["sc.exe", "delete", SERVICE_NAME])
     if SERVICE_EXE.exists():

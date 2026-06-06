@@ -58,9 +58,32 @@
 			return null;
 		}
 	}
+	function isUuidText(value){
+		return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+	}
+	function newReportPublicId(){
+		try{
+			if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+		}catch(_e){}
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+			const r = Math.random() * 16 | 0;
+			const v = c === 'x' ? r : (r & 0x3 | 0x8);
+			return v.toString(16);
+		});
+	}
+	function getReportPublicIdFromUrl(){
+		const serverToken = String(window.__WRK_REPORT_PUBLIC_ID || '').trim();
+		if(isUuidText(serverToken)) return serverToken;
+		try{
+			const seg = decodeURIComponent(String(window.location.pathname || '').split('/').filter(Boolean).pop() || '');
+			if(isUuidText(seg)) return seg;
+		}catch(_e){}
+		return null;
+	}
 	let REPORT_ID = getReportIdFromUrl();
+	let REPORT_PUBLIC_ID = getReportPublicIdFromUrl();
 	function _storageKey(){
-		return `${STORAGE_KEY_BASE}:${REPORT_ID || 'new'}`;
+		return `${STORAGE_KEY_BASE}:${REPORT_ID || REPORT_PUBLIC_ID || 'new'}`;
 	}
 	let REPORT_STATUS_CODE = 'DRAFT';
 	/** @type {ReturnType<initAttachments>|null} */
@@ -88,13 +111,31 @@
 		// subsequent saves will go to the new key.
 		try{
 			const url = new URL(window.location.href);
-			if(id == null || String(id).trim() === ''){
+			if(REPORT_PUBLIC_ID){
+				url.pathname = `/b/${encodeURIComponent(REPORT_PUBLIC_ID)}`;
+				url.searchParams.delete('id');
+				url.searchParams.delete('report_id');
+				url.searchParams.delete('reportId');
+			}else if(id == null || String(id).trim() === ''){
 				url.searchParams.delete('id');
 				url.searchParams.delete('report_id');
 				url.searchParams.delete('reportId');
 			}else{
 				url.searchParams.set('id', String(id));
 			}
+			window.history.replaceState({}, '', url.toString());
+		}catch(_e){}
+	}
+	function setReportPublicId(publicId){
+		const pid = String(publicId || '').trim();
+		if(!isUuidText(pid)) return;
+		REPORT_PUBLIC_ID = pid;
+		try{
+			const url = new URL(window.location.href);
+			url.pathname = `/b/${encodeURIComponent(pid)}`;
+			url.searchParams.delete('id');
+			url.searchParams.delete('report_id');
+			url.searchParams.delete('reportId');
 			window.history.replaceState({}, '', url.toString());
 		}catch(_e){}
 	}
@@ -535,6 +576,18 @@
 		if(!reportId) return false;
 		const { res, json } = await fetchJson(`/api/wrk/reports/${encodeURIComponent(reportId)}`);
 		if(!res.ok || !json || json.success !== true || !json.item) return false;
+		if(json.item.public_id) setReportPublicId(json.item.public_id);
+		if(json.item.id) REPORT_ID = json.item.id;
+		applyApiItemToForm(json.item);
+		return true;
+	}
+	async function loadFromApiByPublicId(publicId){
+		if(!isUuidText(publicId)) return false;
+		const { res, json } = await fetchJson(`/api/wrk/reports/public/${encodeURIComponent(publicId)}`);
+		if(res.status === 404) return false;
+		if(!res.ok || !json || json.success !== true || !json.item) return false;
+		if(json.item.public_id) setReportPublicId(json.item.public_id);
+		if(json.item.id) REPORT_ID = json.item.id;
 		applyApiItemToForm(json.item);
 		return true;
 	}
@@ -1244,6 +1297,7 @@
 			impact: data.impact || null,
 			draft_date: data.draft_date || null,
 			payload_json: data,
+			public_id: REPORT_PUBLIC_ID || undefined,
 			classifications: data.categories || null,
 			worktypes: data.work_types || null,
 			participant_user_ids: Array.isArray(participant_user_ids) ? participant_user_ids : undefined,
@@ -1269,6 +1323,7 @@
 			return { ok:false, message: (json && json.message) ? json.message : '서버 생성에 실패했습니다.' };
 		}
 		if(json.item.id){
+			if(json.item.public_id) setReportPublicId(json.item.public_id);
 			setReportId(json.item.id);
 		}
 		try{ applyApiItemToForm(json.item); } catch(_e){}
@@ -2412,6 +2467,7 @@
 			systemSelectState.selectedKeys = new Set();
 			_syncSystemSelectedHint();
 		}
+		try{ initSystemSelectSearchableFilters(); }catch(_e){}
 		modal.classList.add('show');
 		modal.setAttribute('aria-hidden','false');
 		document.body.classList.add('modal-open');
@@ -3993,6 +4049,23 @@
 		}
 
 		// localStorage 임시저장 복원 (있으면)
+		if(REPORT_PUBLIC_ID){
+			const ok = await loadFromApiByPublicId(REPORT_PUBLIC_ID);
+			if(ok){
+				if(userDept){
+					const draftDept = $('[data-field="draft_dept"]');
+					if(draftDept) draftDept.value = userDept;
+				}
+				try{ updatePersistButton(); }catch(_e){}
+				try{ lockFormForCompleted(); }catch(_e){}
+				try{ lockFormForUser(); }catch(_e){}
+				revealReport();
+				return;
+			}
+		}else{
+			setReportPublicId(newReportPublicId());
+		}
+
 		let loadedFromStorage = false;
 		if(localStorage.getItem(_storageKey())){
 			loadFromStorage();

@@ -918,7 +918,7 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 .access-category-tabs .system-tab-btn:focus-visible,
 .request-category-tabs .system-tab-btn:focus-visible { outline:2px solid #cbd5e1; outline-offset:-2px; border-radius:4px 4px 0 0; }
 .access-connect-filter {
-	grid-template-columns:minmax(220px, 1.4fr) minmax(120px, .8fr) minmax(140px, .8fr);
+	grid-template-columns:minmax(220px, 1.4fr) minmax(120px, .65fr) minmax(130px, .7fr) minmax(140px, .8fr) minmax(150px, .85fr);
 	padding:14px 20px;
 }
 .access-list-wrap { flex:0 0 auto; padding:14px 16px 16px; }
@@ -1342,7 +1342,7 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 .audit-table-wrap { overflow:auto; }
 .audit-table {
 	width:100%;
-	min-width:1180px;
+	min-width:1260px;
 	border-collapse:separate;
 	border-spacing:0;
 }
@@ -1369,6 +1369,8 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 .audit-table tbody tr:hover { background:#f8fafc; }
 .audit-col-check { width:44px; text-align:left; }
 .audit-col-time { width:150px; }
+.audit-col-category { width:128px; }
+.audit-col-operation { width:132px; }
 .audit-col-action { width:96px; }
 .audit-col-result { width:88px; }
 .audit-col-fail-reason { min-width:140px; max-width:220px; }
@@ -1940,6 +1942,10 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 	background-repeat:no-repeat;
 	background-size:14px 14px;
 }
+.access-audit-page .audit-page-size-selector:has(.fk-searchable-control)::after {
+	content:none;
+	display:none;
+}
 .access-audit-page .audit-page-size-selector:focus-within::after {
 	transform:translateY(-50%) rotate(180deg);
 	opacity:1;
@@ -1953,12 +1959,14 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 }
 .access-audit-page .audit-table {
 	width:100%;
-	min-width:1720px;
+	min-width:1850px;
 	table-layout:fixed;
 	border-collapse:collapse;
 	border-spacing:0;
 }
 .access-audit-page .audit-table th {
+	display:table-cell !important;
+	visibility:visible !important;
 	position:sticky;
 	top:0;
 	z-index:10;
@@ -1975,9 +1983,52 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 	text-align:left;
 	white-space:nowrap;
 }
+.access-audit-page .audit-table thead {
+	display:table-header-group !important;
+	visibility:visible !important;
+}
+.access-audit-page .audit-table thead tr {
+	display:table-row !important;
+	height:46px;
+}
 .access-audit-page .audit-table th + th { border-left:1px solid #eef2f7; }
 .access-audit-page .audit-table th.audit-col-check {
 	text-align:left;
+}
+.access-audit-page .audit-table .audit-col-risk-reason {
+	display:none;
+}
+.access-audit-page .audit-table.audit-table-risk-mode {
+	min-width:1460px;
+}
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-risk-reason {
+	display:table-cell;
+}
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-session-end,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-operation,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-action,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-fail-reason,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-dept,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-emp-no,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-connect-account,
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-activity-history {
+	display:none !important;
+}
+.access-audit-page .audit-table.audit-table-risk-mode .audit-col-risk-reason {
+	width:220px;
+}
+.access-audit-page .audit-risk-reason {
+	display:inline;
+	max-width:100%;
+	padding:0;
+	border:0;
+	border-radius:0;
+	background:transparent;
+	color:#111827;
+	font-size:13px;
+	font-weight:400;
+	line-height:1.45;
+	white-space:nowrap;
 }
 .access-audit-page .audit-table td.audit-col-user-name {
 	white-space:normal;
@@ -1986,7 +2037,7 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 	max-width:none;
 }
 .access-audit-page .audit-table td {
-	padding:12px 20px;
+	padding:17px 20px;
 	border-bottom:1px solid #f3f4f6;
 	color:#374151;
 	font-size:13px;
@@ -2004,6 +2055,8 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 .access-audit-page .audit-col-connect-account { width:100px; }
 .access-audit-page .audit-col-activity-history { width:96px; text-align:left; }
 .access-audit-page .audit-col-kind { width:84px; }
+.access-audit-page .audit-col-category { width:128px; }
+.access-audit-page .audit-col-operation { width:132px; }
 .access-audit-page .audit-col-action { width:95px; }
 .access-audit-page .audit-col-result { width:88px; }
 .access-audit-page .audit-col-fail-reason { min-width:160px; max-width:240px; }
@@ -2255,6 +2308,11 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 .access-audit-page .agent-table thead .agent-th-sortable.sort-active-desc {
 	color:#1e1b4b;
 }
+.access-audit-page #audit-table tbody tr,
+.access-audit-page #agent-table tbody tr {
+	height:58px;
+}
+.access-audit-page #audit-table tbody td,
 .access-audit-page #agent-table tbody td {
 	padding-top:17px !important;
 	padding-bottom:17px !important;
@@ -2905,7 +2963,7 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 }
 .resource-picker-toolbar {
 	display:grid;
-	grid-template-columns:minmax(300px, 1fr) repeat(3, 200px) 220px;
+	grid-template-columns:minmax(300px, 1fr) repeat(5, 154px) 220px;
 	gap:8px;
 	padding:10px 12px;
 	border-bottom:1px solid #e2e8f0;
@@ -3659,6 +3717,27 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 	width:100%;
 	min-width:0;
 }
+.access-audit-page .audit-page-size-selector .fk-searchable-display {
+	height:36px;
+	min-height:36px;
+	padding:6px 44px 6px 14px;
+	border:1px solid #d9dce2;
+	border-radius:8px;
+	background:linear-gradient(135deg,#ffffff 0%, #f8fafc 100%);
+	color:#9ca3af;
+	font-size:13px;
+	font-weight:400;
+	line-height:22px;
+}
+.access-audit-page .audit-page-size-selector .fk-searchable-display:not(.has-value) {
+	color:#9ca3af;
+}
+.access-audit-page .audit-page-size-selector .fk-searchable-control .fk-searchable-display::after {
+	right:11px;
+	width:14px !important;
+	height:14px !important;
+	background-size:14px 14px;
+}
 .access-connect-page .fk-searchable-display,
 .access-request-page .fk-searchable-display,
 .access-status-page .fk-searchable-display,
@@ -3844,4 +3923,956 @@ font-size: 11px; font-weight: 700; letter-spacing: .3px; vertical-align: middle;
 	min-height:240px;
 	border:0;
 	background:#fff;
+}
+/* 2026-06-02: access risk audit workspace */
+.access-audit-page .audit-risk-policy {
+	display: grid;
+	grid-template-columns: minmax(260px, 1fr) auto;
+	gap: 14px;
+	align-items: center;
+	margin: 0 0 12px;
+	padding: 14px 16px;
+	border: 1px solid #dbe5f0;
+	border-radius: 8px;
+	background: linear-gradient(180deg, #fff, #f8fbff);
+	box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
+}
+.access-audit-page .audit-risk-policy[hidden] { display: none !important; }
+.access-audit-page .audit-risk-policy-summary strong {
+	display: block;
+	color: #0f172a;
+	font-size: 14px;
+	font-weight: 800;
+}
+.access-audit-page .audit-risk-policy-summary span {
+	display: block;
+	margin-top: 4px;
+	color: #64748b;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.45;
+}
+.access-audit-page .audit-risk-policy-tools {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+}
+.access-audit-page .audit-risk-policy-tools .page-size-select {
+	min-width: 132px;
+	height: 34px;
+}
+.access-audit-page .audit-risk-ip-editor {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.access-audit-page .audit-risk-ip-editor input {
+	width: 190px;
+	height: 34px;
+	padding: 0 10px;
+	border: 1px solid #d7e0eb;
+	border-radius: 8px;
+	color: #0f172a;
+	font-size: 12px;
+	outline: none;
+}
+.access-audit-page .audit-risk-ip-editor input:focus {
+	border-color: #6366F1;
+	box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+}
+.access-audit-page .audit-risk-ip-editor button {
+	height: 34px;
+	padding: 0 12px;
+	border: 1px solid #6366F1;
+	border-radius: 8px;
+	background: #6366F1;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+.access-audit-page .audit-risk-ip-list {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	min-height: 22px;
+}
+.access-audit-page .audit-risk-ip-empty {
+	color: #94a3b8;
+	font-size: 12px;
+}
+.access-audit-page .audit-risk-ip-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 24px;
+	padding: 0 8px;
+	border: 1px solid #fecdd3;
+	border-radius: 999px;
+	background: #fff1f2;
+	color: #9f1239;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+/* 2026-06-02: compact risk criteria button and tabbed modal */
+.access-audit-page .audit-risk-policy {
+	display: flex;
+	justify-content: flex-end;
+	margin: 0 0 10px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+.access-audit-page .audit-risk-policy-open {
+	height: 34px;
+	padding: 0 14px;
+	border: 1px solid #6366F1;
+	border-radius: 8px;
+	background: #6366F1;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 800;
+	cursor: pointer;
+	box-shadow: 0 8px 18px rgba(99, 102, 241, .18);
+}
+.audit-risk-policy-modal {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background: rgba(15, 23, 42, .42);
+}
+.audit-risk-policy-modal.show { display: flex; }
+.audit-risk-policy-dialog {
+	width: min(820px, calc(100vw - 48px));
+	height: 430px;
+	max-height: calc(100vh - 48px);
+	display: flex;
+	flex-direction: column;
+	border-radius: 12px;
+	background: #fff;
+	box-shadow: 0 24px 70px rgba(15, 23, 42, .24);
+	overflow: hidden;
+}
+.audit-risk-policy-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 22px 24px 16px;
+	border-bottom: 1px solid #e2e8f0;
+}
+.audit-risk-policy-header h2 {
+	margin: 0;
+	color: #0f172a;
+	font-size: 20px;
+	font-weight: 800;
+}
+.audit-risk-policy-header p {
+	margin: 6px 0 0;
+	color: #64748b;
+	font-size: 13px;
+}
+.audit-risk-policy-header button {
+	width: 34px;
+	height: 34px;
+	border: 1px solid #dbe5f0;
+	border-radius: 999px;
+	background: #fff;
+	color: #64748b;
+	font-size: 20px;
+	cursor: pointer;
+}
+.audit-risk-policy-tabs {
+	flex: 0 0 auto;
+	display: flex;
+	gap: 8px;
+	padding: 16px 24px 0;
+	border-bottom: 1px solid #eef2f7;
+	overflow-x: auto;
+}
+.audit-risk-policy-tabs button {
+	height: 36px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 3px solid transparent;
+	background: transparent;
+	color: #64748b;
+	font-size: 13px;
+	font-weight: 800;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.audit-risk-policy-tabs button.active {
+	border-bottom-color: #6366F1;
+	color: #4338ca;
+}
+.audit-risk-policy-form {
+	flex: 0 0 auto;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 8px;
+	padding: 18px 24px 12px;
+}
+.audit-risk-policy-form input {
+	height: 38px;
+	padding: 0 12px;
+	border: 1px solid #d7e0eb;
+	border-radius: 8px;
+	color: #0f172a;
+	font-size: 13px;
+	outline: none;
+}
+.audit-risk-policy-form input:focus {
+	border-color: #6366F1;
+	box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+}
+.audit-risk-policy-form button {
+	height: 38px;
+	padding: 0 16px;
+	border: 1px solid #6366F1;
+	border-radius: 8px;
+	background: #6366F1;
+	color: #fff;
+	font-size: 13px;
+	font-weight: 800;
+	cursor: pointer;
+}
+.audit-risk-policy-items {
+	flex: 1 1 auto;
+	min-height: 96px;
+	padding: 0 24px 24px;
+	overflow-y: auto;
+}
+.audit-risk-policy-table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	overflow: hidden;
+	font-size: 12px;
+}
+.audit-risk-policy-table th {
+	height: 34px;
+	padding: 0 10px;
+	background: #f8fafc;
+	border-bottom: 1px solid #e2e8f0;
+	color: #475569;
+	font-weight: 700;
+	text-align: left;
+}
+.audit-risk-policy-table td {
+	height: 38px;
+	padding: 0 10px;
+	border-bottom: 1px solid #edf2f7;
+	color: #0f172a;
+	font-weight: 400;
+	vertical-align: middle;
+}
+.audit-risk-policy-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+.audit-risk-policy-value {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.audit-risk-policy-state {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 22px;
+	min-width: 42px;
+	padding: 0 8px;
+	border-radius: 999px;
+	background: #f1f5f9;
+	color: #64748b;
+	font-size: 11px;
+	font-weight: 700;
+}
+.audit-risk-policy-state.active {
+	background: #dcfce7;
+	color: #166534;
+}
+.audit-risk-policy-delete {
+	height: 26px;
+	padding: 0 9px;
+	border: 1px solid #fecdd3;
+	border-radius: 7px;
+	background: #fff1f2;
+	color: #be123c;
+	font-size: 11px;
+	font-weight: 700;
+	cursor: pointer;
+}
+.audit-risk-policy-delete:hover {
+	background: #ffe4e6;
+}
+.audit-risk-policy-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: #64748b;
+	font-size: 13px;
+	font-weight: 500;
+}
+.audit-risk-policy-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 30px;
+	padding: 0 10px;
+	border: 1px solid #dbeafe;
+	border-radius: 999px;
+	background: #eff6ff;
+	color: #1e40af;
+	font-size: 12px;
+	font-weight: 800;
+	cursor: pointer;
+}
+.audit-risk-policy-empty {
+	color: #94a3b8;
+	font-size: 13px;
+}
+
+/* 2026-06-02: move risk criteria action into toolbar icon */
+.access-audit-page #audit-risk-policy {
+	display: none !important;
+}
+.access-audit-page .audit-risk-policy-toolbar-open {
+	display: none;
+}
+.access-audit-page:has(#audit-tab-risk.active) .audit-risk-policy-toolbar-open {
+	display: inline-flex;
+}
+.access-audit-page:has(#audit-tab-risk.active) #audit-work-operation-wrapper {
+	display: none !important;
+}
+.access-audit-page #audit-risk-policy-toolbar-open[hidden] {
+	display: none !important;
+}
+.access-audit-page .audit-risk-policy-toolbar-open .header-icon {
+	width: 17px;
+	height: 17px;
+	opacity: .78;
+}
+
+/* 2026-06-03: enterprise table controls for risk policy modal */
+.audit-risk-policy-items {
+	padding: 0 24px 18px;
+	scrollbar-width: thin;
+	scrollbar-color: #cbd5e1 transparent;
+}
+.audit-risk-policy-items::-webkit-scrollbar {
+	width: 8px;
+}
+.audit-risk-policy-items::-webkit-scrollbar-track {
+	background: transparent;
+}
+.audit-risk-policy-items::-webkit-scrollbar-thumb {
+	border: 2px solid #fff;
+	border-radius: 999px;
+	background: #cbd5e1;
+}
+.audit-risk-policy-items::-webkit-scrollbar-thumb:hover {
+	background: #94a3b8;
+}
+.audit-risk-policy-table {
+	border: 0;
+	border-radius: 0;
+	font-size: 13px;
+}
+.audit-risk-policy-table th {
+	height: 38px;
+	padding: 0 12px;
+	background: #f8fafc;
+	color: #475569;
+	font-size: 12px;
+	font-weight: 800;
+}
+.audit-risk-policy-table td {
+	height: 42px;
+	padding: 0 12px;
+	color: #0f172a;
+	font-size: 13px;
+	font-weight: 500;
+}
+.audit-risk-policy-table th:nth-child(1),
+.audit-risk-policy-table td:nth-child(1) {
+	width: 42px;
+}
+.audit-risk-policy-table th:nth-child(2),
+.audit-risk-policy-table td:nth-child(2) {
+	width: 18%;
+}
+.audit-risk-policy-table th:nth-child(4),
+.audit-risk-policy-table td:nth-child(4) {
+	width: 18%;
+}
+.audit-risk-policy-table th:nth-child(5),
+.audit-risk-policy-table td:nth-child(5) {
+	width: 110px;
+}
+.audit-risk-policy-table th:nth-child(6),
+.audit-risk-policy-table td:nth-child(6) {
+	width: 54px;
+	text-align: center;
+}
+.audit-risk-policy-check {
+	text-align: center !important;
+}
+.audit-risk-policy-check input {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	accent-color: #6366F1;
+	cursor: pointer;
+}
+.audit-risk-policy-value {
+	font-size: 13px;
+	font-weight: 500;
+}
+.audit-risk-policy-state {
+	gap: 7px;
+	width: 74px;
+	height: 26px;
+	min-width: 74px;
+	padding: 0 10px;
+	border: 1px solid #dbe5f0;
+	border-radius: 999px;
+	background: #fff;
+	color: #64748b;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.audit-risk-policy-state.active {
+	border-color: #bbf7d0;
+	background: #f0fdf4;
+	color: #166534;
+}
+.audit-risk-policy-state:disabled {
+	opacity: .62;
+	cursor: wait;
+}
+.audit-risk-policy-state-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	background: #94a3b8;
+	box-shadow: 0 0 0 3px rgba(148, 163, 184, .14);
+}
+.audit-risk-policy-state.active .audit-risk-policy-state-dot {
+	background: #22c55e;
+	box-shadow: 0 0 0 3px rgba(34, 197, 94, .14);
+}
+.audit-risk-policy-delete {
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	background: #fff;
+	color: #94a3b8;
+}
+.audit-risk-policy-delete svg {
+	width: 16px;
+	height: 16px;
+	fill: currentColor;
+}
+.audit-risk-policy-delete:hover {
+	border-color: #fecdd3;
+	background: #fff1f2;
+	color: #e11d48;
+}
+
+/* 2026-06-03: risk criteria modal final sizing and controls */
+.audit-risk-policy-dialog {
+	width: min(1040px, calc(100vw - 64px));
+	height: 560px;
+	max-height: calc(100vh - 72px);
+	border-radius: 12px;
+}
+.audit-risk-policy-header {
+	padding: 24px 30px 18px;
+}
+.audit-risk-policy-header h2 {
+	font-size: 23px;
+	line-height: 1.25;
+}
+.audit-risk-policy-header p {
+	margin-top: 8px;
+	font-size: 14px;
+}
+.audit-risk-policy-tabs {
+	padding: 16px 30px 0;
+	gap: 18px;
+	overflow-x: hidden;
+}
+.audit-risk-policy-tabs button {
+	height: 40px;
+	padding: 0 2px;
+	font-size: 14px;
+}
+.audit-risk-policy-form {
+	padding: 18px 30px 14px;
+	gap: 10px;
+}
+.audit-risk-policy-form input {
+	height: 42px;
+	padding: 0 14px;
+	font-size: 14px;
+}
+.audit-risk-policy-form button {
+	height: 42px;
+	padding: 0 18px;
+	font-size: 14px;
+}
+.audit-risk-policy-items {
+	padding: 0 30px 24px;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(100, 116, 139, .42) transparent;
+}
+.audit-risk-policy-items::-webkit-scrollbar {
+	width: 5px;
+}
+.audit-risk-policy-items::-webkit-scrollbar-track {
+	margin: 6px 0;
+	background: transparent;
+}
+.audit-risk-policy-items::-webkit-scrollbar-thumb {
+	border: 0;
+	border-radius: 999px;
+	background: rgba(100, 116, 139, .34);
+}
+.audit-risk-policy-items::-webkit-scrollbar-thumb:hover {
+	background: rgba(100, 116, 139, .52);
+}
+.audit-risk-policy-table {
+	border: 1px solid #e5edf6;
+	border-radius: 10px;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+	font-size: 14px;
+}
+.audit-risk-policy-table th {
+	height: 42px;
+	padding: 0 14px;
+	background: #f8fafc;
+	border-bottom: 1px solid #dbe5f0;
+	color: #475569;
+	font-size: 13px;
+	font-weight: 800;
+}
+.audit-risk-policy-table td {
+	height: 46px;
+	padding: 0 14px;
+	border-bottom: 1px solid #edf2f7;
+	color: #0f172a;
+	font-size: 14px;
+	font-weight: 500;
+}
+.audit-risk-policy-table tbody tr:hover td {
+	background: #fbfdff;
+}
+.audit-risk-policy-check input {
+	width: 17px;
+	height: 17px;
+}
+.audit-risk-policy-value {
+	font-size: 14px;
+}
+.audit-risk-policy-state {
+	width: 82px;
+	height: 28px;
+	min-width: 82px;
+	gap: 8px;
+	background: #fff;
+	border: 1px solid #dbe5f0;
+	color: #64748b;
+	font-size: 13px;
+	font-weight: 700;
+}
+.audit-risk-policy-state.active {
+	border-color: #bbf7d0;
+	background: #f0fdf4;
+	color: #166534;
+}
+.audit-risk-policy-state-dot {
+	width: 8px;
+	height: 8px;
+}
+.audit-risk-policy-delete {
+	width: 32px;
+	height: 32px;
+	border: 1px solid #dbe5f0;
+	border-radius: 8px;
+	background: #fff;
+	color: #94a3b8;
+	box-shadow: none;
+}
+.audit-risk-policy-delete svg {
+	width: 17px;
+	height: 17px;
+}
+.audit-risk-policy-delete:hover {
+	border-color: #cbd5e1;
+	background: #f8fafc;
+	color: #64748b;
+}
+
+/* 2026-06-03: audit risk policy controls aligned to hardware list controls */
+.audit-risk-policy-modal.show {
+	align-items: center !important;
+	justify-content: center !important;
+	padding: 20px !important;
+}
+.audit-risk-policy-modal.show .audit-risk-policy-dialog {
+	position: absolute;
+	left: 50%;
+	top: 52%;
+	margin: 0 !important;
+	transform: translate(-50%, -50%);
+}
+.audit-risk-policy-form {
+	align-items: flex-start;
+}
+.audit-risk-policy-form input,
+.audit-risk-policy-form select,
+.audit-risk-policy-time-editor input {
+	height: 42px;
+	border: 1px solid #d8e2ee;
+	border-radius: 8px;
+	background: #fff;
+	color: #0f172a;
+	font-size: 14px;
+	font-weight: 600;
+	outline: none;
+}
+.audit-risk-policy-form input,
+.audit-risk-policy-form select {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0 14px;
+}
+.audit-risk-policy-form input.is-invalid,
+.audit-risk-policy-form select.is-invalid,
+.audit-risk-policy-time-editor input.is-invalid {
+	border-color: #ef4444;
+	box-shadow: 0 0 0 3px rgba(239, 68, 68, .12);
+}
+.audit-risk-policy-select {
+	appearance: auto;
+}
+.audit-risk-policy-time-editor {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(180px, 1fr));
+	gap: 10px;
+	flex: 1 1 auto;
+}
+.audit-risk-policy-time-editor label {
+	display: grid;
+	grid-template-columns: 54px 1fr;
+	align-items: center;
+	gap: 8px;
+	height: 42px;
+	padding: 0 12px;
+	border: 1px solid #d8e2ee;
+	border-radius: 8px;
+	background: #fff;
+}
+.audit-risk-policy-time-editor label span {
+	color: #475569;
+	font-size: 13px;
+	font-weight: 800;
+}
+.audit-risk-policy-time-editor input {
+	width: 100%;
+	border: 0;
+	padding: 0;
+}
+.audit-risk-policy-form #audit-risk-policy-add.audit-risk-policy-add {
+	width: 42px;
+	min-width: 42px;
+	height: 42px;
+	padding: 0;
+	border: 1px solid #6366f1;
+	border-radius: 8px;
+	background: #6366f1;
+	box-shadow: 0 2px 8px rgba(99,102,241,.28);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: all .2s ease;
+}
+.audit-risk-policy-form #audit-risk-policy-add.audit-risk-policy-add .header-icon {
+	width: 18px;
+	height: 18px;
+	filter: brightness(0) invert(1);
+	opacity: 1;
+}
+.audit-risk-policy-form #audit-risk-policy-add.audit-risk-policy-add:hover {
+	background: #4f46e5;
+	border-color: #4f46e5;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(99,102,241,.32);
+}
+.audit-risk-policy-help {
+	margin: -6px 30px 12px;
+	color: #64748b;
+	font-size: 14px;
+	line-height: 1.45;
+	font-weight: 500;
+}
+.audit-risk-policy-help.is-error {
+	color: #dc2626;
+	font-weight: 700;
+}
+.audit-risk-policy-table {
+	font-size: 14px;
+}
+.audit-risk-policy-table th,
+.audit-risk-policy-table td {
+	font-size: 14px;
+}
+.audit-risk-policy-state.status-pill {
+	width: auto;
+	min-width: 86px;
+	height: 30px;
+	padding: 4px 14px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border: 1px solid #e5e7eb;
+	border-radius: 9999px;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	color: #374151;
+	font-size: 13px;
+	font-weight: 700;
+	cursor: pointer;
+}
+.audit-risk-policy-state.status-pill .status-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	display: inline-block;
+	box-shadow: 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+.audit-risk-policy-state.status-pill .status-dot.ws-run {
+	background: #6366f1;
+}
+.audit-risk-policy-state.status-pill .status-dot.ws-wait {
+	background: #94a3b8;
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete {
+	width: 36px;
+	height: 36px;
+	border: 1px solid #e8eaed;
+	background: #ffffff;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	transition: all .2s ease;
+	margin: 0 3px;
+	position: relative;
+	overflow: hidden;
+	box-sizing: border-box;
+	padding: 0;
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(99,102,241,.1), transparent);
+	transition: left .5s ease;
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete .action-icon {
+	width: 17px;
+	height: 17px;
+	filter: grayscale(.55) brightness(1.35) contrast(.8);
+	opacity: .46;
+	transition: filter .22s ease, opacity .22s ease, transform .22s ease;
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete:hover,
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete:focus-visible {
+	background-color: #6366F1;
+	border-color: #6366F1;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 12px rgba(99,102,241,.28);
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete:hover::before {
+	left: 100%;
+}
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete:hover .action-icon,
+.audit-risk-policy-table .action-btn.audit-risk-policy-delete:focus-visible .action-icon {
+	opacity: 1;
+	transform: scale(1.1);
+	filter: brightness(0) invert(1);
+}
+
+/* 2026-06-03: risk policy modal typography and time picker polish */
+.audit-risk-policy-table,
+.audit-risk-policy-table th,
+.audit-risk-policy-table td,
+.audit-risk-policy-table .audit-risk-policy-value {
+	font-family: inherit !important;
+	letter-spacing: 0 !important;
+}
+.audit-risk-policy-table th {
+	color: #475569 !important;
+	font-size: 14px !important;
+	font-weight: 700 !important;
+}
+.audit-risk-policy-table td {
+	color: #0f172a !important;
+	font-size: 14px !important;
+	font-weight: 400 !important;
+}
+.audit-risk-policy-table .audit-risk-policy-value {
+	display: inline-block;
+	color: inherit !important;
+	font-size: 14px !important;
+	font-weight: 400 !important;
+	line-height: 1.4;
+}
+.audit-risk-policy-table td:nth-child(3),
+.audit-risk-policy-table td:nth-child(4) {
+	font-weight: 400 !important;
+}
+.audit-risk-policy-state.status-pill {
+	font-weight: 600 !important;
+}
+.audit-risk-policy-time-editor {
+	grid-template-columns: repeat(2, minmax(220px, 1fr));
+	gap: 12px;
+}
+.audit-risk-policy-time-editor label {
+	height: 44px;
+	grid-template-columns: 48px 1fr 18px;
+	padding: 0 14px;
+	border: 1px solid #d8e2ee;
+	border-radius: 9px;
+	background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+	box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+	transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.audit-risk-policy-time-editor label::after {
+	content: "";
+	width: 16px;
+	height: 16px;
+	background: url("/static/image/svg/workflow/free-icon-font-time-past.svg") center / 15px 15px no-repeat;
+	opacity: .56;
+	pointer-events: none;
+}
+.audit-risk-policy-time-editor label:hover {
+	border-color: #b8c7d9;
+	background: #fff;
+}
+.audit-risk-policy-time-editor label:focus-within {
+	border-color: #6366f1;
+	box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+	background: #fff;
+}
+.audit-risk-policy-time-editor label span {
+	color: #334155;
+	font-size: 13px;
+	font-weight: 700;
+}
+.audit-risk-policy-time-editor input[type="time"] {
+	width: 100%;
+	height: 42px;
+	border: 0 !important;
+	background: transparent !important;
+	color: #0f172a;
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1;
+	box-shadow: none !important;
+	outline: none;
+}
+.audit-risk-policy-time-editor input[type="time"]::-webkit-calendar-picker-indicator {
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.audit-risk-policy-time-editor input[type="time"]::-webkit-datetime-edit {
+	padding: 0;
+}
+.audit-risk-policy-time-editor input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+	padding: 0;
+}
+.audit-risk-policy-time-editor input[type="time"]::-webkit-datetime-edit-hour-field,
+.audit-risk-policy-time-editor input[type="time"]::-webkit-datetime-edit-minute-field,
+.audit-risk-policy-time-editor input[type="time"]::-webkit-datetime-edit-ampm-field {
+	font-family: inherit;
+	font-weight: 400;
+}
+.audit-risk-policy-time-select {
+	height: 44px !important;
+	padding: 0 42px 0 16px !important;
+	border: 1px solid #d8e2ee !important;
+	border-radius: 9px !important;
+	background:
+		linear-gradient(45deg, transparent 50%, #64748b 50%) calc(100% - 20px) 19px / 6px 6px no-repeat,
+		linear-gradient(135deg, #64748b 50%, transparent 50%) calc(100% - 16px) 19px / 6px 6px no-repeat,
+		linear-gradient(180deg, #ffffff 0%, #fbfdff 100%) !important;
+	color: #0f172a !important;
+	font-size: 14px !important;
+	font-weight: 400 !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, .03) !important;
+	appearance: none;
+}
+.audit-risk-policy-time-select:hover {
+	border-color: #b8c7d9 !important;
+	background-color: #fff !important;
+}
+.audit-risk-policy-time-select:focus {
+	border-color: #6366f1 !important;
+	box-shadow: 0 0 0 3px rgba(99,102,241,.12) !important;
+}
+.audit-risk-policy-table tbody tr {
+	cursor: pointer;
+	transition: background-color .14s ease, box-shadow .14s ease;
+}
+.audit-risk-policy-table tbody tr:has(.audit-risk-policy-row-check:checked) td,
+.audit-risk-policy-table tbody tr.selected td {
+	background: #f4f7ff !important;
+	border-bottom-color: #dbe4ff !important;
+}
+.audit-risk-policy-table tbody tr:has(.audit-risk-policy-row-check:checked) td:first-child,
+.audit-risk-policy-table tbody tr.selected td:first-child {
+	box-shadow: inset 3px 0 0 #6366f1;
+}
+.audit-risk-policy-table tbody tr:has(.audit-risk-policy-row-check:checked):hover td,
+.audit-risk-policy-table tbody tr.selected:hover td {
+	background: #eef2ff !important;
+}
+.audit-risk-policy-row-check,
+#audit-risk-policy-check-all {
+	accent-color: #6366f1;
+	cursor: pointer;
 }

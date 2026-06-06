@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=20260526_settings_gap1">
+    <script src="/static/js/blossom.js?v=20260601_account_policy_removepolicycards1" defer></script>
+    <script src="/static/js/settings/account_policy.js?v=20260601_account_policy_removepolicycards1" defer></script>
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper admin-settings-wrapper">
+            <div class="page-header">
+                <div>
+                    <h1>{{ settings_page_title|default('계정정책') }}</h1>
+                    <p>{{ settings_page_description|default('에이전트 계정 정책을 관리합니다.') }}</p>
+                </div>
+            </div>
+
+            {% include 'authentication/11-3.admin/_settings_tabs.html' %}
+
+            <div id="account-policy-root" data-policy-page-mode="{{ account_policy_mode|default('common') }}">
+                <div class="account-policy-page account-policy-panel{% if account_policy_mode|default('common') == 'common' %} is-active{% endif %}" data-policy-page="common">
+                    <div class="account-policy-control-board" data-policy-control-board="common"></div>
+                    <div class="account-policy-common-form">
+                        <div class="account-policy-common-column is-left">
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>통신 설정</h3></div>
+                                <div class="account-policy-form-grid">
+                                    <label>AP 서버 주소<input id="common-ap-server" data-common-field="communication.ap_server" type="text" placeholder="https://192.168.56.106"></label>
+                                    <label>포트<input id="common-ap-port" data-common-field="communication.port" type="number" min="1" max="65535"></label>
+                                    <label>통신 주기(초)<input id="common-interval" data-common-field="communication.interval_seconds" type="number" min="10"></label>
+                                    <label>TLS 모드<select id="common-tls" data-common-field="communication.tls_mode"><option value="required">사용</option><option value="optional">선택</option><option value="disabled">미사용</option></select></label>
+                                    <label class="account-policy-check field-full"><input id="common-cert-verify" data-common-field="communication.verify_certificate" type="checkbox"> 인증서 검증</label>
+                                </div>
+                                <div class="account-policy-extra-fields">
+                                    <h4>통신 운영 기준</h4>
+                                    <label>AP 서버 이중화 주소<input data-common-field="communication.secondary_ap_server" type="text" placeholder="https://192.168.56.106"></label>
+                                    <label>연결 타임아웃(초)<input data-common-field="communication.connect_timeout_seconds" type="number" min="1"></label>
+                                    <label>요청 타임아웃(초)<input data-common-field="communication.request_timeout_seconds" type="number" min="1"></label>
+                                    <label>재접속 백오프(초)<input data-common-field="communication.reconnect_backoff_seconds" type="number" min="1"></label>
+                                    <label>식별키 회전 주기(일)<input data-common-field="communication.agent_key_rotation_days" type="number" min="1"></label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>성능 정책</h3></div>
+                                <div class="account-policy-form-grid">
+                                    <label>CPU 제한(%)<input data-common-field="performance.cpu_limit_percent" type="number" min="1" max="100"></label>
+                                    <label>메모리 제한(MB)<input data-common-field="performance.memory_limit_mb" type="number" min="64"></label>
+                                    <label>디스크 I/O 제한(MB/s)<input data-common-field="performance.disk_io_limit_mb" type="number" min="1"></label>
+                                    <label>네트워크 제한(MB/s)<input data-common-field="performance.network_limit_mb" type="number" min="1"></label>
+                                </div>
+                                <div class="account-policy-extra-fields">
+                                    <h4>성능 운영 기준</h4>
+                                    <label>최대 CPU 사용 시간(초)<input data-common-field="performance.max_cpu_seconds" type="number" min="1"></label>
+                                    <label>동시 작업 수<input data-common-field="performance.concurrent_jobs" type="number" min="1"></label>
+                                    <label>수집 배치 크기<input data-common-field="performance.batch_size" type="number" min="1"></label>
+                                    <label>샘플링 간격(초)<input data-common-field="performance.sampling_seconds" type="number" min="1"></label>
+                                    <label class="account-policy-check field-full"><input data-common-field="performance.transfer_compression" type="checkbox"> 전송 압축 사용</label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>로그 정책</h3></div>
+                                <div class="account-policy-form-grid">
+                                    <label>로그 레벨<select data-common-field="log.level"><option value="DEBUG">DEBUG</option><option value="INFO">INFO</option><option value="WARN">WARN</option><option value="ERROR">ERROR</option></select></label>
+                                    <label>보관기간(일)<input data-common-field="log.retention_days" type="number" min="1"></label>
+                                    <label>최대 로그크기(MB)<input data-common-field="log.max_size_mb" type="number" min="1"></label>
+                                    <label class="account-policy-check"><input data-common-field="log.compress" type="checkbox"> 압축 사용</label>
+                                </div>
+                                <div class="account-policy-extra-fields">
+                                    <h4>로그 운영 기준</h4>
+                                    <label class="account-policy-check"><input data-common-field="log.audit_forwarding" type="checkbox"> 감사 로그 전송</label>
+                                    <label class="account-policy-check"><input data-common-field="log.local_encryption" type="checkbox"> 로컬 로그 암호화</label>
+                                    <label>로그 전송 재시도 횟수<input data-common-field="log.forward_retry_limit" type="number" min="0"></label>
+                                    <label class="field-full">마스킹 대상 키워드<input data-common-field="log.masking_patterns" type="hidden"><span class="account-policy-mask-chip-row" data-mask-chip-row></span></label>
+                                    <label class="field-full">사용자 정의 키워드<span class="account-policy-mask-custom"><input data-mask-custom type="text" placeholder="예: private_key"><button type="button" class="account-policy-mask-add" data-mask-add>추가</button></span><span class="account-policy-mask-help">저장 전 화면에서 선택한 키워드를 기준으로 로그의 민감 문자열을 마스킹합니다.</span></label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+                        </div>
+
+                        <div class="account-policy-common-column is-right">
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>수집 정책</h3></div>
+                                <div class="account-policy-check-grid">
+                                    <label><input data-common-collection="interfaces" type="checkbox"> 인터페이스</label>
+                                    <label><input data-common-collection="accounts" type="checkbox"> 계정</label>
+                                    <label><input data-common-collection="permissions" type="checkbox"> 권한</label>
+                                    <label><input data-common-collection="firewall" type="checkbox"> 방화벽</label>
+                                    <label><input data-common-collection="performance" type="checkbox"> 성능</label>
+                                    <label><input data-common-collection="vulnerabilities" type="checkbox"> 취약점</label>
+                                    <label><input data-common-collection="packages" type="checkbox"> 패키지</label>
+                                    <label><input data-common-collection="processes" type="checkbox"> 프로세스</label>
+                                </div>
+                                <div class="account-policy-collection-intervals">
+                                    <h4>모듈별 수집 주기(분)</h4>
+                                    <div class="account-policy-interval-grid">
+                                        <label>인터페이스<input data-common-interval="interfaces" type="number" min="1"></label>
+                                        <label>계정<input data-common-interval="accounts" type="number" min="1"></label>
+                                        <label>권한<input data-common-interval="permissions" type="number" min="1"></label>
+                                        <label>방화벽<input data-common-interval="firewall" type="number" min="1"></label>
+                                        <label>성능<input data-common-interval="performance" type="number" min="1"></label>
+                                        <label>취약점<input data-common-interval="vulnerabilities" type="number" min="1"></label>
+                                        <label>패키지<input data-common-interval="packages" type="number" min="1"></label>
+                                        <label>프로세스<input data-common-interval="processes" type="number" min="1"></label>
+                                    </div>
+                                </div>
+                                <div class="account-policy-extra-fields">
+                                    <h4>수집 운영 기준</h4>
+                                    <label>수집 실패 재시도 횟수<input data-common-field="collection.retry_count" type="number" min="0"></label>
+                                    <label>수집 지연 허용 시간(분)<input data-common-field="collection.delay_tolerance_minutes" type="number" min="1"></label>
+                                    <label>수집 결과 보관 기간(일)<input data-common-field="collection.retention_days" type="number" min="1"></label>
+                                    <label>부하 제한 시간대<select data-common-field="collection.quiet_hours"><option value="">제한 없음</option><option value="business">업무 시간대(09:00-18:00)</option><option value="night">야간 시간대(22:00-06:00)</option><option value="weekend">주말</option></select></label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>보안 정책</h3></div>
+                                <div class="account-policy-check-grid">
+                                    <label><input data-common-security="agent_auth" type="checkbox"> 에이전트 인증</label>
+                                    <label><input data-common-security="command_verify" type="checkbox"> 명령 검증</label>
+                                    <label><input data-common-security="mask_secrets" type="checkbox"> 민감정보 마스킹</label>
+                                    <label><input data-common-security="integrity_check" type="checkbox"> 무결성 검증</label>
+                                </div>
+                                <div class="account-policy-security-rules">
+                                    <label>에이전트 인증 방식<select data-common-security-option="auth_mode"><option value="token_tls">토큰 + TLS</option><option value="mtls">mTLS</option><option value="signed_token">서명 토큰</option></select></label>
+                                    <label>명령 검증 기준<select data-common-security-option="command_policy"><option value="signed_only">서명된 명령만 허용</option><option value="allowlist">허용 목록 기반</option><option value="approval">승인 기반</option></select></label>
+                                    <label>민감정보 마스킹<select data-common-security-option="secret_masking_level"><option value="strict">엄격</option><option value="normal">표준</option><option value="audit">감사 로그만</option></select></label>
+                                    <label>무결성 실패 처리<select data-common-security-option="integrity_action"><option value="block">차단</option><option value="alert">알림</option><option value="quarantine">격리</option></select></label>
+                                    <label>보안 실패 공통 처리<select data-common-security-option="failure_action"><option value="retry_then_block">재시도 후 차단</option><option value="alert_only">알림만</option><option value="disable_agent">에이전트 비활성화</option></select></label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+
+                            <section class="account-policy-form-card">
+                                <div class="account-policy-form-card-head"><h3>오프라인 정책</h3></div>
+                                <div class="account-policy-form-grid">
+                                    <label class="account-policy-check"><input data-common-field="offline.enabled" type="checkbox"> 오프라인 모드 허용</label>
+                                    <label class="account-policy-check"><input data-common-field="offline.local_cache" type="checkbox"> 로컬캐시 사용</label>
+                                    <label>재전송 횟수<input data-common-field="offline.retry_count" type="number" min="0"></label>
+                                    <label>재전송 간격(초)<input data-common-field="offline.retry_interval_seconds" type="number" min="10"></label>
+                                </div>
+                                <div class="account-policy-extra-fields">
+                                    <h4>오프라인 운영 기준</h4>
+                                    <label>오프라인 허용 최대 시간(분)<input data-common-field="offline.max_offline_minutes" type="number" min="1"></label>
+                                    <label>오프라인 알림 기준(분)<input data-common-field="offline.offline_alert_minutes" type="number" min="1"></label>
+                                    <label class="account-policy-check"><input data-common-field="offline.cache_encryption" type="checkbox"> 로컬 캐시 암호화</label>
+                                    <label>재연결 동기화 방식<select data-common-field="offline.sync_mode"><option value="delta">변경분만 동기화</option><option value="full">전체 동기화</option><option value="manual">수동 확인 후 동기화</option></select></label>
+                                </div>
+                                <div class="account-policy-form-card-foot"><button type="button" class="account-policy-section-btn account-policy-common-section-save">저장</button></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="account-policy-page account-policy-panel{% if account_policy_mode|default('common') == 'linux' %} is-active{% endif %}" data-policy-page="linux">
+                    <div class="account-policy-control-board" data-policy-control-board="linux"></div>
+                    <section class="setting-card">
+                        <div class="setting-card-header">
+                            <div><h2>업무분류 정책</h2><p>Linux/Unix UID 범위와 기본 홈 디렉터리 경로를 관리합니다.</p></div>
+                            <div class="account-policy-head-actions">
+                                <span class="count-badge account-policy-count" id="account-policy-category-count">0</span>
+                                <button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-category-save">수정</button>
+                                <button type="button" class="account-policy-section-btn account-policy-add-btn" id="account-policy-category-add">추가</button>
+                            </div>
+                        </div>
+                        <div class="account-policy-table-wrap">
+                            <table class="account-policy-table account-policy-category-table">
+                                <thead><tr><th>업무분류</th><th>시작 UID</th><th>종료 UID</th><th>홈 디렉터리</th><th class="account-policy-manage-head">관리</th></tr></thead>
+                                <tbody id="account-policy-categories"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="setting-card">
+                        <div class="setting-card-header">
+                            <div><h2>세부그룹 정책</h2><p>Linux/Unix 세부그룹별 10 단위 GID를 관리합니다.</p></div>
+                            <div class="account-policy-head-actions">
+                                <span class="count-badge account-policy-count" id="account-policy-group-count">0</span>
+                                <button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-group-save">수정</button>
+                                <button type="button" class="account-policy-section-btn account-policy-add-btn" id="account-policy-group-add">추가</button>
+                            </div>
+                        </div>
+                        <div class="account-policy-table-wrap">
+                            <table class="account-policy-table">
+                                <thead><tr><th>업무분류</th><th>세부그룹</th><th>GID</th><th class="account-policy-manage-head">관리</th></tr></thead>
+                                <tbody id="account-policy-groups"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" id="account-policy-linux-protection-card">
+                        <div class="setting-card-header">
+                            <div><h2>예약 / 보호 계정 정책</h2><p>생성 금지 계정과 삭제 보호 계정을 관리합니다.</p></div>
+                            <div class="account-policy-head-actions"><button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-linux-protection-save">수정</button></div>
+                        </div>
+                        <div class="account-policy-form-grid">
+                            <label class="field-full">예약 계정<textarea id="account-policy-reserved-accounts" rows="3" placeholder="root, daemon, bin"></textarea></label>
+                            <label class="field-full">삭제 보호 계정<textarea id="account-policy-protected-accounts" rows="3" placeholder="root, bin, daemon"></textarea></label>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" id="account-policy-linux-validation-card">
+                        <div class="setting-card-header">
+                            <div><h2>계정 검증 정책</h2><p>Linux/Unix 계정 생성과 변경 시 적용할 검증 항목입니다.</p></div>
+                            <div class="account-policy-head-actions"><button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-linux-validation-save">수정</button></div>
+                        </div>
+                        <div class="account-policy-check-grid">
+                            <label><input data-linux-validation="uid_unique" type="checkbox"> UID 중복 금지</label>
+                            <label><input data-linux-validation="gid_exists" type="checkbox"> GID 존재 여부 확인</label>
+                            <label><input data-linux-validation="account_unique" type="checkbox"> 계정명 중복 금지</label>
+                            <label><input data-linux-validation="reserved_block" type="checkbox"> 예약 계정 생성 금지</label>
+                            <label><input data-linux-validation="special_char_policy" type="checkbox"> 특수문자 정책 검증</label>
+                            <label><input data-linux-validation="uid_range" type="checkbox"> UID 범위 검증</label>
+                            <label><input data-linux-validation="expiration_policy" type="checkbox"> 만료일 정책 검증</label>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="account-policy-page account-policy-panel{% if account_policy_mode|default('common') == 'windows' %} is-active{% endif %}" data-policy-page="windows">
+                    <div class="account-policy-control-board" data-policy-control-board="windows"></div>
+                    <section class="setting-card">
+                        <div class="setting-card-header">
+                            <div><h2>Windows 계정 유형 정책</h2><p>업무분류와 계정유형에 따라 계정명을 자동 생성하고 필수 통제를 적용합니다.</p></div>
+                            <div class="account-policy-head-actions">
+                                <span class="count-badge account-policy-count" id="account-policy-windows-type-count">0</span>
+                                <button type="button" class="account-policy-section-btn account-policy-add-btn" id="account-policy-windows-type-add">추가</button>
+                                <button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-windows-type-save">수정</button>
+                            </div>
+                        </div>
+                        <div class="account-policy-windows-policy-list" id="account-policy-windows-types"></div>
+                    </section>
+
+                    <section class="setting-card">
+                        <div class="setting-card-header">
+                            <div><h2>Windows 그룹/권한 정책</h2><p>계정에는 직접 권한을 주지 않고 Local Group, AD Group, Logon Rights 템플릿에 소속시킵니다.</p></div>
+                            <div class="account-policy-head-actions">
+                                <span class="count-badge account-policy-count" id="account-policy-windows-rule-count">0</span>
+                                <button type="button" class="account-policy-section-btn account-policy-add-btn" id="account-policy-windows-rule-add">추가</button>
+                                <button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-windows-rule-save">수정</button>
+                            </div>
+                        </div>
+                        <div class="account-policy-windows-policy-list" id="account-policy-windows-rules"></div>
+                    </section>
+
+                    <section class="setting-card">
+                        <div class="setting-card-header">
+                            <div><h2>Windows 권한 템플릿</h2><p>템플릿은 만들 수 있고, 권한/제한은 정해진 항목을 선택해서 구성합니다.</p></div>
+                            <div class="account-policy-head-actions">
+                                <span class="count-badge account-policy-count" id="account-policy-windows-template-count">0</span>
+                                <button type="button" class="account-policy-section-btn account-policy-add-btn" id="account-policy-windows-template-add">추가</button>
+                                <button type="button" class="account-policy-section-btn account-policy-section-save" id="account-policy-windows-template-save">수정</button>
+                            </div>
+                        </div>
+                        <div class="account-policy-template-list" id="account-policy-windows-templates">
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

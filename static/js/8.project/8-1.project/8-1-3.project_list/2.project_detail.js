@@ -5844,7 +5844,7 @@
                 var items=Array.isArray(d)?d:(d.items||d.data||[]);
                 var match=items.find(function(it){return String(it.doc_no||'').trim()===docNo;});
                 if(match&&match.id){
-                  var url='/p/2.task_detail.html?id='+encodeURIComponent(match.id);
+                  var url=(match.detail_url || (match.public_id ? '/b/'+encodeURIComponent(match.public_id) : '/b/2.task_detail.html?id='+encodeURIComponent(match.id)));
                   var w=1100, h=900;
                   var left=Math.max(0,Math.floor((window.screen.width-w)/2));
                   var top=Math.max(0,Math.floor((window.screen.height-h)/2));

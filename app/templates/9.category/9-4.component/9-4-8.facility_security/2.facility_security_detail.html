@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
     <meta charset="UTF-8">
@@ -11,31 +11,31 @@
     <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
     <link rel="stylesheet" href="/static/css/detail-common.css?v=20260512_no_data_spacing1">
     <link rel="stylesheet" href="/static/css/detail3.css?v=1.4">
-    <link rel="stylesheet" href="/static/css/category2.css?v=20260514_facility_modal_gap2">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260604_category_modal1">
 </head>
 <body>
     {% include 'layouts/_header.html' %}
     {% include 'layouts/_sidebar.html' %}
 
     {% set facility_tabs = [
-        ('cat_facility_security_access', 'access', '출입관리'),
-        ('cat_facility_security_data_delete', 'data_delete', '데이터삭제'),
-        ('cat_facility_security_cctv', 'cctv', '영상감시'),
-        ('cat_facility_security_transformer', 'transformer', '변압기'),
-        ('cat_facility_security_generator', 'generator', '발전기'),
-        ('cat_facility_security_ups', 'ups', '무정전전원장치'),
-        ('cat_facility_security_battery', 'battery', '배터리'),
-        ('cat_facility_security_hvac', 'hvac', '항온항습기'),
-        ('cat_facility_security_thermometer', 'thermometer', '온/습도계'),
-        ('cat_facility_security_leak_detector', 'leak_detector', '누수감지'),
+        ('cat_facility_security_access', 'access', '異쒖엯愿由?),
+        ('cat_facility_security_data_delete', 'data_delete', '?곗씠?곗궘??),
+        ('cat_facility_security_cctv', 'cctv', '?곸긽媛먯떆'),
+        ('cat_facility_security_transformer', 'transformer', '蹂?뺢린'),
+        ('cat_facility_security_generator', 'generator', '諛쒖쟾湲?),
+        ('cat_facility_security_ups', 'ups', '臾댁젙?꾩쟾?먯옣移?),
+        ('cat_facility_security_battery', 'battery', '諛고꽣由?),
+        ('cat_facility_security_hvac', 'hvac', '??삩??뒿湲?),
+        ('cat_facility_security_thermometer', 'thermometer', '???듬룄怨?),
+        ('cat_facility_security_leak_detector', 'leak_detector', '?꾩닔媛먯?'),
         ('cat_facility_security_rack', 'rack', 'RACK'),
-        ('cat_facility_security_detection', 'detection', '감지설비'),
-        ('cat_facility_security_fire_extinguishing', 'fire_extinguishing', '소화설비'),
-        ('cat_facility_security_evacuation', 'evacuation', '대피설비')
+        ('cat_facility_security_detection', 'detection', '媛먯??ㅻ퉬'),
+        ('cat_facility_security_fire_extinguishing', 'fire_extinguishing', '?뚰솕?ㅻ퉬'),
+        ('cat_facility_security_evacuation', 'evacuation', '??쇱꽕鍮?)
     ] %}
     {% set detail_base = current_key.replace('_detail', '') %}
     {% set manual_resources = ['transformer', 'generator', 'ups', 'battery', 'hvac', 'leak_detector', 'detection', 'fire_extinguishing', 'evacuation'] %}
-    {% set ns = namespace(resource='access', label='출입관리', manual=false) %}
+    {% set ns = namespace(resource='access', label='異쒖엯愿由?, manual=false) %}
     {% for tab_key, resource_key, tab_label in facility_tabs %}
         {% if detail_base == tab_key %}
             {% set ns.resource = resource_key %}
@@ -48,9 +48,8 @@
     <main class="main-content">
         <div class="content-wrapper">
             <a href="{{ url_for('pages.blossom_hub', segment=detail_base) }}" class="back-btn">
-                <img src="/static/image/svg/exit.svg" alt="뒤로가기">
-                목록으로 돌아가기
-            </a>
+                <img src="/static/image/svg/exit.svg" alt="?ㅻ줈媛湲?>
+                紐⑸줉?쇰줈 ?뚯븘媛湲?            </a>
 
             <div class="page-header">
                 <h1 id="page-header-title">{{ title }}</h1>
@@ -63,55 +62,55 @@
                     <a href="{{ t.href or url_for('pages.blossom_hub', segment=t.key) }}" class="server-detail-tab-btn{% if current_key == t.key %} active{% endif %}">{{ t.label }}</a>
                     {% endfor %}
                 {% else %}
-                    <a href="{{ url_for('pages.blossom_hub', segment=facility_security_public_id) if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_detail') }}" class="server-detail-tab-btn active">기본정보</a>
-                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=system') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_system') }}" class="server-detail-tab-btn">시설·보안</a>
-                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=log') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_log') }}" class="server-detail-tab-btn">변경이력</a>
-                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=file') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_file') }}" class="server-detail-tab-btn">구성/파일</a>
+                    <a href="{{ url_for('pages.blossom_hub', segment=facility_security_public_id) if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_detail') }}" class="server-detail-tab-btn active">湲곕낯?뺣낫</a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=system') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_system') }}" class="server-detail-tab-btn">?쒖꽕쨌蹂댁븞</a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=log') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_log') }}" class="server-detail-tab-btn">蹂寃쎌씠??/a>
+                    <a href="{{ (url_for('pages.blossom_hub', segment=facility_security_public_id) ~ '?tab=file') if facility_security_public_id else url_for('pages.blossom_hub', segment=detail_base + '_file') }}" class="server-detail-tab-btn">援ъ꽦/?뚯씪</a>
                 {% endif %}
             </div>
 
             <div class="server-detail-content">
                 <div class="server-detail-pane active" id="basic">
-                    <button class="add-btn-icon" id="facility-security-detail-edit-open" title="기본정보 수정" type="button">
-                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="수정">
+                    <button class="add-btn-icon" id="facility-security-detail-edit-open" title="湲곕낯?뺣낫 ?섏젙" type="button">
+                        <img src="/static/image/svg/list/free-icon-pencil.svg" alt="?섏젙">
                     </button>
                     <div class="detail-section">
-                        <h3>기본정보</h3>
+                        <h3>湲곕낯?뺣낫</h3>
                         <div class="basic-info-grid">
                             <div class="basic-info-card">
                                 <div class="basic-info-card-header"><h4>{{ ns.label }}</h4></div>
                                 <div class="basic-info-card-content">
-                                    <div class="info-row"><label>모델명</label><span class="info-value" id="fsi-model-name">{{ item.get('model_name') or '-' }}</span></div>
-                                    <div class="info-row"><label>용량</label><span class="info-value" id="fsi-capacity">{{ item.get('capacity') or '-' }}</span></div>
-                                    <div class="info-row"><label>제조사</label><span class="info-value" id="fsi-manufacturer">{{ item.get('manufacturer_name') or '-' }}</span></div>
-                                    <div class="info-row"><label>부품번호</label><span class="info-value" id="fsi-part-number">{{ item.get('part_number') or '-' }}</span></div>
-                                    <div class="info-row"><label>비고</label><span class="info-value" id="fsi-remark">{{ item.get('remark') or '-' }}</span></div>
+                                    <div class="info-row"><label>紐⑤뜽紐?/label><span class="info-value" id="fsi-model-name">{{ item.get('model_name') or '-' }}</span></div>
+                                    <div class="info-row"><label>?⑸웾</label><span class="info-value" id="fsi-capacity">{{ item.get('capacity') or '-' }}</span></div>
+                                    <div class="info-row"><label>?쒖“??/label><span class="info-value" id="fsi-manufacturer">{{ item.get('manufacturer_name') or '-' }}</span></div>
+                                    <div class="info-row"><label>遺?덈쾲??/label><span class="info-value" id="fsi-part-number">{{ item.get('part_number') or '-' }}</span></div>
+                                    <div class="info-row"><label>鍮꾧퀬</label><span class="info-value" id="fsi-remark">{{ item.get('remark') or '-' }}</span></div>
                                 </div>
                             </div>
 
                             <div class="basic-info-card">
-                                <div class="basic-info-card-header"><h4>상태 통계</h4></div>
+                                <div class="basic-info-card-header"><h4>?곹깭 ?듦퀎</h4></div>
                                 <div class="basic-info-card-content">
                                     <div class="pie-wrap" hidden>
-                                        <div class="pie-chart" id="stat-pie" aria-label="상태 분포 그래프"></div>
+                                        <div class="pie-chart" id="stat-pie" aria-label="?곹깭 遺꾪룷 洹몃옒??></div>
                                         <ul class="pie-legend">
-                                            <li class="legend-item"><span class="legend-dot seg-run"></span><span class="legend-host">가동</span><span class="legend-size" id="stat-run-legend">0 (0%)</span></li>
-                                            <li class="legend-item"><span class="legend-dot seg-idle"></span><span class="legend-host">유휴</span><span class="legend-size" id="stat-idle-legend">0 (0%)</span></li>
-                                            <li class="legend-item"><span class="legend-dot seg-wait"></span><span class="legend-host">대기</span><span class="legend-size" id="stat-wait-legend">0 (0%)</span></li>
+                                            <li class="legend-item"><span class="legend-dot seg-run"></span><span class="legend-host">媛??/span><span class="legend-size" id="stat-run-legend">0 (0%)</span></li>
+                                            <li class="legend-item"><span class="legend-dot seg-idle"></span><span class="legend-host">?좏쑕</span><span class="legend-size" id="stat-idle-legend">0 (0%)</span></li>
+                                            <li class="legend-item"><span class="legend-dot seg-wait"></span><span class="legend-host">?湲?/span><span class="legend-size" id="stat-wait-legend">0 (0%)</span></li>
                                         </ul>
                                     </div>
-                                    <p id="stat-empty" class="info-desc" hidden>할당 시스템 내역이 없습니다.</p>
+                                    <p id="stat-empty" class="info-desc" hidden>?좊떦 ?쒖뒪???댁뿭???놁뒿?덈떎.</p>
                                 </div>
                             </div>
 
                             <div class="basic-info-card">
-                                <div class="basic-info-card-header"><h4>운영 통계</h4></div>
+                                <div class="basic-info-card-header"><h4>?댁쁺 ?듦퀎</h4></div>
                                 <div class="basic-info-card-content">
                                     <div class="pie-wrap" hidden>
-                                        <div class="pie-chart" id="oper-pie" aria-label="업무운영 분포 그래프"></div>
+                                        <div class="pie-chart" id="oper-pie" aria-label="?낅Т?댁쁺 遺꾪룷 洹몃옒??></div>
                                         <ul class="pie-legend" id="oper-legend"></ul>
                                     </div>
-                                    <p id="oper-empty" class="info-desc" hidden>할당 시스템 내역이 없습니다.</p>
+                                    <p id="oper-empty" class="info-desc" hidden>?좊떦 ?쒖뒪???댁뿭???놁뒿?덈떎.</p>
                                 </div>
                             </div>
                         </div>
@@ -121,7 +120,7 @@
         </div>
     </main>
 
-    <script src="/static/js/blossom.js?v=20260515_facility_public1"></script>
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
     <script>
         window.__FACILITY_SECURITY_RESOURCE__ = "{{ ns.resource }}";
         window.__FACILITY_SECURITY_LABEL__ = "{{ ns.label }}";
@@ -133,11 +132,11 @@
     <div id="facility-security-edit-modal" class="system-edit-modal server-add-modal facility-security-entry-modal modal-overlay-full" aria-hidden="true">
         <div class="server-add-content">
             <div class="server-add-header">
-                <div class="server-add-title"><h3>{{ ns.label }} 수정</h3><p class="server-add-subtitle">선택한 인프라 유형 정보를 수정합니다.</p></div>
-                <button class="close-btn" type="button" id="facility-security-edit-close" title="닫기" aria-label="닫기"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                <div class="server-add-title"><h3>{{ ns.label }} ?섏젙</h3><p class="server-add-subtitle">?좏깮???명봽???좏삎 ?뺣낫瑜??섏젙?⑸땲??</p></div>
+                <button class="close-btn" type="button" id="facility-security-edit-close" title="?リ린" aria-label="?リ린"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
             </div>
             <div class="server-add-body"><form id="facility-security-edit-form"></form></div>
-            <div class="server-add-actions align-right"><div class="action-buttons right"><button type="button" class="btn-primary" id="facility-security-edit-save">저장</button></div></div>
+            <div class="server-add-actions align-right"><div class="action-buttons right"><button type="button" class="btn-primary" id="facility-security-edit-save">???/button></div></div>
         </div>
     </div>
 

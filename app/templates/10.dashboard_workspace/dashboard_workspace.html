@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260606_count1">
+    <link rel="stylesheet" href="/static/css/system.css?v=4.32">
+    <link rel="stylesheet" href="/static/css/wf_designer.css?v=20260606_count1">
+    <link rel="stylesheet" href="/static/css/dashboard_workspace.css?v=20260606_dashbuild9">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content dashboard-workspace-page" data-page="{{ dashboard_workspace_page|default('my') }}">
+        <div id="lumina-dashboard-root"></div>
+    </main>
+
+    <script>
+        window.__LUMINA_DASHBOARD_PAGE__ = {{ dashboard_workspace_page|default('my')|tojson }};
+        window.__LUMINA_DASHBOARD_SEGMENT__ = {{ current_key|default('dashboard_my')|tojson }};
+    </script>
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
+    <script src="/static/js/dashboard_workspace.js?v=20260606_dashbuild9"></script>
+</body>
+</html>

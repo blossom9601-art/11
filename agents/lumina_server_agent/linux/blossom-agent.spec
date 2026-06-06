@@ -1,5 +1,5 @@
 %define name    lumina-agent
-%define version 1.2.0
+%define version 1.2.1
 %define release 1%{?dist}
 
 Name:           %{name}
@@ -42,6 +42,7 @@ install -m 644 %{_sourcedir}/linux/collectors/authority.py   %{buildroot}/opt/lu
 install -m 644 %{_sourcedir}/linux/collectors/firewalld.py   %{buildroot}/opt/lumina/linux/collectors/
 install -m 644 %{_sourcedir}/linux/collectors/storage.py     %{buildroot}/opt/lumina/linux/collectors/
 install -m 644 %{_sourcedir}/linux/collectors/package.py     %{buildroot}/opt/lumina/linux/collectors/
+install -m 644 %{_sourcedir}/linux/collectors/performance.py %{buildroot}/opt/lumina/linux/collectors/
 
 # 설정 디렉터리 (lumina user r/w)
 install -d %{buildroot}/etc/lumina
@@ -107,6 +108,9 @@ fi
 systemctl daemon-reload
 
 %changelog
+* %(date "+%a %b %d %Y") Blossom Admin <admin@blossom.local> - 1.2.1-1
+- Performance collector, 1-minute default collection interval
+
 * %(date "+%a %b %d %Y") Blossom Admin <admin@blossom.local> - 1.2.0-1
 - Account Root Worker (UDS), account policy module, agent --account-request CLI
 - [account_worker] config section, lumina-agent group for socket peer access

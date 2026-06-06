@@ -19,3 +19,298 @@
     font-size: 13px;
     color: #94a3b8;
 }
+
+.tab96-service-root .svc-legacy-table-wrap {
+    display: none;
+}
+
+.tab96-service-root .svc-card-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.tab96-service-root .svc-detail-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tab96-service-root .svc-detail-card:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 10px 22px rgba(31, 41, 55, .08);
+}
+
+.tab96-service-root .svc-detail-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tab96-service-root .svc-detail-card h4 {
+    margin: 0;
+    color: #111827;
+    font-size: 16px;
+    line-height: 1.35;
+}
+
+.tab96-service-root .svc-detail-card p {
+    margin: 4px 0 0;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.tab96-service-root .svc-detail-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+}
+
+.tab96-service-root .svc-detail-meta span {
+    min-width: 0;
+    color: #475467;
+    font-size: 13px;
+}
+
+.tab96-service-root .svc-detail-meta b {
+    display: block;
+    color: #98a2b3;
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+.tab96-service-root .svc-detail-badges,
+.svc-link-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tab96-service-root .svc-detail-badge,
+.svc-link-tag {
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #475467;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.tab96-service-root .svc-detail-badge.on,
+.svc-link-tag.on {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+.tab96-service-root .svc-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#svc-link-modal .svc-link-content {
+    width: min(860px, calc(100vw - 48px));
+    max-height: min(720px, calc(100vh - 64px));
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, .24);
+}
+
+#svc-link-modal .server-add-header {
+    padding: 24px 36px 22px;
+    background: #fff;
+    border-bottom: 1px solid #eef2f7;
+}
+
+#svc-link-modal .server-add-title h3 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    line-height: 1.25;
+    color: #111827;
+}
+
+#svc-link-modal .server-add-subtitle {
+    margin: 0;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+#svc-link-modal .close-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    color: #64748b;
+    background: #fff;
+}
+
+#svc-link-modal .close-btn:hover {
+    color: #334155;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+#svc-link-modal .svc-link-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 24px 36px 26px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.svc-link-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 16px;
+}
+
+.svc-link-toolbar .form-input {
+    width: 100%;
+    height: 44px;
+    border: 1px solid #d8dee9;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.svc-link-toolbar .form-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+}
+
+.svc-master-shortcut {
+    min-width: 0;
+    width: auto;
+    height: 44px !important;
+    min-height: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    border-radius: 8px;
+    padding: 0 16px !important;
+    box-sizing: border-box;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1 !important;
+    white-space: nowrap;
+}
+
+.svc-link-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    max-height: 380px;
+    overflow: auto;
+    padding: 4px;
+}
+
+.svc-link-list:empty {
+    display: none;
+}
+
+.svc-link-card {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px 16px 16px 46px;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.svc-link-card:hover {
+    border-color: #c7d2fe;
+    box-shadow: 0 10px 24px rgba(31, 41, 55, .08);
+    transform: translateY(-1px);
+}
+
+.svc-link-card input {
+    position: absolute;
+    left: 16px;
+    top: 19px;
+}
+
+.svc-link-card strong {
+    display: block;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.35;
+    margin-bottom: 5px;
+}
+
+.svc-link-card p {
+    margin: 0 0 12px;
+    color: #667085;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.svc-link-empty {
+    min-height: 164px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed #d7dce5;
+    border-radius: 8px;
+    background: #fbfcff;
+    color: #667085;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+#svc-link-modal .server-add-actions {
+    padding: 20px 36px 22px;
+    background: #f8fafc;
+    border-top: 1px solid #eef2f7;
+}
+
+#svc-link-modal .action-buttons.right {
+    gap: 10px;
+}
+
+#svc-link-modal .server-add-actions button {
+    min-width: 100px;
+    height: 40px;
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+@media (max-width: 720px) {
+    #svc-link-modal .svc-link-content {
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+    }
+
+    #svc-link-modal .server-add-header,
+    #svc-link-modal .svc-link-body,
+    #svc-link-modal .server-add-actions {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .svc-link-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .svc-master-shortcut {
+        width: 100%;
+    }
+}

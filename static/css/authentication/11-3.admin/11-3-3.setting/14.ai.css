@@ -1,0 +1,245 @@
+.ai-settings-page .page-header {
+	margin-bottom: 0;
+}
+
+.ai-settings-columns {
+	align-items: stretch;
+}
+
+.ai-main-card {
+	border-color: #e5e7eb;
+}
+
+.ai-settings-page .setting-card {
+	display: flex;
+	flex-direction: column;
+}
+
+.ai-settings-page .cp-policy-grid {
+	align-content: start;
+}
+
+.ai-card-actions {
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+	gap: 8px;
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid #eef2f7;
+}
+
+.ai-safety-actions {
+	justify-content: flex-start;
+}
+
+.ai-textarea {
+	min-height: 132px;
+	resize: vertical;
+	line-height: 1.55;
+	font-family: inherit;
+	font-size: inherit;
+}
+
+.ai-settings-page select.form-input,
+.ai-settings-page .ai-select {
+	appearance: none;
+	-webkit-appearance: none;
+	min-height: 36px;
+	padding-right: 38px;
+	background-color: #fff;
+	background-image:
+		linear-gradient(45deg, transparent 50%, #64748b 50%),
+		linear-gradient(135deg, #64748b 50%, transparent 50%);
+	background-position:
+		calc(100% - 18px) 50%,
+		calc(100% - 13px) 50%;
+	background-size: 5px 5px, 5px 5px;
+	background-repeat: no-repeat;
+}
+
+.ai-guide {
+	margin: 8px 0 16px;
+	padding: 12px 14px;
+	border: 1px solid #dbeafe;
+	border-radius: 8px;
+	background: #f8fbff;
+	color: #475569;
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.ai-guide strong {
+	display: block;
+	margin-bottom: 4px;
+	color: #1e293b;
+	font-size: 13px;
+}
+
+.ai-guide p {
+	margin: 0;
+}
+
+.ai-guide code {
+	padding: 1px 5px;
+	border-radius: 4px;
+	background: #e0e7ff;
+	color: #3730a3;
+	font-family: inherit;
+	font-size: 12px;
+}
+
+.account-policy-alert {
+	position: fixed;
+	inset: 0;
+	z-index: 10050;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background: rgba(15, 23, 42, .45);
+}
+
+.account-policy-alert.is-open {
+	display: flex;
+}
+
+.account-policy-alert-dialog {
+	width: min(640px, calc(100vw - 32px));
+	border-radius: 10px;
+	background: #fff;
+	box-shadow: 0 24px 60px rgba(15, 23, 42, .24);
+	overflow: hidden;
+}
+
+.account-policy-alert-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	min-height: 58px;
+	padding: 22px 32px 14px;
+	background: #f8fafc;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.account-policy-alert-title {
+	margin: 0;
+	color: #111827;
+	font-size: 24px;
+	font-weight: 800;
+}
+
+.account-policy-alert-body {
+	min-height: 220px;
+	padding: 34px 32px 30px;
+	color: #475569;
+	font-size: 14px;
+	line-height: 1.65;
+	white-space: pre-line;
+}
+
+.account-policy-alert-content {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 28px;
+}
+
+.account-policy-alert-message {
+	flex: 1 1 auto;
+	padding-top: 4px;
+}
+
+.account-policy-alert-illust {
+	flex: 0 0 auto;
+	width: 176px;
+	margin-top: -10px;
+}
+
+.account-policy-alert-illust img {
+	display: block;
+	width: 176px;
+	height: auto;
+	filter: drop-shadow(0 2px 6px rgba(15, 23, 42, .08));
+}
+
+.account-policy-alert-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 22px 32px;
+	background: #f8fafc;
+	border-top: 1px solid #e5e7eb;
+}
+
+.account-policy-alert-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border: 1px solid #dbe3ef;
+	border-radius: 999px;
+	background: #fff;
+	color: #64748b;
+	cursor: pointer;
+	box-shadow: 0 2px 6px rgba(15, 23, 42, .08);
+}
+
+.account-policy-alert-close svg {
+	width: 20px;
+	height: 20px;
+	display: block;
+}
+
+.account-policy-alert-cancel {
+	height: 40px;
+	min-width: 64px;
+	border: 1px solid #dbe3ef;
+	border-radius: 8px;
+	background: #fff;
+	color: #111827;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.account-policy-alert-ok {
+	height: 40px;
+	min-width: 72px;
+	border: 0;
+	border-radius: 8px;
+	background: #6366F1;
+	color: #fff;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: 0 10px 18px rgba(99, 102, 241, .22);
+}
+
+.ai-settings-page #ai-restore-defaults {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: auto;
+	min-height: 0;
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-size: 12.5px;
+	font-weight: 600;
+	line-height: 1.2;
+	box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+	.account-policy-alert-content {
+		flex-direction: column;
+	}
+	.account-policy-alert-illust {
+		width: 120px;
+		margin: 0;
+	}
+	.account-policy-alert-illust img {
+		width: 120px;
+	}
+}

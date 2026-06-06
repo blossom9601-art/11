@@ -13,7 +13,7 @@
    0. 디자인 토큰
    ========================================================================= */
 :root {
-  --bls-stats-max-width: 920px;
+  --bls-stats-max-width: 1040px;
   --bls-stats-max-height: 88vh;
   --bls-stats-radius: 16px;
   --bls-stats-shadow: 0 12px 32px rgba(15,23,42,0.12), 0 2px 8px rgba(15,23,42,0.04);
@@ -46,15 +46,15 @@
   --bls-stats-section-accent: var(--accent, #6366f1);
 
   /* 카드 그리드 */
-  --bls-stats-grid-cols: repeat(auto-fill, 240px);
-  --bls-stats-grid-gap: 16px;
+  --bls-stats-grid-cols: repeat(auto-fit, minmax(260px, 1fr));
+  --bls-stats-grid-gap: 18px;
 
   /* 카드 */
   --bls-stats-card-bg: #ffffff;
   --bls-stats-card-border: #e5e7eb;
-  --bls-stats-card-radius: 12px;
-  --bls-stats-card-pad: 16px;
-  --bls-stats-card-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --bls-stats-card-radius: 10px;
+  --bls-stats-card-pad: 16px 16px 18px;
+  --bls-stats-card-shadow: 0 10px 22px rgba(15,23,42,0.05);
   --bls-stats-card-title-size: 13px;
   --bls-stats-card-title-color: #6b7280;
   --bls-stats-card-title-weight: 500;
@@ -343,12 +343,23 @@
   box-shadow: var(--bls-stats-card-shadow);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   height: 100%;
-  transition: box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .bls-stats .stat-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border-color: #cbd5e1;
+  box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+  transform: translateY(-1px);
+}
+
+.bls-stats .stat-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #edf1f6;
 }
 
 .bls-stats .stat-card .stat-title {
@@ -356,9 +367,24 @@
   font-weight: var(--bls-stats-card-title-weight);
   color: var(--bls-stats-card-title-color);
   line-height: 1.4;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #f1f5f9;
   margin: 0;
+  min-width: 0;
+}
+
+.bls-stats .stat-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.bls-stats .stat-total strong {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .bls-stats .stat-card .stat-items {
@@ -397,7 +423,8 @@
    ========================================================================= */
 
 .bls-stats .stat-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(72px, 0.8fr) minmax(72px, 1fr) minmax(34px, auto);
   align-items: center;
   gap: 8px;
   font-size: var(--bls-stats-item-font);
@@ -407,9 +434,8 @@
 
 /* 라벨 */
 .bls-stats .stat-item .label {
-  flex: 0 0 auto;
-  min-width: 56px;
-  max-width: 96px;
+  min-width: 0;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -420,7 +446,6 @@
 
 /* 막대 */
 .bls-stats .stat-item .bar {
-  flex: 1 1 0%;
   min-width: 60px;
   height: var(--bls-stats-bar-height);
   background: var(--bls-stats-bar-bg);
@@ -430,14 +455,13 @@
 .bls-stats .stat-item .bar > span {
   display: block;
   height: 100%;
-  background: var(--bls-stats-bar-fill);
+  background: linear-gradient(90deg, var(--bls-stats-bar-fill) 0%, #38bdf8 100%);
   border-radius: var(--bls-stats-bar-radius);
   transition: width 0.3s ease;
 }
 
 /* 값 */
 .bls-stats .stat-item .value {
-  flex: 0 0 auto;
   min-width: 32px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -657,7 +681,6 @@
 .bls-stats .va-donut-legend::-webkit-scrollbar-thumb {
   background: rgba(156,163,175,0.3);
   border-radius: 3px;
-}
 }
 .bls-stats .va-donut-legend-item {
   display: flex;

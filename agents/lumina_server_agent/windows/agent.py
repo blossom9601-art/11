@@ -37,8 +37,9 @@ from windows.collectors.authority import AuthorityCollector
 from windows.collectors.firewalld import FirewalldCollector
 from windows.collectors.storage import StorageCollector
 from windows.collectors.package import PackageCollector
+from windows.collectors.performance import PerformanceCollector
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 # PKI 등록용 경로
 _PKI_DIR = os.path.join(
@@ -258,10 +259,119 @@ def _send_heartbeat(config: AgentConfig):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=5, context=ctx):
-            pass
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = {}
+        if isinstance(data, dict) and data.get("success"):
+            _run_vulnerability_commands(config, data.get("commands") or [])
     except Exception:
         pass  # heartbeat 실패는 무시
+
+
+def _post_json(config: AgentConfig, path: str, body: dict, timeout: int = 30):
+    if not config.server_host:
+        return None
+    url = f"{config.server_protocol}://{config.server_host}:{config.server_port}{path}"
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    ctx = _build_ssl_context(config)
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+    try:
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _extract_lumina_result(stdout: str) -> str:
+    for line in str(stdout or "").splitlines():
+        line = line.strip()
+        if line.startswith("LUMINA_RESULT="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+def _run_vulnerability_script(script: str, guide_id: int, check_code: str) -> dict:
+    env = dict(os.environ)
+    env["LUMINA_GUIDE_ID"] = str(guide_id)
+    env["LUMINA_CHECK_CODE"] = str(check_code or "")
+    try:
+        proc = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", str(script or "")],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=env,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "exit_code": int(proc.returncode),
+            "stdout": (proc.stdout or "")[-8000:],
+            "stderr": (proc.stderr or "")[-4000:],
+            "result": _extract_lumina_result(proc.stdout),
+            "message": "completed" if proc.returncode == 0 else f"exit_code={proc.returncode}",
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "ok": False,
+            "exit_code": 124,
+            "stdout": (exc.stdout or "")[-8000:] if isinstance(exc.stdout, str) else "",
+            "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+            "result": "need",
+            "message": "timeout",
+        }
+    except Exception as exc:
+        return {"ok": False, "exit_code": -1, "stdout": "", "stderr": str(exc), "result": "need", "message": str(exc)}
+
+
+def _run_vulnerability_commands(config: AgentConfig, commands: list):
+    if not commands:
+        return
+    import socket
+    hostname = (config.hostname or socket.gethostname()).strip()
+    for command in commands:
+        raw = str(command or "").strip()
+        if not raw.startswith("vulnerability_check:"):
+            continue
+        try:
+            guide_id = int(raw.split(":", 1)[1].strip())
+        except Exception:
+            continue
+        try:
+            data = _post_json(
+                config,
+                f"/api/agent/vulnerability-guides/{guide_id}/script",
+                {"hostname": hostname},
+                timeout=30,
+            ) or {}
+            if not data.get("success"):
+                logger.warning("vulnerability script fetch failed guide_id=%s error=%s", guide_id, data.get("error"))
+                continue
+            item = data.get("item") or {}
+            result = _run_vulnerability_script(
+                item.get("script_content") or "",
+                guide_id,
+                item.get("check_code") or "",
+            )
+            result["hostname"] = hostname
+            _post_json(
+                config,
+                f"/api/agent/vulnerability-guides/{guide_id}/result",
+                result,
+                timeout=30,
+            )
+            logger.info("vulnerability check reported guide_id=%s result=%s", guide_id, result.get("result") or result.get("ok"))
+        except Exception:
+            logger.exception("vulnerability command failed guide_id=%s", guide_id)
 
 
 def run_once(config: AgentConfig):
@@ -279,6 +389,8 @@ def run_once(config: AgentConfig):
         collectors.append(StorageCollector())
     if "package" in config.collectors:
         collectors.append(PackageCollector())
+    if "performance" in config.collectors:
+        collectors.append(PerformanceCollector())
 
     logger.info("수집 시작 (hostname=%s, collectors=%s)",
                 config.hostname, [c.name for c in collectors])

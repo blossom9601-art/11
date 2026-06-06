@@ -1,4 +1,4 @@
-<!-- Reusable sidebar navigation -->
+﻿<!-- Reusable sidebar navigation -->
 {% if sidebar_perms is not defined %}{% set sidebar_perms = {} %}{% endif %}
 {% set _category_match_map = {
 	'business': [
@@ -80,7 +80,13 @@
 	]
 } %}
 {% set _sidebar_match_map = {
-	'dashboard': ['dashboard'],
+	'dashboard': ['dashboard', 'dashboard_workspace', 'dashboard_my', 'dashboard_shared', 'dashboard_favorite', 'dashboard_templates', 'dashboard_builder'],
+	'dashboard_workspace': ['dashboard_workspace', 'dashboard_my', 'dashboard_shared', 'dashboard_favorite', 'dashboard_templates', 'dashboard_builder'],
+	'dashboard_my': ['dashboard_my'],
+	'dashboard_shared': ['dashboard_shared'],
+	'dashboard_favorite': ['dashboard_favorite'],
+	'dashboard_templates': ['dashboard_templates'],
+	'dashboard_builder': ['dashboard_builder'],
 	'hw_server_onpremise': [
 		'hw_server_onpremise', 'hw_server_onpremise_detail', 'hw_server_onpremise_hw', 'hw_server_onpremise_sw',
 		'hw_server_onpremise_backup', 'hw_server_onpremise_if', 'hw_server_onpremise_account', 'hw_server_onpremise_authority',
@@ -219,10 +225,6 @@
 	'access_control_access': ['access_control_access'],
 	'access_control_request': ['access_control_request'],
 	'access_control_audit': ['access_control_audit'],
-	'identity_account_status': ['identity_account_status'],
-	'identity_account_request': ['identity_account_request'],
-	'identity_account_audit': ['identity_account_audit'],
-	'identity_account_mapping': ['identity_account_mapping'],
 	'insight_trend': ['insight_trend', 'insight_security', 'insight_report', 'insight_technical'],
 	'insight_blog_it': ['insight_blog_it', 'insight_blog_it_detail']
 } %}
@@ -231,11 +233,17 @@
 	<div class="sidebar-menu">
 		<ul class="menu-list main-list">
 			{% if sidebar_perms.get('dashboard', {}).get('read', True) %}
-			<li class="menu-item"><a href="{{ url_for('pages.blossom_hub', segment='dashboard') }}" class="menu-link" data-match-keys="{{ (_sidebar_match_map.get('dashboard') or []) | join(',') }}"><img src="/static/image/svg/dashboard.svg" class="menu-icon" alt="대시"/><span class="menu-text">대시보드</span></a></li>
+            <li class="menu-item has-submenu">
+                <div class="menu-link submenu-trigger" data-match-keys="{{ (_sidebar_match_map.get('dashboard') or []) | join(',') }}"><img src="/static/image/svg/dashboard.svg" class="menu-icon" alt="대시보드"/><span class="menu-text">대시보드</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+                <ul class="submenu">
+                    <li><a href="{{ url_for('pages.blossom_hub', segment='dashboard') }}" class="submenu-link" data-match-keys="dashboard">기본 대시보드</a></li>
+                    <li><a href="{{ url_for('pages.blossom_hub', segment='dashboard_my') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dashboard_workspace') or []) | join(',') }}">제작 대시보드</a></li>
+                </ul>
+            </li>
 			{% endif %}
 			{% if sidebar_perms.get('system', {}).get('read', True) %}
 			<li class="menu-item has-submenu">
-				<div class="menu-link submenu-trigger"><img src="/static/image/svg/build.svg" class="menu-icon" alt="HW"/><span class="menu-text">시스템</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/build.svg" class="menu-icon" alt="시스템"/><span class="menu-text">시스템</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
 				<ul class="submenu">
 					<li><a href="{{ url_for('pages.blossom_hub', segment='hw_server_onpremise') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_server_onpremise') or []) | join(',') }}">서버</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='hw_storage_san') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('hw_storage_san') or []) | join(',') }}">스토리지</a></li>
@@ -256,25 +264,15 @@
 				</ul>
 			</li>
 			{% endif %}
-			{% if sidebar_perms.get('identity_governance', {}).get('read', True) %}
-			<li class="menu-item has-submenu">
-				<div class="menu-link submenu-trigger"><img src="/static/image/svg/chat/free-icon-font-circle-user.svg" class="menu-icon" alt="통합계정"/><span class="menu-text">통합계정</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
-				<ul class="submenu">
-					<li><a href="{{ url_for('pages.blossom_hub', segment='identity_account_status') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('identity_account_status') or []) | join(',') }}">현황</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='identity_account_request') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('identity_account_request') or []) | join(',') }}">신청</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='identity_account_audit') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('identity_account_audit') or []) | join(',') }}">감사</a></li>
-					<li><a href="{{ url_for('pages.blossom_hub', segment='identity_account_mapping') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('identity_account_mapping') or []) | join(',') }}">계정 매핑 관리</a></li>
-				</ul>
-			</li>
-			{% endif %}
 			{% if sidebar_perms.get('governance', {}).get('read', True) %}
 			<li class="menu-item has-submenu">
-				<div class="menu-link submenu-trigger"><img src="/static/image/svg/governance.svg" class="menu-icon" alt="NW"/><span class="menu-text">거버넌스</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/governance.svg" class="menu-icon" alt="거버넌스"/><span class="menu-text">거버넌스</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
 				<ul class="submenu">
 					<!-- <li><a href="{{ url_for('pages.blossom_hub', segment='gov_dr_training') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_dr_training') or []) | join(',') }}">재해복구 모의훈련</a></li> -->
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_backup_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_backup_policy') or []) | join(',') }}">백업 정책</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_package_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_package_list') or []) | join(',') }}">패키지 관리</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_vulnerability_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_vulnerability_dashboard') or []) | join(',') }}">취약점 분석</a></li>
+					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_service_management') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_service_management') or []) | join(',') }}">서비스 관리</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_ip_policy') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_ip_policy') or []) | join(',') }}">IP 정책</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_vpn_policy') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_vpn_policy') or []) | join(',') }}">VPN 정책</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='gov_dedicatedline_member') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('gov_dedicatedline_member') or []) | join(',') }}">전용회선 정책</a></li>
@@ -284,7 +282,7 @@
 			{% endif %}
 			{% if sidebar_perms.get('datacenter', {}).get('read', True) %}
 			<li class="menu-item has-submenu">
-				<div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="DC"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/domain.svg" class="menu-icon" alt="데이터센터"/><span class="menu-text">데이터센터</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
 				<ul class="submenu datacenter-facility-submenu">
 					<li class="submenu-group-title">보안설비</li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='dc_access_control') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('dc_access_control') or []) | join(',') }}">- 출입관리</a></li>
@@ -309,7 +307,7 @@
 			{% endif %}
 			{% if sidebar_perms.get('cost', {}).get('read', True) %}
 			<li class="menu-item has-submenu">
-				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-font-usd-circle.svg" class="menu-icon" alt="비용"/><span class="menu-text">비용관리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
+				<div class="menu-link submenu-trigger"><img src="/static/image/svg/free-icon-font-usd-circle.svg" class="menu-icon" alt="비용관리"/><span class="menu-text">비용관리</span><img src="/static/image/svg/expand_more.svg" class="submenu-arrow" alt="펼치기"/></div>
 				<ul class="submenu">
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cost_opex_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cost_opex_dashboard') or []) | join(',') }}">OPEX</a></li>
 					<li><a href="{{ url_for('pages.blossom_hub', segment='cost_capex_dashboard') }}" class="submenu-link" data-match-keys="{{ (_sidebar_match_map.get('cost_capex_dashboard') or []) | join(',') }}">CAPEX</a></li>
@@ -352,7 +350,7 @@
 			</li>
 			{% endif %}
 		</ul>
-		{# ADMIN 역할: 공백 제거 후 대소문자 무시. session role 없으면 표시 안함. #}
+		{# ADMIN role: keep settings hidden unless session role is ADMIN and permission allows it. #}
 		{% set _sess_role = (session.get('role','') | trim) %}
 		{% if _sess_role.upper() == 'ADMIN' and sidebar_perms.get('settings', {}).get('read', True) %}
 		<ul class="menu-list sidebar-settings">

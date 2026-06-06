@@ -31,7 +31,13 @@
 			retention_days_after_closed: toInt(qs('fp-retention-days').value, 365),
 			archive_days_if_unaccessed: toInt(qs('fp-archive-days').value, 180),
 			exclude_important_from_retention: toBool(qs('fp-retention-exclude').checked),
-			enable_expiry_notification: toBool(qs('fp-retention-notify').checked)
+			enable_expiry_notification: toBool(qs('fp-retention-notify').checked),
+			memo_enabled: toBool(qs('fp-memo-enabled').checked),
+			memo_user_quota_mb: toInt(qs('fp-memo-quota').value, 10240),
+			memo_max_item_kb: toInt(qs('fp-memo-item-size').value, 10240),
+			memo_warn_percent: toInt(qs('fp-memo-warn').value, 80),
+			memo_allow_images: toBool(qs('fp-memo-images').checked),
+			memo_history_days: toInt(qs('fp-memo-history-days').value, 365)
 		};
 	}
 
@@ -55,6 +61,12 @@
 		qs('fp-archive-days').value = item.archive_days_if_unaccessed || 180;
 		qs('fp-retention-exclude').checked = !!item.exclude_important_from_retention;
 		qs('fp-retention-notify').checked = !!item.enable_expiry_notification;
+		qs('fp-memo-enabled').checked = item.memo_enabled !== false;
+		qs('fp-memo-quota').value = item.memo_user_quota_mb || 10240;
+		qs('fp-memo-item-size').value = item.memo_max_item_kb || 10240;
+		qs('fp-memo-warn').value = item.memo_warn_percent || 80;
+		qs('fp-memo-images').checked = item.memo_allow_images !== false;
+		qs('fp-memo-history-days').value = item.memo_history_days || 365;
 	}
 
 	function fetchPolicy() {

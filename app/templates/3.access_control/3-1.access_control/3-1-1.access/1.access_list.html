@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -6,10 +6,11 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260507_ssh_policy3" defer></script>
+	<link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260528_audit_table_bg1">
+	<script src="/static/js/blossom.js?v=20260529_search_empty1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-1.access/1.access_list.js?v=20260531_page_range1" defer></script>
+	<script src="/static/js/3.access_control/access-modal-tabs.js?v=20260528_access_tabs4" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -32,11 +33,10 @@
 						<span id="access-total" class="count-badge access-total-badge" data-count="0" aria-live="polite">0</span>
 					</div>
 					<div class="system-tabs access-category-tabs" role="tablist" aria-label="자원 분류">
-						<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
-						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="내부 서비스">내부 서비스</button>
-						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="외부 서비스">외부 서비스</button>
-						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리 콘솔">관리 콘솔</button>
-						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="기타">기타</button>
+						<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="시스템">시스템</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="서비스">서비스</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="컨테이너">컨테이너</button>
+						<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리콘솔">관리콘솔</button>
 					</div>
 					<form class="access-filter access-connect-filter" id="access-filter-form">
 						<div>
@@ -49,6 +49,23 @@
 								<option value="">전체</option>
 								<option value="WEB">WEB</option>
 								<option value="SSH">SSH</option>
+							</select>
+						</div>
+						<div id="access-work-operation-wrap">
+							<label for="access-work-operation-filter">업무 운영</label>
+							<select id="access-work-operation-filter" class="ac-dropdown-input search-select" name="workOperation" data-searchable-scope="page" data-placeholder="업무 운영">
+								<option value="">전체</option>
+							</select>
+						</div>
+						<div id="access-category-detail-wrap" hidden>
+							<label for="access-category-detail-filter">장비군</label>
+							<select id="access-category-detail-filter" class="ac-dropdown-input search-select" name="categoryDetail" data-searchable-scope="page" data-placeholder="장비군" disabled>
+								<option value="">전체</option>
+								<option value="서버">서버</option>
+								<option value="스토리지">스토리지</option>
+								<option value="SAN">SAN</option>
+								<option value="네트워크">네트워크</option>
+								<option value="보안장비">보안장비</option>
 							</select>
 						</div>
 						<div>
@@ -66,7 +83,7 @@
 						<div id="access-state" class="access-empty-state" hidden></div>
 						<div id="access-resource-list" class="access-resource-list" role="list" aria-live="polite"></div>
 						<div class="access-pagination" id="access-pagination" hidden>
-							<span id="access-pagination-info">0개 항목</span>
+							<span id="access-pagination-info">0-0 / 0개 항목</span>
 							<div class="access-pagination-buttons">
 								<button type="button" class="action-chip action-muted" id="access-prev">이전</button>
 								<button type="button" class="action-chip action-muted" id="access-next">다음</button>

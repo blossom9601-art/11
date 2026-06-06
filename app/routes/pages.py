@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from flask import Blueprint, render_template, abort, request, redirect, url_for, session
+from flask import Blueprint, render_template, abort, request, redirect, url_for, session, g
 import os
+import re
+import uuid
+
+
+_UUID_SEGMENT_RE = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$')
 
 
 def _template_exists(template_path: str) -> bool:
@@ -34,6 +39,8 @@ from app.services.work_group_service import (
     list_work_groups,
     get_work_group as _svc_get_work_group,
     get_work_group_by_public_id as _svc_get_work_group_by_public_id,
+    get_service_master as _svc_get_service_master,
+    get_service_master_by_public_id as _svc_get_service_master_by_public_id,
 )
 from app.services.sw_db_type_service import get_sw_db_type
 from app.services.sw_os_type_service import get_sw_os_type
@@ -194,7 +201,8 @@ _KEY_MENU_CODE = {
     'identity_account_audit': 'identity_governance.audit',
     'identity_account_mapping': 'identity_governance.mapping',
     'gov_backup': 'governance.backup', 'gov_package': 'governance.package',
-    'gov_vulnerability': 'governance.vulnerability', 'gov_ip': 'governance.ip',
+    'gov_vulnerability': 'governance.vulnerability', 'gov_service': 'governance.service',
+    'gov_ip': 'governance.ip',
     'gov_vpn': 'governance.vpn', 'gov_leased': 'governance.leased_line',
     'gov_unused': 'governance.unused_asset',
     'datacenter_access': 'datacenter.access', 'datacenter_rack': 'datacenter.rack',
@@ -221,6 +229,7 @@ _KEY_MENU_CODE = {
     'admin_auth': 'settings.auth', 'admin_security': 'settings.security',
     'admin_mail': 'settings.mail', 'admin_quality': 'settings.quality',
     'admin_log': 'settings.log', 'admin_access_control': 'settings.access_control',
+    'settings_security_control': 'settings.security_control',
 }
 
 
@@ -239,6 +248,12 @@ def _resolve_menu_code(key):
 # 화이트리스트: key -> template 경로
 TEMPLATE_MAP = {
     'dashboard': '1.dashboard/1.dashboard.html',
+    'dashboard_workspace': '10.dashboard_workspace/dashboard_workspace.html',
+    'dashboard_my': '10.dashboard_workspace/dashboard_workspace.html',
+    'dashboard_shared': '10.dashboard_workspace/dashboard_workspace.html',
+    'dashboard_favorite': '10.dashboard_workspace/dashboard_workspace.html',
+    'dashboard_templates': '10.dashboard_workspace/dashboard_workspace.html',
+    'dashboard_builder': '10.dashboard_workspace/dashboard_workspace.html',
     # Insight
     'insight_trend': '5.insight/5-1.insight/5-1-1.trend/1.trend_list.html',
     'insight_security': '5.insight/5-1.insight/5-1-2.security/1.security_list.html',
@@ -258,6 +273,7 @@ TEMPLATE_MAP = {
     'hw_server_onpremise_authority': '2.hardware/2-1.server/2-1-1.onpremise/tab06-authority.html',
     'hw_server_onpremise_activate': '2.hardware/2-1.server/2-1-1.onpremise/tab07-activate.html',
     'hw_server_onpremise_firewalld': 'layouts/tab08-firewalld-shared.html',
+    'hw_server_onpremise_performance': 'layouts/tab09-performance-shared.html',
     'hw_server_onpremise_storage': 'layouts/tab10-storage-shared.html',
     'hw_server_onpremise_task': '2.hardware/2-1.server/2-1-1.onpremise/tab11-task.html',
     'hw_server_onpremise_vulnerability': 'layouts/tab12-vulnerability-shared.html',
@@ -274,6 +290,7 @@ TEMPLATE_MAP = {
     'hw_server_cloud_authority': '2.hardware/2-1.server/2-1-2.cloud/tab06-authority.html',
     'hw_server_cloud_activate': '2.hardware/2-1.server/2-1-2.cloud/tab07-activate.html',
     'hw_server_cloud_firewalld': 'layouts/tab08-firewalld-shared.html',
+    'hw_server_cloud_performance': 'layouts/tab09-performance-shared.html',
     'hw_server_cloud_storage': 'layouts/tab10-storage-shared.html',
     'hw_server_cloud_task': '2.hardware/2-1.server/2-1-2.cloud/tab11-task.html',
     'hw_server_cloud_vulnerability': 'layouts/tab12-vulnerability-shared.html',
@@ -299,6 +316,7 @@ TEMPLATE_MAP = {
     'hw_server_workstation_authority': '2.hardware/2-1.server/2-1-4.workstation/tab06-authority.html',
     'hw_server_workstation_activate': '2.hardware/2-1.server/2-1-4.workstation/tab07-activate.html',
     'hw_server_workstation_firewalld': 'layouts/tab08-firewalld-shared.html',
+    'hw_server_workstation_performance': 'layouts/tab09-performance-shared.html',
     'hw_server_workstation_storage': 'layouts/tab10-storage-shared.html',
     'hw_server_workstation_task': '2.hardware/2-1.server/2-1-4.workstation/tab11-task.html',
     'hw_server_workstation_vulnerability': 'layouts/tab12-vulnerability-shared.html',
@@ -517,6 +535,12 @@ TEMPLATE_MAP = {
     'gov_package_dashboard': '4.governance/4-7.package_policy/4-7-0.package_dashboard/1.package_dashboard.html',
     'gov_package_list': '4.governance/4-7.package_policy/4-7-1.package_list/1.package_list.html',
     'gov_package_vulnerability': '4.governance/4-7.package_policy/4-7-2.package_vulnerability/1.package_vulnerability.html',
+    'gov_service_management': '4.governance/4-9.service_management/1.service_management.html',
+    'gov_service_management_detail': '4.governance/4-9.service_management/2.service_detail.html',
+    'gov_service_management_manager': 'layouts/tab92-employee-shared.html',
+    'gov_service_management_system': 'layouts/tab91-system-shared.html',
+    'gov_service_management_log': 'layouts/tab14-log-shared.html',
+    'gov_service_management_file': 'layouts/tab15-file-shared.html',
 
     # Governance: Vulnerability analysis
     'gov_vulnerability_dashboard': '4.governance/4-8.vulnerability_policy/4-8-0.vulnerability_dashboard/1.vulnerability_dashboard.html',
@@ -989,6 +1013,7 @@ TEMPLATE_MAP = {
     'cat_hw_security_file': '9.category/9-2.hardware/9-2-5.security/tab15-file.html',
     # ── 설정 ──
     'settings_info_message': '10.settings/info_message_settings.html',
+    'settings_security_control': '10.settings/security_control.html',
     'settings_version': '10.settings/version.html',
     'help': '10.settings/help.html',
     'privacy': '10.settings/privacy.html',
@@ -1014,6 +1039,15 @@ _WG_SECURE_TAB_TO_KEY = {
 }
 _WG_KEY_TO_SECURE_TAB = {v: k for k, v in _WG_SECURE_TAB_TO_KEY.items()}
 _WG_DETAIL_KEYS = set(_WG_KEY_TO_SECURE_TAB)
+_SERVICE_SECURE_TAB_TO_KEY = {
+    'basic': 'gov_service_management_detail',
+    'manager': 'gov_service_management_manager',
+    'system': 'gov_service_management_system',
+    'log': 'gov_service_management_log',
+    'file': 'gov_service_management_file',
+}
+_SERVICE_KEY_TO_SECURE_TAB = {v: k for k, v in _SERVICE_SECURE_TAB_TO_KEY.items()}
+_SERVICE_DETAIL_KEYS = set(_SERVICE_KEY_TO_SECURE_TAB)
 _WG_LEGACY_SENSITIVE_PARAMS = {
     'wc_name', 'group_name', 'dept', 'sys_dept', 'dept_code', 'dept_name',
     'work_status', 'status_code', 'model', 'vendor', 'group_code',
@@ -1043,6 +1077,29 @@ def business_group_detail(public_id: str):
     if tab != 'basic':
         target = f'{target}?tab={tab}'
     return redirect(target, code=302)
+
+
+@pages_bp.route('/service-management/<public_id>')
+def service_management_detail(public_id: str):
+    tab = (request.args.get('tab') or 'basic').strip().lower()
+    key = _SERVICE_SECURE_TAB_TO_KEY.get(tab)
+    if not key:
+        abort(404)
+    row = _svc_get_service_master_by_public_id(public_id)
+    if not row:
+        abort(404)
+    _set_single_detail_session_ctx('cat_detail_ctx_v1', 'gov_service_management', {
+        'id': str(row.get('id') or ''),
+        'public_id': str(row.get('public_id') or public_id),
+    })
+    g.service_management_detail_id = str(row.get('id') or '')
+    g.service_management_public_id = str(row.get('public_id') or public_id)
+    return show(key, public_id)
+
+
+@pages_bp.route('/gov_service_management')
+def governance_service_management():
+    return show('gov_service_management')
 
 
 _CATEGORY_TAB_TO_SUFFIX = {
@@ -1285,6 +1342,64 @@ def _page_url_for_key(key: str, token: str | None = None, **qs) -> str:
     return url_for('pages.blossom_hub', segment=k, **qs)
 
 
+_HW_DETAIL_TAB_TO_SUFFIX = {
+    'basic': '_detail',
+    'hardware': '_hw',
+    'software': '_sw',
+    'backup': '_backup',
+    'interface': '_if',
+    'account': '_account',
+    'authority': '_authority',
+    'activate': '_activate',
+    'firewall': '_firewalld',
+    'performance': '_performance',
+    'storage': '_storage',
+    'task': '_task',
+    'vulnerability': '_vulnerability',
+    'package': '_package',
+    'log': '_log',
+    'file': '_file',
+}
+_HW_DETAIL_SUFFIX_TO_TAB = {suffix: tab for tab, suffix in _HW_DETAIL_TAB_TO_SUFFIX.items()}
+
+
+def _hardware_detail_base_key(key: str) -> str | None:
+    k = (key or '').strip()
+    if not k.startswith('hw_'):
+        return None
+    for suffix in sorted(_HW_DETAIL_SUFFIX_TO_TAB, key=len, reverse=True):
+        if not k.endswith(suffix):
+            continue
+        base_key = k[:-len(suffix)]
+        if base_key and base_key in TEMPLATE_MAP and (base_key + '_detail') in TEMPLATE_MAP:
+            return base_key
+    return None
+
+
+def _hardware_detail_tab_key(base_key: str, tab_name: str | None = None) -> str | None:
+    base = (base_key or '').strip()
+    tab = (tab_name or request.args.get('tab') or 'basic').strip().lower()
+    suffix = _HW_DETAIL_TAB_TO_SUFFIX.get(tab)
+    if not suffix:
+        return None
+    key = base + suffix
+    return key if key in TEMPLATE_MAP else None
+
+
+def _hardware_detail_url(base_key: str, tab_key: str | None = None, token: str | None = None) -> str:
+    base = (base_key or '').strip()
+    suffix = ''
+    if tab_key and tab_key.startswith(base):
+        suffix = tab_key[len(base):]
+    tab = _HW_DETAIL_SUFFIX_TO_TAB.get(suffix or '_detail', 'basic')
+    qs = {}
+    if tab != 'basic':
+        qs['tab'] = tab
+    if token:
+        return url_for('pages.blossom_hub_token', segment=base + '_detail', token=token, **qs)
+    return url_for('pages.blossom_hub', segment=base + '_detail', **qs)
+
+
 def _is_category_nav_path(path: str) -> bool:
     """Legacy ?id= flows are honored on /b/… (after /p → /b redirect)."""
     p = path or ''
@@ -1374,6 +1489,8 @@ def blossom_hub(segment: str):
     seg = (segment or '').strip()
     if not seg or '/' in seg:
         abort(404)
+    if _UUID_SEGMENT_RE.match(seg):
+        return show('2.task_detail.html', seg)
     if seg.startswith('cat_'):
         return show(seg)
     pref = seg.split('_', 1)[0] if '_' in seg else ''
@@ -1473,6 +1590,16 @@ def show(key: str, token: str | None = None):
             _target = f"{_target}?{_qs}"
         return redirect(_target, code=302)
     _rp = request.path or ''
+    _hw_detail_base = _hardware_detail_base_key(key)
+    if _hw_detail_base and _is_category_key_path(_rp, key):
+        _canonical_key = _hw_detail_base + '_detail'
+        if key == _canonical_key:
+            _requested_hw_tab_key = _hardware_detail_tab_key(_hw_detail_base)
+            if not _requested_hw_tab_key:
+                abort(404)
+            key = _requested_hw_tab_key
+        elif request.headers.get('X-Requested-With', '') not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
+            return redirect(_hardware_detail_url(_hw_detail_base, key, token), code=302)
     if key in _WG_DETAIL_KEYS and _is_category_key_path(_rp, key):
         legacy_id = (request.args.get('group_id') or request.args.get('id') or '').strip()
         if not legacy_id:
@@ -1485,6 +1612,21 @@ def show(key: str, token: str | None = None):
             abort(404)
         tab = _WG_KEY_TO_SECURE_TAB.get(key, 'basic')
         target = url_for('pages.business_group_detail', public_id=row['public_id'])
+        if tab != 'basic':
+            target = f"{target}?tab={tab}"
+        return redirect(target, code=302)
+    if key in _SERVICE_DETAIL_KEYS and _is_category_key_path(_rp, key):
+        legacy_id = (request.args.get('service_id') or request.args.get('id') or '').strip()
+        if not legacy_id:
+            abort(404)
+        try:
+            row = _svc_get_service_master(int(legacy_id))
+        except Exception:
+            row = None
+        if not row or not row.get('public_id'):
+            abort(404)
+        tab = _SERVICE_KEY_TO_SECURE_TAB.get(key, 'basic')
+        target = url_for('pages.service_management_detail', public_id=row['public_id'])
         if tab != 'basic':
             target = f"{target}?tab={tab}"
         return redirect(target, code=302)
@@ -1540,6 +1682,12 @@ def show(key: str, token: str | None = None):
     # 최소 셸(header+sidebar+skeleton)을 반환하고, JS가 콘텐츠를 비동기 로드한다.
     _xhr = request.headers.get('X-Requested-With', '')
     _force_full_render_keys = {
+        'dashboard_workspace',
+        'dashboard_my',
+        'dashboard_shared',
+        'dashboard_favorite',
+        'dashboard_templates',
+        'dashboard_builder',
         'cat_business_dashboard',
         # 비즈니스 목록(분류·구분·상태·운영·그룹): SPA 셸 초기 진입만으로 정적 스크립트가 불안정하게 떨어지는 문제 방지 → 항상 풀 렌더
         'cat_business_work',
@@ -1553,6 +1701,12 @@ def show(key: str, token: str | None = None):
         'cat_business_group_service',
         'cat_business_group_log',
         'cat_business_group_file',
+        'gov_service_management',
+        'gov_service_management_detail',
+        'gov_service_management_manager',
+        'gov_service_management_system',
+        'gov_service_management_log',
+        'gov_service_management_file',
         # 통합계정(신청 포함): SPA 셸 교체 시 스크립트/마법사 초기화 누락 방지 → 항상 풀 렌더
         'identity_account_request',
         'identity_account_status',
@@ -1595,6 +1749,10 @@ def show(key: str, token: str | None = None):
     _force_full_render_keys.update(
         k for k in TEMPLATE_MAP
         if any(str(k).startswith(prefix) for prefix in _category_full_render_prefixes)
+    )
+    _force_full_render_keys.update(
+        k for k in TEMPLATE_MAP
+        if _hardware_detail_base_key(str(k))
     )
     if key not in _force_full_render_keys and _xhr not in ('blossom-spa', 'blossom-spa-prefetch', 'XMLHttpRequest'):
         return render_template(
@@ -1892,7 +2050,11 @@ def show(key: str, token: str | None = None):
     # AD/DNS 정책은 자체 로그 API(/api/network/ad/{id}/logs 등)를 사용하므로
     # 중앙 변경이력 공유 템플릿 우회 대상에서 제외한다.
     _TAB14_SKIP_SHARED = set()
-    if (str(template).endswith('/tab14-log.html') or str(template).endswith('\\tab14-log.html')) and key not in _TAB14_SKIP_SHARED:
+    if (
+        str(template).endswith('/tab14-log.html')
+        or str(template).endswith('\\tab14-log.html')
+        or str(template).replace('\\', '/').endswith('layouts/tab14-log-shared.html')
+    ) and key not in _TAB14_SKIP_SHARED:
         base_key = key[:-4] if key.endswith('_log') else key
         back_key = base_key if base_key in TEMPLATE_MAP else None
         back_label = None
@@ -1973,6 +2135,12 @@ def show(key: str, token: str | None = None):
             _wg_order = ('_detail', '_manager', '_system', '_service', '_log', '_file')
             tabs = [t for t in tabs if t['key'].endswith(_wg_order)]
             tabs.sort(key=lambda t: next((i for i, s in enumerate(_wg_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+
+        if base_key == 'gov_service_management':
+            _svc_order = ('_detail', '_manager', '_system', '_log', '_file')
+            tabs = [t for t in tabs if t['key'].endswith(_svc_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_svc_order) if t['key'].endswith(s)), 99))
             back_label = '목록으로 돌아가기'
 
         # 카테고리>소프트웨어 상세: 탭 4개만 표시 (기본정보, 소프트웨어, 변경이력, 구성/파일)
@@ -2804,7 +2972,8 @@ def show(key: str, token: str | None = None):
     _TAB15_SKIP_SHARED = set()  # 필요시 특정 키 제외
     _is_file_tab = (
         (str(template).endswith('/tab15-file.html') or str(template).endswith('\\tab15-file.html')
-         or str(template).endswith('-file.html'))
+         or str(template).endswith('-file.html')
+         or str(template).replace('\\', '/').endswith('layouts/tab15-file-shared.html'))
         and key.endswith('_file')
         and key not in _TAB15_SKIP_SHARED
     )
@@ -2857,6 +3026,12 @@ def show(key: str, token: str | None = None):
             _wg_order = ('_detail', '_manager', '_system', '_service', '_log', '_file')
             tabs = [t for t in tabs if t['key'].endswith(_wg_order)]
             tabs.sort(key=lambda t: next((i for i, s in enumerate(_wg_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+
+        if base_key == 'gov_service_management':
+            _svc_order = ('_detail', '_manager', '_system', '_log', '_file')
+            tabs = [t for t in tabs if t['key'].endswith(_svc_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_svc_order) if t['key'].endswith(s)), 99))
             back_label = '목록으로 돌아가기'
 
         # 카테고리>소프트웨어
@@ -3964,6 +4139,22 @@ def show(key: str, token: str | None = None):
             _t91_storage_key = 'wg:system:pageSize'
             _t91_file_prefix = 'workgroup_system_'
 
+        elif base_key == 'gov_service_management':
+            _svc_order = ('_detail', '_manager', '_system', '_log', '_file')
+            tabs = [t for t in tabs if t['key'].endswith(_svc_order)]
+            tabs.sort(key=lambda t: next((i for i, s in enumerate(_svc_order) if t['key'].endswith(s)), 99))
+            back_label = '목록으로 돌아가기'
+            _t91_preset = 'workgroup-system'
+            _t91_section_title = '시스템'
+            _t91_analytics_title = '시스템 통계 분석'
+            _t91_analytics_subtitle = '구분별 유형 분포'
+            _t91_empty_title = '시스템 항목이 없습니다.'
+            _t91_empty_desc = '연결된 시스템 항목이 없습니다.'
+            _t91_api_base = '/api/governance/service-masters'
+            _t91_api_suffix = '/systems'
+            _t91_storage_key = 'service:system:pageSize'
+            _t91_file_prefix = 'service_system_'
+
         # 소프트웨어 카테고리 > 소프트웨어 (시스템 탭에 소프트웨어 라벨)
         elif str(base_key).startswith('cat_sw_'):
             for tab in tabs:
@@ -4409,9 +4600,46 @@ def show(key: str, token: str | None = None):
                 'subtitle': _hw_sys,
                 'id': _hw_aid,
             })
-            return redirect(url_for('pages.blossom_hub', segment=key), code=302)
+            _token_map = session.get('hw_detail_token_ctx') or {}
+            if not isinstance(_token_map, dict):
+                _token_map = {}
+            _hw_token = None
+            for _tok, _ctx in list(_token_map.items()):
+                if isinstance(_ctx, dict) and str(_ctx.get('base') or '') == _hwb and str(_ctx.get('id') or '') == str(_hw_aid):
+                    _hw_token = _tok
+                    break
+            if not _hw_token or not _UUID_SEGMENT_RE.match(str(_hw_token)):
+                _hw_token = str(uuid.uuid4())
+            _token_map[_hw_token] = {
+                'base': _hwb,
+                'title': _hw_work,
+                'subtitle': _hw_sys,
+                'id': _hw_aid,
+            }
+            session['hw_detail_token_ctx'] = _token_map
+            session.modified = True
+            return redirect(_hardware_detail_url(_hwb, key, _hw_token), code=302)
 
         # ── No query params — read title/subtitle from session ──
+        if token:
+            _token_map = session.get('hw_detail_token_ctx') or {}
+            _token_ctx = _token_map.get(token) if isinstance(_token_map, dict) else None
+            if isinstance(_token_ctx, dict) and str(_token_ctx.get('base') or '') == _hwb and _token_ctx.get('id'):
+                _hw_work = (_token_ctx.get('title') or '').strip()
+                _hw_sys = (_token_ctx.get('subtitle') or '').strip()
+                if not _hw_work or not _hw_sys:
+                    try:
+                        _ha = svc_get_hardware_asset(int(_token_ctx.get('id')))
+                        if _ha:
+                            _hw_work = _hw_work or (_ha.get('work_name') or '')
+                            _hw_sys = _hw_sys or (_ha.get('system_name') or '')
+                    except Exception:
+                        pass
+                _set_single_detail_session_ctx('hw_detail_ctx', _hwb, {
+                    'title': _hw_work,
+                    'subtitle': _hw_sys,
+                    'id': str(_token_ctx.get('id')),
+                })
         if title is None:
             _hw_raw = (session.get('hw_detail_ctx') or {}).get(_hwb)
             if isinstance(_hw_raw, dict):
@@ -5617,6 +5845,35 @@ def show(key: str, token: str | None = None):
 
     # Expose the governance-session ID for any gov_ detail/tab page.
     _gov_detail_id = _gov_sess.get('id', '') if _gov_sess else ''
+    _service_detail_id = ''
+    _service_public_id = ''
+    if str(key).startswith('gov_service_management_'):
+        _service_sess = {}
+        try:
+            _service_sess = (session.get('cat_detail_ctx_v1') or {}).get('gov_service_management') or {}
+        except Exception:
+            _service_sess = {}
+        _service_public_id = (
+            getattr(g, 'service_management_public_id', '')
+            or token
+            or _service_sess.get('public_id')
+            or ''
+        ).strip()
+        _service_detail_id = (
+            getattr(g, 'service_management_detail_id', '')
+            or request.args.get('id')
+            or request.args.get('service_id')
+            or _service_sess.get('id')
+            or ''
+        ).strip()
+        if not _service_detail_id and _service_public_id:
+            try:
+                _service_by_public = _svc_get_service_master_by_public_id(_service_public_id)
+            except Exception:
+                _service_by_public = None
+            if _service_by_public:
+                _service_detail_id = str(_service_by_public.get('id') or '').strip()
+                _service_public_id = str(_service_by_public.get('public_id') or _service_public_id).strip()
 
     context = {
         'db_detail': db_detail,
@@ -5633,8 +5890,29 @@ def show(key: str, token: str | None = None):
         'work_group_public_id': _wg_public_id,
         'work_group_secure_tab': _WG_KEY_TO_SECURE_TAB.get(key, ''),
         'gov_detail_id': _gov_detail_id,
+        'service_detail_id': _service_detail_id,
+        'service_id': _service_detail_id,
+        'service_detail_public_id': _service_public_id,
+        'service_management_secure_tab': _SERVICE_KEY_TO_SECURE_TAB.get(key, ''),
         **_hw_extra_for_ctx,
     }
+
+    if _service_detail_id:
+        try:
+            _service_detail = _svc_get_service_master(int(_service_detail_id))
+        except Exception:
+            _service_detail = None
+        if _service_detail:
+            title = _service_detail.get('service_name') or title or '서비스'
+            _service_category = str(_service_detail.get('service_category') or '').strip()
+            subtitle = {
+                'external': '외부 서비스',
+                'integration': '연계 서비스',
+                'internal': '내부 서비스',
+                '외부 서비스': '외부 서비스',
+                '연계 서비스': '연계 서비스',
+                '내부 서비스': '내부 서비스',
+            }.get(_service_category, _service_category or '서비스')
     # tab14-log 페이지용 storage_prefix (sessionStorage 키 조회에 사용)
     try:
         context['storage_prefix'] = _tab14_storage_prefix
@@ -5754,6 +6032,9 @@ def show(key: str, token: str | None = None):
     if key == 'cat_business_group_log' and _cat_detail_id:
         context['tab14_entity_type'] = 'biz_work_group'
         context['tab14_entity_id'] = str(_cat_detail_id)
+    if key == 'gov_service_management_log' and _service_detail_id:
+        context['tab14_entity_type'] = 'gov_service_master'
+        context['tab14_entity_id'] = str(_service_detail_id)
     # 카테고리>벤더: 변경이력 entity 컨텍스트 전달
     _VENDOR_LOG_ENTITY_MAP = {
         'cat_vendor_manufacturer_log': 'vendor_manufacturer',
@@ -5774,6 +6055,8 @@ def show(key: str, token: str | None = None):
     # 거버넌스 상세(구성/파일 탭): gov_detail_id 를 owner_key 로 전달
     if key.endswith('_file') and not context.get('tab15_owner_key') and _gov_detail_id:
         context['tab15_owner_key'] = str(_gov_detail_id)
+    if key == 'gov_service_management_file' and _service_detail_id:
+        context['tab15_owner_key'] = 'gov_service_master:' + str(_service_detail_id)
     # 소프트웨어·비용 등(구성/파일 탭): detail_manage_no 또는 detail_entity_key 를 owner_key 로 전달
     if key.endswith('_file') and not context.get('tab15_owner_key') and detail_entity_key:
         context['tab15_owner_key'] = str(detail_entity_key)
@@ -5849,7 +6132,10 @@ def show(key: str, token: str | None = None):
     try:
         if _is_tab91:
             # entity_id는 routing block 시점에 알 수 없으므로 context 단계에서 주입
-            _tab91_context['tab91_entity_id'] = str(_cat_detail_id) if _cat_detail_id else ''
+            if key == 'gov_service_management_system':
+                _tab91_context['tab91_entity_id'] = str(_service_detail_id) if _service_detail_id else ''
+            else:
+                _tab91_context['tab91_entity_id'] = str(_cat_detail_id) if _cat_detail_id else ''
             context.update(_tab91_context)
     except NameError:
         pass
@@ -6533,12 +6819,15 @@ def show(key: str, token: str | None = None):
     # ── tab92 담당자 공통 템플릿 (업무 그룹) ───────────────────────────────
     _TAB92_KEYS = {
         'cat_business_group_manager',
+        'gov_service_management_manager',
     }
     if key in _TAB92_KEYS:
         _tab92_base = key.rsplit('_manager', 1)[0]
         back_key = _tab92_base if _tab92_base in TEMPLATE_MAP else None
         back_label = '목록으로 돌아가기'
         _tab92_order = ('_detail', '_manager', '_system', '_service', '_log', '_file')
+        if _tab92_base == 'gov_service_management':
+            _tab92_order = ('_detail', '_manager', '_system', '_log', '_file')
         tabs = []
         for _suf92, _lbl92 in (
             ('_detail', '기본정보'),
@@ -6553,7 +6842,7 @@ def show(key: str, token: str | None = None):
                 tabs.append({'key': _tk92, 'label': _lbl92})
         tabs.sort(key=lambda t: next((i for i, s in enumerate(_tab92_order) if t['key'].endswith(s)), 99))
         context['tab92'] = {
-            'body_class': 'page-workgroup-manager',
+            'body_class': 'page-service-manager' if _tab92_base == 'gov_service_management' else 'page-workgroup-manager',
             'section_title': '담당자 정보',
             'empty_title': '담당자 항목이 없습니다.',
             'empty_desc': "우측 상단 '추가' 버튼을 눌러 첫 담당자를 등록하세요.",
@@ -6814,6 +7103,112 @@ def show(key: str, token: str | None = None):
     except Exception:
         pass
 
+    try:
+        _service_public_id = context.get('service_detail_public_id') or ''
+        if _service_public_id and 'tabs' in locals() and isinstance(tabs, list) and key in _SERVICE_DETAIL_KEYS:
+            for _tab in tabs:
+                _tab_key = _tab.get('key') if isinstance(_tab, dict) else ''
+                _secure_tab = _SERVICE_KEY_TO_SECURE_TAB.get(_tab_key)
+                if _secure_tab:
+                    _href = url_for('pages.service_management_detail', public_id=_service_public_id)
+                    if _secure_tab != 'basic':
+                        _href = f'{_href}?tab={_secure_tab}'
+                    _tab['href'] = _href
+            context['secure_back_url'] = url_for('pages.blossom_hub', segment='gov_service_management')
+    except Exception:
+        pass
+
+    try:
+        _hw_tab_base = _hardware_detail_base_key(key)
+        if _hw_tab_base:
+            if 'tabs' in locals() and isinstance(tabs, list):
+                for _tab in tabs:
+                    _tab_key = _tab.get('key') if isinstance(_tab, dict) else ''
+                    if _tab_key:
+                        _tab['href'] = _hardware_detail_url(_hw_tab_base, _tab_key, token)
+            context['hardware_detail_canonical_url'] = _hardware_detail_url(_hw_tab_base, key, token)
+            context['hardware_detail_token'] = token or ''
+            context['disable_detail_tab_spa'] = True
+    except Exception:
+        pass
+
+    # tab09 성능 탭은 별도 공유 템플릿을 사용한다. 기존 탭 목록에도 자동 삽입한다.
+    _TAB09_PREFIX_MAP = {
+        'hw_server_onpremise': 'onpremise',
+        'hw_server_cloud': 'cloud',
+        'hw_server_workstation': 'workstation',
+    }
+    _TAB09_SUFFIXES = (
+        '_detail', '_hw', '_sw', '_backup', '_if', '_account', '_authority',
+        '_activate', '_firewalld', '_performance', '_storage', '_task',
+        '_vulnerability', '_package', '_log', '_file'
+    )
+    _tab09_base = locals().get('base_key') or key
+    for _suf09 in _TAB09_SUFFIXES:
+        if str(_tab09_base).endswith(_suf09):
+            _tab09_base = str(_tab09_base)[:-len(_suf09)]
+            break
+    _tab09_key = str(_tab09_base) + '_performance'
+    if _tab09_key in TEMPLATE_MAP:
+        _tabs09 = locals().get('tabs')
+        if isinstance(_tabs09, list) and not any(t.get('key') == _tab09_key for t in _tabs09 if isinstance(t, dict)):
+            _insert_at09 = len(_tabs09)
+            for _idx09, _tab09 in enumerate(_tabs09):
+                if isinstance(_tab09, dict) and _tab09.get('key') == str(_tab09_base) + '_firewalld':
+                    _insert_at09 = _idx09 + 1
+                    break
+                if isinstance(_tab09, dict) and _tab09.get('key') == str(_tab09_base) + '_storage':
+                    _insert_at09 = _idx09
+                    break
+            _perf_tab09 = {'key': _tab09_key, 'label': '성능관리'}
+            try:
+                _perf_tab09['href'] = _hardware_detail_url(str(_tab09_base), _tab09_key, token)
+            except Exception:
+                pass
+            _tabs09.insert(_insert_at09, _perf_tab09)
+
+    if key.endswith('_performance') and str(template) == 'layouts/tab09-performance-shared.html':
+        base_key = key[:-12]
+        back_key = base_key if base_key in TEMPLATE_MAP else None
+        back_label = '목록으로 돌아가기' if str(base_key).startswith('hw_server_') else None
+        storage_prefix = _TAB09_PREFIX_MAP.get(base_key, '')
+        context['storage_prefix'] = storage_prefix
+        context['tab09_api_base'] = '/api/agent-performance'
+        if not locals().get('tabs'):
+            _tab09_specs = [
+                ('_detail', '기본정보'),
+                ('_hw', '하드웨어'),
+                ('_sw', '소프트웨어'),
+                ('_backup', '백업정책'),
+                ('_if', '인터페이스'),
+                ('_account', '계정관리'),
+                ('_authority', '권한관리'),
+                ('_activate', '기동절차'),
+                ('_firewalld', '방화벽'),
+                ('_performance', '성능관리'),
+                ('_storage', '스토리지'),
+                ('_task', '작업이력'),
+                ('_vulnerability', '취약점'),
+                ('_package', '패키지'),
+                ('_log', '변경이력'),
+                ('_file', '구성/파일'),
+            ]
+            tabs = []
+            for _suf09, _label09 in _tab09_specs:
+                _key09 = base_key + _suf09
+                if _key09 in TEMPLATE_MAP:
+                    tabs.append({'key': _key09, 'label': _label09})
+
+    if key.startswith('dashboard_') and str(template) == '10.dashboard_workspace/dashboard_workspace.html':
+        context['dashboard_workspace_page'] = {
+            'dashboard_workspace': 'my',
+            'dashboard_my': 'my',
+            'dashboard_shared': 'shared',
+            'dashboard_favorite': 'favorite',
+            'dashboard_templates': 'templates',
+            'dashboard_builder': 'builder',
+        }.get(key, 'my')
+
     return render_template(
         template,
         current_key=key,
@@ -6833,4 +7228,3 @@ def show(key: str, token: str | None = None):
         tabs=locals().get('tabs'),
         **context,
     )
-

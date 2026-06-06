@@ -230,6 +230,36 @@ class TestP1Auth:
         body = resp.get_json()
         assert body['alive'] is False
 
+    def test_session_check_authenticated_legacy_session(self, app, client):
+        """emp_no만 있는 레거시 세션도 session-check에서 허위 로그아웃하지 않는다."""
+        _, up_id = _create_auth_user(app, 'CHECK01', 'Pass1234!')
+        with client.session_transaction() as sess:
+            sess['emp_no'] = 'CHECK01'
+            sess['user_profile_id'] = up_id
+
+        resp = client.get('/api/auth/session-check', headers={'X-Requested-With': 'XMLHttpRequest'})
+
+        assert resp.status_code == 200
+        assert resp.get_json()['valid'] is True
+
+    def test_session_check_degraded_active_session_lookup(self, app, client):
+        """active_sessions 조회 장애는 프론트 자동 로그아웃을 유발하는 401로 처리하지 않는다."""
+        _, up_id = _create_auth_user(app, 'CHECK02', 'Pass1234!')
+        _login(client, user_id=up_id, emp_no='CHECK02')
+        with client.session_transaction() as sess:
+            sess['_session_id'] = 'broken-active-session-lookup'
+
+        with app.app_context():
+            db.session.execute(db.text('DROP TABLE IF EXISTS active_sessions'))
+            db.session.commit()
+
+        resp = client.get('/api/auth/session-check', headers={'X-Requested-With': 'XMLHttpRequest'})
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body['valid'] is True
+        assert body['degraded'] is True
+
     # ── TC-AUTH-012: 로그아웃 → 세션 삭제 ──
     def test_logout_clears_session(self, app, client):
         """로그아웃 후 세션 완전 삭제."""

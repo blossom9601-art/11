@@ -85,7 +85,7 @@
   function detectHwPageKeyFromUrl() {
     try {
       const path = String(window.location && window.location.pathname ? window.location.pathname : '');
-      const m = path.match(/\/p\/([^/?#]+)/);
+      const m = path.match(/\/[pb]\/([^/?#]+)/);
       return m ? decodeURIComponent(m[1]) : '';
     } catch (_e) {
       return '';
@@ -103,7 +103,9 @@
   }
 
   function shouldSkipCategoryFkField(fieldEl, fkName) {
-    if (fkName === 'model' && (isSoftwareCategoryPage() || isComponentCategoryPage())) return true;
+    const key = detectHwPageKeyFromUrl();
+    const isCategoryPage = key.indexOf('cat_hw_') === 0 || key.indexOf('cat_sw_') === 0 || key.indexOf('cat_component_') === 0;
+    if (fkName === 'model' && isCategoryPage) return true;
     if (fkName === 'vendor' && (isSoftwareCategoryPage() || isComponentCategoryPage())) {
       const tag = fieldEl && fieldEl.tagName ? fieldEl.tagName.toLowerCase() : '';
       return tag === 'select' && fieldEl.classList && fieldEl.classList.contains('search-select');

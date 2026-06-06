@@ -8,7 +8,10 @@
 		detail: null,
 		page: 1,
 		pageSize: 8,
-		category: '',
+		category: '시스템',
+		categoryDetail: '',
+		workOperationCode: '',
+		workOperations: [],
 		activeEndpointIndex: 0,
 		sshPanelOpen: false,
 		sshCredentialsUnlocked: false,
@@ -25,6 +28,19 @@
 	var CONNECT_COOLDOWN_MS = 3000;
 	var CONNECT_RATE_WINDOW_MS = 60000;
 	var CONNECT_RATE_MAX_COUNT = 5;
+	var CATEGORY_ALIASES = {
+		'시스템': '시스템', system: '시스템', os: '시스템', linux: '시스템', windows: '시스템', unix: '시스템', vm: '시스템', '서버': '시스템', server: '시스템', ssh: '시스템', db: '시스템', '기타': '시스템', etc: '시스템',
+		'서비스': '서비스', service: '서비스', webservice: '서비스', '웹서비스': '서비스', '내부서비스': '서비스', '외부서비스': '서비스', internal: '서비스', external: '서비스', '웹': '서비스', web: '서비스',
+		'컨테이너': '컨테이너', container: '컨테이너', kubernetes: '컨테이너', k8s: '컨테이너', '쿠버네티스': '컨테이너', openshift: '컨테이너', rancher: '컨테이너', portainer: '컨테이너',
+		'관리콘솔': '관리콘솔', adminconsole: '관리콘솔', managementconsole: '관리콘솔', console: '관리콘솔'
+	};
+	var CONSOLE_GROUP_ALIASES = {
+		'서버': '서버', server: '서버', ilo: '서버', idrac: '서버', cimc: '서버', imm: '서버',
+		'스토리지': '스토리지', storage: '스토리지', netapp: '스토리지', emc: '스토리지', hpestorage: '스토리지',
+		san: 'SAN', brocade: 'SAN', ciscosan: 'SAN',
+		'네트워크': '네트워크', network: '네트워크', cisco: '네트워크', juniper: '네트워크', arista: '네트워크', l4l7: '네트워크',
+		'보안장비': '보안장비', security: '보안장비', firewall: '보안장비', vpn: '보안장비', waf: '보안장비', ips: '보안장비'
+	};
 
 	function qs(id) { return document.getElementById(id); }
 	function esc(value) {
@@ -40,6 +56,31 @@
 		if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') return s.slice(1, -1).trim();
 		if (s.length >= 2 && s.charAt(0) === "'" && s.charAt(s.length - 1) === "'") return s.slice(1, -1).trim();
 		return s;
+	}
+	function categoryKey(value) { return String(value || '').replace(/[\s\/_-]+/g, '').toLowerCase(); }
+		function normalizeCategoryValue(value) { return CATEGORY_ALIASES[categoryKey(value)] || (String(value || '').trim() || '시스템'); }
+		function normalizeConsoleGroup(value) { return CONSOLE_GROUP_ALIASES[categoryKey(value)] || ''; }
+		function categoryLabel(row) { return normalizeCategoryValue(row && (row.category_name || row.category_label || row.category)); }
+		function categoryDetail(row) { return categoryLabel(row) === '관리콘솔' ? normalizeConsoleGroup(row && (row.category_detail || row.console_group)) : ''; }
+		function workOperationCode(row) { return categoryLabel(row) === '관리콘솔' ? '' : String(row && (row.work_operation_code || '') || '').trim(); }
+		function isInternalWorkOperationCode(value) { return /^OPERATION_\d+$/i.test(String(value || '').trim()); }
+		function workOperationLabel(row) {
+			var label = categoryLabel(row) === '관리콘솔' ? '' : String(row && (row.work_operation_name || row.work_operation || '') || '').trim();
+			return isInternalWorkOperationCode(label) ? '' : label;
+		}
+	function categoryPath(row) {
+		var category = categoryLabel(row);
+		var detail = categoryDetail(row);
+		return category === '관리콘솔' && detail ? category + ' / ' + detail : category;
+	}
+	function operationOptionsHtml() {
+		var html = '<option value="">전체</option>';
+		state.workOperations.forEach(function (item) {
+			var code = item.operation_code || '';
+			var name = item.wc_name || item.operation_name || code;
+			if (code) html += '<option value="' + esc(code) + '">' + esc(name) + '</option>';
+		});
+		return html;
 	}
 	function normalizeSshUser(raw) {
 		var s = raw == null ? '' : String(raw).trim();
@@ -183,29 +224,34 @@
 		if (ep.kind === 'WEB') return ep.url || ep.host || '-';
 		return ep.host || ep.url || '-';
 	}
+	function endpointProtocol(ep) {
+		return String((ep && (ep.protocol || ep.access_type || ep.kind)) || '').toUpperCase();
+	}
+	function isWebEndpoint(ep) {
+		var p = endpointProtocol(ep);
+		return p === 'WEB' || p === 'HTTP' || p === 'HTTPS' || p === 'API';
+	}
+	function isRemoteClientEndpoint(ep) {
+		var p = endpointProtocol(ep);
+		return p === 'SSH' || p === 'SFTP' || p === 'RDP';
+	}
 	function endpointPort(ep) {
 		if (!ep) return '';
-		return ep.port || (ep.kind === 'SSH' ? 22 : (ep.protocol === 'HTTP' ? 80 : 443));
+		var protocol = endpointProtocol(ep);
+		if (ep.port) return ep.port;
+		if (protocol === 'HTTP') return 80;
+		if (protocol === 'RDP') return 3389;
+		if (protocol === 'SSH' || protocol === 'SFTP') return 22;
+		return 443;
 	}
 	function uniqueKinds(row) {
 		var seen = {};
 		var out = [];
 		(row.endpoints || []).forEach(function (ep) {
-			var kind = ep.kind || '';
+			var kind = endpointProtocol(ep) || ep.kind || '';
 			if (kind && !seen[kind]) { seen[kind] = true; out.push(kind); }
 		});
 		return out;
-	}
-	function normalizeCategory(value) {
-		return String(value || '').replace(/\s+/g, '').toLowerCase();
-	}
-	function categoryLabel(row) {
-		var raw = normalizeCategory(row.category_name || row.category || '');
-		if (raw === '내부서비스' || raw === 'internal' || raw.indexOf('내부') >= 0) return '내부 서비스';
-		if (raw === '외부서비스' || raw === 'external' || raw === '웹' || raw === 'web' || raw.indexOf('외부') >= 0) return '외부 서비스';
-		if (raw === '관리콘솔' || raw === 'adminconsole' || raw === 'console' || raw.indexOf('관리콘솔') >= 0 || raw.indexOf('콘솔') >= 0) return '관리 콘솔';
-		if (raw === '기타' || raw === 'etc') return '기타';
-		return '기타';
 	}
 	function kindChips(row) {
 		var kinds = uniqueKinds(row);
@@ -248,7 +294,7 @@
 		return cls;
 	}
 	function getSearchText(row) {
-		var parts = [row.resource_name, row.description, row.resource_url, row.host_address, row.primary_url, row.category_name];
+		var parts = [row.resource_name, row.description, row.resource_url, row.host_address, row.primary_url, row.category_name, row.category_detail, row.work_operation_code, workOperationLabel(row), categoryPath(row)];
 		(row.endpoints || []).forEach(function (ep) { parts.push(ep.label, ep.kind, ep.protocol, ep.host, ep.url, ep.url_path); });
 		return parts.join(' ').toLowerCase();
 	}
@@ -257,9 +303,13 @@
 		var kind = (qs('access-type-filter').value || '').trim();
 		var status = (qs('access-status-filter').value || '').trim();
 		var category = state.category || '';
+		var detail = state.categoryDetail || '';
+		var operation = state.workOperationCode || '';
 		state.filtered = state.rows.filter(function (row) {
 			if (search && getSearchText(row).indexOf(search) === -1) return false;
 			if (category && categoryLabel(row) !== category) return false;
+			if (category === '관리콘솔' && detail && categoryDetail(row) !== detail) return false;
+			if (category !== '관리콘솔' && operation && workOperationCode(row) !== operation) return false;
 			if (kind && uniqueKinds(row).indexOf(kind) === -1 && row.primary_kind !== kind) return false;
 			if (status && statusLabel(row) !== status) return false;
 			return true;
@@ -285,7 +335,7 @@
 		wrap.hidden = state.filtered.length <= state.pageSize;
 		qs('access-prev').disabled = state.page <= 1;
 		qs('access-next').disabled = state.page >= pages;
-		if (!state.filtered.length) qs('access-pagination-info').textContent = '0개 항목';
+		if (!state.filtered.length) qs('access-pagination-info').textContent = '0-0 / 0개 항목';
 		else {
 			var start = (state.page - 1) * state.pageSize + 1;
 			var end = Math.min(state.filtered.length, state.page * state.pageSize);
@@ -294,11 +344,32 @@
 	}
 	function syncCategoryTabs() {
 		var tabs = document.querySelectorAll('.access-category-tabs .system-tab-btn[data-category]');
+		var detailWrap = qs('access-category-detail-wrap');
+		var detailSelect = qs('access-category-detail-filter');
+		var operationWrap = qs('access-work-operation-wrap');
+		var operationSelect = qs('access-work-operation-filter');
+		var isConsole = (state.category || '') === '관리콘솔';
 		Array.prototype.forEach.call(tabs, function (button) {
 			var active = (button.getAttribute('data-category') || '') === (state.category || '');
 			button.classList.toggle('active', active);
 			button.setAttribute('aria-selected', active ? 'true' : 'false');
 		});
+		if (detailWrap) detailWrap.hidden = !isConsole;
+		if (detailSelect) {
+			detailSelect.disabled = !isConsole;
+			if (!isConsole) {
+				state.categoryDetail = '';
+				detailSelect.value = '';
+			}
+		}
+		if (operationWrap) operationWrap.hidden = isConsole;
+		if (operationSelect) {
+			operationSelect.disabled = isConsole;
+			if (isConsole) {
+				state.workOperationCode = '';
+				operationSelect.value = '';
+			}
+		}
 	}
 	function renderList() {
 		var countEl = qs('access-total');
@@ -329,6 +400,7 @@
 		qs('access-state').style.display = 'none';
 		qs('access-resource-list').innerHTML = currentRows().map(function (row) {
 			var ep = firstEndpoint(row);
+			var operation = workOperationLabel(row);
 			var epIndex = Math.max(0, (row.endpoints || []).indexOf(ep));
 			var busy = isConnectLocked(row.id, epIndex);
 			var disabled = !row.can_access || statusLabel(row) === '만료됨' || statusLabel(row) === '시작 전' || !ep || busy;
@@ -343,8 +415,10 @@
 							'<span class="access-endpoint-target">' + esc(endpointTarget(ep)) + '</span>' +
 						'</div>' +
 						'<div class="access-card-meta">' +
-							'<span>만료일 ' + esc(formatDate(row.grant_end_date)) + '</span>' +
-							'<span>최근 접속 ' + esc(formatDateTime(row.last_accessed_at)) + '</span>' +
+							'<span>' + esc(categoryPath(row)) + '</span>' +
+							(operation ? '<span><strong>업무 운영</strong> ' + esc(operation) + '</span>' : '') +
+							'<span><strong>만료일</strong> ' + esc(formatDate(row.grant_end_date)) + '</span>' +
+							'<span><strong>최근 접속</strong> ' + esc(formatDateTime(row.last_accessed_at)) + '</span>' +
 						'</div>' +
 					'</div>' +
 					'<div class="access-card-side">' +
@@ -393,7 +467,8 @@
 	}
 	function sshUrl(ep) {
 		var port = endpointPort(ep);
-		return ep.url || ('ssh://' + (ep.host || '') + (port && Number(port) !== 22 ? ':' + port : ''));
+		var scheme = endpointProtocol(ep) === 'SFTP' ? 'sftp' : 'ssh';
+		return ep.url || (scheme + '://' + (ep.host || '') + (port && Number(port) !== 22 ? ':' + port : ''));
 	}
 	function endpointTabCaption(ep) {
 		if (!ep) return '-';
@@ -418,15 +493,16 @@
 		}).join('') + '</div>';
 	}
 	function renderAccessAction(item, ep, idx) {
-		var cred, credFields, sshHeadStatus, sshPrimaryBtn, busy;
+		var cred, credFields, sshHeadStatus, sshPrimaryBtn, busy, epProtocol, sshTitle;
 		if (!ep) return '<div class="ac-action-box is-disabled"><strong>접속점이 없습니다.</strong><p>관리자에게 자원 접속점을 등록해 달라고 요청하세요.</p></div>';
+		epProtocol = endpointProtocol(ep);
 		if (statusLabel(item) === '시작 전') {
 			return '<div class="ac-action-box is-disabled"><strong>아직 접속 시작일 전입니다.</strong><p>권한의 <strong>사용 시작일</strong>(' + esc(formatDate(item.grant_start_date)) + ') 이후부터 접속할 수 있습니다. (기준: 한국 시간)</p><a class="action-chip action-muted" href="' + requestUrl() + '">신청 내역 보기</a></div>';
 		}
 		if (!item.can_access || statusLabel(item) === '만료됨') {
 			return '<div class="ac-action-box is-disabled"><strong>권한이 만료되었습니다.</strong><p>다시 접속하려면 접근 권한을 신청하세요.</p><a class="action-chip action-primary" href="' + requestUrl() + '?resource_id=' + esc(item.id) + '">접근 권한 신청하기</a></div>';
 		}
-		if (ep.kind === 'WEB') {
+		if (isWebEndpoint(ep)) {
 			busy = isConnectLocked(item.id, idx);
 			return '<div class="ac-action-box ac-action-box--web">' +
 				'<div class="ac-web-action-main">' +
@@ -447,6 +523,7 @@
 				detailRow('Username', '<input type="text" class="ac-ssh-input" data-ssh-field="user" name="ssh-user" autocomplete="username" value="' + esc(cred.username || '') + '">') +
 				detailRow('Password', '<div class="ac-ssh-input-row"><input type="password" class="ac-ssh-input" data-ssh-field="password" name="ssh-password" autocomplete="current-password" value="' + esc(cred.password || '') + '"><button type="button" class="ac-inline-btn" data-action="toggle-ssh-password-vis">보기</button></div>');
 		}
+		sshTitle = epProtocol === 'SFTP' ? 'SFTP / FileZilla' : (epProtocol === 'RDP' ? 'RDP' : 'SSH');
 		sshHeadStatus = state.pendingSshAuditId
 			? '<span class="ac-ssh-status-done">로그 기록 완료</span>'
 			: '<span class="ac-ssh-status-pending">접속을 눌러 감사 로그를 남깁니다</span>';
@@ -458,7 +535,7 @@
 			'<img src="/static/image/svg/control/free-icon-font-door-open.svg" alt="" class="ac-action-icon" aria-hidden="true"><span>' + (busy ? '처리 중' : '접속') + '</span>' +
 			'</button>';
 		return '<div class="ac-ssh-panel">' +
-			'<div class="ac-ssh-panel-head"><strong>SSH 접속 정보</strong>' + sshHeadStatus + '</div>' +
+			'<div class="ac-ssh-panel-head"><strong>' + esc(sshTitle) + ' 접속 정보</strong>' + sshHeadStatus + '</div>' +
 			'<div class="ac-ssh-grid">' +
 				detailRow('IP', esc(ep.host || '-')) +
 				detailRow('Port', esc(endpointPort(ep) || '-')) +
@@ -489,6 +566,7 @@
 			renderEndpointButtons(item) +
 			renderAccessAction(item, ep, epIdx) +
 			'<section class="ac-detail-section"><h4>권한 정보</h4><div class="ac-info-grid">' +
+				detailRow('분류', esc(categoryPath(item))) +
 				detailRow('승인일', esc(formatDate(item.approved_at))) +
 				detailRow('사용 시작일', esc(formatDate(item.grant_start_date))) +
 				detailRow('만료일', esc(formatDate(item.grant_end_date))) +
@@ -550,9 +628,10 @@
 			reason: reason != null ? String(reason).slice(0, 512) : ''
 		}).catch(function () {});
 	}
-	/** Windows SSH: Blossom Chat preload가 있으면 IPC(openSsh) 우선 — 없으면 OS의 blossom-ssh:// 로 PuTTY (Lumina Gate PC 에이전트 또는 Blossom 설치 프로그램이 등록). */
+	/** Windows SSH/SFTP: SSH uses PuTTY, SFTP uses FileZilla through Lumina Gate Agent URL handlers. */
 	function launchSshSession(item, ep, auditId, formOverride) {
-		if (!item || !ep || String(ep.kind || '').toUpperCase() !== 'SSH') return;
+		var epProtocol = endpointProtocol(ep);
+		if (!item || !ep || !isRemoteClientEndpoint(ep)) return;
 		var aid = auditId != null ? auditId : state.pendingSshAuditId;
 		if (!/Windows/i.test(navigator.userAgent || '')) {
 			window.location.href = sshUrl(ep);
@@ -606,7 +685,10 @@
 				blossomSshOpenUrl(item, ep, form.user, form.password);
 				reportOutcome(true);
 			}
-			if (window.blossom && window.blossom.app && typeof window.blossom.app.openSsh === 'function') {
+			if (epProtocol === 'SFTP') {
+				blossomSshOpenUrl(item, ep, form.user, form.password);
+				reportOutcome(true);
+			} else if (window.blossom && window.blossom.app && typeof window.blossom.app.openSsh === 'function') {
 				window.blossom.app.openSsh({
 					host: (ep.host || '').trim(),
 					port: endpointPort(ep) || 22,
@@ -757,11 +839,11 @@
 		if (!ep) { window.alert('등록된 접속점이 없습니다.'); return; }
 		if (!row.can_access || statusLabel(row) === '만료됨' || statusLabel(row) === '시작 전') { selectResource(id, epIdx, false); return; }
 		epKind = String(ep.kind || '').toUpperCase();
-		if (epKind === 'SSH' && state.sshCredentialsUnlocked && state.detail && String(state.detail.id) === String(id)) {
+		if (isRemoteClientEndpoint(ep) && state.sshCredentialsUnlocked && state.detail && String(state.detail.id) === String(id)) {
 			sshFormSnapshot = readSshFormFromPanel(qs('access-detail-panel'));
 		}
 		if (!beginConnectAttempt(id, epIdx)) return;
-		if (epKind === 'WEB') {
+		if (isWebEndpoint(ep)) {
 			var webUrl = ep.url || endpointTarget(ep);
 			if (!webUrl || webUrl === '-') {
 				window.alert('표시할 WEB URL이 없습니다.');
@@ -839,6 +921,23 @@
 				renderNoSelection();
 			});
 	}
+	function loadWorkOperations() {
+		return fetchJson('/api/work-operations')
+			.then(function (data) {
+				state.workOperations = data.items || data.rows || [];
+				populateWorkOperationFilter();
+			})
+			.catch(function () {
+				state.workOperations = [];
+				populateWorkOperationFilter();
+			});
+	}
+	function populateWorkOperationFilter() {
+		var select = qs('access-work-operation-filter');
+		if (!select) return;
+		select.innerHTML = operationOptionsHtml();
+		select.value = state.workOperationCode || '';
+	}
 	function readSshFormFromPanel(panel) {
 		var uIn, pIn;
 		if (!panel) return { user: '', password: '' };
@@ -863,13 +962,14 @@
 		var cred = credentialInfo(item);
 		var host = (ep.host || '').trim();
 		var port = String(endpointPort(ep) || 22);
+		var scheme = endpointProtocol(ep) === 'SFTP' ? 'blossom-sftp' : 'blossom-ssh';
 		var user = userOverride != null && String(userOverride).trim() !== '' ? normalizeSshUser(String(userOverride)) : normalizeSshUser((cred.username || '').trim());
 		var q = 'host=' + encodeURIComponent(host) + '&port=' + encodeURIComponent(port);
 		if (user) q += '&user=' + encodeURIComponent(user);
 		if (passwordPlain != null && String(passwordPlain).trim() !== '') {
 			q += '&pw=' + encodeURIComponent(utf8ToBase64Url(normalizeSshPassword(String(passwordPlain))));
 		}
-		var href = 'blossom-ssh://open?' + q;
+		var href = scheme + '://open?' + q;
 		var a = document.createElement('a');
 		a.href = href;
 		a.rel = 'noopener';
@@ -953,9 +1053,23 @@
 		filter.dataset.bound = '1';
 		filter.addEventListener('input', syncFilterSelection);
 		filter.addEventListener('change', syncFilterSelection);
+		if (qs('access-category-detail-filter')) {
+			qs('access-category-detail-filter').addEventListener('change', function () {
+				state.categoryDetail = normalizeConsoleGroup(qs('access-category-detail-filter').value || '');
+				syncFilterSelection();
+			});
+		}
+		if (qs('access-work-operation-filter')) {
+			qs('access-work-operation-filter').addEventListener('change', function () {
+				state.workOperationCode = qs('access-work-operation-filter').value || '';
+				syncFilterSelection();
+			});
+		}
 		Array.prototype.forEach.call(document.querySelectorAll('.access-category-tabs .system-tab-btn[data-category]'), function (button) {
 			button.addEventListener('click', function () {
 				state.category = button.getAttribute('data-category') || '';
+				if (state.category !== '관리콘솔') state.categoryDetail = '';
+				else state.workOperationCode = '';
 				syncCategoryTabs();
 				syncFilterSelection();
 			});
@@ -994,7 +1108,7 @@
 			renderList();
 			if (state.detail) renderDetail(state.detail);
 		}).catch(function () {});
-		loadRows(false);
+		loadWorkOperations().then(function () { return loadRows(false); });
 	}
 	document.addEventListener('DOMContentLoaded', init);
 	if (document.readyState === 'interactive' || document.readyState === 'complete') {

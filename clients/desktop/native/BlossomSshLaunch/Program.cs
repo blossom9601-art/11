@@ -69,7 +69,8 @@ internal static class Program
 		{
 			return 1;
 		}
-		if (!string.Equals(uri.Scheme, "blossom-ssh", StringComparison.OrdinalIgnoreCase)) return 1;
+		bool isSftp = string.Equals(uri.Scheme, "blossom-sftp", StringComparison.OrdinalIgnoreCase);
+		if (!isSftp && !string.Equals(uri.Scheme, "blossom-ssh", StringComparison.OrdinalIgnoreCase)) return 1;
 		if (!string.Equals(uri.Host, "open", StringComparison.OrdinalIgnoreCase)) return 1;
 
 		string query = (uri.Query ?? "").TrimStart('?');
@@ -79,7 +80,7 @@ internal static class Program
 		if (targetHost.Length > 253) return 1;
 		if (Regex.IsMatch(targetHost, @"[^\w.\[\]:+%-]")) return 1;
 
-		int port = 22;
+		int port = isSftp ? 22 : 22;
 		string portStr;
 		if (pairs.TryGetValue("port", out portStr) && !string.IsNullOrEmpty(portStr))
 		{
@@ -103,6 +104,13 @@ internal static class Program
 
 		string baseDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 		if (string.IsNullOrEmpty(baseDir)) return 1;
+		if (isSftp)
+		{
+			string filezilla = FindFileZilla(baseDir);
+			if (string.IsNullOrEmpty(filezilla)) return 1;
+			string sftpUrl = BuildSftpUrl(targetHost, port, user);
+			return StartProcess(filezilla, QuotePart(sftpUrl), Path.GetDirectoryName(filezilla)) ? 0 : 1;
+		}
 		string putty = Path.Combine(baseDir, "putty.exe");
 		if (!File.Exists(putty)) return 1;
 
@@ -162,6 +170,38 @@ internal static class Program
 			argParts.Add(port.ToString(System.Globalization.CultureInfo.InvariantCulture));
 		}
 		return StartProcess(putty, JoinArguments(argParts), baseDir) ? 0 : 1;
+	}
+
+	private static string FindFileZilla(string baseDir)
+	{
+		string[] candidates = new string[]
+		{
+			Path.Combine(baseDir, "FileZilla.exe"),
+			Path.Combine(baseDir, "filezilla", "FileZilla.exe"),
+			Path.Combine(baseDir, "..", "filezilla", "FileZilla.exe"),
+			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "FileZilla FTP Client", "filezilla.exe"),
+			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "FileZilla FTP Client", "filezilla.exe")
+		};
+		foreach (string candidate in candidates)
+		{
+			try
+			{
+				string full = Path.GetFullPath(candidate);
+				if (File.Exists(full)) return full;
+			}
+			catch { }
+		}
+		return null;
+	}
+
+	private static string BuildSftpUrl(string host, int port, string user)
+	{
+		string safeHost = host;
+		if (safeHost.IndexOf(':') >= 0 && !safeHost.StartsWith("[", StringComparison.Ordinal))
+			safeHost = "[" + safeHost + "]";
+		string auth = string.IsNullOrEmpty(user) ? "" : Uri.EscapeDataString(user) + "@";
+		string portPart = port > 0 && port != 22 ? ":" + port.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+		return "sftp://" + auth + safeHost + portPart + "/";
 	}
 
 	private static bool StartProcess(string fileName, string arguments, string workingDirectory)

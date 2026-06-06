@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="google" content="notranslate">
+	<title>blossom</title>
+	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
+	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
+	<link rel="stylesheet" href="/static/css/authentication.css?v=20260529_language_time1">
+	<link rel="stylesheet" href="/static/css/authentication/11-3.admin/11-3-3.setting/13.language_settings.css?v=20260530_language_global1">
+	<script src="/static/js/blossom.js?v=20260512_stat_empty_unified1" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
+	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
+	<script src="/static/js/authentication/11-3.admin/11-3-3.setting/13.language_settings.js?v=20260530_language_global1" defer></script>
+</head>
+<body>
+	{% include 'layouts/_header.html' %}
+	{% include 'layouts/_sidebar.html' %}
+
+	<main class="main-content">
+		<div class="content-wrapper admin-settings-wrapper language-time-page">
+			<div class="page-header">
+				<h1>언어/시간</h1>
+				<p>시스템 기본 언어, 사용자 언어 정책, 서버 시간 및 시간대를 관리합니다.</p>
+			</div>
+
+			{% include 'authentication/11-3.admin/_settings_tabs.html' %}
+
+			<div class="lt-grid" aria-label="언어 및 시간 설정">
+				<section class="lt-card" aria-labelledby="lt-language-title">
+					<div class="lt-card-head">
+						<h2 class="lt-card-title" id="lt-language-title">언어 정책</h2>
+					</div>
+					<div class="lt-card-body">
+						<div class="lt-form-grid">
+							<label class="lt-field">
+								<span>기본 언어</span>
+								<span class="lt-select-wrap">
+									<select id="lt-default-language" class="lt-select">
+										<option value="ko-KR">한국어 (ko-KR)</option>
+										<option value="en-US">English (en-US)</option>
+										<option value="ja-JP">日本語 (ja-JP)</option>
+										<option value="zh-CN">简体中文 (zh-CN)</option>
+									</select>
+								</span>
+							</label>
+							<label class="lt-field">
+								<span>번역 누락 처리 방식</span>
+								<span class="lt-select-wrap">
+									<select id="lt-fallback-mode" class="lt-select">
+										<option value="default">기본 언어 표시</option>
+										<option value="key">번역 키 표시</option>
+										<option value="blank">빈 값 표시</option>
+									</select>
+								</span>
+							</label>
+						</div>
+
+						<div class="lt-section-title">지원 언어</div>
+						<div class="lt-language-list">
+							<div class="lt-language-row"><span class="lt-language-name">한국어</span><span class="lt-language-code">ko-KR</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">English</span><span class="lt-language-code">en-US</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">日本語</span><span class="lt-language-code">ja-JP</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">简体中文</span><span class="lt-language-code">zh-CN</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">繁體中文</span><span class="lt-language-code">zh-TW</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">Deutsch</span><span class="lt-language-code">de-DE</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">Français</span><span class="lt-language-code">fr-FR</span></div>
+							<div class="lt-language-row"><span class="lt-language-name">Español</span><span class="lt-language-code">es-ES</span></div>
+						</div>
+
+						<div class="lt-toggle-grid">
+							<label class="lt-toggle-row"><span>사용자 언어 변경 허용</span><input type="checkbox" class="lt-switch" checked></label>
+							<label class="lt-toggle-row"><span>브라우저 언어 자동 감지</span><input type="checkbox" class="lt-switch" checked></label>
+						</div>
+
+						<div class="lt-actions">
+							<button type="button" class="btn-save" id="lt-language-save">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								<span class="lt-save-label">저장</span>
+							</button>
+						</div>
+					</div>
+				</section>
+
+				<section class="lt-card" aria-labelledby="lt-time-title">
+					<div class="lt-card-head">
+						<h2 class="lt-card-title" id="lt-time-title">시스템 시간</h2>
+					</div>
+					<div class="lt-card-body">
+						<div class="lt-time-now">
+							<div class="lt-time-now-head">
+								<span>현재 서버 시간</span>
+								<button type="button" class="lt-refresh-btn" id="lt-refresh-time">새로고침</button>
+							</div>
+							<strong id="lt-current-time">-</strong>
+						</div>
+
+						<div class="lt-time-grid">
+							<label class="lt-field">
+								<span>시스템 시간대</span>
+								<span class="lt-select-wrap">
+									<select id="lt-timezone" class="lt-select">
+										<option value="Asia/Seoul">Asia/Seoul</option>
+										<option value="Asia/Tokyo">Asia/Tokyo</option>
+										<option value="Asia/Singapore">Asia/Singapore</option>
+										<option value="UTC">UTC</option>
+										<option value="America/Los_Angeles">America/Los_Angeles</option>
+										<option value="America/New_York">America/New_York</option>
+										<option value="Europe/London">Europe/London</option>
+										<option value="Europe/Berlin">Europe/Berlin</option>
+									</select>
+								</span>
+							</label>
+							<label class="lt-field">
+								<span>시스템 시간</span>
+								<input type="text" id="lt-system-time" class="lt-input lt-date-input" placeholder="YYYY-MM-DD HH:mm" autocomplete="off">
+							</label>
+						</div>
+
+						<div class="lt-time-grid">
+							<label class="lt-toggle-row lt-ntp-row"><span>NTP 자동 동기화</span><input type="checkbox" id="lt-ntp" class="lt-switch" checked></label>
+							<div class="lt-help-box">시간 변경은 서버 OS 시간에 반영됩니다. NTP가 켜져 있으면 수동 시간은 즉시 다시 보정될 수 있습니다.</div>
+						</div>
+
+						<div class="lt-actions">
+							<button type="button" class="btn-save" id="lt-time-save">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+								<span class="lt-save-label">저장</span>
+							</button>
+						</div>
+					</div>
+				</section>
+			</div>
+		</div>
+	</main>
+</body>
+</html>

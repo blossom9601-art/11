@@ -236,12 +236,12 @@
         function renderAnalytics(){
             var items = getItems();
             if(!items.length){
-                if(analyticsEmpty) analyticsEmpty.style.display='';
+                if(analyticsEmpty){ analyticsEmpty.hidden=false; analyticsEmpty.style.display=''; }
                 if(tabStrip) tabStrip.innerHTML='';
                 if(tabContent) tabContent.innerHTML='';
                 return;
             }
-            if(analyticsEmpty) analyticsEmpty.style.display='none';
+            if(analyticsEmpty){ analyticsEmpty.hidden=true; analyticsEmpty.style.display='none'; }
             var catMap = buildCatMap(items);
             var cats   = renderTabStrip(catMap);
             if(cats.length>0) renderContent(catMap[cats[0]]);

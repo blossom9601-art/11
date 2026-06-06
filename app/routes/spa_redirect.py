@@ -8,6 +8,12 @@ from typing import Callable, Optional
 _EXACT: dict[str, str] = {
     # Dashboard
     'dashboard': '/',
+    'dashboard_workspace': '/dashboards/workspace',
+    'dashboard_my': '/dashboards/my',
+    'dashboard_shared': '/dashboards/shared',
+    'dashboard_favorite': '/dashboards/favorites',
+    'dashboard_templates': '/dashboards/templates',
+    'dashboard_builder': '/dashboards/builder',
 
     # Insight
     'insight_trend': '/insight/trend',

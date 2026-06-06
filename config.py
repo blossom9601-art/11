@@ -1,9 +1,33 @@
 import os
+import secrets
 from datetime import timedelta
+
+def _stable_secret_key(length=64):
+    env_key = os.environ.get('SECRET_KEY')
+    if env_key:
+        return env_key
+    secret_path = os.environ.get('BLOSSOM_SECRET_KEY_FILE') or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'instance',
+        '.secret_key',
+    )
+    try:
+        os.makedirs(os.path.dirname(secret_path), exist_ok=True)
+        if os.path.exists(secret_path):
+            with open(secret_path, 'r', encoding='utf-8') as fh:
+                saved = fh.read().strip()
+            if saved:
+                return saved
+        generated = secrets.token_hex(length)
+        with open(secret_path, 'w', encoding='utf-8') as fh:
+            fh.write(generated)
+        return generated
+    except Exception:
+        return 'blossom-dev-secret-key'
 
 class Config:
     # 기본 설정
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
+    SECRET_KEY = _stable_secret_key(32)
     
     # SQLite 데이터베이스 설정 (개발용)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///blossom.db'
@@ -22,7 +46,7 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     
     # 파일 업로드 설정
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    MAX_CONTENT_LENGTH = 101 * 1024 * 1024  # 100MB 파일 업로드 + multipart 오버헤드
     UPLOAD_FOLDER = 'uploads'
     
     # 로깅 설정
@@ -45,7 +69,7 @@ class ProductionConfig(Config):
     DEBUG = False
     SQLALCHEMY_ECHO = False
     # 프로덕션: SECRET_KEY 환경변수 필수
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(64).hex()
+    SECRET_KEY = _stable_secret_key(64)
     # 프로덕션 환경에서는 MySQL 사용
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f'mysql+pymysql://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}:{Config.MYSQL_PORT}/{Config.MYSQL_DB}?charset=utf8mb4'
     SQLALCHEMY_ENGINE_OPTIONS = {

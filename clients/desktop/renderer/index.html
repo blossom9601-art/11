@@ -38,6 +38,9 @@
       <button class="rail-btn rail-icon-img" id="btnMemo" data-tab="memo" title="메모" aria-label="메모">
         <img src="assets/svg/chat/free-icon-font-edit.svg" alt="" />
       </button>
+      <button class="rail-btn rail-icon-img" id="btnAi" data-tab="ai" title="AI" aria-label="AI">
+        <img src="assets/svg/chat/free-icon-font-microchip-ai.svg" alt="" />
+      </button>
       <div class="rail-grow"></div>
       <button class="rail-btn rail-icon-img" id="btnLock" title="잠금" aria-label="잠금">
         <img src="assets/svg/chat/free-icon-font-unlock1.svg" alt="" />
@@ -300,6 +303,42 @@
       <div class="cal-month-grid" id="calMonthGrid"></div>
     </section>
 
+    <!-- AI 메인 뷰 -->
+    <section class="full-pane ai-pane" id="aiPane" hidden>
+      <header class="full-pane-head ai-pane-head">
+        <div class="ai-head-title">
+          <div class="fp-title">Blossom AI</div>
+          <div class="ai-conversation-title" id="aiConversationTitle">새 대화</div>
+        </div>
+        <div class="fp-actions">
+          <span class="status-pill" id="aiStatusPill">AI 비활성화</span>
+        </div>
+      </header>
+      <div class="ai-chat-shell">
+        <div class="ai-main-area">
+          <div class="ai-thread" id="aiThread"></div>
+          <form class="ai-composer" id="aiComposer">
+            <textarea id="aiInput" rows="1" placeholder="Blossom AI에게 메시지 보내기"></textarea>
+            <button type="submit" class="ai-send-btn" id="aiSendBtn" title="보내기" aria-label="보내기">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </form>
+        </div>
+        <aside class="ai-history" aria-label="AI 히스토리">
+          <div class="ai-history-head">
+            <strong>히스토리</strong>
+            <button type="button" class="icon-btn-tiny" id="aiNewChatBtn" title="새 대화" aria-label="새 대화">＋</button>
+          </div>
+          <div class="ai-history-list" id="aiHistoryList"></div>
+        </aside>
+      </div>
+      <div class="ai-context-menu" id="aiHistoryMenu" hidden>
+        <button type="button" data-action="rename">제목 이름 바꾸기</button>
+        <button type="button" data-action="pin">고정하기</button>
+        <button type="button" data-action="delete">삭제하기</button>
+      </div>
+    </section>
+
     <!-- v0.4.16: 메모 메인 뷰 -->
     <section class="full-pane" id="memoPane" hidden>
       <header class="full-pane-head">
@@ -317,6 +356,11 @@
             <option value="name">그룹 이름순</option>
           </select>
           <span class="fp-grow"></span>
+          <div class="memo-quota" id="memoQuota" title="메모 용량">
+            <span class="memo-quota-label">메모 사용량</span>
+            <strong id="memoQuotaText">0 B / 10 GB</strong>
+            <div class="memo-quota-track"><span id="memoQuotaBar"></span></div>
+          </div>
           <button class="btn-primary" id="memoNewBtn">＋ 새 메모</button>
         </div>
       </header>

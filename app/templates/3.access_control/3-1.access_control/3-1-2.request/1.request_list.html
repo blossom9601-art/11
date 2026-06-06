@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -6,14 +6,15 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+	<link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/flatpickr.min.css">
 	<link rel="stylesheet" href="/static/vendor/flatpickr/4.6.13/themes/airbnb.css">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507ui4">
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260528_audit_table_bg1">
+	<script src="/static/js/blossom.js?v=20260529_search_empty1" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/flatpickr.min.js" defer></script>
 	<script src="/static/vendor/flatpickr/4.6.13/l10n/ko.js" defer></script>
-	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260507ui1" defer></script>
+	<script src="/static/js/3.access_control/3-1.access_control/3-1-2.request/1.request_list.js?v=20260531_page_range1" defer></script>
+	<script src="/static/js/3.access_control/access-modal-tabs.js?v=20260528_access_tabs4" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -43,9 +44,27 @@
 						</div>
 					</div>
 					<form class="request-form" id="request-form" novalidate>
-						<div class="request-type-panel" role="radiogroup" aria-label="신청 유형">
-							<label class="request-type-card is-active" for="request-type-use">
-								<input id="request-type-use" type="radio" name="requestType" value="use" checked>
+						<div class="system-tabs request-category-tabs" role="tablist" aria-label="자원 분류">
+							<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="시스템">시스템</button>
+							<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="서비스">서비스</button>
+							<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="컨테이너">컨테이너</button>
+							<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리콘솔">관리콘솔</button>
+						</div>
+						<div class="request-stepper" aria-label="신청 단계" hidden>
+							<button type="button" class="request-step is-active" data-request-step="1">
+								<span>1</span><strong>자원 선택</strong>
+							</button>
+							<button type="button" class="request-step" data-request-step="2">
+								<span>2</span><strong>사유/기간</strong>
+							</button>
+							<button type="button" class="request-step" data-request-step="3">
+								<span>3</span><strong>승인자</strong>
+							</button>
+						</div>
+						<input type="hidden" id="request-system-action" name="systemAction" value="">
+						<div class="request-type-panel" id="request-type-panel" role="radiogroup" aria-label="신청 유형">
+							<label class="request-type-card" for="request-type-use">
+								<input id="request-type-use" type="radio" name="requestType" value="use">
 								<span><strong>사용 신청</strong><em>접근 권한을 새로 요청합니다.</em></span>
 							</label>
 							<label class="request-type-card" for="request-type-delete">
@@ -53,14 +72,70 @@
 								<span><strong>삭제 신청</strong><em>보유 중인 접근 권한 삭제를 요청합니다.</em></span>
 							</label>
 						</div>
-						<div class="resource-picker">
-							<div class="system-tabs request-category-tabs" role="tablist" aria-label="자원 분류">
-								<button type="button" class="system-tab-btn active" role="tab" aria-selected="true" data-category="">전체</button>
-								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="내부 서비스">내부 서비스</button>
-								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="외부 서비스">외부 서비스</button>
-								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="관리 콘솔">관리 콘솔</button>
-								<button type="button" class="system-tab-btn" role="tab" aria-selected="false" data-category="기타">기타</button>
+						<div class="system-request-panel" id="system-request-panel">
+							<div class="system-request-head">
+								<div>
+									<strong>시스템 계정 신청 유형</strong>
+									<span>에이전트 연동 대상 시스템은 계정 작업 유형을 먼저 선택합니다.</span>
+								</div>
 							</div>
+							<div class="system-request-groups" role="radiogroup" aria-label="시스템 계정 신청 유형">
+								<div class="system-request-group">
+									<span class="system-request-group-title">공통</span>
+									<p class="system-request-group-desc">최초 1회 내 기본 사용자 ID를 신청합니다.</p>
+									<button type="button" class="system-request-option" data-system-action="공통 - 사용자 ID 신청" data-request-type="use" data-flow="id-request">사용자 ID 신청 <small>최초 1회</small></button>
+									<button type="button" class="system-request-option" data-system-action="공통 - 그룹 생성 신청" data-request-type="use" data-flow="group-create">그룹 생성 신청</button>
+								</div>
+								<div class="system-request-group">
+									<span class="system-request-group-title">개인 계정</span>
+									<p class="system-request-group-desc">개인 사용자 기준의 계정 작업을 신청합니다.</p>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 계정 신규 신청" data-request-type="use" data-flow="account-create">계정 신규 신청</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 계정 연장 신청" data-request-type="use" data-flow="account-extend">계정 연장 신청</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 계정 삭제 신청" data-request-type="delete" data-flow="account-delete">계정 삭제 신청</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 계정 잠금 해제" data-request-type="use" data-flow="unlock">계정 잠금 해제</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 패스워드 변경" data-request-type="use" data-flow="password-change">패스워드 변경</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 그룹 추가 신청" data-request-type="use" data-flow="group-add">그룹 추가 신청</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - 그룹 삭제 신청" data-request-type="delete" data-flow="group-delete">그룹 삭제 신청</button>
+									<button type="button" class="system-request-option" data-system-action="개인 계정 - SFTP 권한 신청" data-request-type="use" data-flow="sftp">SFTP 권한 신청</button>
+								</div>
+								<div class="system-request-group">
+									<span class="system-request-group-title">서비스 계정</span>
+									<p class="system-request-group-desc">서비스 운영 계정의 권한과 담당자를 관리합니다.</p>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 계정 신규 신청" data-request-type="use" data-flow="account-create">계정 신규 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 계정 연장 신청" data-request-type="use" data-flow="account-extend">계정 연장 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 계정 삭제 신청" data-request-type="delete" data-flow="account-delete">계정 삭제 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 계정 잠금 해제" data-request-type="use" data-flow="unlock">계정 잠금 해제</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 패스워드 변경" data-request-type="use" data-flow="password-change">패스워드 변경</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 그룹 추가 신청" data-request-type="use" data-flow="group-add">그룹 추가 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 그룹 삭제 신청" data-request-type="delete" data-flow="group-delete">그룹 삭제 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 관리자 변경 신청" data-request-type="use" data-flow="owner-change">관리자 변경 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - 사용자 변경 신청" data-request-type="use" data-flow="user-change">사용자 변경 신청</button>
+									<button type="button" class="system-request-option" data-system-action="서비스 계정 - SFTP 권한 신청" data-request-type="use" data-flow="sftp">SFTP 권한 신청</button>
+								</div>
+							</div>
+						</div>
+						<div class="request-action-summary" id="request-action-summary" hidden>
+							<div>
+								<span>선택한 신청 유형</span>
+								<strong id="request-action-summary-title">-</strong>
+								<em id="request-action-summary-desc">자원을 선택해 신청서를 계속 작성합니다.</em>
+							</div>
+							<button type="button" class="action-chip action-muted" id="request-action-change">유형 변경</button>
+						</div>
+						<div class="request-action-help request-step-block request-step-block-1" id="request-action-help" hidden></div>
+						<div class="user-id-request-panel request-step-block request-step-block-1" id="user-id-request-panel" hidden>
+							<div>
+								<label for="request-user-id">ID 추가</label>
+								<div class="user-id-check-row">
+									<input id="request-user-id" name="requestedUserId" type="text" placeholder="신청할 사용자 ID 입력" autocomplete="off">
+									<button type="button" class="action-chip action-muted icon-only" id="request-user-id-check" aria-label="중복 점검" title="중복 점검">
+										<img src="/static/image/svg/free-icon-font-badge-check.svg" alt="">
+									</button>
+								</div>
+								<p id="request-user-id-status" class="user-id-check-status">사용할 ID를 입력한 뒤 중복 점검을 진행하세요.</p>
+							</div>
+						</div>
+						<div class="resource-picker request-step-block request-step-block-1">
 							<div class="resource-picker-toolbar">
 								<div>
 									<label for="request-resource-search">자원 검색</label>
@@ -74,14 +149,31 @@
 										<option value="SSH">SSH</option>
 									</select>
 								</div>
-								<div>
+								<div class="request-category-filter-wrap" hidden>
 									<label for="request-category-filter">분류</label>
 									<select id="request-category-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="분류">
 										<option value="">전체</option>
-										<option value="내부 서비스">내부 서비스</option>
-										<option value="외부 서비스">외부 서비스</option>
-										<option value="관리 콘솔">관리 콘솔</option>
-										<option value="기타">기타</option>
+										<option value="시스템">시스템</option>
+										<option value="서비스">서비스</option>
+										<option value="컨테이너">컨테이너</option>
+										<option value="관리콘솔">관리콘솔</option>
+									</select>
+								</div>
+								<div id="request-category-detail-wrap" hidden>
+									<label for="request-category-detail-filter">장비군</label>
+									<select id="request-category-detail-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="장비군" disabled>
+										<option value="">전체</option>
+										<option value="서버">서버</option>
+										<option value="스토리지">스토리지</option>
+										<option value="SAN">SAN</option>
+										<option value="네트워크">네트워크</option>
+										<option value="보안장비">보안장비</option>
+									</select>
+								</div>
+								<div id="request-work-operation-wrap">
+									<label for="request-work-operation-filter">업무 운영</label>
+									<select id="request-work-operation-filter" class="ac-dropdown-input search-select" data-searchable-scope="page" data-placeholder="업무 운영">
+										<option value="">전체</option>
 									</select>
 								</div>
 								<div>
@@ -118,18 +210,18 @@
 										<tr>
 											<th class="resource-check-col"><input id="request-select-page-check" type="checkbox" aria-label="현재 페이지 자원 선택"></th>
 											<th>자원명</th>
-											<th>유형</th>
+											<th>프로토콜, 유형</th>
 											<th>분류</th>
+											<th>업무 운영</th>
 											<th>접속정보</th>
 											<th>상태</th>
-											<th>신청 불가 사유</th>
 										</tr>
 									</thead>
 									<tbody id="request-resource-list"></tbody>
 								</table>
 							</div>
 							<div class="resource-picker-footer">
-								<span id="request-resource-page-info">0개 항목</span>
+								<span id="request-resource-page-info">0-0 / 0개 항목</span>
 								<div class="resource-page-actions">
 									<button type="button" class="action-chip action-muted" id="request-resource-prev">이전</button>
 									<div class="resource-page-numbers" id="request-resource-page-numbers" aria-label="자원 페이지 번호"></div>
@@ -137,7 +229,7 @@
 								</div>
 							</div>
 						</div>
-						<div class="selected-resource-panel">
+						<div class="selected-resource-panel request-step-block request-step-block-1">
 							<div class="selected-resource-head">
 								<div>
 									<strong>선택된 자원</strong>
@@ -151,11 +243,11 @@
 							<div class="selected-resource-list" id="request-selected-list"></div>
 							<div class="resource-error-list" id="request-resource-errors" hidden></div>
 						</div>
-						<div>
+						<div class="request-step-block request-step-block-2">
 							<label for="request-reason">신청 사유</label>
 							<textarea id="request-reason" name="reason" minlength="10" placeholder="업무 목적과 필요 기간을 구체적으로 입력하세요."></textarea>
 						</div>
-						<div class="period-mode-panel" id="request-period-mode-panel" role="radiogroup" aria-label="사용 기간 유형">
+						<div class="period-mode-panel request-step-block request-step-block-2" id="request-period-mode-panel" role="radiogroup" aria-label="사용 기간 유형">
 							<label class="period-mode-card" for="request-period-range">
 								<input id="request-period-range" type="radio" name="requestPeriodType" value="range" checked>
 								<span><strong>기간 지정</strong><em>시작일과 종료일 기준</em></span>
@@ -165,10 +257,10 @@
 								<span><strong>영구 접근</strong><em>관리자/보안 담당자 승인</em></span>
 							</label>
 						</div>
-						<div class="permanent-access-note" id="request-permanent-note" hidden>
+						<div class="permanent-access-note request-step-block request-step-block-2" id="request-permanent-note" hidden>
 							영구 접근 신청은 종료일 없이 제출되며 승인자는 관리자/보안 담당자로 자동 지정됩니다.
 						</div>
-						<div class="request-grid-2" id="request-period-date-grid">
+						<div class="request-grid-2 request-step-block request-step-block-2" id="request-period-date-grid">
 							<div class="request-date-field">
 								<label for="request-start-date">사용 시작일</label>
 								<input id="request-start-date" class="request-date-input" name="startDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
@@ -178,12 +270,12 @@
 								<input id="request-end-date" class="request-date-input" name="endDate" type="text" placeholder="YYYY-MM-DD" autocomplete="off" readonly>
 							</div>
 						</div>
-						<div class="quick-periods" id="request-quick-periods" aria-label="사용기간 빠른 선택">
+						<div class="quick-periods request-step-block request-step-block-2" id="request-quick-periods" aria-label="사용기간 빠른 선택">
 							<button type="button" class="action-chip action-muted" data-period-days="1">1일</button>
 							<button type="button" class="action-chip action-muted" data-period-days="7">7일</button>
 							<button type="button" class="action-chip action-muted" data-period-days="30">30일</button>
 						</div>
-						<div class="request-grid-2">
+						<div class="request-grid-2 request-step-block request-step-block-3">
 							<div>
 								<label for="request-emergency-flag">긴급 여부</label>
 								<select id="request-emergency-flag" class="ac-dropdown-input search-select" name="emergencyFlag" data-searchable-scope="page" data-placeholder="긴급 여부">
@@ -196,9 +288,13 @@
 								<input id="request-approver" name="approver" type="text" readonly placeholder="부서 팀장이 자동 지정됩니다.">
 							</div>
 						</div>
-						<div class="request-actions request-submit-bar">
+						<div class="request-step-footer">
 							<div id="request-form-message">동일 자원 승인 대기 건이 있거나 유효 권한이 있으면 제출할 수 없습니다.</div>
-							<button type="submit" class="action-chip action-primary request-submit-button" id="request-submit-button">사용 신청 제출</button>
+							<div class="request-step-actions">
+								<button type="button" class="action-chip action-muted" id="request-step-prev" hidden>이전</button>
+								<button type="button" class="action-chip action-primary" id="request-step-next">다음</button>
+								<button type="submit" class="action-chip action-primary request-submit-button request-step-block request-step-block-3" id="request-submit-button">사용 신청 제출</button>
+							</div>
 						</div>
 					</form>
 				</section>
@@ -221,13 +317,14 @@
 								<tr>
 									<th>신청일</th>
 									<th>신청번호</th>
-									<th>유형</th>
+									<th>신청 구분</th>
+									<th>신청 작업</th>
 									<th>자원 개수</th>
 									<th>상태</th>
 									<th>승인 단계</th>
 									<th>신청자</th>
 									<th>긴급</th>
-									<th>액션</th>
+									<th>관리</th>
 								</tr>
 							</thead>
 							<tbody id="request-table-body"></tbody>
@@ -261,7 +358,6 @@
 		<div class="request-confirm-content request-detail-modal-content" role="dialog" aria-modal="true" aria-labelledby="request-detail-title">
 			<div class="request-confirm-head">
 				<div>
-					<span class="request-confirm-kicker">신청 상세</span>
 					<h3 id="request-detail-title">신청 및 승인 상세</h3>
 					<p>상세 정보와 자원별 승인 상태를 확인합니다.</p>
 				</div>

@@ -68,6 +68,10 @@ from app.services.account_job_service import (
     reject_account_job,
 )
 from app.services.identity_governance_service import apply_account_job_result
+from app.services.vulnerability_guide_service import (
+    get_vulnerability_guide_agent_script,
+    record_vulnerability_guide_agent_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +128,56 @@ def agent_heartbeat():
     except Exception:
         logger.exception("heartbeat 처리 오류")
         return jsonify({"success": False, "error": "서버 내부 오류"}), 500
+
+
+@agent_api_bp.route("/api/agent/vulnerability-guides/<int:guide_id>/script", methods=["POST"])
+def agent_vulnerability_guide_script(guide_id: int):
+    data = request.get_json(silent=True) or {}
+    hostname = (data.get("hostname") or "").strip()
+    if not hostname:
+        return jsonify({"success": False, "error": "hostname required"}), 400
+    try:
+        item = get_vulnerability_guide_agent_script(
+            guide_id=guide_id,
+            hostname=hostname,
+            app=current_app,
+        )
+        return jsonify({"success": True, "item": item})
+    except ValueError as exc:
+        msg = str(exc)
+        status = 404 if msg in {"not found", "agent not found", "script not found"} else 400
+        return jsonify({"success": False, "error": msg}), status
+    except Exception:
+        logger.exception("vulnerability guide script fetch failed")
+        return jsonify({"success": False, "error": "server error"}), 500
+
+
+@agent_api_bp.route("/api/agent/vulnerability-guides/<int:guide_id>/result", methods=["POST"])
+def agent_vulnerability_guide_result(guide_id: int):
+    data = request.get_json(silent=True) or {}
+    hostname = (data.get("hostname") or "").strip()
+    if not hostname:
+        return jsonify({"success": False, "error": "hostname required"}), 400
+    try:
+        item = record_vulnerability_guide_agent_result(
+            guide_id=guide_id,
+            hostname=hostname,
+            ok=data.get("ok"),
+            exit_code=data.get("exit_code", data.get("exitCode")),
+            stdout=str(data.get("stdout") or ""),
+            stderr=str(data.get("stderr") or ""),
+            result=str(data.get("result") or ""),
+            message=str(data.get("message") or ""),
+            app=current_app,
+        )
+        return jsonify({"success": True, "item": item})
+    except ValueError as exc:
+        msg = str(exc)
+        status = 404 if msg in {"not found", "agent not found", "script not found"} else 400
+        return jsonify({"success": False, "error": msg}), status
+    except Exception:
+        logger.exception("vulnerability guide result save failed")
+        return jsonify({"success": False, "error": "server error"}), 500
 
 
 @agent_api_bp.route("/api/agent/account-jobs/result", methods=["POST"])

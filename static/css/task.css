@@ -826,6 +826,7 @@ body[data-loading] .report-sheet{opacity:0}
 #system-select-modal .dropdown-field.open{ z-index:1000000; }
 #system-select-modal .dropdown-field,
 #system-select-modal .dropdown-field *{ box-sizing:border-box; }
+#system-select-modal .sysel-native-select{ display:none !important; }
 #system-select-modal .dropdown-trigger{
 	display:flex;
 	align-items:center;

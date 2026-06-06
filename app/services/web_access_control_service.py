@@ -1,6 +1,8 @@
 import logging
+import ipaddress
 import json
 import os
+import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Set
@@ -22,30 +24,132 @@ PC_AGENT_TABLE = 'pc_agent_device'
 ATTACHMENT_TABLE = 'web_access_request_attachment'
 NOTIFICATION_TABLE = 'web_access_notification'
 DELEGATION_TABLE = 'web_access_approver_delegation'
+RISK_POLICY_TABLE = 'web_access_risk_policy'
+WORK_OPERATION_TABLE = 'biz_work_operation'
+USER_ID_REQUEST_RESOURCE_URL = '__internal_user_id_request__'
+USER_ID_REQUEST_ACTION = '공통 - 사용자 ID 신청'
 
 RESOURCE_STATUS_ACTIVE = '사용 가능'
 RESOURCE_STATUS_BLOCKED = '차단'
 
-# 단순화된 자원 유형: WEB / SSH 두 가지만
+# Endpoint kind is stored as the concrete access method. WEB/SSH remain for legacy rows only.
 ENDPOINT_KIND_WEB = 'WEB'
 ENDPOINT_KIND_SSH = 'SSH'
-ENDPOINT_KINDS = (ENDPOINT_KIND_WEB, ENDPOINT_KIND_SSH)
+ENDPOINT_KIND_HTTP = 'HTTP'
+ENDPOINT_KIND_HTTPS = 'HTTPS'
+ENDPOINT_KIND_API = 'API'
+ENDPOINT_KIND_SFTP = 'SFTP'
+ENDPOINT_KIND_RDP = 'RDP'
+ENDPOINT_KINDS = (
+    ENDPOINT_KIND_HTTP,
+    ENDPOINT_KIND_HTTPS,
+    ENDPOINT_KIND_API,
+    ENDPOINT_KIND_SSH,
+    ENDPOINT_KIND_SFTP,
+    ENDPOINT_KIND_RDP,
+    ENDPOINT_KIND_WEB,
+)
+ENDPOINT_WEB_KINDS = (ENDPOINT_KIND_WEB, ENDPOINT_KIND_HTTP, ENDPOINT_KIND_HTTPS, ENDPOINT_KIND_API)
+ENDPOINT_REMOTE_KINDS = (ENDPOINT_KIND_SSH, ENDPOINT_KIND_SFTP, ENDPOINT_KIND_RDP)
 
 # 유형별 허용 프로토콜과 기본 포트
 ENDPOINT_PROTOCOLS = {
-    ENDPOINT_KIND_WEB: ('HTTPS', 'HTTP'),
+    ENDPOINT_KIND_WEB: ('HTTPS', 'HTTP', 'API'),
+    ENDPOINT_KIND_HTTP: ('HTTP',),
+    ENDPOINT_KIND_HTTPS: ('HTTPS',),
+    ENDPOINT_KIND_API: ('API',),
     ENDPOINT_KIND_SSH: ('SSH',),
+    ENDPOINT_KIND_SFTP: ('SFTP',),
+    ENDPOINT_KIND_RDP: ('RDP',),
 }
 ENDPOINT_DEFAULT_PORT = {
     'HTTPS': 443,
     'HTTP': 80,
+    'API': 443,
     'SSH': 22,
+    'SFTP': 22,
+    'RDP': 3389,
 }
+
+# 운영 접근 자산 분류. 접속 프로토콜은 endpoint(kind/protocol)에서 별도로 관리한다.
+RESOURCE_CATEGORIES = ('시스템', '서비스', '컨테이너', '관리콘솔')
+RESOURCE_CONSOLE_GROUPS = ('서버', '스토리지', 'SAN', '네트워크', '보안장비')
+RESOURCE_WORK_OPERATION_CATEGORIES = ('시스템', '서비스', '컨테이너')
 
 # 호환용 (기존 코드 의존성)
 RESOURCE_TYPES = ('웹', '서버', 'DB', 'SSH', '기타')
 RESOURCE_DEFAULT_PORTS = {'SSH': 22, 'DB': 0, '서버': 22}
 RESOURCE_DEFAULT_PROTOCOLS = {'웹': 'HTTPS', 'SSH': 'SSH', '서버': 'SSH', 'DB': 'TCP'}
+
+_RESOURCE_CATEGORY_ALIASES = {
+    '시스템': '시스템',
+    'system': '시스템',
+    'os': '시스템',
+    '운영체제': '시스템',
+    'linux': '시스템',
+    'windows': '시스템',
+    'unix': '시스템',
+    'vm': '시스템',
+    '서버': '시스템',
+    'server': '시스템',
+    'ssh': '시스템',
+    'db': '시스템',
+    'database': '시스템',
+    '서비스': '서비스',
+    'service': '서비스',
+    'webservice': '서비스',
+    '웹서비스': '서비스',
+    '내부서비스': '서비스',
+    '외부서비스': '서비스',
+    'internal': '서비스',
+    'external': '서비스',
+    '웹': '서비스',
+    'web': '서비스',
+    '컨테이너': '컨테이너',
+    'container': '컨테이너',
+    'kubernetes': '컨테이너',
+    'k8s': '컨테이너',
+    '쿠버네티스': '컨테이너',
+    'openshift': '컨테이너',
+    'rancher': '컨테이너',
+    'portainer': '컨테이너',
+    '관리콘솔': '관리콘솔',
+    'adminconsole': '관리콘솔',
+    'managementconsole': '관리콘솔',
+    'console': '관리콘솔',
+    'infra': '관리콘솔',
+    '기타': '시스템',
+    'etc': '시스템',
+}
+
+_RESOURCE_CONSOLE_GROUP_ALIASES = {
+    '서버': '서버',
+    'server': '서버',
+    'ilo': '서버',
+    'idrac': '서버',
+    'cimc': '서버',
+    'imm': '서버',
+    '스토리지': '스토리지',
+    'storage': '스토리지',
+    'netapp': '스토리지',
+    'emc': '스토리지',
+    'hpestorage': '스토리지',
+    'san': 'SAN',
+    'brocade': 'SAN',
+    'ciscosan': 'SAN',
+    '네트워크': '네트워크',
+    'network': '네트워크',
+    'cisco': '네트워크',
+    'juniper': '네트워크',
+    'arista': '네트워크',
+    'l4l7': '네트워크',
+    '보안장비': '보안장비',
+    'security': '보안장비',
+    'firewall': '보안장비',
+    'vpn': '보안장비',
+    'waf': '보안장비',
+    'ips': '보안장비',
+}
 
 REQUEST_STATUS_DRAFT = '임시저장'
 REQUEST_STATUS_SUBMITTED = '제출'
@@ -81,6 +185,16 @@ GRANT_STATUS_BLOCKED = '차단'
 AUDIT_ACCESS_OUTCOME_SUCCESS = '성공'
 AUDIT_ACCESS_OUTCOME_FAIL = '실패'
 AUDIT_ACCESS_OUTCOME_PENDING = '진행중'
+
+RISK_POLICY_TYPES = ('overseas', 'night', 'blocked', 'privilege', 'unauthorized', 'blacklist')
+RISK_POLICY_LABELS = {
+    'overseas': '해외 접속',
+    'night': '새벽 접속',
+    'blocked': '차단/실패',
+    'privilege': '관리자/권한 상승',
+    'unauthorized': '비인가 접근',
+    'blacklist': '차단 IP',
+}
 
 PERMANENT_ACCESS_END_DATE = '9999-12-31'
 REQUEST_REASON_MIN_LENGTH = 10
@@ -194,6 +308,321 @@ def _today() -> str:
     return datetime.now(_access_policy_tz()).date().isoformat()
 
 
+def _risk_policy_defaults() -> List[Dict[str, str]]:
+    return [
+        {'policy_type': 'overseas', 'match_value': 'CN', 'match_mode': 'country', 'description': '중국 접속 국가 코드'},
+        {'policy_type': 'overseas', 'match_value': 'RU', 'match_mode': 'country', 'description': '러시아 접속 국가 코드'},
+        {'policy_type': 'overseas', 'match_value': 'KP', 'match_mode': 'country', 'description': '북한 접속 국가 코드'},
+        {'policy_type': 'overseas', 'match_value': 'IR', 'match_mode': 'country', 'description': '이란 접속 국가 코드'},
+        {'policy_type': 'overseas', 'match_value': '국외 IP', 'match_mode': 'keyword', 'description': '국외 IP 판정 키워드'},
+        {'policy_type': 'night', 'match_value': '00:00-06:00', 'match_mode': 'time_range', 'description': '업무시간 외 새벽 접속'},
+        {'policy_type': 'blocked', 'match_value': '차단', 'match_mode': 'keyword', 'description': '차단 결과 키워드'},
+        {'policy_type': 'blocked', 'match_value': '실패', 'match_mode': 'keyword', 'description': '실패 결과 키워드'},
+        {'policy_type': 'blocked', 'match_value': '접속 실패', 'match_mode': 'keyword', 'description': '접속 실패 사유'},
+        {'policy_type': 'blocked', 'match_value': '정책 차단', 'match_mode': 'keyword', 'description': '정책 기반 차단'},
+        {'policy_type': 'privilege', 'match_value': '관리자', 'match_mode': 'keyword', 'description': '관리자 계정 사용'},
+        {'policy_type': 'privilege', 'match_value': 'root', 'match_mode': 'keyword', 'description': 'root 계정 사용'},
+        {'policy_type': 'privilege', 'match_value': 'sudo', 'match_mode': 'keyword', 'description': 'sudo 권한 사용'},
+        {'policy_type': 'privilege', 'match_value': '권한 상승', 'match_mode': 'keyword', 'description': '권한 상승 탐지'},
+        {'policy_type': 'privilege', 'match_value': 'admin', 'match_mode': 'keyword', 'description': 'admin 계정 사용'},
+        {'policy_type': 'unauthorized', 'match_value': '비인가', 'match_mode': 'keyword', 'description': '비인가 접근 키워드'},
+        {'policy_type': 'unauthorized', 'match_value': '미승인', 'match_mode': 'keyword', 'description': '미승인 접근 키워드'},
+        {'policy_type': 'unauthorized', 'match_value': '승인 없는 자산', 'match_mode': 'keyword', 'description': '승인 없는 자산 접근'},
+        {'policy_type': 'unauthorized', 'match_value': '권한 없음', 'match_mode': 'keyword', 'description': '권한 없음 접근'},
+        {'policy_type': 'blacklist', 'match_value': '203.0.113.0/24', 'match_mode': 'ip_cidr', 'description': '문서용 TEST-NET-3 차단 예시'},
+        {'policy_type': 'blacklist', 'match_value': '198.51.100.0/24', 'match_mode': 'ip_cidr', 'description': '문서용 TEST-NET-2 차단 예시'},
+        {'policy_type': 'blacklist', 'match_value': '192.0.2.0/24', 'match_mode': 'ip_cidr', 'description': '문서용 TEST-NET-1 차단 예시'},
+    ]
+
+
+def _normalize_risk_policy_type(value: Any) -> str:
+    policy_type = str(value or '').strip().lower()
+    return policy_type if policy_type in RISK_POLICY_TYPES else ''
+
+
+def _normalize_risk_match_mode(policy_type: str, value: Any) -> str:
+    mode = str(value or '').strip().lower()
+    if mode in ('keyword', 'country', 'time_range', 'ip_cidr', 'exact'):
+        return mode
+    if policy_type == 'blacklist':
+        return 'ip_cidr'
+    if policy_type == 'night':
+        return 'time_range'
+    if policy_type == 'overseas':
+        return 'country'
+    return 'keyword'
+
+
+def _normalize_risk_match_value(policy_type: str, match_value: Any) -> str:
+    value = str(match_value or '').strip()
+    if not value:
+        raise ValueError('기준 값을 입력하세요.')
+    if policy_type == 'overseas':
+        if len(value) == 2 and re.fullmatch(r'[A-Za-z]{2}', value):
+            return value.upper()
+        if not re.fullmatch(r'[A-Za-z가-힣][A-Za-z가-힣 ._-]{1,49}', value):
+            raise ValueError('해외 접속 기준은 국가 코드 2자리(CN, RU 등) 또는 국가명을 입력하세요.')
+        return value
+    if policy_type == 'night':
+        if not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]|24):[0-5]\d', value):
+            raise ValueError('새벽 접속 기준은 00:00-06:00 형식으로 입력하세요.')
+        return value
+    if policy_type == 'blacklist':
+        try:
+            if '/' in value:
+                return str(ipaddress.ip_network(value, strict=False))
+            return str(ipaddress.ip_address(value))
+        except ValueError:
+            raise ValueError('차단 IP는 192.0.2.10 또는 192.0.2.0/24 형식으로 입력하세요.')
+    if len(value) < 2:
+        raise ValueError('키워드는 2자 이상 입력하세요.')
+    if len(value) > 100:
+        raise ValueError('기준 값은 100자 이하로 입력하세요.')
+    return value
+
+
+def _risk_policy_row(row) -> Dict[str, Any]:
+    item = _dict(row) or {}
+    item['active_flag'] = int(item.get('active_flag') or 0)
+    item['is_deleted'] = int(item.get('is_deleted') or 0)
+    item['policy_label'] = RISK_POLICY_LABELS.get(item.get('policy_type'), item.get('policy_type') or '')
+    item['active'] = bool(item['active_flag'])
+    return item
+
+
+def _create_risk_policy_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f'''
+        CREATE TABLE IF NOT EXISTS {RISK_POLICY_TABLE} (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            policy_type     TEXT NOT NULL,
+            match_value     TEXT NOT NULL,
+            match_mode      TEXT NOT NULL DEFAULT 'keyword',
+            description     TEXT NOT NULL DEFAULT '',
+            severity        TEXT NOT NULL DEFAULT 'warning',
+            active_flag     INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      TEXT,
+            created_by      TEXT NOT NULL DEFAULT 'system',
+            updated_by      TEXT NOT NULL DEFAULT '',
+            is_deleted      INTEGER NOT NULL DEFAULT 0
+        )
+        '''
+    )
+    conn.execute(
+        f'''CREATE INDEX IF NOT EXISTS idx_{RISK_POLICY_TABLE}_type_active
+            ON {RISK_POLICY_TABLE}(policy_type, active_flag, is_deleted)'''
+    )
+    conn.execute(
+        f'''CREATE UNIQUE INDEX IF NOT EXISTS idx_{RISK_POLICY_TABLE}_unique_active
+            ON {RISK_POLICY_TABLE}(policy_type, match_value, is_deleted)'''
+    )
+
+
+def _seed_risk_policies(conn: sqlite3.Connection) -> None:
+    row = conn.execute(f'SELECT id FROM {RISK_POLICY_TABLE} WHERE is_deleted = 0 LIMIT 1').fetchone()
+    if row:
+        return
+    for item in _risk_policy_defaults():
+        conn.execute(
+            f'''
+            INSERT INTO {RISK_POLICY_TABLE}
+                (policy_type, match_value, match_mode, description, severity, active_flag, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, 1, ?, 'system')
+            ''',
+            (item['policy_type'], item['match_value'], item['match_mode'], item.get('description', ''), 'warning', _now())
+        )
+
+
+def list_risk_policies(policy_type: Optional[str] = None, active_only: bool = False, app=None) -> List[Dict[str, Any]]:
+    normalized_type = _normalize_risk_policy_type(policy_type)
+    where = ['is_deleted = 0']
+    params: List[Any] = []
+    if normalized_type:
+        where.append('policy_type = ?')
+        params.append(normalized_type)
+    if active_only:
+        where.append('active_flag = 1')
+    with _get_connection(app) as conn:
+        _create_risk_policy_table(conn)
+        _seed_risk_policies(conn)
+        rows = conn.execute(
+            f'''
+            SELECT *
+              FROM {RISK_POLICY_TABLE}
+             WHERE {' AND '.join(where)}
+             ORDER BY CASE policy_type
+                        WHEN 'overseas' THEN 1
+                        WHEN 'night' THEN 2
+                        WHEN 'blocked' THEN 3
+                        WHEN 'privilege' THEN 4
+                        WHEN 'unauthorized' THEN 5
+                        WHEN 'blacklist' THEN 6
+                        ELSE 99
+                      END,
+                      id ASC
+            ''',
+            params
+        ).fetchall()
+    return [_risk_policy_row(row) for row in rows]
+
+
+def create_risk_policy(payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = None, app=None) -> Dict[str, Any]:
+    policy_type = _normalize_risk_policy_type(payload.get('policy_type') or payload.get('type'))
+    if not policy_type:
+        raise ValueError('위험 접근 유형이 올바르지 않습니다.')
+    match_value = _normalize_risk_match_value(policy_type, payload.get('match_value') or payload.get('value'))
+    match_mode = _normalize_risk_match_mode(policy_type, payload.get('match_mode'))
+    description = str(payload.get('description') or '').strip()[:500]
+    severity = str(payload.get('severity') or 'warning').strip().lower()
+    if severity not in ('normal', 'warning', 'danger'):
+        severity = 'warning'
+    actor_name = str((actor or {}).get('emp_no') or (actor or {}).get('name') or 'system')[:80]
+    with _get_connection(app) as conn:
+        _create_risk_policy_table(conn)
+        try:
+            cur = conn.execute(
+                f'''
+                INSERT INTO {RISK_POLICY_TABLE}
+                    (policy_type, match_value, match_mode, description, severity, active_flag, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                ''',
+                (policy_type, match_value, match_mode, description, severity, _now(), actor_name)
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError('이미 등록된 위험 접근 기준입니다.')
+        conn.commit()
+        row = conn.execute(f'SELECT * FROM {RISK_POLICY_TABLE} WHERE id = ?', (cur.lastrowid,)).fetchone()
+    return _risk_policy_row(row)
+
+
+def update_risk_policy(policy_id: int, payload: Dict[str, Any], actor: Optional[Dict[str, Any]] = None, app=None) -> Optional[Dict[str, Any]]:
+    actor_name = str((actor or {}).get('emp_no') or (actor or {}).get('name') or 'system')[:80]
+    with _get_connection(app) as conn:
+        row = conn.execute(f'SELECT * FROM {RISK_POLICY_TABLE} WHERE id = ? AND is_deleted = 0', (policy_id,)).fetchone()
+        if not row:
+            return None
+        current = _risk_policy_row(row)
+        policy_type = _normalize_risk_policy_type(payload.get('policy_type') or payload.get('type') or current.get('policy_type'))
+        raw_match_value = payload.get('match_value') if payload.get('match_value') is not None else payload.get('value')
+        if raw_match_value is None:
+            raw_match_value = current.get('match_value')
+        if not policy_type:
+            raise ValueError('위험 접근 기준 값이 올바르지 않습니다.')
+        match_value = _normalize_risk_match_value(policy_type, raw_match_value)
+        match_mode = _normalize_risk_match_mode(policy_type, payload.get('match_mode') or current.get('match_mode'))
+        description = str(payload.get('description') if payload.get('description') is not None else current.get('description') or '').strip()[:500]
+        severity = str(payload.get('severity') or current.get('severity') or 'warning').strip().lower()
+        if severity not in ('normal', 'warning', 'danger'):
+            severity = 'warning'
+        active_flag = 1 if payload.get('active_flag', payload.get('active', current.get('active_flag'))) in (1, True, '1', 'true', 'Y', 'y') else 0
+        try:
+            conn.execute(
+                f'''
+                UPDATE {RISK_POLICY_TABLE}
+                   SET policy_type = ?, match_value = ?, match_mode = ?, description = ?,
+                       severity = ?, active_flag = ?, updated_at = ?, updated_by = ?
+                 WHERE id = ? AND is_deleted = 0
+                ''',
+                (policy_type, match_value, match_mode, description, severity, active_flag, _now(), actor_name, policy_id)
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError('이미 등록된 위험 접근 기준입니다.')
+        conn.commit()
+        row = conn.execute(f'SELECT * FROM {RISK_POLICY_TABLE} WHERE id = ?', (policy_id,)).fetchone()
+    return _risk_policy_row(row)
+
+
+def delete_risk_policy(policy_id: int, actor: Optional[Dict[str, Any]] = None, app=None) -> bool:
+    actor_name = str((actor or {}).get('emp_no') or (actor or {}).get('name') or 'system')[:80]
+    with _get_connection(app) as conn:
+        cur = conn.execute(
+            f'''
+            UPDATE {RISK_POLICY_TABLE}
+               SET is_deleted = 1, active_flag = 0, updated_at = ?, updated_by = ?
+             WHERE id = ? AND is_deleted = 0
+            ''',
+            (_now(), actor_name, policy_id)
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def _ip_matches_policy(ip_value: str, policy_value: str) -> bool:
+    ip_value = str(ip_value or '').strip()
+    policy_value = str(policy_value or '').strip()
+    if not ip_value or not policy_value:
+        return False
+    try:
+        ip_obj = ipaddress.ip_address(ip_value)
+        if '/' in policy_value:
+            return ip_obj in ipaddress.ip_network(policy_value, strict=False)
+        return ip_obj == ipaddress.ip_address(policy_value)
+    except Exception:
+        if '*' in policy_value:
+            return ip_value.startswith(policy_value.replace('*', ''))
+        return ip_value == policy_value
+
+
+def _hour_in_time_range(hour: int, value: str) -> bool:
+    match = re.match(r'^\s*(\d{1,2})(?::\d{2})?\s*-\s*(\d{1,2})(?::\d{2})?\s*$', str(value or ''))
+    if not match or hour < 0:
+        return False
+    start = max(0, min(23, int(match.group(1))))
+    end = max(0, min(24, int(match.group(2))))
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
+def evaluate_risk_policy_for_audit(row: Dict[str, Any], policies: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+    policies = policies if policies is not None else list_risk_policies(active_only=True)
+    try:
+        extra = json.loads(row.get('extra_json') or '{}') if isinstance(row.get('extra_json'), str) else (row.get('extra_json') or {})
+    except Exception:
+        extra = {}
+    text = ' '.join(str(v or '') for v in [
+        row.get('risk_reason'), row.get('reason'), row.get('description'), row.get('details'),
+        row.get('note'), row.get('action_result'), row.get('access_type'), row.get('resource_name'),
+        row.get('connect_account'), row.get('ip_address'), extra.get('country'), extra.get('country_code'),
+        extra.get('geo_country'), extra.get('risk_reason')
+    ]).lower()
+    occurred = str(row.get('occurred_at') or '')
+    hour = -1
+    try:
+        hour = datetime.fromisoformat(occurred.replace('Z', '+00:00')).hour
+    except Exception:
+        try:
+            hour = int(occurred[11:13])
+        except Exception:
+            hour = -1
+    ip_value = str(row.get('ip_address') or '').strip()
+    for policy in policies:
+        if not policy.get('active_flag'):
+            continue
+        policy_type = policy.get('policy_type')
+        value = str(policy.get('match_value') or '').strip()
+        mode = policy.get('match_mode') or 'keyword'
+        matched = False
+        if policy_type == 'blacklist' or mode == 'ip_cidr':
+            matched = _ip_matches_policy(ip_value, value)
+        elif policy_type == 'night' or mode == 'time_range':
+            matched = _hour_in_time_range(hour, value)
+        elif mode == 'exact':
+            matched = text == value.lower()
+        else:
+            matched = bool(value and value.lower() in text)
+        if matched:
+            return {
+                'type': policy_type,
+                'label': RISK_POLICY_LABELS.get(policy_type, policy_type),
+                'policy_id': policy.get('id'),
+                'match_value': value,
+                'severity': policy.get('severity') or 'warning',
+            }
+    return None
+
+
 def web_access_calendar_today_iso() -> str:
     """Flask/API에서 grant 날짜와 동일한 기준의 '오늘' (Seoul 달력)."""
     return _today()
@@ -253,6 +682,79 @@ def _is_permanent_access_payload(payload: Dict[str, Any]) -> bool:
     if _to_bool(payload.get('permanent_access') or payload.get('permanentAccess') or 0):
         return True
     return str(payload.get('request_end_date') or '').strip() == PERMANENT_ACCESS_END_DATE
+
+
+def _is_user_id_request_payload(payload: Dict[str, Any]) -> bool:
+    action = str(payload.get('system_action') or payload.get('systemAction') or '').strip()
+    period_type = str(payload.get('request_period_type') or payload.get('period_type') or '').strip().lower()
+    return action == USER_ID_REQUEST_ACTION or action.endswith('사용자 ID 신청') or period_type == 'user_id_request'
+
+
+def _ensure_user_id_request_resource(conn: sqlite3.Connection) -> int:
+    row = conn.execute(
+        f'''SELECT id FROM {RESOURCE_TABLE}
+              WHERE resource_url = ? AND is_deleted = 0
+              LIMIT 1''',
+        (USER_ID_REQUEST_RESOURCE_URL,)
+    ).fetchone()
+    if row:
+        return int(row['id'])
+    cur = conn.execute(
+        f'''
+        INSERT INTO {RESOURCE_TABLE}
+            (resource_name, resource_url, resource_type, description, category_name,
+             active_flag, approval_required, default_period_days, security_level,
+             launch_mode, caution_text, created_at, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            '사용자 ID 신청',
+            USER_ID_REQUEST_RESOURCE_URL,
+            'SYSTEM',
+            '자원 선택 없이 최초 사용자 ID를 생성하기 위한 내부 신청 대상',
+            '시스템',
+            1,
+            1,
+            0,
+            '중',
+            '내부 처리',
+            '',
+            _now(),
+            'system',
+        )
+    )
+    return int(cur.lastrowid)
+
+
+def check_user_id_available(user_id: str, app=None) -> Dict[str, Any]:
+    value = str(user_id or '').strip()
+    if not value:
+        return {'available': False, 'message': '사용자 ID를 입력하세요.'}
+    if not re.fullmatch(r'[A-Za-z0-9._-]{3,32}', value):
+        return {'available': False, 'message': '사용자 ID는 영문, 숫자, 점, 밑줄, 하이픈 3~32자로 입력하세요.'}
+    with _get_connection(app) as conn:
+        for table, column in (('org_user', 'emp_no'), ('auth_user', 'emp_no'), ('user_profile', 'emp_no')):
+            try:
+                row = conn.execute(
+                    f'''SELECT 1 FROM {table}
+                         WHERE UPPER(COALESCE({column}, '')) = UPPER(?)
+                         LIMIT 1''',
+                    (value,)
+                ).fetchone()
+                if row:
+                    return {'available': False, 'message': '이미 사용 중인 ID입니다.'}
+            except sqlite3.OperationalError:
+                continue
+    try:
+        from sqlalchemy import func
+        from app.models import AuthUser, UserProfile
+        if AuthUser.query.filter(func.upper(AuthUser.emp_no) == value.upper()).first():
+            return {'available': False, 'message': '이미 사용 중인 ID입니다.'}
+        if UserProfile.query.filter(func.upper(UserProfile.emp_no) == value.upper()).first():
+            return {'available': False, 'message': '이미 사용 중인 ID입니다.'}
+    except Exception:
+        pass
+    return {'available': True, 'message': '사용 가능한 ID입니다.'}
 
 
 def _normalize_request_type(payload: Dict[str, Any]) -> str:
@@ -334,6 +836,9 @@ def _ensure_resource_extra_columns(conn: sqlite3.Connection) -> None:
         ('login_account', "TEXT NOT NULL DEFAULT ''"),
         ('connection_options', "TEXT NOT NULL DEFAULT ''"),
         ('tags', "TEXT NOT NULL DEFAULT ''"),
+        ('category_detail', "TEXT NOT NULL DEFAULT ''"),
+        ('work_operation_code', "TEXT NOT NULL DEFAULT ''"),
+        ('agent_id', "TEXT NOT NULL DEFAULT ''"),
     )
     for col, decl in spec:
         if col not in existing:
@@ -775,6 +1280,24 @@ def list_pc_agents(filters: Optional[Dict[str, Any]] = None, page: int = 1, page
         where += ' AND a.mapped_user_id IS NOT NULL'
     elif mapping_state == 'unmapped':
         where += ' AND a.mapped_user_id IS NULL'
+    if filters.get('resource_unmapped'):
+        exclude_resource_id = _to_int_or_none(filters.get('exclude_resource_id'))
+        if exclude_resource_id:
+            where += f''' AND NOT EXISTS (
+                SELECT 1 FROM {RESOURCE_TABLE} r
+                 WHERE r.is_deleted = 0
+                   AND TRIM(COALESCE(r.agent_id, '')) != ''
+                   AND r.agent_id = a.agent_id
+                   AND r.id != ?
+            )'''
+            params.append(exclude_resource_id)
+        else:
+            where += f''' AND NOT EXISTS (
+                SELECT 1 FROM {RESOURCE_TABLE} r
+                 WHERE r.is_deleted = 0
+                   AND TRIM(COALESCE(r.agent_id, '')) != ''
+                   AND r.agent_id = a.agent_id
+            )'''
     with _get_connection(app) as conn:
         count_row = conn.execute(
             f'''SELECT COUNT(*) AS total
@@ -1105,6 +1628,140 @@ def _split_policy_patterns(text: Any) -> List[str]:
     return out
 
 
+def _category_lookup_key(value: Any) -> str:
+    return str(value or '').strip().replace(' ', '').replace('/', '').replace('-', '').replace('_', '').lower()
+
+
+def _normalize_resource_category(value: Any) -> str:
+    key = _category_lookup_key(value)
+    if not key:
+        return '시스템'
+    label = _RESOURCE_CATEGORY_ALIASES.get(key)
+    if label:
+        return label
+    text = str(value or '').strip()
+    return text if text in RESOURCE_CATEGORIES else '시스템'
+
+
+def _normalize_console_group(category: Any, value: Any) -> str:
+    if _normalize_resource_category(category) != '관리콘솔':
+        return ''
+    key = _category_lookup_key(value)
+    if not key:
+        return ''
+    label = _RESOURCE_CONSOLE_GROUP_ALIASES.get(key)
+    if label:
+        return label
+    text = str(value or '').strip()
+    return text if text in RESOURCE_CONSOLE_GROUPS else ''
+
+
+def _resource_category_filter_values(category: Any) -> List[str]:
+    label = _normalize_resource_category(category)
+    values = {
+        '시스템': ['시스템', '기타', '서버', 'SSH', 'DB'],
+        '서비스': ['서비스', '내부 서비스', '외부 서비스', '웹'],
+        '컨테이너': ['컨테이너'],
+        '관리콘솔': ['관리콘솔', '관리 콘솔'],
+    }.get(label, [label])
+    out: List[str] = []
+    for value in values:
+        if value not in out:
+            out.append(value)
+    return out
+
+
+def _resource_category_path(category: Any, category_detail: Any) -> str:
+    label = _normalize_resource_category(category)
+    detail = _normalize_console_group(label, category_detail)
+    return f'{label} / {detail}' if label == '관리콘솔' and detail else label
+
+
+def _normalize_work_operation_code(value: Any) -> str:
+    return str(value or '').strip()[:80]
+
+
+def _resource_uses_work_operation(category: Any) -> bool:
+    return _normalize_resource_category(category) in RESOURCE_WORK_OPERATION_CATEGORIES
+
+
+def _work_operation_table_exists(conn: sqlite3.Connection) -> bool:
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+            (WORK_OPERATION_TABLE,),
+        ).fetchone()
+        return row is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _lookup_work_operation_name(conn: Optional[sqlite3.Connection], code: Any) -> str:
+    work_code = _normalize_work_operation_code(code)
+    if not conn or not work_code:
+        return ''
+    try:
+        if not _work_operation_table_exists(conn):
+            return ''
+        row = conn.execute(
+            f'''SELECT operation_name
+                  FROM {WORK_OPERATION_TABLE}
+                 WHERE operation_code = ?
+                   AND is_deleted = 0
+                 LIMIT 1''',
+            (work_code,),
+        ).fetchone()
+        return str(row['operation_name'] or '').strip() if row else ''
+    except sqlite3.DatabaseError:
+        return ''
+
+
+def _work_operation_from_payload(payload: Dict[str, Any], category: str, current: Optional[Dict[str, Any]] = None) -> str:
+    if not _resource_uses_work_operation(category):
+        return ''
+    current = current or {}
+    raw = payload.get(
+        'work_operation_code',
+        payload.get('work_operation', current.get('work_operation_code', current.get('work_operation', ''))),
+    )
+    return _normalize_work_operation_code(raw)
+
+
+def _enrich_work_operation_fields(item: Dict[str, Any], conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    category = _normalize_resource_category(item.get('category_name') or item.get('category'))
+    code = _normalize_work_operation_code(item.get('work_operation_code') or item.get('work_operation')) if _resource_uses_work_operation(category) else ''
+    name = ''
+    if code:
+        name = str(item.get('work_operation_name') or '').strip() or _lookup_work_operation_name(conn, code)
+    item['work_operation_code'] = code
+    item['work_operation_name'] = name
+    item['work_operation'] = name or code
+    return item
+
+
+def _enrich_resource_category_fields(item: Dict[str, Any], conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    category = _normalize_resource_category(item.get('category_name') or item.get('category'))
+    detail = _normalize_console_group(category, item.get('category_detail') or item.get('console_group'))
+    item['category_name'] = category
+    item['category_detail'] = detail
+    item['console_group'] = detail
+    item['category_label'] = category
+    item['category_path'] = _resource_category_path(category, detail)
+    _enrich_work_operation_fields(item, conn)
+    return item
+
+
+def _resource_category_from_payload(payload: Dict[str, Any], current: Optional[Dict[str, Any]] = None) -> tuple[str, str, str]:
+    current = current or {}
+    raw_category = payload.get('category', payload.get('category_name', current.get('category_name', '시스템')))
+    category = _normalize_resource_category(raw_category)
+    raw_detail = payload.get(
+        'category_detail',
+        payload.get('console_group', payload.get('category_group', current.get('category_detail', current.get('console_group', ''))))
+    )
+    return category, _normalize_console_group(category, raw_detail), _work_operation_from_payload(payload, category, current)
+
+
 def get_browse_policy_for_user(app=None) -> Dict[str, Any]:
     """일반 사용자 접속 UI용 정책 스냅샷 (민감 필드 제외)."""
     pol = get_default_policy(app) or {}
@@ -1130,7 +1787,10 @@ def init_web_access_control_tables(app=None) -> None:
                 resource_url            TEXT NOT NULL,
                 resource_type           TEXT NOT NULL DEFAULT '웹',
                 description             TEXT NOT NULL DEFAULT '',
-                category_name           TEXT NOT NULL DEFAULT '웹',
+                category_name           TEXT NOT NULL DEFAULT '서비스',
+                category_detail         TEXT NOT NULL DEFAULT '',
+                work_operation_code     TEXT NOT NULL DEFAULT '',
+                agent_id                TEXT NOT NULL DEFAULT '',
                 active_flag             INTEGER NOT NULL DEFAULT 1,
                 approval_required       INTEGER NOT NULL DEFAULT 1,
                 default_period_days     INTEGER NOT NULL DEFAULT 30,
@@ -1152,6 +1812,7 @@ def init_web_access_control_tables(app=None) -> None:
             )
             '''
         )
+        _ensure_resource_extra_columns(conn)
         conn.execute(
             f'''CREATE UNIQUE INDEX IF NOT EXISTS idx_{RESOURCE_TABLE}_url_deleted
                 ON {RESOURCE_TABLE}(resource_url, is_deleted)'''
@@ -1160,7 +1821,10 @@ def init_web_access_control_tables(app=None) -> None:
             f'''CREATE INDEX IF NOT EXISTS idx_{RESOURCE_TABLE}_type
                 ON {RESOURCE_TABLE}(resource_type)'''
         )
-        _ensure_resource_extra_columns(conn)
+        conn.execute(
+            f'''CREATE INDEX IF NOT EXISTS idx_{RESOURCE_TABLE}_agent_id
+                ON {RESOURCE_TABLE}(agent_id, is_deleted)'''
+        )
         conn.execute(
             f'''
             CREATE TABLE IF NOT EXISTS {POLICY_TABLE} (
@@ -1352,6 +2016,8 @@ def init_web_access_control_tables(app=None) -> None:
         _create_delegation_table(conn)
         _create_pc_agent_table(conn)
         _create_ssh_command_log_table(conn)
+        _create_risk_policy_table(conn)
+        _seed_risk_policies(conn)
         _ensure_sqlite_org_user_for_pc_agent_join(conn)
         _migrate_endpoints_from_resource(conn)
         _backfill_endpoint_access_columns(conn)
@@ -1395,7 +2061,7 @@ def _seed_default_resource(conn: sqlite3.Connection) -> None:
         (
             'NAVER',
             'https://www.naver.com',
-            '웹',
+            '서비스',
             '기본 예시 외부 웹 자원',
             '웹',
             1,
@@ -1548,44 +2214,60 @@ def _migrate_endpoints_from_resource(conn: sqlite3.Connection) -> None:
 
 def _endpoint_url(ep: Dict[str, Any]) -> str:
     """endpoint dict → 사람이 읽는 URL 문자열."""
-    kind = (ep.get('kind') or '').upper()
-    protocol = (ep.get('protocol') or '').upper()
+    kind = _endpoint_access_type(ep)
+    protocol = (ep.get('protocol') or kind).upper()
     host = (ep.get('host') or '').strip()
     port = ep.get('port')
     path = (ep.get('url_path') or '').strip()
     if not host:
         return ''
-    if kind == ENDPOINT_KIND_WEB:
-        scheme = 'https' if protocol == 'HTTPS' else 'http'
+    if kind in ENDPOINT_WEB_KINDS:
+        if protocol == 'API':
+            scheme = 'https'
+        else:
+            scheme = 'https' if protocol == 'HTTPS' else 'http'
         default_port = ENDPOINT_DEFAULT_PORT.get(protocol, 0)
         port_part = '' if not port or int(port) == default_port else f':{int(port)}'
         path_part = path if (path and path.startswith('/')) else (f'/{path}' if path else '')
         return f'{scheme}://{host}{port_part}{path_part}'
-    if kind == ENDPOINT_KIND_SSH:
-        port_part = '' if not port or int(port) == 22 else f':{int(port)}'
+    if kind in ENDPOINT_REMOTE_KINDS:
+        default_port = ENDPOINT_DEFAULT_PORT.get(kind, 22)
+        port_part = '' if not port or int(port) == default_port else f':{int(port)}'
+        if kind == ENDPOINT_KIND_SFTP:
+            return f'sftp://{host}{port_part}'
+        if kind == ENDPOINT_KIND_RDP:
+            return f'rdp://{host}{port_part}'
         return f'ssh://{host}{port_part}'
     return host
 
 
 def _endpoint_access_type(endpoint: Dict[str, Any]) -> str:
     kind = (endpoint.get('kind') or endpoint.get('access_type') or '').strip().upper()
+    protocol = (endpoint.get('protocol') or '').strip().upper()
     if kind == '웹':
-        return ENDPOINT_KIND_WEB
+        return protocol if protocol in (ENDPOINT_KIND_HTTP, ENDPOINT_KIND_HTTPS, ENDPOINT_KIND_API) else ENDPOINT_KIND_HTTPS
+    if kind == ENDPOINT_KIND_WEB:
+        return protocol if protocol in (ENDPOINT_KIND_HTTP, ENDPOINT_KIND_HTTPS, ENDPOINT_KIND_API) else ENDPOINT_KIND_HTTPS
+    if kind == ENDPOINT_KIND_SSH and protocol in ENDPOINT_REMOTE_KINDS:
+        return protocol
     if kind in ENDPOINT_KINDS:
         return kind
-    return kind or ENDPOINT_KIND_WEB
+    if protocol in ENDPOINT_KINDS:
+        return protocol
+    return kind or ENDPOINT_KIND_HTTPS
 
 
 def _endpoint_access_info(endpoint: Dict[str, Any]) -> str:
     access_type = _endpoint_access_type(endpoint)
     host = (endpoint.get('host') or '').strip()
     port = _to_int_or_none(endpoint.get('port'))
-    if access_type == ENDPOINT_KIND_WEB:
+    if access_type in ENDPOINT_WEB_KINDS:
         return _endpoint_url(endpoint)
-    if access_type == ENDPOINT_KIND_SSH:
+    if access_type in ENDPOINT_REMOTE_KINDS:
         if not host:
             return ''
-        return f'{host}:{port}' if port and port != ENDPOINT_DEFAULT_PORT['SSH'] else host
+        default_port = ENDPOINT_DEFAULT_PORT.get(access_type) or ENDPOINT_DEFAULT_PORT['SSH']
+        return f'{host}:{port}' if port and port != default_port else host
     return _endpoint_url(endpoint) or host
 
 
@@ -1598,18 +2280,25 @@ def _backfill_endpoint_access_columns(conn: sqlite3.Connection) -> None:
         endpoint = dict(row)
         access_type = _endpoint_access_type(endpoint)
         access_info = _endpoint_access_info(endpoint)
-        if endpoint.get('access_type') == access_type and endpoint.get('access_info') == access_info:
+        stored_kind = str(endpoint.get('kind') or '').strip().upper()
+        kind_needs_split = stored_kind in ('WEB', 'SSH') and access_type not in ('WEB', 'SSH')
+        if endpoint.get('access_type') == access_type and endpoint.get('access_info') == access_info and not kind_needs_split:
             continue
         conn.execute(
             f'''UPDATE {ENDPOINT_TABLE}
                    SET access_type = ?,
-                       access_info = ?
+                       access_info = ?,
+                       kind = CASE
+                           WHEN UPPER(COALESCE(kind, '')) IN ('WEB', 'SSH') THEN ?
+                           ELSE kind
+                       END
                  WHERE id = ?''',
-            (access_type, access_info, endpoint['id'])
+            (access_type, access_info, access_type, endpoint['id'])
         )
 
 
-def _enrich_resource_endpoint_fields(item: Dict[str, Any], endpoints: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _enrich_resource_endpoint_fields(item: Dict[str, Any], endpoints: List[Dict[str, Any]], conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    _enrich_resource_category_fields(item, conn)
     item['endpoints'] = endpoints
     item['endpoint_count'] = len(endpoints)
     primary = next((endpoint for endpoint in endpoints if endpoint.get('is_primary')), endpoints[0] if endpoints else None)
@@ -1624,7 +2313,7 @@ def _enrich_resource_endpoint_fields(item: Dict[str, Any], endpoints: List[Dict[
 
 
 def _validate_endpoint_payload(ep: Dict[str, Any]) -> Dict[str, Any]:
-    kind = (ep.get('kind') or '').strip().upper() or ENDPOINT_KIND_WEB
+    kind = _endpoint_access_type(ep)
     if kind not in ENDPOINT_KINDS:
         raise ValueError('지원하지 않는 접속점 유형입니다. (WEB / SSH)')
     protocol = (ep.get('protocol') or '').strip().upper()
@@ -1642,7 +2331,7 @@ def _validate_endpoint_payload(ep: Dict[str, Any]) -> Dict[str, Any]:
     if port is None or port < 1 or port > 65535:
         raise ValueError('포트는 1~65535 범위여야 합니다.')
     url_path = (ep.get('url_path') or '').strip()
-    if kind == ENDPOINT_KIND_SSH:
+    if kind in ENDPOINT_REMOTE_KINDS:
         url_path = ''
     elif url_path and not url_path.startswith('/'):
         url_path = '/' + url_path
@@ -1925,7 +2614,10 @@ def update_default_policy(payload: Dict[str, Any], actor: str, app=None) -> Dict
 
 
 def list_resources(search: str = '', status: str = '', resource_type: str = '', app=None) -> List[Dict[str, Any]]:
-    expire_due_grants(app)
+    try:
+        expire_due_grants(app)
+    except sqlite3.OperationalError:
+        _log.exception('Failed to expire due web access grants; continuing resource list')
     sql = f'''
         SELECT *
           FROM {RESOURCE_TABLE}
@@ -1936,6 +2628,8 @@ def list_resources(search: str = '', status: str = '', resource_type: str = '', 
         sql += ' AND (resource_name LIKE ? OR resource_url LIKE ? OR description LIKE ? OR host_address LIKE ?)'
         like = f'%{search.strip()}%'
         params.extend([like, like, like, like])
+    sql += ' AND resource_url <> ?'
+    params.append(USER_ID_REQUEST_RESOURCE_URL)
     if resource_type:
         sql += ' AND resource_type = ?'
         params.append(resource_type)
@@ -1950,7 +2644,7 @@ def list_resources(search: str = '', status: str = '', resource_type: str = '', 
         for row in rows:
             d = dict(row)
             endpoints = list_endpoints(d['id'], conn=conn)
-            items.append(_enrich_resource_endpoint_fields(d, endpoints))
+            items.append(_enrich_resource_endpoint_fields(d, endpoints, conn))
     return items
 
 
@@ -1964,7 +2658,7 @@ def get_resource(resource_id: int, app=None) -> Optional[Dict[str, Any]]:
             return None
         d = dict(row)
         endpoints = list_endpoints(resource_id, conn=conn)
-        _enrich_resource_endpoint_fields(d, endpoints)
+        _enrich_resource_endpoint_fields(d, endpoints, conn)
     return d
 
 
@@ -1975,7 +2669,8 @@ def create_resource(payload: Dict[str, Any], actor: str, app=None) -> Dict[str, 
         raise ValueError('자원명을 입력하세요.')
     description = (payload.get('description') or '').strip()
     tags = (payload.get('tags') or '').strip()
-    category = (payload.get('category') or '').strip() or '기타'
+    category, category_detail, work_operation_code = _resource_category_from_payload(payload)
+    agent_id = _pc_agent_text(payload.get('agent_id') or payload.get('agentId'), 128)
     active_flag = _to_bool(payload.get('active_flag', 1))
     approval_required = _to_bool(payload.get('approval_required', 1))
     default_period_days = int(payload.get('default_period_days') or 30)
@@ -1990,8 +2685,9 @@ def create_resource(payload: Dict[str, Any], actor: str, app=None) -> Dict[str, 
     if cleaned and not any(ep['is_primary'] for ep in cleaned):
         cleaned[0]['is_primary'] = 1
     primary = next((ep for ep in cleaned if ep.get('is_primary')), cleaned[0] if cleaned else None)
-    legacy_url = _endpoint_url(primary) if (primary and primary['kind'] == ENDPOINT_KIND_WEB) else ''
+    legacy_url = _endpoint_url(primary) if (primary and _endpoint_access_type(primary) in ENDPOINT_WEB_KINDS) else ''
     legacy_type = '웹' if (primary and primary['kind'] == ENDPOINT_KIND_WEB) else ('SSH' if primary else '웹')
+    legacy_type = _endpoint_access_type(primary) if primary else ENDPOINT_KIND_HTTPS
     legacy_host = primary['host'] if primary else ''
     legacy_port = primary['port'] if primary else None
     legacy_protocol = primary['protocol'] if primary else ''
@@ -1999,12 +2695,12 @@ def create_resource(payload: Dict[str, Any], actor: str, app=None) -> Dict[str, 
         cur = conn.execute(
             f'''
             INSERT INTO {RESOURCE_TABLE}
-                (resource_name, resource_url, resource_type, description, tags, category_name,
-                 active_flag, approval_required, default_period_days, security_level,
+                (resource_name, resource_url, resource_type, description, tags, category_name, category_detail, work_operation_code,
+                 agent_id, active_flag, approval_required, default_period_days, security_level,
                  launch_mode, owner_department_id, owner_user_id, caution_text,
                  host_address, port_number, protocol, login_account, connection_options,
                  created_at, updated_at, created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
             (
                 name,
@@ -2013,6 +2709,9 @@ def create_resource(payload: Dict[str, Any], actor: str, app=None) -> Dict[str, 
                 description,
                 tags,
                 category,
+                category_detail,
+                work_operation_code,
+                agent_id,
                 active_flag,
                 approval_required,
                 default_period_days,
@@ -2061,17 +2760,22 @@ def update_resource(resource_id: int, payload: Dict[str, Any], actor: str, app=N
     if cleaned and not any(ep.get('is_primary') for ep in cleaned):
         cleaned[0]['is_primary'] = 1
     primary = next((ep for ep in cleaned if ep.get('is_primary')), cleaned[0] if cleaned else None)
-    legacy_url = _endpoint_url(primary) if (primary and primary.get('kind') == ENDPOINT_KIND_WEB) else ''
+    legacy_url = _endpoint_url(primary) if (primary and _endpoint_access_type(primary) in ENDPOINT_WEB_KINDS) else ''
     legacy_type = '웹' if (primary and primary.get('kind') == ENDPOINT_KIND_WEB) else ('SSH' if primary else (current.get('resource_type') or '웹'))
+    legacy_type = _endpoint_access_type(primary) if primary else (current.get('resource_type') or ENDPOINT_KIND_HTTPS)
     legacy_host = (primary or {}).get('host', '') if primary else ''
     legacy_port = (primary or {}).get('port') if primary else None
     legacy_protocol = (primary or {}).get('protocol', '') if primary else ''
+    category, category_detail, work_operation_code = _resource_category_from_payload(payload, current)
     merged = {
         'resource_name': name,
         'resource_url': legacy_url,
         'resource_type': legacy_type,
         'description': (payload.get('description', current.get('description', '')) or '').strip(),
-        'category_name': (payload.get('category', current.get('category_name', '기타')) or '기타').strip(),
+        'category_name': category,
+        'category_detail': category_detail,
+        'work_operation_code': work_operation_code,
+        'agent_id': _pc_agent_text(payload.get('agent_id', current.get('agent_id', '')) or payload.get('agentId', ''), 128),
         'active_flag': _to_bool(payload.get('active_flag', current.get('active_flag', 1))),
         'approval_required': _to_bool(payload.get('approval_required', current.get('approval_required', 1))),
         'default_period_days': int(payload.get('default_period_days', current.get('default_period_days', 30)) or 30),
@@ -2097,6 +2801,9 @@ def update_resource(resource_id: int, payload: Dict[str, Any], actor: str, app=N
                    description = ?,
                    tags = ?,
                    category_name = ?,
+                   category_detail = ?,
+                   work_operation_code = ?,
+                   agent_id = ?,
                    active_flag = ?,
                    approval_required = ?,
                    default_period_days = ?,
@@ -2121,6 +2828,9 @@ def update_resource(resource_id: int, payload: Dict[str, Any], actor: str, app=N
                 merged['description'],
                 merged['tags'],
                 merged['category_name'],
+                merged['category_detail'],
+                merged['work_operation_code'],
+                merged['agent_id'],
                 merged['active_flag'],
                 merged['approval_required'],
                 merged['default_period_days'],
@@ -2477,7 +3187,7 @@ def _has_pending_request_conn(conn: sqlite3.Connection, user_id: int, resource_i
 
 def _load_request_items(conn: sqlite3.Connection, request_id: int) -> List[Dict[str, Any]]:
     rows = conn.execute(
-        f'''SELECT ri.*, s.resource_name, s.resource_url, s.resource_type, s.category_name,
+        f'''SELECT ri.*, s.resource_name, s.resource_url, s.resource_type, s.category_name, s.category_detail, s.work_operation_code,
                    s.description, s.caution_text, s.active_flag, s.host_address,
                    s.port_number, s.protocol, s.login_account, s.tags
               FROM {REQUEST_ITEM_TABLE} ri
@@ -2489,6 +3199,7 @@ def _load_request_items(conn: sqlite3.Connection, request_id: int) -> List[Dict[
     items: List[Dict[str, Any]] = []
     for row in rows:
         item = _dict(row) or {}
+        _enrich_resource_category_fields(item, conn)
         resource_id = int(item.get('resource_id') or 0)
         endpoints = list_endpoints(resource_id, conn=conn) if resource_id else []
         primary = next((ep for ep in endpoints if ep.get('is_primary')), endpoints[0] if endpoints else None)
@@ -2584,9 +3295,21 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
     request_type = _normalize_request_type(payload)
     is_delete_request = request_type == REQUEST_TYPE_DELETE
     resource_ids = _normalize_resource_ids(payload)
+    is_user_id_request = _is_user_id_request_payload(payload)
+    if not resource_ids and is_user_id_request:
+        with _get_connection(app) as conn:
+            resource_ids = [_ensure_user_id_request_resource(conn)]
+            conn.commit()
     if not resource_ids:
         raise ValueError('신청 대상 자원을 한 개 이상 선택하세요.')
     reason = (payload.get('reason') or '').strip()
+    requested_user_id = str(payload.get('requested_user_id') or payload.get('requestedUserId') or '').strip()
+    if is_user_id_request:
+        check = check_user_id_available(requested_user_id, app=app)
+        if not check.get('available'):
+            raise ValueError(check.get('message') or '사용자 ID 중복 점검이 필요합니다.')
+        if requested_user_id and '[신청 ID]' not in reason:
+            reason = f'[신청 ID] {requested_user_id}\n{reason}'
     if len(reason) < REQUEST_REASON_MIN_LENGTH:
         raise ValueError(f'신청 사유는 {REQUEST_REASON_MIN_LENGTH}자 이상 입력하세요.')
     permanent_access = (not is_delete_request) and _is_permanent_access_payload(payload)
@@ -2614,7 +3337,14 @@ def create_request(payload: Dict[str, Any], actor: Dict[str, Any], app=None) -> 
         for rid in resource_ids:
             resource = resources.get(rid)
             if not resource:
+                if is_user_id_request:
+                    raise ValueError('사용자 ID 신청 정보를 준비하지 못했습니다. 다시 시도하세요.')
                 item_errors.append({'resource_id': rid, 'message': '자원 정보를 찾을 수 없습니다.'})
+                continue
+            if is_user_id_request:
+                if _has_pending_request_conn(conn, user_id, rid, REQUEST_TYPE_USE):
+                    raise ValueError('이미 사용자 ID 신청이 진행 중입니다. 신청 및 승인 현황에서 상태를 확인하세요.')
+                valid_ids.append(rid)
                 continue
             if int(resource.get('active_flag') or 0) != 1 and not is_delete_request:
                 item_errors.append({'resource_id': rid, 'resource_name': resource.get('resource_name'), 'message': '비활성화된 자원은 신청할 수 없습니다.'})
@@ -3259,7 +3989,7 @@ def touch_access(
         recent_count = int(recent_row['cnt'] if recent_row else 0)
         if recent_count >= max_count:
             raise ValueError(f'접속 요청이 너무 잦습니다. {window_seconds}초 동안 최대 {max_count}회까지만 허용됩니다.')
-        if access_kind == ENDPOINT_KIND_SSH:
+        if access_kind in ENDPOINT_REMOTE_KINDS:
             if not _to_bool(policy.get('ssh_launch_enabled', 1)):
                 reason = 'SSH 접속 실행이 관리자 정책으로 중지되어 있습니다.'
                 _insert_audit(
@@ -3288,7 +4018,7 @@ def touch_access(
                 )
                 conn.commit()
                 raise ValueError(reason)
-        initial_outcome = AUDIT_ACCESS_OUTCOME_PENDING if access_kind == ENDPOINT_KIND_SSH else AUDIT_ACCESS_OUTCOME_SUCCESS
+        initial_outcome = AUDIT_ACCESS_OUTCOME_PENDING if access_kind in ENDPOINT_REMOTE_KINDS else AUDIT_ACCESS_OUTCOME_SUCCESS
         conn.execute(
             f'UPDATE {GRANT_TABLE} SET last_accessed_at = ?, updated_at = ? WHERE id = ?',
             (_now(), _now(), grant['id'])
@@ -3445,6 +4175,9 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
         except (TypeError, ValueError):
             page_size = 20
     resource_name_expr = "COALESCE(NULLIF(l.resource_name, ''), r.resource_name, '')"
+    category_expr = "COALESCE(r.category_name, '')"
+    category_detail_expr = "COALESCE(r.category_detail, '')"
+    work_operation_expr = "COALESCE(r.work_operation_code, '')"
     access_type_expr = f'''
         COALESCE(
             NULLIF(l.access_type, ''),
@@ -3501,13 +4234,30 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
                 l.actor_name LIKE ?
                 OR l.actor_emp_no LIKE ?
                 OR ''' + resource_name_expr + ''' LIKE ?
+                OR ''' + category_expr + ''' LIKE ?
+                OR ''' + category_detail_expr + ''' LIKE ?
                 OR ''' + access_info_expr + ''' LIKE ?
                 OR l.ip_address LIKE ?
                 OR l.note LIKE ?
                 OR IFNULL(l.connect_account, '') LIKE ?
             )
         '''
-        params.extend([keyword, keyword, keyword, keyword, keyword, keyword, keyword])
+        params.extend([keyword, keyword, keyword, keyword, keyword, keyword, keyword, keyword, keyword])
+    if filters.get('category'):
+        category_values = _resource_category_filter_values(filters.get('category'))
+        placeholders = ','.join('?' for _category_value in category_values)
+        where_sql += ' AND ' + category_expr + f' IN ({placeholders})'
+        params.extend(category_values)
+    if filters.get('category_detail'):
+        category_detail = _normalize_console_group(filters.get('category') or '관리콘솔', filters.get('category_detail'))
+        if category_detail:
+            where_sql += ' AND ' + category_detail_expr + ' = ?'
+            params.append(category_detail)
+    if filters.get('work_operation_code'):
+        work_operation_code = _normalize_work_operation_code(filters.get('work_operation_code'))
+        if work_operation_code:
+            where_sql += ' AND ' + work_operation_expr + ' = ?'
+            params.append(work_operation_code)
     if filters.get('actor_name'):
         where_sql += ' AND (l.actor_name LIKE ? OR l.actor_emp_no LIKE ?)'
         actor_keyword = f"%{str(filters['actor_name']).strip()}%"
@@ -3566,6 +4316,9 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
                    {resource_name_expr} AS resource_name,
                    r.resource_url,
                    r.resource_type,
+                   r.category_name,
+                   r.category_detail,
+                   r.work_operation_code,
                    {access_type_expr} AS access_type,
                    {access_type_expr} AS endpoint_kind,
                                      {access_info_expr} AS access_info,
@@ -3580,7 +4333,7 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
             ''',
             params + [page_size, offset]
         ).fetchall()
-    row_dicts = [_dict(row) for row in rows]
+        row_dicts = [_enrich_resource_category_fields(_dict(row), conn) for row in rows]
     out = {
         'rows': _enrich_audit_actor_profiles(row_dicts),
         'total': total,
@@ -3598,6 +4351,53 @@ def list_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, pag
         out['export_truncated'] = True
         out['export_max'] = export_max
     return out
+
+
+def list_risk_audit_logs(filters: Optional[Dict[str, Any]] = None, page: int = 1, page_size: int = 20, app=None) -> Dict[str, Any]:
+    filters = dict(filters or {})
+    risk_type = _normalize_risk_policy_type(filters.pop('risk_type', None))
+    filters['export_all'] = True
+    filters['action_type'] = '접속'
+    base = list_audit_logs(filters, page=1, page_size=5000, app=app)
+    policies = list_risk_policies(active_only=True, app=app)
+    risk_rows: List[Dict[str, Any]] = []
+    for row in base.get('rows') or []:
+        info = evaluate_risk_policy_for_audit(row, policies)
+        if not info:
+            continue
+        if risk_type and info.get('type') != risk_type:
+            continue
+        item = dict(row)
+        item['risk_type'] = info.get('type')
+        item['risk_label'] = info.get('label')
+        item['risk_policy_id'] = info.get('policy_id')
+        item['risk_match_value'] = info.get('match_value')
+        item['risk_severity'] = info.get('severity') or 'warning'
+        risk_rows.append(item)
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = max(1, min(int(page_size or 20), 200))
+    except (TypeError, ValueError):
+        page_size = 20
+    total = len(risk_rows)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    rows = risk_rows[start:start + page_size]
+    return {
+        'rows': rows,
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': total_pages,
+        'summary': {
+            'total': total,
+            'risk_count': total,
+        },
+    }
 
 
 def _normalize_ssh_command_time(value: Any) -> str:

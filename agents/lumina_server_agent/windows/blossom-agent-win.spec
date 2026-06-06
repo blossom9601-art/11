@@ -43,6 +43,7 @@ a = Analysis(
         'windows.collectors.firewalld',
         'windows.collectors.storage',
         'windows.collectors.package',
+        'windows.collectors.performance',
         'cryptography',
         'cryptography.hazmat.primitives.asymmetric.rsa',
         'cryptography.hazmat.primitives.serialization',

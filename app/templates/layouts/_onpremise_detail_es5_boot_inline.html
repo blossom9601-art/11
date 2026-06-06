@@ -239,6 +239,21 @@
     }
   }
 
+  function getFirstAssetFromList(cb){
+    xhrGetJson('/api/hardware/onpremise/assets', function(ok, _status, data){
+      if(!ok || !data || data.success !== true){
+        cb(null);
+        return;
+      }
+      var items = data.items || data.data || [];
+      if(!items || !items.length){
+        cb(null);
+        return;
+      }
+      cb(items[0] || null);
+    });
+  }
+
   function applyItem(item){
     if(!item) return;
 
@@ -340,7 +355,22 @@
     var raw = getParam('asset_id') || getParam('assetId') || getParam('id');
     var id = parseInt(toText(raw), 10);
     if(!id || id <= 0) id = getAssetIdFromStorage();
-    if(!id || id <= 0) return;
+    if(!id || id <= 0){
+      getFirstAssetFromList(function(item){
+        if(!item) return;
+        applyItem(item);
+        var cand = parseInt(toText(item.id != null ? item.id : (item.asset_id != null ? item.asset_id : item.assetId)), 10);
+        if(!cand || cand <= 0) return;
+        try{ sessionStorage.setItem('onpremise:selected:asset_id', String(cand)); }catch(_eA0){}
+        try{ localStorage.setItem('onpremise:selected:asset_id', String(cand)); }catch(_eA1){}
+        try{ localStorage.setItem('onpremise:last_selected_asset_id', String(cand)); }catch(_eA2){}
+        xhrGetJson('/api/hardware/onpremise/assets/' + encodeURIComponent(String(cand)), function(ok, _status, data){
+          if(!ok || !data || data.success !== true) return;
+          applyItem(data.item || item);
+        });
+      });
+      return;
+    }
 
     xhrGetJson('/api/hardware/onpremise/assets/' + encodeURIComponent(String(id)), function(ok, _status, data){
       if(!ok || !data || data.success !== true) return;

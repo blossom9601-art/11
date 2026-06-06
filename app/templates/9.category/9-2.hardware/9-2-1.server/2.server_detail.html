@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/static/css/detail3.css?v=1.6">
     <script src="/static/vendor/lottie/lottie.min.5.12.2.js?v=20260510_local_lottie"></script>
 
-    <script src="/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=20260512_modal_guard1"></script>
+    <script src="/static/js/9.category/9-2.hardware/9-2-1.server/2.server_detail.js?v=20260519_calendar_match1"></script>
 </head>
 <body>
     <!-- 공통 헤더 & 사이드바 인클루드 -->
@@ -102,7 +102,7 @@
             </div>
         </div>
     </main>
-    <script src="/static/js/blossom.js?v=20260512_modal_guard1"></script>
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
     <!-- 서버 수정 모달 (리스트 페이지와 동일한 구조/스타일) -->
     <div id="system-edit-modal" class="system-edit-modal server-edit-modal modal-overlay-full" aria-hidden="true" data-modal>
         <div class="server-edit-content">
@@ -121,117 +121,5 @@
     <!-- 메시지 모달 (alert 대체) -->
     {% include 'layouts/_message_modal.html' %}
 
-<style id="cat-hw-server-detail-modal-fix">
-#system-edit-modal .server-edit-body .form-section {
-  padding:0 36px !important;
-}
-#system-edit-modal .server-edit-body .form-grid {
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
-  gap:18px !important;
-  align-items:start !important;
-}
-#system-edit-modal .server-edit-body .form-row {
-  display:flex !important;
-  flex-direction:column !important;
-  gap:6px !important;
-  margin:0 !important;
-  min-width:0 !important;
-  width:100% !important;
-}
-#system-edit-modal .server-edit-body .form-row > label {
-  display:flex !important;
-  align-items:center !important;
-  height:18px !important;
-  min-height:18px !important;
-  margin:0 !important;
-  padding:0 !important;
-  line-height:18px !important;
-}
-#system-edit-modal .server-edit-body :is(input.form-input, select.form-input, .fk-searchable-display) {
-  width:100% !important;
-  max-width:100% !important;
-  height:46px !important;
-  min-height:46px !important;
-  line-height:20px !important;
-  margin:0 !important;
-  box-sizing:border-box !important;
-}
-#system-edit-modal .server-edit-body .fk-searchable-display {
-  line-height:46px !important;
-}
-#system-edit-modal .server-edit-body .fk-searchable-control {
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-  margin:0 !important;
-}
-#system-edit-modal .server-edit-body textarea.form-input {
-  width:100% !important;
-  max-width:100% !important;
-  min-height:160px !important;
-  margin:0 !important;
-  box-sizing:border-box !important;
-}
-#system-edit-modal .server-edit-body .form-section .form-grid + .form-row {
-  margin-top:18px !important;
-}
-</style>
-<script>
-(function(){
-  function applyModalFix(){
-    var modal = document.getElementById('system-edit-modal');
-    if(!modal) return;
-    modal.classList.add('category-detail-edit-modal');
-    modal.querySelectorAll('.server-edit-body .form-grid').forEach(function(grid){
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = 'minmax(0,1fr) minmax(0,1fr)';
-      grid.style.gap = '18px';
-      grid.style.columnGap = '18px';
-      grid.style.rowGap = '18px';
-      grid.style.alignItems = 'start';
-    });
-    modal.querySelectorAll('.server-edit-body .form-row').forEach(function(row){
-      row.style.display = 'flex';
-      row.style.flexDirection = 'column';
-      row.style.gap = '6px';
-      row.style.margin = '0';
-      row.style.width = '100%';
-      row.style.minWidth = '0';
-    });
-    modal.querySelectorAll('.server-edit-body .form-row > label').forEach(function(label){
-      label.style.height = '18px';
-      label.style.minHeight = '18px';
-      label.style.lineHeight = '18px';
-      label.style.margin = '0';
-      label.style.padding = '0';
-    });
-    modal.querySelectorAll('.server-edit-body input.form-input, .server-edit-body select.form-input, .server-edit-body .fk-searchable-display').forEach(function(field){
-      field.style.width = '100%';
-      field.style.maxWidth = '100%';
-      field.style.height = '46px';
-      field.style.minHeight = '46px';
-      field.style.margin = '0';
-      field.style.boxSizing = 'border-box';
-    });
-  }
-  function run(){
-    applyModalFix();
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
-  else run();
-  document.addEventListener('click', function(e){
-    if(e.target && e.target.closest && e.target.closest('#detail-edit-open')){
-      setTimeout(applyModalFix, 0);
-      setTimeout(applyModalFix, 150);
-      setTimeout(applyModalFix, 500);
-    }
-  }, true);
-  setInterval(function(){
-    var modal = document.getElementById('system-edit-modal');
-    if(modal && modal.classList.contains('show')) applyModalFix();
-  }, 500);
-})();
-</script>
 </body>
 </html>

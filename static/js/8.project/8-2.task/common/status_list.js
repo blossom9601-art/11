@@ -41,6 +41,8 @@
       const items = Array.isArray(json.items) ? json.items : [];
       return items.map(it => ({
         id: it.id,
+        public_id: it.public_id || '',
+        detail_url: it.detail_url || '',
         status: statusCodeToKo(it.status || it.status_label || it.status_ko),
         task_name: it.task_name || it.task_title || '',
         start_datetime: toDisplayDateTime(it.start_datetime),
@@ -101,7 +103,7 @@
               <td class="col-start" title="${sdt}">${sdt}</td>
               <td class="col-end" title="${edt}">${edt}</td>
               <td class="col-assigned" title="${owner}"><img class="avatar-img" src="${avatar}" alt="${owner}" width="24" height="24"/><span class="assignee">${owner}</span></td>
-              <td class="col-actions"><button type="button" class="btn-view" data-id="${it.id}" title="보기"><img src="/static/image/svg/list/free-icon-search.svg" alt="보기" class="icon-view"/></button></td>
+              <td class="col-actions"><button type="button" class="btn-view" data-id="${it.id}" data-url="${escapeHTML(it.detail_url || (it.public_id ? `/b/${it.public_id}` : ''))}" title="보기"><img src="/static/image/svg/list/free-icon-search.svg" alt="보기" class="icon-view"/></button></td>
           </tr>`;
         }).join('');
         tableHtml = `
@@ -200,7 +202,7 @@
       const rid = idRaw ? parseInt(String(idRaw), 10) : NaN;
       if(!Number.isFinite(rid) || rid <= 0) return;
       try{
-        const url = `/p/2.task_detail.html?id=${encodeURIComponent(rid)}`;
+        const url = btn.getAttribute('data-url') || `/b/2.task_detail.html?id=${encodeURIComponent(rid)}`;
         const w = 1100;
         const h = 900;
         const left = Math.max(0, Math.floor((window.screen.width - w) / 2));
@@ -224,7 +226,7 @@
           }, 700);
         }
       }catch(_e){
-        blsSpaNavigate(`/p/2.task_detail.html?id=${encodeURIComponent(rid)}`);
+        blsSpaNavigate(`/b/2.task_detail.html?id=${encodeURIComponent(rid)}`);
       }
     });
       });

@@ -241,7 +241,21 @@ class StateStore:
 
     def authenticate(self, agent_id: str, token: str) -> bool:
         with self.lock:
-            return bool(agent_id and token and self.agents.get(agent_id, {}).get("token") == token)
+            if not agent_id or not token:
+                return False
+            record = self.agents.get(agent_id)
+            if not isinstance(record, dict):
+                return False
+            if record.get("token") == token:
+                return True
+            if str(record.get("token_recovery_mode") or "").strip().lower() == "pending":
+                record["token"] = token
+                record["token_recovery_mode"] = "recovered"
+                record["token_recovered_at"] = local_now_iso()
+                self.save_agents()
+                logging.warning("agent token recovered agent_id=%s", agent_id)
+                return True
+            return False
 
     def touch_agent(self, agent_id: str, values: Dict[str, Any]) -> None:
         with self.lock:
@@ -326,19 +340,23 @@ class StateStore:
         row = dict(payload)
         row["agent_id"] = agent_id
         row["received_at"] = local_now_iso()
+        touch_values = {
+            "hostname": payload.get("hostname"),
+            "current_user": payload.get("current_user"),
+            "agent_version": payload.get("agent_version"),
+            "policy_version": payload.get("policy_version"),
+            "service_status": payload.get("service_status"),
+            "last_error": payload.get("last_error"),
+        }
+        ip_address = str(payload.get("ip_address") or "").strip()
+        mac_address = str(payload.get("mac_address") or "").strip()
+        if ip_address:
+            touch_values["ip_address"] = ip_address
+        if mac_address:
+            touch_values["mac_address"] = mac_address
         with self.lock:
             self.append_json_line(self.heartbeats_path, row)
-            self.touch_agent(
-                agent_id,
-                {
-                    "hostname": payload.get("hostname"),
-                    "current_user": payload.get("current_user"),
-                    "agent_version": payload.get("agent_version"),
-                    "policy_version": payload.get("policy_version"),
-                    "service_status": payload.get("service_status"),
-                    "last_error": payload.get("last_error"),
-                },
-            )
+            self.touch_agent(agent_id, touch_values)
 
     def exception_request(self, agent_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         request_id = f"exc-{uuid.uuid4().hex}"

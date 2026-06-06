@@ -150,12 +150,13 @@
     /* info */
     var infoEl = $('vr-pagination-info');
     if (infoEl) {
-      var s = (_page - 1) * _pageSize + 1;
+      var s = total ? (_page - 1) * _pageSize + 1 : 0;
       var e = Math.min(_page * _pageSize, total);
-      infoEl.textContent = total === 0 ? '0개 항목' : (s + '-' + e + ' / ' + total + '개 항목');
+      infoEl.textContent = s + '-' + e + ' / ' + total + '? ??';
     }
 
     /* buttons */
+    totalPages = Math.max(1, parseInt(totalPages, 10) || 1);
     var firstBtn = $('vr-first'), prevBtn = $('vr-prev'), nextBtn = $('vr-next'), lastBtn = $('vr-last');
     if (firstBtn) firstBtn.disabled = (_page <= 1);
     if (prevBtn) prevBtn.disabled = (_page <= 1);
@@ -174,6 +175,7 @@
 
     for (var p = startP; p <= endP; p++) {
       var btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'page-btn' + (p === _page ? ' active' : '');
       btn.textContent = p;
       btn.setAttribute('data-page', p);

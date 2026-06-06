@@ -231,6 +231,17 @@ body.modal-open .server-edit-modal .server-edit-content {
   opacity: 1;
 }
 
+.bls-management-modal-root {
+  position: relative;
+  z-index: var(--bls-modal-container-z);
+  isolation: isolate;
+}
+
+.bls-management-modal-root .server-add-modal,
+.bls-management-modal-root .server-edit-modal {
+  z-index: var(--bls-modal-container-z);
+}
+
 
 /* =========================================================================
    2. 모달 콘텐츠 컨테이너
@@ -319,8 +330,8 @@ body.modal-open .server-edit-modal .server-edit-content {
   transition: all 0.18s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   padding: 0;
-  font-size: 0;
-  line-height: 0;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .server-add-header .close-btn:hover,
@@ -1338,16 +1349,17 @@ body.modal-open .server-edit-modal .server-edit-content {
 @keyframes bls-modal-slide-up {
   from {
     transform: translate(-50%, -48%);
-    opacity: 0;
   }
   to {
     transform: translate(-50%, -50%);
-    opacity: 1;
   }
 }
 
 .server-add-modal.show .server-add-content,
 .server-edit-modal.show .server-edit-content {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
   animation: bls-modal-slide-up 0.22s ease-out;
 }
 
@@ -1568,6 +1580,81 @@ body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-e
 
 body:has(.server-detail-content) .server-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row,
 .server-edit-modal.category-detail-edit-modal.modal-overlay-full .server-edit-body .form-section .form-grid + .form-row {
+  margin-top: 18px !important;
+}
+
+/* Shared management category add/edit modals use the same field rhythm as category detail edit modals. */
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-section {
+  padding: 0 36px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 18px !important;
+  align-items: start !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-row {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-row > label {
+  display: flex !important;
+  align-items: center !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 18px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-row > :is(input.form-input, select.form-input, textarea.form-input, .fk-searchable-control),
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-row > .fk-searchable-control .fk-searchable-display {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .fk-searchable-control {
+  min-width: 0 !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body :is(input.form-input, select.form-input, .fk-searchable-display) {
+  height: 46px !important;
+  min-height: 46px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body :is(input.form-input, select.form-input) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 20px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body select.form-input {
+  padding-right: 36px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .fk-searchable-display {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 42px 0 14px !important;
+  line-height: 20px !important;
+  white-space: nowrap !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body textarea.form-input {
+  min-height: 160px !important;
+}
+
+.bls-management-modal-root .server-add-modal:is([data-modal="add"], [data-modal="edit"]) .server-add-body .form-section .form-grid + .form-row {
   margin-top: 18px !important;
 }
 

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=20260526_settings_gap1">
+    <script src="/static/js/blossom.js?v=20260531_settings_modal2" defer></script>
+    <script src="/static/js/authentication/11-3.admin/11-3-3.setting/15.agent.js?v=20260603_agent_restore3" defer></script>
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    {% set agent_policy_scope = agent_policy_scope|default('common') %}
+
+    <main class="main-content">
+        <div class="content-wrapper admin-settings-wrapper">
+            <div class="page-header">
+                <div>
+                    <h1>에이전트</h1>
+                    <p>{{ agent_policy_description|default('서버 에이전트의 수집 정책과 실행 기준을 관리합니다.') }}</p>
+                </div>
+            </div>
+
+            {% include 'authentication/11-3.admin/_settings_tabs.html' %}
+
+            <form id="agent-settings-form" class="setting-form" autocomplete="off">
+                <div class="settings-columns">
+                    {% if agent_policy_scope == 'common' %}
+                    <section class="setting-card" aria-labelledby="agent-collection-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-collection-title">수집 주기</h2>
+                                <p>에이전트가 자산 데이터를 수집하는 기본 주기를 관리합니다.</p>
+                            </div>
+                            <span class="smtp-status-badge" id="agent-settings-badge">로드 중</span>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-collect-interval">전체 수집 주기(분)</label>
+                                <input type="number" id="agent-collect-interval" name="agent.collectIntervalMinutes" class="form-input" min="1" max="1440">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-performance-interval">성능 수집 주기(분)</label>
+                                <input type="number" id="agent-performance-interval" name="agent.performanceCollectIntervalMinutes" class="form-input" min="1" max="1440">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-account-interval">계정 정보 수집 주기(분)</label>
+                                <input type="number" id="agent-account-interval" name="agent.accountCollectIntervalMinutes" class="form-input" min="1" max="1440">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-interface-interval">인터페이스 정보 수집 주기(분)</label>
+                                <input type="number" id="agent-interface-interval" name="agent.interfaceCollectIntervalMinutes" class="form-input" min="1" max="1440">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="agent-command-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-command-title">명령 정책</h2>
+                                <p>서버가 내려보내는 수집 명령의 확인 및 실행 기준을 정의합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-poll-seconds">명령 확인 주기(초)</label>
+                                <input type="number" id="agent-poll-seconds" name="agent.commandPollSeconds" class="form-input" min="5" max="3600">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-command-timeout">명령 제한 시간(초)</label>
+                                <input type="number" id="agent-command-timeout" name="agent.commandTimeoutSeconds" class="form-input" min="10" max="7200">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-retry-count">업로드 재시도 횟수</label>
+                                <input type="number" id="agent-retry-count" name="agent.uploadRetryCount" class="form-input" min="0" max="20">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-retry-delay">업로드 재시도 간격(초)</label>
+                                <input type="number" id="agent-retry-delay" name="agent.uploadRetryDelaySeconds" class="form-input" min="1" max="3600">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="agent-target-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-target-title">수집 대상</h2>
+                                <p>공통 인벤토리와 운영 현황 수집 대상을 선택합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-process-enabled">프로세스 정보 포함</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-process-enabled" name="agent.processCollectionEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-package-enabled">패키지 정보 포함</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-package-enabled" name="agent.packageCollectionEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-vulnerability-enabled">취약점 기준 정보 포함</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-vulnerability-enabled" name="agent.vulnerabilityCollectionEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-log-enabled">로그 요약 포함</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-log-enabled" name="agent.logCollectionEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="agent-retention-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-retention-title">보관 정책</h2>
+                                <p>수집 데이터와 로컬 로그의 보관 기간을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-retention-days">수집 데이터 보관 기간(일)</label>
+                                <input type="number" id="agent-retention-days" name="agent.retentionDays" class="form-input" min="1" max="3650">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-local-log-retention">로컬 로그 보관 기간(일)</label>
+                                <input type="number" id="agent-local-log-retention" name="agent.localLogRetentionDays" class="form-input" min="1" max="3650">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-payload-max">업로드 최대 크기(MB)</label>
+                                <input type="number" id="agent-payload-max" name="agent.maxPayloadMb" class="form-input" min="1" max="1024">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="agent-network-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-network-title">통신 정책</h2>
+                                <p>서버 통신, TLS 확인, 압축 업로드 기준을 설정합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-server-url">수신 서버 URL</label>
+                                <input type="text" id="agent-server-url" name="agent.serverUrl" class="form-input" placeholder="https://blossom.example.com">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-tls-verify">TLS 인증서 확인</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-tls-verify" name="agent.tlsVerifyEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-compress-upload">압축 업로드</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-compress-upload" name="agent.compressedUploadEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="agent-operation-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="agent-operation-title">운영 정책</h2>
+                                <p>하트비트, 비활성 판단, 자동 업데이트 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="agent-heartbeat">하트비트 주기(초)</label>
+                                <input type="number" id="agent-heartbeat" name="agent.heartbeatIntervalSeconds" class="form-input" min="5" max="3600">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-offline-threshold">비활성 판단 기준(분)</label>
+                                <input type="number" id="agent-offline-threshold" name="agent.offlineThresholdMinutes" class="form-input" min="1" max="10080">
+                            </div>
+                            <div class="form-row">
+                                <label for="agent-auto-update">자동 업데이트</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="agent-auto-update" name="agent.autoUpdateEnabled">
+                                    <span class="switch-track" aria-hidden="true"></span>
+                                    <span class="switch-label">사용</span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+                    {% elif agent_policy_scope == 'linux' %}
+                    <section class="setting-card" aria-labelledby="linux-runtime-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="linux-runtime-title">실행 환경</h2>
+                                <p>Linux 에이전트 서비스와 설정 파일 위치를 관리합니다.</p>
+                            </div>
+                            <span class="smtp-status-badge" id="agent-settings-badge">로드 중</span>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="linux-service-unit">Systemd Unit</label>
+                                <input type="text" id="linux-service-unit" name="agent.linux.serviceUnit" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-run-user">실행 사용자</label>
+                                <input type="text" id="linux-run-user" name="agent.linux.runUser" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-config-path">설정 파일 경로</label>
+                                <input type="text" id="linux-config-path" name="agent.linux.configPath" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-log-path">로그 경로</label>
+                                <input type="text" id="linux-log-path" name="agent.linux.logPath" class="form-input">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="linux-inventory-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="linux-inventory-title">인벤토리 정책</h2>
+                                <p>패키지, 서비스, 계정 수집 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="linux-package-enabled">패키지 정보</label>
+                                <label class="switch"><input type="checkbox" id="linux-package-enabled" name="agent.linux.collectPackageEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-package-managers">패키지 관리자</label>
+                                <input type="text" id="linux-package-managers" name="agent.linux.packageManagers" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-systemd-enabled">Systemd 서비스</label>
+                                <label class="switch"><input type="checkbox" id="linux-systemd-enabled" name="agent.linux.collectSystemdEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-account-enabled">계정 정보</label>
+                                <label class="switch"><input type="checkbox" id="linux-account-enabled" name="agent.linux.collectAccountEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="linux-network-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="linux-network-title">네트워크 정책</h2>
+                                <p>인터페이스, 리스닝 포트, 방화벽 정보 수집 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="linux-network-enabled">인터페이스 정보</label>
+                                <label class="switch"><input type="checkbox" id="linux-network-enabled" name="agent.linux.collectNetworkEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-port-enabled">리스닝 포트</label>
+                                <label class="switch"><input type="checkbox" id="linux-port-enabled" name="agent.linux.collectListeningPortsEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-firewall-enabled">방화벽 정보</label>
+                                <label class="switch"><input type="checkbox" id="linux-firewall-enabled" name="agent.linux.collectFirewallEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="linux-performance-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="linux-performance-title">성능/로그 정책</h2>
+                                <p>성능 샘플링과 시스템 로그 수집 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="linux-cpu-sample">CPU 샘플링 시간(초)</label>
+                                <input type="number" id="linux-cpu-sample" name="agent.linux.cpuSampleSeconds" class="form-input" min="1" max="300">
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-disk-enabled">디스크 사용량</label>
+                                <label class="switch"><input type="checkbox" id="linux-disk-enabled" name="agent.linux.diskUsageEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="linux-journal-enabled">Journal 로그</label>
+                                <label class="switch"><input type="checkbox" id="linux-journal-enabled" name="agent.linux.journalCollectEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                        </div>
+                    </section>
+                    {% else %}
+                    <section class="setting-card" aria-labelledby="windows-runtime-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="windows-runtime-title">실행 환경</h2>
+                                <p>Windows 에이전트 서비스와 설정 파일 위치를 관리합니다.</p>
+                            </div>
+                            <span class="smtp-status-badge" id="agent-settings-badge">로드 중</span>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="windows-service-name">서비스 이름</label>
+                                <input type="text" id="windows-service-name" name="agent.windows.serviceName" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-run-account">실행 계정</label>
+                                <input type="text" id="windows-run-account" name="agent.windows.runAccount" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-config-path">설정 파일 경로</label>
+                                <input type="text" id="windows-config-path" name="agent.windows.configPath" class="form-input">
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-log-path">로그 경로</label>
+                                <input type="text" id="windows-log-path" name="agent.windows.logPath" class="form-input">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="windows-inventory-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="windows-inventory-title">인벤토리 정책</h2>
+                                <p>소프트웨어, 로컬 사용자, 서비스 수집 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="windows-software-enabled">소프트웨어 정보</label>
+                                <label class="switch"><input type="checkbox" id="windows-software-enabled" name="agent.windows.collectSoftwareEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-users-enabled">로컬 사용자</label>
+                                <label class="switch"><input type="checkbox" id="windows-users-enabled" name="agent.windows.collectLocalUsersEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-groups-enabled">로컬 그룹</label>
+                                <label class="switch"><input type="checkbox" id="windows-groups-enabled" name="agent.windows.collectGroupsEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-services-enabled">서비스 정보</label>
+                                <label class="switch"><input type="checkbox" id="windows-services-enabled" name="agent.windows.collectServicesEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="windows-security-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="windows-security-title">보안/이벤트 정책</h2>
+                                <p>이벤트 로그와 방화벽, 작업 스케줄러 수집 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="windows-event-enabled">이벤트 로그</label>
+                                <label class="switch"><input type="checkbox" id="windows-event-enabled" name="agent.windows.collectEventLogEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-firewall-enabled">방화벽 정보</label>
+                                <label class="switch"><input type="checkbox" id="windows-firewall-enabled" name="agent.windows.collectFirewallEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-task-enabled">작업 스케줄러</label>
+                                <label class="switch"><input type="checkbox" id="windows-task-enabled" name="agent.windows.collectScheduledTasksEnabled"><span class="switch-track" aria-hidden="true"></span><span class="switch-label">사용</span></label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setting-card" aria-labelledby="windows-performance-title">
+                        <div class="setting-card-header">
+                            <div>
+                                <h2 id="windows-performance-title">성능/실행 정책</h2>
+                                <p>성능 샘플링과 WMI, PowerShell 실행 기준을 관리합니다.</p>
+                            </div>
+                        </div>
+                        <div class="form-grid single-col">
+                            <div class="form-row">
+                                <label for="windows-cpu-sample">CPU 샘플링 시간(초)</label>
+                                <input type="number" id="windows-cpu-sample" name="agent.windows.cpuSampleSeconds" class="form-input" min="1" max="300">
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-wmi-timeout">WMI 제한 시간(초)</label>
+                                <input type="number" id="windows-wmi-timeout" name="agent.windows.wmiTimeoutSeconds" class="form-input" min="5" max="600">
+                            </div>
+                            <div class="form-row">
+                                <label for="windows-powershell-path">PowerShell 경로</label>
+                                <input type="text" id="windows-powershell-path" name="agent.windows.powershellPath" class="form-input">
+                            </div>
+                        </div>
+                    </section>
+                    {% endif %}
+                </div>
+                <div class="setting-actions">
+                    <div class="action-buttons">
+                        <button type="submit" class="btn-save">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            저장
+                        </button>
+                    </div>
+                    <p class="setting-status" id="agent-settings-status">설정을 불러오는 중입니다.</p>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

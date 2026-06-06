@@ -1,0 +1,21 @@
+/* Customer page overrides. Keep rules scoped to this module. */
+.customer-page [data-col="member_name"] {
+  min-width: 170px;
+}
+
+.customer-page [data-col="customer_code"] {
+  min-width: 120px;
+}
+
+.customer-page [data-col="phone"] {
+  min-width: 130px;
+}
+
+.customer-page [data-col="address"] {
+  min-width: 240px;
+}
+
+.customer-page [data-col="line_qty"] {
+  width: 110px;
+  text-align: right;
+}

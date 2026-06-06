@@ -38,13 +38,40 @@
         if(window.flatpickr){ return Promise.resolve(); }
         return loadScript(FLATPICKR_JS).then(function(){ return loadScript(FLATPICKR_KO).catch(function(){}); });
       }
+      function ensureCategoryCalendarStyle(){
+        if(document.getElementById('cat-detail-flatpickr-style')) return;
+        var style = document.createElement('style');
+        style.id = 'cat-detail-flatpickr-style';
+        style.textContent = [
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr{border:1px solid #d5dbe4;border-radius:8px;box-shadow:0 10px 22px rgba(15,23,42,.14);padding:0;width:318px;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-months{padding:6px 8px 0;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-current-month{padding-top:3px;font-size:28px;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr span.flatpickr-weekday{font-size:13px;font-weight:700;color:#111827;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day{border-radius:0;height:38px;line-height:38px;max-width:44px;margin:0;border-color:transparent;color:#4b5563;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.prevMonthDay,#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.nextMonthDay{color:#c6ccd7;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day:hover{background:#eef2ff;border-color:transparent;color:#374151;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.today:not(.selected):not(.startRange):not(.endRange){border-top:2px solid #ef4444;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.selected,#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.startRange,#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.endRange,#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-day.selected:hover{background:#5c67e8;border-color:#5c67e8;color:#fff;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .fp-today-btn{position:absolute;right:10px;bottom:8px;border:0;border-radius:7px;background:#5c67e8;color:#fff;font-size:12px;font-weight:700;padding:5px 10px;line-height:1.1;cursor:pointer;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .fp-today-btn:hover{background:#4f58d9;}',
+          '#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-prev-month,#system-edit-modal .flatpickr-calendar.cat-detail-flatpickr .flatpickr-next-month{color:#6b7280;fill:#6b7280;}'
+        ].join('');
+        document.head.appendChild(style);
+      }
+      function applyCategoryCalendarSkin(fp){
+        var cal = fp && fp.calendarContainer;
+        if(!cal) return;
+        cal.classList.add('cat-detail-flatpickr');
+      }
       function initDatePickers(formId){
         var form = document.getElementById(formId); if(!form) return;
+        ensureCategoryCalendarStyle();
         ensureFlatpickr().then(function(){
           var startEl = form.querySelector('[name="release_date"]');
           var endEl = form.querySelector('[name="eosl"]');
           function ensureTodayButton(fp){
             var cal = fp && fp.calendarContainer; if(!cal) return;
+            applyCategoryCalendarSkin(fp);
             if(cal.querySelector('.fp-today-btn')) return;
             var btn = document.createElement('button');
             btn.type = 'button'; btn.className = 'fp-today-btn'; btn.textContent = '오늘';
@@ -54,6 +81,8 @@
           var opts = {
             locale: (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.ko) ? window.flatpickr.l10ns.ko : 'ko',
             dateFormat: 'Y-m-d', allowInput: true, disableMobile: true,
+            prevArrow: '<',
+            nextArrow: '>',
             onReady: function(sd, ds, inst){ ensureTodayButton(inst); },
             onOpen: function(sd, ds, inst){ ensureTodayButton(inst); }
           };

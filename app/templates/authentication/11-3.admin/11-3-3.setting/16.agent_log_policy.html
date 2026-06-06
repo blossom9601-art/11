@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=20260606_observe_policy1">
+    <link rel="stylesheet" href="/static/css/authentication.css?v=20260606_observe_policy1">
+    <script src="/static/js/blossom.js?v=20260606_observe_policy1" defer></script>
+    <style>
+        .agent-policy-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+        .agent-policy-card{background:#fff;border:1px solid #dfe6f2;border-radius:14px;padding:22px;box-shadow:0 16px 34px rgba(15,23,42,.05)}
+        .agent-policy-card h2{margin:0 0 8px;color:#111827;font-size:20px}.agent-policy-card p{margin:0 0 16px;color:#64748b;font-size:13px;line-height:1.55}
+        .agent-policy-list{display:grid;gap:10px}.agent-policy-item{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border:1px solid #e5ebf4;border-radius:10px;padding:12px 14px;background:#f8fafc}
+        .agent-policy-item b{display:block;color:#0f172a;font-size:13px}.agent-policy-item span{display:block;margin-top:3px;color:#64748b;font-size:12px}
+        .agent-policy-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.agent-policy-kpi{border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:#fff}.agent-policy-kpi strong{display:block;font-size:24px;color:#111827}.agent-policy-kpi span{font-size:12px;color:#64748b}
+        .agent-policy-table{width:100%;border-collapse:collapse}.agent-policy-table th,.agent-policy-table td{height:42px;border-bottom:1px solid #edf2f7;text-align:left;padding:0 12px;font-size:13px}.agent-policy-table th{color:#334155;background:#f8fafc}
+        .agent-policy-actions{display:flex;justify-content:flex-end;margin-top:18px}.agent-policy-actions .btn-save{height:36px}
+    </style>
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+    <main class="main-content">
+        <div class="content-wrapper admin-settings-wrapper">
+            <div class="page-header"><div><h1>로그 정책</h1><p>Linux/Windows 운영체제 기본 로그 수집 대상과 분석 KPI 기준을 관리합니다.</p></div></div>
+            {% include 'authentication/11-3.admin/_settings_tabs.html' %}
+            <div class="agent-policy-grid">
+                <section class="agent-policy-card">
+                    <h2>OS 기본 로그 수집</h2>
+                    <p>DB/WEB/WAS/Container/Application 로그는 별도 정책으로 분리하고, 운영체제 기본 로그만 자동 수집합니다.</p>
+                    <div class="agent-policy-list">
+                        <div class="agent-policy-item"><div><b>RHEL / Rocky / CentOS / Oracle Linux</b><span>/var/log/messages, /var/log/secure, /var/log/cron, /var/log/audit/audit.log</span></div><label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label></div>
+                        <div class="agent-policy-item"><div><b>Ubuntu</b><span>/var/log/syslog, /var/log/auth.log, /var/log/kern.log, /var/log/audit/audit.log</span></div><label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label></div>
+                        <div class="agent-policy-item"><div><b>Windows Server</b><span>Security, System, Application Event Log</span></div><label class="switch"><input type="checkbox" checked><span class="switch-track"></span></label></div>
+                    </div>
+                </section>
+                <section class="agent-policy-card">
+                    <h2>KPI 분석 기준</h2>
+                    <p>상세 페이지 분석 모달과 동일한 기준으로 로그 상태를 집계합니다.</p>
+                    <div class="agent-policy-kpis">
+                        <div class="agent-policy-kpi"><strong>7</strong><span>기본 KPI</span></div>
+                        <div class="agent-policy-kpi"><strong>8</strong><span>Severity 단계</span></div>
+                        <div class="agent-policy-kpi"><strong>4</strong><span>Linux 기본 로그</span></div>
+                        <div class="agent-policy-kpi"><strong>3</strong><span>Windows 채널</span></div>
+                    </div>
+                    <table class="agent-policy-table" style="margin-top:16px">
+                        <thead><tr><th>KPI</th><th>분석 기준</th></tr></thead>
+                        <tbody>
+                            <tr><td>전체 로그</td><td>수집된 Event Time 기준 총량</td></tr>
+                            <tr><td>Error / Warning</td><td>Severity, 메시지 키워드, Windows Event Level</td></tr>
+                            <tr><td>인증 실패</td><td>SSH 실패, sudo/su 실패, Windows 4625</td></tr>
+                            <tr><td>계정 변경</td><td>Windows 4720/4726/4738/4740, Linux audit 계정 이벤트</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+            <div class="agent-policy-actions"><button type="button" class="btn-save">저장</button></div>
+        </div>
+    </main>
+</body>
+</html>

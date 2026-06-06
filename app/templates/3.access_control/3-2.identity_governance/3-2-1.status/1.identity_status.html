@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko" translate="no">
 <head>
 	<meta charset="UTF-8">
@@ -6,12 +6,13 @@
 	<meta name="google" content="notranslate">
 	<title>blossom</title>
 	<link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
-	<link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
-	<link rel="stylesheet" href="/static/css/system.css?v=4.32">
-	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260507sshcmd2">
-	<link rel="stylesheet" href="/static/css/3.access_control/identity_governance.css?v=20260505b">
-	<script src="/static/js/blossom.js?v=20260510_isforeign_loading_fix" defer></script>
-	<script src="/static/js/3.access_control/3-2.identity_governance/3-2-1.status/1.identity_status.js?v=20260505b" defer></script>
+	<link rel="stylesheet" href="/static/css/blossom.css?v=20260530_pagination_consistency1">
+	<link rel="stylesheet" href="/static/css/system.css?v=20260528_dispose_modal1">
+	<link rel="stylesheet" href="/static/css/3.access_control/access_control.css?v=20260528_audit_table_bg1">
+	<link rel="stylesheet" href="/static/css/3.access_control/identity_governance.css?v=20260528_gov_modal_footer1">
+	<script src="/static/js/blossom.js?v=20260529_search_empty1" defer></script>
+	<script src="/static/js/3.access_control/3-2.identity_governance/3-2-1.status/1.identity_status.js?v=20260531_page_range1" defer></script>
+	<script src="/static/js/3.access_control/access-modal-tabs.js?v=20260528_access_tabs4" defer></script>
 </head>
 <body>
 	{% include 'layouts/_header.html' %}
@@ -77,7 +78,7 @@
 				</div>
 				<div id="identity-account-empty" class="identity-empty" hidden>등록된 통합계정이 없습니다.</div>
 				<div class="identity-pagination" id="identity-account-pagination">
-					<span id="identity-account-page-info">0개 항목</span>
+					<span id="identity-account-page-info">0-0 / 0개 항목</span>
 					<div class="resource-page-actions">
 						<button type="button" class="action-chip action-muted" id="identity-account-prev">이전</button>
 						<div class="resource-page-numbers" id="identity-account-page-numbers" aria-label="통합계정 페이지 번호"></div>
@@ -115,7 +116,7 @@
 				</div>
 				<div id="identity-unmapped-empty" class="identity-empty" hidden>미매핑 계정이 없습니다.</div>
 				<div class="identity-pagination" id="identity-unmapped-pagination">
-					<span id="identity-unmapped-page-info">0개 항목</span>
+					<span id="identity-unmapped-page-info">0-0 / 0개 항목</span>
 					<div class="resource-page-actions">
 						<button type="button" class="action-chip action-muted" id="identity-unmapped-prev">이전</button>
 						<div class="resource-page-numbers" id="identity-unmapped-page-numbers" aria-label="미매핑 계정 페이지 번호"></div>

@@ -1,0 +1,311 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <title>blossom</title>
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/governance.css?v=20260524-15">
+    <link rel="stylesheet" href="/static/css/governance_service_management.css?v=20260604_tabs1">
+    <script defer src="/static/js/4.governance/4-9.service_management/1.service_management.js?v=20260526_treemap_pie2"></script>
+</head>
+<body class="page-governance-service-management">
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content gov-service-root">
+        <div class="content-wrapper backup-policy-page vuln-analysis-page">
+            <div class="page-header">
+                <h1>서비스 관리</h1>
+                <p>업무 그룹 상세에서 연결할 서비스 마스터를 유형별로 관리합니다.</p>
+            </div>
+
+            <nav class="service-view-tabs" aria-label="서비스 관리 화면">
+                <button type="button" class="active" data-service-view="dashboard">대시보드</button>
+                <button type="button" data-service-view="external">외부 서비스</button>
+                <button type="button" data-service-view="integration">연계 서비스</button>
+                <button type="button" data-service-view="internal">내부 서비스</button>
+            </nav>
+
+            <section class="service-dashboard-panel active" data-service-view-panel="dashboard" aria-live="polite">
+                <div class="service-command-panel">
+                    <div>
+                        <span class="service-kicker">Enterprise Service Portfolio</span>
+                        <h2>서비스 운영 현황</h2>
+                        <p>업무 영향도, 보안 속성, 설치 영역을 한 화면에서 확인하고 서비스 마스터를 표준화합니다.</p>
+                    </div>
+                    <div class="service-command-metrics">
+                        <div><span>전체</span><strong id="service-total-count">0</strong></div>
+                        <div><span>외부</span><strong id="service-external-count">0</strong></div>
+                        <div><span>연계</span><strong id="service-integration-count">0</strong></div>
+                        <div><span>내부</span><strong id="service-internal-count">0</strong></div>
+                    </div>
+                </div>
+
+                <div class="service-enterprise-grid">
+                    <article class="service-dashboard-card">
+                        <div class="service-card-title">
+                            <span>Exposure</span>
+                            <strong>설치영역 분포</strong>
+                        </div>
+                        <div class="service-progress-list" id="service-exposure-bars"></div>
+                    </article>
+
+                    <article class="service-dashboard-card">
+                        <div class="service-card-title">
+                            <span>Continuity</span>
+                            <strong>연속성 신호</strong>
+                        </div>
+                        <div class="service-risk-list" id="service-priority-list"></div>
+                    </article>
+
+                    <article class="service-dashboard-card">
+                        <div class="service-card-title">
+                            <span>CSO</span>
+                            <strong>보안 속성 현황</strong>
+                        </div>
+                        <div class="service-pie-panel" id="service-cso-chart"></div>
+                    </article>
+
+                    <article class="service-dashboard-card">
+                        <div class="service-card-title">
+                            <span>Department</span>
+                            <strong>부서별 서비스 현황</strong>
+                        </div>
+                        <div class="service-treemap" id="service-department-treemap"></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="service-list-panel" data-service-view-panel="external">
+                <div class="tab-content single-pane service-table-pane">
+                    <div class="tab-pane active">
+                        <div class="tab-header">
+                            <div class="tab-header-left"><h2>외부 서비스 <span class="count-badge" data-service-count="external">0</span></h2></div>
+                            <div class="tab-header-right">
+                                <div class="search-container" role="search">
+                                    <div class="search-input-wrapper">
+                                        <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                                        <input type="text" class="search-input" data-service-search="external" placeholder="검색" aria-label="외부 서비스 검색" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="page-size-selector compact">
+                                    <select class="page-size-select" data-service-page-size="external" aria-label="페이지 당 행 수">
+                                        <option value="10" selected>10 개</option><option value="20">20 개</option><option value="50">50 개</option><option value="100">100 개</option>
+                                    </select>
+                                </div>
+                                <button class="header-btn" data-service-bulk-delete="external" title="삭제" aria-label="선택 행 삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon"></button>
+                                <button class="header-btn" data-service-add="external" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button>
+                            </div>
+                        </div>
+                        <div class="system-table-container server-table-container">
+                            <table class="system-data-table server-data-table" data-service-table="external">
+                                <thead><tr><th><input type="checkbox" data-service-select-all="external" aria-label="전체 선택"></th><th>서비스 이름</th><th>서비스 부서</th><th>설치 영역</th><th>망분리</th><th>보안속성</th><th>DMZ</th><th>DR 구축여부</th><th>영향도</th><th>관리</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="system-empty" data-service-empty="external" hidden role="status"><div class="empty-illustration"><img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img"></div><div class="empty-text"><h3>조회 결과가 없습니다.</h3><p>검색 조건을 변경하거나 서비스를 등록하세요.</p></div></div>
+                        <div class="modern-pagination" data-service-pagination="external"><div class="pagination-info"><span data-service-page-info="external">0개 항목</span></div><div class="pagination-controls"><button class="pagination-btn" data-page-action="first" data-page-category="external" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button><button class="pagination-btn" data-page-action="prev" data-page-category="external" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button><div class="page-numbers" data-service-page-numbers="external"></div><button class="pagination-btn" data-page-action="next" data-page-category="external" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button><button class="pagination-btn" data-page-action="last" data-page-category="external" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button></div></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="service-list-panel" data-service-view-panel="integration">
+                <div class="tab-content single-pane service-table-pane">
+                    <div class="tab-pane active">
+                        <div class="tab-header">
+                            <div class="tab-header-left"><h2>연계 서비스 <span class="count-badge" data-service-count="integration">0</span></h2></div>
+                            <div class="tab-header-right"><div class="search-container" role="search"><div class="search-input-wrapper"><img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon"><input type="text" class="search-input" data-service-search="integration" placeholder="검색" aria-label="연계 서비스 검색" autocomplete="off"></div></div><div class="page-size-selector compact"><select class="page-size-select" data-service-page-size="integration" aria-label="페이지 당 행 수"><option value="10" selected>10 개</option><option value="20">20 개</option><option value="50">50 개</option><option value="100">100 개</option></select></div><button class="header-btn" data-service-bulk-delete="integration" title="삭제" aria-label="선택 행 삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon"></button><button class="header-btn" data-service-add="integration" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button></div>
+                        </div>
+                        <div class="system-table-container server-table-container"><table class="system-data-table server-data-table" data-service-table="integration"><thead><tr><th><input type="checkbox" data-service-select-all="integration" aria-label="전체 선택"></th><th>서비스 이름</th><th>서비스 부서</th><th>설치 영역</th><th>망분리</th><th>보안속성</th><th>DMZ</th><th>DR 구축여부</th><th>영향도</th><th>관리</th></tr></thead><tbody></tbody></table></div>
+                        <div class="system-empty" data-service-empty="integration" hidden role="status"><div class="empty-illustration"><img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img"></div><div class="empty-text"><h3>조회 결과가 없습니다.</h3><p>검색 조건을 변경하거나 서비스를 등록하세요.</p></div></div>
+                        <div class="modern-pagination" data-service-pagination="integration"><div class="pagination-info"><span data-service-page-info="integration">0개 항목</span></div><div class="pagination-controls"><button class="pagination-btn" data-page-action="first" data-page-category="integration" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button><button class="pagination-btn" data-page-action="prev" data-page-category="integration" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button><div class="page-numbers" data-service-page-numbers="integration"></div><button class="pagination-btn" data-page-action="next" data-page-category="integration" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button><button class="pagination-btn" data-page-action="last" data-page-category="integration" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button></div></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="service-list-panel" data-service-view-panel="internal">
+                <div class="tab-content single-pane service-table-pane">
+                    <div class="tab-pane active">
+                        <div class="tab-header">
+                            <div class="tab-header-left"><h2>내부 서비스 <span class="count-badge" data-service-count="internal">0</span></h2></div>
+                            <div class="tab-header-right"><div class="search-container" role="search"><div class="search-input-wrapper"><img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon"><input type="text" class="search-input" data-service-search="internal" placeholder="검색" aria-label="내부 서비스 검색" autocomplete="off"></div></div><div class="page-size-selector compact"><select class="page-size-select" data-service-page-size="internal" aria-label="페이지 당 행 수"><option value="10" selected>10 개</option><option value="20">20 개</option><option value="50">50 개</option><option value="100">100 개</option></select></div><button class="header-btn" data-service-bulk-delete="internal" title="삭제" aria-label="선택 행 삭제"><img src="/static/image/svg/list/free-icon-trash.svg" alt="삭제" class="header-icon"></button><button class="header-btn" data-service-add="internal" title="추가"><img src="/static/image/svg/list/free-icon-plus.svg" alt="추가" class="header-icon"></button></div>
+                        </div>
+                        <div class="system-table-container server-table-container"><table class="system-data-table server-data-table" data-service-table="internal"><thead><tr><th><input type="checkbox" data-service-select-all="internal" aria-label="전체 선택"></th><th>서비스 이름</th><th>서비스 부서</th><th>설치 영역</th><th>망분리</th><th>보안속성</th><th>DMZ</th><th>DR 구축여부</th><th>영향도</th><th>관리</th></tr></thead><tbody></tbody></table></div>
+                        <div class="system-empty" data-service-empty="internal" hidden role="status"><div class="empty-illustration"><img src="/static/image/svg/list/free-icon-not-available.svg" alt="데이터 없음" class="empty-icon-img"></div><div class="empty-text"><h3>조회 결과가 없습니다.</h3><p>검색 조건을 변경하거나 서비스를 등록하세요.</p></div></div>
+                        <div class="modern-pagination" data-service-pagination="internal"><div class="pagination-info"><span data-service-page-info="internal">0개 항목</span></div><div class="pagination-controls"><button class="pagination-btn" data-page-action="first" data-page-category="internal" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="처음"></button><button class="pagination-btn" data-page-action="prev" data-page-category="internal" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate-90" alt="이전"></button><div class="page-numbers" data-service-page-numbers="internal"></div><button class="pagination-btn" data-page-action="next" data-page-category="internal" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="다음"></button><button class="pagination-btn" data-page-action="last" data-page-category="internal" disabled><img src="/static/image/svg/expand_more.svg" class="pagination-icon rotate--90" alt="마지막"></button></div></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    <div id="service-modal" class="service-modal-overlay" aria-hidden="true">
+        <div class="service-modal" role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
+            <header class="service-modal-header">
+                <div>
+                    <h2 id="service-modal-title">서비스 등록</h2>
+                    <p id="service-modal-subtitle">서비스 정보를 구획별로 입력합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="service-modal-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </header>
+            <nav class="service-modal-tabs" aria-label="서비스 입력 탭">
+                <button type="button" class="active" data-service-tab="basic">기본정보</button>
+                <button type="button" data-service-tab="placement">분류/소속</button>
+                <button type="button" data-service-tab="security">보안속성</button>
+                <button type="button" data-service-tab="control">보안통제</button>
+                <button type="button" data-service-tab="memo">비고</button>
+            </nav>
+            <form id="service-form" class="service-form">
+                <input type="hidden" id="service-id">
+                <section class="service-tab-panel active" data-service-panel="basic">
+                    <label>서비스 이름<input name="service_name" required placeholder="예: 고객채널 인터넷"></label>
+                    <label>서비스 상태<select name="service_status" data-search-select><option>활성</option><option>비활성</option></select></label>
+                    <label>서비스 구분<select name="service_category" data-search-select><option value="external">외부 서비스</option><option value="integration">연계 서비스</option><option value="internal">내부 서비스</option></select></label>
+                    <label class="service-field-full">서비스 설명<textarea name="service_description" rows="4" placeholder="서비스 목적과 운영 범위를 입력"></textarea></label>
+                    <label>서비스 도메인<input name="service_domain" placeholder="예: example.com"></label>
+                    <label>L4 IP<input name="l4_ip" placeholder="예: 192.168.0.10"></label>
+                </section>
+                <section class="service-tab-panel" data-service-panel="placement">
+                    <label>서비스 부서<select name="service_department" data-search-select data-dynamic-source="departments"><option value="">선택</option></select></label>
+                    <label>서비스 담당자<select name="service_manager" data-search-select data-dynamic-source="users"><option value="">선택</option></select></label>
+                    <label>설치영역<select name="install_area" data-search-select><option value="">선택</option><option>내부망</option><option>업무망</option><option>개발망</option><option>DMZ</option></select></label>
+                    <label>망분리<select name="network_separation" data-search-select><option value="">선택</option><option>물리</option><option>논리</option><option>구간</option><option>미적용</option></select></label>
+                    <label>대외기관<select name="external_link" data-search-select data-dynamic-source="customers"><option value="">선택</option></select></label>
+                </section>
+                <section class="service-tab-panel" data-service-panel="security">
+                    <div class="service-cso-guide service-field-full">
+                        <div><strong>기밀(C)</strong><span>법령상 비밀·비공개로 규정되거나 공개 시 직무수행에 지장을 주는 정보</span></div>
+                        <div><strong>민감(S)</strong><span>개인정보, 업무상 민감정보, 영업상 비밀, 로그 및 망연계 백업 등</span></div>
+                        <div><strong>공개(O)</strong><span>C/S 정보 이외의 공개 정보 또는 공개 전환 검토 대상 정보</span></div>
+                    </div>
+                    <label>기밀(C)<select name="confidential" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>민감(S)<select name="sensitive" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>공개(O)<select name="open_level" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>DMZ<select name="dmz" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>BCP 대상<select name="bcp_target" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>DR 구축여부<select name="dr_built" data-search-select><option>X</option><option>O</option></select></label>
+                    <label>영향도<select name="impact_level" data-search-select><option value="">선택</option><option>매우 높음</option><option>높음</option><option>중간</option><option>낮음</option></select></label>
+                </section>
+                <section class="service-tab-panel" data-service-panel="control">
+                    <div class="service-control-panel service-field-full">
+                        <div class="service-control-head">
+                            <strong>보안통제 항목</strong>
+                            <span>기밀(C), 민감(S), 공개(O) 선택값에 따라 적용 항목을 표시합니다.</span>
+                        </div>
+                        <div class="service-control-table">
+                            <table>
+                                <thead><tr><th>대항목</th><th>중항목</th><th>통제 ID</th><th>소항목</th><th>통제 등급</th></tr></thead>
+                                <tbody id="service-control-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="service-control-pagination">
+                            <span id="service-control-page-info">0개 항목</span>
+                            <div class="service-control-page-controls">
+                                <button type="button" class="pagination-btn" id="service-control-prev" disabled>‹</button>
+                                <div class="page-numbers" id="service-control-page-numbers"></div>
+                                <button type="button" class="pagination-btn" id="service-control-next" disabled>›</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="service-tab-panel" data-service-panel="memo">
+                    <label class="service-field-full">비고<textarea name="remark" rows="6" placeholder="운영 참고사항"></textarea></label>
+                </section>
+            </form>
+            <footer class="service-modal-actions">
+                <button type="button" class="service-secondary-btn" id="service-cancel-btn">취소</button>
+                <button type="button" class="service-primary-btn" id="service-detail-btn" hidden>상세 페이지 이동</button>
+                <button type="submit" form="service-form" class="service-primary-btn">저장</button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="service-preview-modal" class="service-preview-modal-overlay" aria-hidden="true">
+        <div class="service-preview-modal" role="dialog" aria-modal="true" aria-labelledby="service-preview-title">
+            <header class="service-preview-header">
+                <div>
+                    <h2 id="service-preview-title">서비스 정보</h2>
+                    <p id="service-preview-subtitle">서비스 마스터 주요 정보를 확인합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="service-preview-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </header>
+            <div class="service-preview-body">
+                <dl id="service-preview-dl" class="service-preview-dl"></dl>
+            </div>
+            <footer class="service-preview-actions">
+                <button type="button" class="service-primary-btn" id="service-preview-detail">상세 페이지 이동</button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="service-system-modal" class="service-system-modal-overlay" aria-hidden="true">
+        <div class="service-system-modal" role="dialog" aria-modal="true" aria-labelledby="service-system-modal-title">
+            <header class="service-system-modal-header">
+                <div>
+                    <h3 id="service-system-modal-title">시스템 선택</h3>
+                    <p>연결할 시스템을 검색하여 추가합니다.</p>
+                </div>
+                <button class="close-btn" type="button" id="service-system-close" title="닫기" aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </header>
+            <div class="service-system-modal-body">
+                <div class="search-input-wrapper service-system-search">
+                    <img src="/static/image/svg/list/free-icon-search.svg" alt="검색" class="search-icon">
+                    <input type="text" id="service-system-search-input" class="search-input" placeholder="시스템 구분, 상태, 업무 이름, 시스템 이름 검색" autocomplete="off">
+                </div>
+                <div class="service-system-result-table">
+                    <table>
+                        <thead><tr><th></th><th>시스템 구분</th><th>시스템 상태</th><th>업무 이름</th><th>시스템 이름</th><th>관리</th></tr></thead>
+                        <tbody id="service-system-results"></tbody>
+                    </table>
+                </div>
+            </div>
+            <footer class="service-system-modal-actions">
+                <button type="button" class="service-secondary-btn" id="service-system-cancel">취소</button>
+                <button type="button" class="service-primary-btn" id="service-system-apply">추가</button>
+            </footer>
+        </div>
+    </div>
+
+    <div id="service-delete-modal" class="server-add-modal system-delete-modal modal-overlay-full" aria-hidden="true">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title dispose-title">
+                    <h3>삭제</h3>
+                    <p class="server-add-subtitle" id="service-delete-subtitle">선택된 0개의 서비스를 정말 삭제하시겠습니까?</p>
+                </div>
+                <button class="close-btn" type="button" id="service-delete-close" title="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="dispose-content">
+                    <div class="dispose-text">
+                        <p>선택한 서비스 항목을 목록에서 제거합니다.</p>
+                        <p>삭제를 진행하려면 확인을 눌러주세요.</p>
+                    </div>
+                    <div class="dispose-illust">
+                        <img src="/static/image/svg/list/free-sticker-solution.svg" alt="Solution Illustration" loading="lazy">
+                    </div>
+                </div>
+            </div>
+            <div class="server-add-actions align-right">
+                <div class="action-buttons right">
+                    <button type="button" class="btn-primary" id="service-delete-confirm">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+﻿<!DOCTYPE html>
+<html lang="ko" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>blossom</title>
+    <link rel="icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="shortcut icon" type="image/png" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="apple-touch-icon" href="/static/image/svg/favicon/free-icon-bold-5090971.svg">
+    <link rel="stylesheet" href="/static/css/blossom.css?v=1.2.6">
+    <link rel="stylesheet" href="/static/css/category2.css?v=20260604_category_modal1">
+    <link rel="stylesheet" href="/static/css/shared/management-page.css?v={{ hardware_asset_version|default('20260519_empty_sticker1') }}">
+    <link rel="stylesheet" href="/static/css/shared/form-builder.css?v={{ hardware_asset_version|default('20260518_single_row_align1') }}">
+    <link rel="stylesheet" href="/static/css/modules/hardware.css?v={{ hardware_asset_version|default('20260518_single_row_align1') }}">
+</head>
+<body>
+    {% include 'layouts/_header.html' %}
+    {% include 'layouts/_sidebar.html' %}
+
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="page-header">
+                <div class="page-utility-right" data-info-key="system.{{ hardware_kind }}"></div>
+                <h1>?섎뱶?⑥뼱 愿由?/h1>
+                <p>?섎뱶?⑥뼱 ?좏삎 以?<strong>{{ hardware_list_title }}</strong>??愿由ы빀?덈떎.</p>
+            </div>
+
+            {% set tabs = [
+                ('cat_hw_dashboard', '??쒕낫??),
+                ('cat_hw_server', '?쒕쾭'),
+                ('cat_hw_storage', '?ㅽ넗由ъ?'),
+                ('cat_hw_san', 'SAN'),
+                ('cat_hw_network', '?ㅽ듃?뚰겕'),
+                ('cat_hw_security', '蹂댁븞?λ퉬'),
+            ] %}
+            <div class="system-tabs" role="tablist" aria-label="?섎뱶?⑥뼱 ?좏삎 愿由???>
+                {% for tab_key, label in tabs %}
+                    {% if current_key == tab_key %}
+                    <a class="system-tab-btn active" role="tab" aria-selected="true" href="{{ url_for('pages.blossom_hub', segment=tab_key) }}">{{ label }}</a>
+                    {% else %}
+                    <a class="system-tab-btn" role="tab" aria-selected="false" href="{{ url_for('pages.blossom_hub', segment=tab_key) }}">{{ label }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="tab-content single-pane">
+                <div class="tab-pane active" id="hardware-{{ hardware_kind }}-pane">
+                    <div id="hardware-management-root"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/blossom.js?v=20260524_spa_redirect_guard1"></script>
+    <script src="/static/js/blossom-query.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-entities.js?v=20260320"></script>
+    <script src="/static/js/blossom-query-bridge.js?v=20260320"></script>
+    <script>
+        window.__HARDWARE_DETAIL_URL = {{ url_for('pages.blossom_hub', segment=hardware_detail_key)|tojson }};
+        {% if hardware_detail_global is defined and hardware_detail_global %}
+        window[{{ hardware_detail_global|tojson }}] = window.__HARDWARE_DETAIL_URL;
+        {% endif %}
+        window.__HARDWARE_MODULE_CONTEXT__ = {
+            kind: {{ hardware_kind|tojson }},
+            label: {{ hardware_label|tojson }},
+            listTitle: {{ hardware_list_title|tojson }},
+            apiBase: {{ hardware_api_base|tojson }},
+            detailKey: {{ hardware_detail_key|tojson }},
+            detailUrl: window.__HARDWARE_DETAIL_URL,
+            storageKey: {{ hardware_storage_key|tojson }},
+            nameKey: {{ hardware_name_key|tojson }},
+            typeKey: {{ hardware_type_key|tojson }},
+            codeKey: {{ hardware_code_key|tojson }},
+            countKey: {{ hardware_count_key|tojson }},
+            typeOptions: {{ hardware_type_options|default([])|tojson }},
+            analyticsTabOrder: {{ hardware_analytics_tab_order|default([])|tojson }}
+        };
+        window.__analyticsConfig = {
+            chartType: 'stacked',
+            catField: 'hw_type',
+            typeField: 'vendor',
+            modelField: 'model',
+            tabOrder: {{ hardware_analytics_tab_order|default([])|tojson }}
+        };
+    </script>
+    <script src="/static/js/common/api-client.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/common/modal-utils.js?v={{ hardware_asset_version|default('20260518_deletealert1') }}"></script>
+    <script src="/static/js/shared/api/crud-api.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/shared/components/data-table.js?v={{ hardware_asset_version|default('20260523_row_select_sync1') }}"></script>
+    <script src="/static/js/shared/components/form-builder.js?v=20260520_model_text_fkignore1"></script>
+    <script src="/static/js/shared/components/management-page.js?v=20260520_model_text_fkignore1"></script>
+    <script src="/static/js/modules/hardware/types/hardware.typedef.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/validation/hardware.validation.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/hardware.actions.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/config/hardware.config.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/schemas/hardware.schema.js?v=20260519_model_text1"></script>
+    <script src="/static/js/modules/hardware/api/hardware.api.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/hooks/use-hardware.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+    <script src="/static/js/modules/hardware/pages/hardware.page.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+
+    <div id="system-analytics-modal" class="server-add-modal modal-overlay-full" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="analytics-title">
+        <div class="server-add-content">
+            <div class="server-add-header">
+                <div class="server-add-title">
+                    <h3 id="analytics-title">{{ hardware_list_title }} ?듦퀎 遺꾩꽍</h3>
+                    <p class="server-add-subtitle" id="analytics-subtitle">?좏삎蹂??쒖“??쨌 紐⑤뜽紐?遺꾪룷</p>
+                </div>
+                <button class="close-btn" type="button" id="system-analytics-close" title="?リ린">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+            <div class="server-add-body">
+                <div class="vendor-analytics-body">
+                    <div class="va-tab-strip" id="analytics-tab-strip"></div>
+                    <div class="va-tab-content" id="analytics-tab-content"></div>
+                    <div class="vendor-analytics-empty" id="analytics-empty" hidden>
+                        <div class="empty-text">?좊떦 ?쒖뒪???댁뿭???놁뒿?덈떎.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/_shared/list-analytics.js?v={{ hardware_asset_version|default('20260518_single_row_align1') }}"></script>
+
+    {% include 'layouts/_message_modal.html' %}
+    {% include 'layouts/_download_modal_range.html' %}
+    {% include 'layouts/_stats_modal.html' %}
+
+    <script src="/static/js/common/info-message-v2.js?v=20260413e"></script>
+</body>
+</html>

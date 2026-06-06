@@ -34,6 +34,7 @@ def test_cmp_etc_type_crud_flow(client, etc_vendor_code):
 	assert created['success'] is True
 	item = created['item']
 	assert item['model_name'] == 'HPE TPM 2.0 Kit'
+	assert item['public_id'].startswith('cmp_')
 	assert item['manufacturer_code'] == etc_vendor_code
 	assert item['part_number'] == 'P01366-B21'
 	etc_id = item['id']
@@ -48,6 +49,7 @@ def test_cmp_etc_type_crud_flow(client, etc_vendor_code):
 	assert list_resp.status_code == 200
 	listed = list_resp.get_json()
 	assert listed['total'] == 1
+	assert listed['items'][0]['public_id'] == item['public_id']
 	assert listed['items'][0]['qty'] == 12
 
 	delete_resp = client.post('/api/cmp-etc-types/bulk-delete', json={'ids': [etc_id]})
